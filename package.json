@@ -1,7 +1,8 @@
 {
+  "$schema": "https://www.schemastore.org/package.json",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd \"school portal frontend\" && npm ci && npm run build"
+    "build": "cd school-portal-frontend && npm ci && npm run build"
   }
 }
