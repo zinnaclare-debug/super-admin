@@ -10,14 +10,17 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
-            ['email' => 'admin@system.com'],
+        $user = User::updateOrCreate(
+            ['email' => 'lytebridgeprofessionalservices@gmail.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('password'),
-                'role' => 'super_admin',
+                'password' => Hash::make('12345678=TEN'),
+                'role' => User::ROLE_SUPER_ADMIN,
                 'school_id' => null,
             ]
         );
+
+        $user->is_active = true;
+        $user->save();
     }
 }

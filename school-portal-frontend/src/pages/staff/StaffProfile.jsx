@@ -19,9 +19,7 @@ export default function StaffProfile() {
     setLoading(true);
     setError("");
     try {
-      // Call backend using localhost so cookies set for domain=localhost are sent
-      const backend = "https://web-production-7ba391.up.railway.app";
-      const res = await api.get(`${backend}/api/staff/profile`);
+      const res = await api.get("/api/staff/profile");
       if (!res?.data?.data) {
         setError(res?.data?.message || "No profile data returned");
         setProfile(null);
@@ -56,8 +54,7 @@ export default function StaffProfile() {
     try {
       const formData = new FormData();
       formData.append("photo", selectedFile);
-      const backend = "https://web-production-7ba391.up.railway.app";
-      const res = await api.post(`${backend}/api/staff/profile/photo`, formData, {
+      const res = await api.post("/api/staff/profile/photo", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert("Photo uploaded successfully");

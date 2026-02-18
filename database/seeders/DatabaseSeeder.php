@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,12 +16,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::create([
-            'name' => 'Super Admin',
-            'email' => 'test@example.com',
-            'password' => bcrypt('password'),
-            'role' => 'super_admin',
-            'is_active' => true,
-        ]);
+        $user = User::updateOrCreate(
+            ['email' => 'lytebridgeprofessionalservices@gmail.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('12345678=TEN'),
+                'role' => User::ROLE_SUPER_ADMIN,
+                'school_id' => null,
+            ]
+        );
+
+        $user->is_active = true;
+        $user->save();
     }
 }
