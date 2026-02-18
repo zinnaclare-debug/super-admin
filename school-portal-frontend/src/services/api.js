@@ -58,7 +58,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: "https://web-production-7ba391.up.railway.app",
   headers: {
     "X-Requested-With": "XMLHttpRequest",
     "Accept": "application/json",
