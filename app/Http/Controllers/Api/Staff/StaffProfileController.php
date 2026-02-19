@@ -16,7 +16,11 @@ class StaffProfileController extends Controller
     public function show(Request $request)
     {
         $user = $request->user();
-        
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         if ($user->role !== 'staff') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -67,7 +71,11 @@ class StaffProfileController extends Controller
     public function uploadPhoto(Request $request)
     {
         $user = $request->user();
-        
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         if ($user->role !== 'staff') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -115,6 +123,10 @@ $path = $request->file('photo')->store(
     public function photo(Request $request)
     {
         $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
 
         if ($user->role !== 'staff') {
             return response()->json(['message' => 'Unauthorized'], 403);
