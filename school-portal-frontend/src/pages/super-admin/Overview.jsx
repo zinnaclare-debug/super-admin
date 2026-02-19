@@ -10,6 +10,7 @@ function SuperAdminSchools() {
   // ✅ STEP 1: STATE (already correct)
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
+  const [resettingAdminId, setResettingAdminId] = useState(null);
 
   const loadSchools = async () => {
     try {
@@ -81,6 +82,37 @@ function SuperAdminSchools() {
     }
   };
 
+  const resetAdminPassword = async (school) => {
+    const admin = school?.admin;
+    if (!admin?.id) {
+      alert("This school does not have an assigned admin.");
+      return;
+    }
+
+    const password = window.prompt(`Enter new password for ${admin.name}:`);
+    if (!password) return;
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
+    const confirmPassword = window.prompt("Confirm new password:");
+    if (confirmPassword !== password) {
+      alert("Passwords do not match.");
+      return;
+    }
+
+    setResettingAdminId(admin.id);
+    try {
+      await api.post(`/api/super-admin/users/${admin.id}/reset-password`, { password });
+      alert("School admin password reset successfully.");
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to reset school admin password.");
+    } finally {
+      setResettingAdminId(null);
+    }
+  };
+
   return (
     <div>
       <h1>Schools Control Panel</h1>
@@ -134,6 +166,16 @@ function SuperAdminSchools() {
                 >
                   {school.status === "active" ? "Disable" : "Enable"}
                 </button>
+
+                {school.admin && (
+                  <button
+                    style={{ marginLeft: 10 }}
+                    onClick={() => resetAdminPassword(school)}
+                    disabled={resettingAdminId === school.admin.id}
+                  >
+                    {resettingAdminId === school.admin.id ? "Resetting..." : "Reset Admin Password"}
+                  </button>
+                )}
               </td>
             </tr>
           ))}
