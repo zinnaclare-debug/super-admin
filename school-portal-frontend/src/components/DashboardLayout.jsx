@@ -132,6 +132,7 @@ function DashboardLayout() {
       "virtual class": "virtual-class",
       "question bank": "question-bank",
       "school fees": "school-fees",
+      subjects: "subjects",
       cbt: "cbt",
       attendance: "attendance",
       "behaviour rating": "behaviour-rating",
@@ -147,9 +148,12 @@ function DashboardLayout() {
       <aside
         style={{
           width: 240,
+          height: "100vh",
           background: "#1f2937",
           color: "#fff",
           padding: 20,
+          overflowY: "auto",
+          overflowX: "hidden",
         }}
       >
         <h3>Welcome, {user?.name}</h3>

@@ -45,8 +45,6 @@ export default function StudentCBTHome() {
 
   return (
     <div>
-      <h2>CBT</h2>
-
       {loading ? (
         <p>Loading...</p>
       ) : exams.length === 0 ? (

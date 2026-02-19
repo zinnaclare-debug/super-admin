@@ -60,9 +60,7 @@ export default function ClassTermStudents() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Enrolled Students</h2>
         <div>
-          <button onClick={() => navigate(-1)}>Back</button>
           <button onClick={() => navigate(`/school/admin/classes/${classId}/terms/${termId}/enroll`)} style={{ marginLeft: 8 }}>
             Open Enroll Table
           </button>

@@ -89,13 +89,13 @@ export default function AcademicSessionDetails() {
         }}
       >
         <strong>{schoolName}</strong>
-        <button onClick={() => navigate(-1)}>← Back</button>
+
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <h2 style={{ margin: "8px 0" }}>
+        <p style={{ margin: "8px 0", fontWeight: 700 }}>
           {session?.session_name || session?.academic_year || "Academic Session"}
-        </h2>
+        </p>
         <p style={{ marginTop: 0, opacity: 0.75 }}>
           Status: <strong>{session?.status || "N/A"}</strong>
         </p>

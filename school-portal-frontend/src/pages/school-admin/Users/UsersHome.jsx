@@ -15,7 +15,6 @@ export default function UsersHome() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <h2 style={{ margin: 0 }}>Users</h2>
         <span style={{ opacity: 0.7, fontSize: 13 }}>
           Select a user type to manage.
         </span>

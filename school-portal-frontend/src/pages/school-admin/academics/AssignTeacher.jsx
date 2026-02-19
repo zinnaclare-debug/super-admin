@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 
 export default function AssignTeacher() {
   const { classId } = useParams();
-  const navigate = useNavigate();
 
   const [teachers, setTeachers] = useState([]);
   const [teacherId, setTeacherId] = useState("");
@@ -61,8 +60,6 @@ export default function AssignTeacher() {
     <div>
       {/* Navbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Assign Class Teacher</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
       </div>
 
       {loading ? (

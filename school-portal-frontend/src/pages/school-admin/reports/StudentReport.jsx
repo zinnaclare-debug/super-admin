@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 
+const isMissingCurrentSessionTerm = (message = "") =>
+  String(message).toLowerCase().includes("no current academic session/term configured");
+
 export default function StudentReport() {
   const [rows, setRows] = useState([]);
   const [context, setContext] = useState(null);
   const [termId, setTermId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sessionConfigError, setSessionConfigError] = useState("");
 
   const schoolName = useMemo(() => {
     const u = JSON.parse(localStorage.getItem("user") || "null");
@@ -18,10 +22,16 @@ export default function StudentReport() {
       const params = {};
       if (selectedTermId) params.term_id = selectedTermId;
       const res = await api.get("/api/school-admin/reports/student", { params });
+      setSessionConfigError("");
       setRows(res.data?.data || []);
       setContext(res.data?.context || null);
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to load student report.");
+      const message = e?.response?.data?.message || "Failed to load student report.";
+      if (isMissingCurrentSessionTerm(message)) {
+        setSessionConfigError(message);
+      } else {
+        alert(message);
+      }
       setRows([]);
       setContext(null);
     } finally {
@@ -37,7 +47,9 @@ export default function StudentReport() {
 
   return (
     <div>
-      <h2>Student Report</h2>
+      {sessionConfigError ? (
+        <p style={{ marginTop: 10, color: "#b45309" }}>{sessionConfigError}</p>
+      ) : null}
       <p style={{ marginTop: 6, opacity: 0.8 }}>
         {schoolName} | Session:{" "}
         {context?.current_session?.session_name || context?.current_session?.academic_year || "-"}
@@ -102,4 +114,3 @@ export default function StudentReport() {
     </div>
   );
 }
-

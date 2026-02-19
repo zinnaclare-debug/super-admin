@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
-import { useNavigate } from "react-router-dom";
 
 export default function StudentELibrary() {
-  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,11 +21,6 @@ export default function StudentELibrary() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>E-Library</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
-
       {loading ? (
         <p>Loading...</p>
       ) : (

@@ -101,8 +101,6 @@ export default function StudentResultsHome() {
 
   return (
     <div>
-      <h2>Results</h2>
-
       {loadingClasses ? (
         <p>Loading assigned classes...</p>
       ) : classes.length === 0 ? (

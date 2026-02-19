@@ -6,6 +6,7 @@ return [
         [ 'key' => 'attendance', 'label' => 'Attendance', 'category' => 'general' ],
         [ 'key' => 'results', 'label' => 'Results', 'category' => 'general' ],
         [ 'key' => 'profile', 'label' => 'Student Profiles', 'category' => 'general' ],
+        [ 'key' => 'subjects', 'label' => 'Subjects', 'category' => 'general' ],
         [ 'key' => 'topics', 'label' => 'Topics', 'category' => 'general' ],
         [ 'key' => 'e-library', 'label' => 'E-Library', 'category' => 'general' ],
         [ 'key' => 'class activities', 'label' => 'Class Activities', 'category' => 'general' ],

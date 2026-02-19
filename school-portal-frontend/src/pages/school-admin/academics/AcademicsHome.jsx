@@ -41,7 +41,6 @@ export default function AcademicsHome() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0 }}>Academics (Courses)</h2>
           <p style={{ marginTop: 6, opacity: 0.75 }}>
             Session: <strong>{data.session?.session_name}</strong>
           </p>

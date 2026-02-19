@@ -28,7 +28,6 @@ export default function AcademicSessions() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Academic Sessions</h2>
         <button onClick={() => navigate('/school/admin/academic_session/manage')}>
           + Create Session
         </button>

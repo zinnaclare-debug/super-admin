@@ -48,12 +48,6 @@ export default function EnrollStudents() {
 
   return (
     <div>
-      {/* Navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Enroll Students</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
-
       <div style={{ marginTop: 12 }}>
         <input
           value={search}

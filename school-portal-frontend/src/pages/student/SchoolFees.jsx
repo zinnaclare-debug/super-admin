@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 
 export default function StudentSchoolFees() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
@@ -95,11 +94,6 @@ export default function StudentSchoolFees() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>School Fees</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
-
       {loading ? (
         <p>Loading school fees...</p>
       ) : error ? (

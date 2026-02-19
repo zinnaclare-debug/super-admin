@@ -51,8 +51,6 @@ export default function StudentClassActivitiesHome() {
 
   return (
     <div>
-      <h2>Class Activities</h2>
-
       {loading ? (
         <p>Loading...</p>
       ) : subjects.length === 0 ? (

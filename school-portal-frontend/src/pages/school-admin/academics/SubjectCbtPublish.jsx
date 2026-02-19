@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 
 export default function SubjectCbtPublish() {
-  const navigate = useNavigate();
   const { classId, termId, subjectId } = useParams();
 
   const [meta, setMeta] = useState(null);
@@ -50,14 +49,12 @@ export default function SubjectCbtPublish() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0 }}>Publish CBT Exams</h2>
           <p style={{ marginTop: 6, opacity: 0.75 }}>
             {meta
               ? `${meta.subject_name} • ${meta.class_name} (${String(meta.class_level || "").toUpperCase()}) • ${meta.term_name}`
               : "Loading subject info..."}
           </p>
         </div>
-        <button onClick={() => navigate(-1)}>Back</button>
       </div>
 
       {loading ? (

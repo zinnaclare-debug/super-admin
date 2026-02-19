@@ -17,6 +17,7 @@ return [
     'student' => [
         'results',
         'profile',
+        'subjects',
         'topics',
         'e-library',
         'class activities',

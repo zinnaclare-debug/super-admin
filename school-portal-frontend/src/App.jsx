@@ -41,6 +41,7 @@ import SchoolAdminPayments from "./pages/school-admin/Payments";
 import Promotion from "./pages/school-admin/Promotion";
 import TeacherReport from "./pages/school-admin/reports/TeacherReport";
 import StudentReport from "./pages/school-admin/reports/StudentReport";
+import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
 
 
@@ -72,6 +73,8 @@ import StudentClassActivitiesHome from "./pages/student/class-activities/ClassAc
 import StudentVirtualClassHome from "./pages/student/virtual-class/VirtualClassHome";
 import StudentCBTHome from "./pages/student/cbt/CBTHome";
 import StudentSchoolFees from "./pages/student/SchoolFees";
+import StudentSubjectsHome from "./pages/student/subjects/SubjectsHome";
+import StudentFeatureLayout from "./pages/student/StudentFeatureLayout";
 
 
 
@@ -114,6 +117,7 @@ function App() {
         <Route path="dashboard" element={<SchoolDashboard />} />
         <Route path="features" element={<SchoolFeatures />} />
 
+        <Route element={<SchoolAdminFeatureLayout />}>
         {/* Admin Features */}
         <Route path="admin/register" element={<Register />} />
 
@@ -155,6 +159,7 @@ function App() {
         <Route path="admin/promotion" element={<Promotion />} />
         <Route path="admin/teacher_report" element={<TeacherReport />} />
         <Route path="admin/student_report" element={<StudentReport />} />
+        </Route>
 
       </Route>
 
@@ -193,16 +198,20 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<StudentDashboard />} />
-        <Route path="results" element={<StudentResultsHome />} />
-        <Route path="profile" element={<StudentProfile />} />
-        <Route path="topics" element={<StudentTopicsHome />} />
-        <Route path="e-library" element={<StudentELibrary />} />
-        <Route path="class-activities" element={<StudentClassActivitiesHome />} />
-        <Route path="virtual-class" element={<StudentVirtualClassHome />} />
-        <Route path="cbt" element={<StudentCBTHome />} />
-        <Route path="school-fees" element={<StudentSchoolFees />} />
-        <Route path=":featureKey" element={<FeaturePage />} />
+        <Route element={<StudentFeatureLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="results" element={<StudentResultsHome />} />
+          <Route path="profile" element={<StudentProfile />} />
+          <Route path="subjects" element={<StudentSubjectsHome />} />
+          <Route path="topics" element={<StudentTopicsHome />} />
+          <Route path="e-library" element={<StudentELibrary />} />
+          <Route path="class-activities" element={<StudentClassActivitiesHome />} />
+          <Route path="virtual-class" element={<StudentVirtualClassHome />} />
+          <Route path="cbt" element={<StudentCBTHome />} />
+          <Route path="school-fees" element={<StudentSchoolFees />} />
+          <Route path=":featureKey" element={<FeaturePage />} />
+        </Route>
 
       </Route>
 

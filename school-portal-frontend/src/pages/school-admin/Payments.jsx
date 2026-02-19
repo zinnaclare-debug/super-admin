@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 
+const isMissingCurrentSessionTerm = (message = "") =>
+  String(message).toLowerCase().includes("no current academic session/term configured");
+
 export default function SchoolAdminPayments() {
   const [configLoading, setConfigLoading] = useState(true);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
   const [amountDue, setAmountDue] = useState("");
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [context, setContext] = useState(null);
+  const [sessionConfigError, setSessionConfigError] = useState("");
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -18,20 +23,34 @@ export default function SchoolAdminPayments() {
     try {
       const res = await api.get("/api/school-admin/payments/config");
       const data = res.data?.data || null;
+      setSessionConfigError("");
       setContext(data);
       setAmountDue(String(data?.amount_due ?? ""));
       setPaystackSubaccountCode(String(data?.paystack_subaccount_code ?? ""));
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to load payment config.");
+      const message = e?.response?.data?.message || "Failed to load payment config.";
+      if (isMissingCurrentSessionTerm(message)) {
+        setSessionConfigError(message);
+      } else {
+        alert(message);
+      }
       setContext(null);
       setAmountDue("");
       setPaystackSubaccountCode("");
     } finally {
       setConfigLoading(false);
+      setConfigLoaded(true);
     }
   };
 
   const loadPayments = async () => {
+    if (sessionConfigError) {
+      setRows([]);
+      setMeta(null);
+      setTableLoading(false);
+      return;
+    }
+
     setTableLoading(true);
     try {
       const res = await api.get("/api/school-admin/payments", { params: { search, page } });
@@ -39,7 +58,12 @@ export default function SchoolAdminPayments() {
       setMeta(res.data?.meta || null);
       if (res.data?.context) setContext((prev) => ({ ...(prev || {}), ...res.data.context }));
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to load payments.");
+      const message = e?.response?.data?.message || "Failed to load payments.";
+      if (isMissingCurrentSessionTerm(message)) {
+        setSessionConfigError(message);
+      } else {
+        alert(message);
+      }
       setRows([]);
       setMeta(null);
     } finally {
@@ -52,8 +76,9 @@ export default function SchoolAdminPayments() {
   }, []);
 
   useEffect(() => {
+    if (!configLoaded || sessionConfigError) return;
     loadPayments();
-  }, [search, page]);
+  }, [configLoaded, search, page, sessionConfigError]);
 
   const saveConfig = async () => {
     const amount = Number(amountDue);
@@ -79,7 +104,9 @@ export default function SchoolAdminPayments() {
 
   return (
     <div>
-      <h2>Payments</h2>
+      {sessionConfigError ? (
+        <p style={{ marginTop: 10, color: "#b45309" }}>{sessionConfigError}</p>
+      ) : null}
 
       {configLoading ? (
         <p>Loading fee setup...</p>

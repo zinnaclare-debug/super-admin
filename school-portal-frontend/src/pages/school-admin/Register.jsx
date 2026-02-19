@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 
@@ -223,15 +223,8 @@ export default function Register() {
     }
   };
 
-  const schoolName = useMemo(() => {
-    const u = JSON.parse(localStorage.getItem("user") || "null");
-    return u?.school?.name || u?.school_name || "Registration Portal";
-  }, []);
-
   return (
     <div style={{ maxWidth: 720 }}>
-      <h2>{schoolName}</h2>
-      <h3 style={{ marginTop: 8 }}>{isEditMode ? "Edit User" : "Register User"}</h3>
       {isEditMode && username && (
         <p style={{ marginTop: 4, opacity: 0.75 }}>
           Username: <strong>{username}</strong>

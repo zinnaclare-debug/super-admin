@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 
 export default function TermCourses() {
   const { classId, termId } = useParams();
-  const navigate = useNavigate();
 
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +58,6 @@ export default function TermCourses() {
 
   return (
     <div>
-      {/* Navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Term Courses</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
-
       {loading ? (
         <p>Loading courses...</p>
       ) : (

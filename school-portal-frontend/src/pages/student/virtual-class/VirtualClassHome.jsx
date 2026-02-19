@@ -51,8 +51,6 @@ export default function StudentVirtualClassHome() {
 
   return (
     <div>
-      <h2>Virtual Class</h2>
-
       {loading ? (
         <p>Loading...</p>
       ) : subjects.length === 0 ? (

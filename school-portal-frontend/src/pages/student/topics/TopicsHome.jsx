@@ -51,8 +51,6 @@ export default function StudentTopicsHome() {
 
   return (
     <div>
-      <h2>Topics</h2>
-
       {loading ? (
         <p>Loading...</p>
       ) : subjects.length === 0 ? (

@@ -98,8 +98,6 @@ export default function ClassSubjects() {
     <div>
       {/* navbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>{cls?.name || "Class Subjects"}</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
       </div>
 
       {/* term selector */}

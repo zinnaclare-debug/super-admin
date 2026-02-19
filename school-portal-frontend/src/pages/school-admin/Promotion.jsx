@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 
+const isMissingCurrentSessionTerm = (message = "") =>
+  String(message).toLowerCase().includes("no current academic session/term configured");
+
 export default function Promotion() {
   const [levels, setLevels] = useState([]);
   const [session, setSession] = useState(null);
   const [term, setTerm] = useState(null);
   const [loadingLevels, setLoadingLevels] = useState(true);
+  const [sessionConfigError, setSessionConfigError] = useState("");
 
   const [selectedClass, setSelectedClass] = useState(null);
   const [students, setStudents] = useState([]);
@@ -23,11 +27,17 @@ export default function Promotion() {
     try {
       const res = await api.get("/api/school-admin/promotion/classes");
       const data = res.data?.data || {};
+      setSessionConfigError("");
       setLevels(data.levels || []);
       setSession(data.current_session || null);
       setTerm(data.current_term || null);
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to load classes for promotion.");
+      const message = e?.response?.data?.message || "Failed to load classes for promotion.";
+      if (isMissingCurrentSessionTerm(message)) {
+        setSessionConfigError(message);
+      } else {
+        alert(message);
+      }
       setLevels([]);
       setSession(null);
       setTerm(null);
@@ -76,7 +86,9 @@ export default function Promotion() {
 
   return (
     <div>
-      <h2>Promotion</h2>
+      {sessionConfigError ? (
+        <p style={{ marginTop: 10, color: "#b45309" }}>{sessionConfigError}</p>
+      ) : null}
       <p style={{ marginTop: 6, opacity: 0.8 }}>
         {schoolName} | Session: {session?.session_name || session?.academic_year || "-"} | Term:{" "}
         {term?.name || "-"}
@@ -169,4 +181,3 @@ export default function Promotion() {
     </div>
   );
 }
-

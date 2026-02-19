@@ -217,7 +217,6 @@ export default function AcademicSession() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0 }}>Academic Session</h2>
           <p style={{ marginTop: 6, opacity: 0.75 }}>
             Manage school academic years and set a single current session.
           </p>

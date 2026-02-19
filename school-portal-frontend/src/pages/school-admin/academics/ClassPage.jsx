@@ -34,8 +34,6 @@ export default function ClassPage() {
     <div>
       {/* Navbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>{cls?.name || "Class"}</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
       </div>
 
       {/* Actions */}
