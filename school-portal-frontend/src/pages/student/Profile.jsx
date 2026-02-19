@@ -24,9 +24,25 @@ export default function StudentProfile() {
 
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
-    if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+
     const base = (api.defaults.baseURL || "").replace(/\/$/, "");
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+    const apiOrigin = base ? new URL(base).origin : window.location.origin;
+
+    if (/^(blob:|data:)/i.test(url)) return url;
+
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname.startsWith("/storage/")) {
+          return `${apiOrigin}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        return url;
+      }
+      return url;
+    }
+
+    return `${apiOrigin}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   const user = profile?.user || {};
@@ -36,7 +52,11 @@ export default function StudentProfile() {
   const currentTerm = profile?.current_term || null;
   const currentClass = profile?.current_class || null;
   const currentDepartment = profile?.current_department || null;
-  const photoUrl = toAbsoluteUrl(profile?.photo_url || "");
+  const rawPhotoUrl =
+    profile?.photo_url ||
+    (profile?.photo_path ? `/storage/${profile.photo_path}` : "") ||
+    (student?.photo_path ? `/storage/${student.photo_path}` : "");
+  const photoUrl = toAbsoluteUrl(rawPhotoUrl);
 
   return (
     <div>

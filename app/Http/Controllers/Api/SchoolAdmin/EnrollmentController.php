@@ -86,7 +86,19 @@ class EnrollmentController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($rows, $class, $term, $schoolId) {
+        $sessionTermIds = Term::where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($sessionTermIds)) {
+            return response()->json(['message' => 'No terms found for this class session'], 422);
+        }
+
+        return DB::transaction(function () use ($rows, $class, $schoolId, $sessionTermIds) {
 
             $inserted = [];
             $skippedDuplicates = [];
@@ -110,7 +122,6 @@ class EnrollmentController extends Controller
                 if ($this->hasDuplicateNameOrEmailEnrollment(
                     $schoolId,
                     (int) $class->academic_session_id,
-                    (int) $term->id,
                     (int) $student->id,
                     (string) $studentUser->name,
                     $studentUser->email
@@ -119,35 +130,48 @@ class EnrollmentController extends Controller
                         'student_id' => (int) $student->id,
                         'name' => $studentUser->name,
                         'email' => $studentUser->email,
-                        'reason' => 'Name or email already enrolled in this session and term',
+                        'reason' => 'Name or email already enrolled in this session',
                     ];
                     continue;
                 }
 
-                // prevent duplicate enrollment
-                $exists = Enrollment::where([
-                    'student_id' => $studentId,
+                DB::table('class_students')->updateOrInsert([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $class->academic_session_id,
                     'class_id' => $class->id,
-                    'term_id' => $term->id,
-                ])->exists();
-
-                if ($exists) continue;
-
-                $enrollmentData = [
                     'student_id' => $studentId,
-                    'class_id' => $class->id,
-                    'term_id' => $term->id,
-                    'department_id' => $departmentId,
-                ];
-                if (Schema::hasColumn('enrollments', 'school_id')) {
-                    $enrollmentData['school_id'] = $schoolId;
+                ], [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]);
+
+                foreach ($sessionTermIds as $sessionTermId) {
+                    $exists = Enrollment::where([
+                        'student_id' => $studentId,
+                        'class_id' => $class->id,
+                        'term_id' => $sessionTermId,
+                    ])->exists();
+
+                    if ($exists) {
+                        continue;
+                    }
+
+                    $enrollmentData = [
+                        'student_id' => $studentId,
+                        'class_id' => $class->id,
+                        'term_id' => $sessionTermId,
+                        'department_id' => $departmentId,
+                    ];
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $enrollmentData['school_id'] = $schoolId;
+                    }
+
+                    $inserted[] = Enrollment::create($enrollmentData);
                 }
-
-                $inserted[] = Enrollment::create($enrollmentData);
             }
 
             return response()->json([
-                'message' => 'Enrollment completed',
+                'message' => 'Enrollment completed for all terms in this session',
                 'count' => count($inserted),
                 'skipped_duplicates' => $skippedDuplicates,
                 'data' => $inserted
@@ -248,13 +272,37 @@ class EnrollmentController extends Controller
             'enrollment_ids.*' => 'integer|exists:enrollments,id',
         ]);
 
-        $deleted = Enrollment::whereIn('id', $data['enrollment_ids'])
+        $studentIds = Enrollment::whereIn('id', $data['enrollment_ids'])
             ->where('class_id', $class->id)
             ->where('term_id', $term->id)
-            ->delete();
+            ->pluck('student_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $sessionTermIds = Term::where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->pluck('id')
+            ->all();
+
+        $deleted = empty($studentIds)
+            ? 0
+            : Enrollment::where('class_id', $class->id)
+                ->whereIn('term_id', $sessionTermIds)
+                ->whereIn('student_id', $studentIds)
+                ->delete();
+
+        if (!empty($studentIds)) {
+            DB::table('class_students')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $class->academic_session_id)
+                ->where('class_id', $class->id)
+                ->whereIn('student_id', $studentIds)
+                ->delete();
+        }
 
         return response()->json([
-            'message' => 'Students unenrolled',
+            'message' => 'Students unenrolled for this class session',
             'count' => $deleted
         ]);
     }
@@ -278,7 +326,6 @@ class EnrollmentController extends Controller
     private function hasDuplicateNameOrEmailEnrollment(
         int $schoolId,
         int $academicSessionId,
-        int $termId,
         int $excludeStudentId,
         string $name,
         ?string $email
@@ -288,7 +335,6 @@ class EnrollmentController extends Controller
             ->join('users as u', 'u.id', '=', 's.user_id')
             ->join('classes as c', 'c.id', '=', 'enrollments.class_id')
             ->where('s.school_id', $schoolId)
-            ->where('enrollments.term_id', $termId)
             ->where('c.academic_session_id', $academicSessionId)
             ->where('s.id', '!=', $excludeStudentId)
             ->where(function ($sub) use ($name, $email) {

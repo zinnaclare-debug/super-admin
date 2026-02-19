@@ -17,9 +17,11 @@ class ProfileController extends Controller
             ->where('school_id', $user->school_id)
             ->first();
 
+        $photoPath = $staff?->photo_path ?: $user->photo_path;
+
         $photoUrl = null;
-        if ($staff && $staff->photo_path) {
-            $relativeOrAbsolute = Storage::disk('public')->url($staff->photo_path);
+        if ($photoPath) {
+            $relativeOrAbsolute = Storage::disk('public')->url($photoPath);
             $photoUrl = str_starts_with($relativeOrAbsolute, 'http://')
                 || str_starts_with($relativeOrAbsolute, 'https://')
                 ? $relativeOrAbsolute

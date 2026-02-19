@@ -56,6 +56,15 @@ class FeatureAccessController extends Controller
 
         $final = array_values(array_intersect($enabled, $allowed));
 
+        // Keep Subjects visible when any subject-dependent feature is enabled.
+        if (!in_array('subjects', $final, true)) {
+            $subjectDependent = ['topics', 'e-library', 'class activities', 'virtual class', 'cbt'];
+            $hasDependent = count(array_intersect($final, $subjectDependent)) > 0;
+            if ($hasDependent && in_array('subjects', $allowed, true)) {
+                $final[] = 'subjects';
+            }
+        }
+
         if ($school && !$school->results_published) {
             $final = array_values(array_filter($final, fn ($feature) => $feature !== 'results'));
         }

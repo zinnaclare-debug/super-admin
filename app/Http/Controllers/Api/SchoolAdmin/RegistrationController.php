@@ -88,6 +88,7 @@ class RegistrationController extends Controller
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email, // can be null for student
+            'photo_path' => $photoPath,
             'password' => Hash::make($request->password),
             'role' => $request->role,
         ]);
@@ -183,6 +184,7 @@ class RegistrationController extends Controller
             'name' => $request->name,
             'username' => $username,
             'email' => $request->email, // ✅ fixed
+            'photo_path' => $photoPath,
             'password' => Hash::make($request->password),
             'role' => $request->role,
         ]);

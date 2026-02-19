@@ -10,6 +10,7 @@ use App\Models\Term;
 use App\Models\TermSubject;
 use App\Models\VirtualClass;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class VirtualClassesController extends Controller
@@ -30,6 +31,35 @@ class VirtualClassesController extends Controller
             ->first();
 
         return $fallback ? (int)$fallback->id : null;
+    }
+
+    private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId, int $currentTermId): array
+    {
+        $classIds = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('student_id', $studentId)
+            ->pluck('class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (!empty($classIds)) {
+            return $classIds;
+        }
+
+        $enrollQuery = Enrollment::query()
+            ->where('student_id', $studentId)
+            ->where('term_id', $currentTermId);
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollQuery->where('school_id', $schoolId);
+        }
+
+        return $enrollQuery
+            ->pluck('class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function allowedTermSubjectIds(Request $request): array
@@ -57,26 +87,13 @@ class VirtualClassesController extends Controller
         $student = Student::where('user_id', $user->id)->where('school_id', $schoolId)->first();
         if (!$student) return response()->json(['data' => []]);
 
-        $enrollQuery = Enrollment::query()
-            ->where('student_id', $student->id)
-            ->where('term_id', $currentTermId);
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $enrollQuery->where('school_id', $schoolId);
-        }
-        $enrollments = $enrollQuery->get(['class_id', 'term_id']);
-        if ($enrollments->isEmpty()) return response()->json(['data' => []]);
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id, $currentTermId);
+        if (empty($classIds)) return response()->json(['data' => []]);
 
         $rows = TermSubject::query()
             ->where('term_subjects.school_id', $schoolId)
             ->where('term_subjects.term_id', $currentTermId)
-            ->where(function ($q) use ($enrollments) {
-                foreach ($enrollments as $e) {
-                    $q->orWhere(function ($qq) use ($e) {
-                        $qq->where('term_subjects.class_id', $e->class_id)
-                            ->where('term_subjects.term_id', $e->term_id);
-                    });
-                }
-            })
+            ->whereIn('term_subjects.class_id', $classIds)
             ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
             ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
             ->join('terms', 'terms.id', '=', 'term_subjects.term_id')

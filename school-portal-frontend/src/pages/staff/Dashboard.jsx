@@ -10,10 +10,25 @@ export default function StaffDashboard() {
 
   const toAbsoluteUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+
     const base = (api.defaults.baseURL || "").replace(/\/$/, "");
-    if (!base) return url;
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+    const apiOrigin = base ? new URL(base).origin : window.location.origin;
+
+    if (/^(blob:|data:)/i.test(url)) return url;
+
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname.startsWith("/storage/")) {
+          return `${apiOrigin}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        return url;
+      }
+      return url;
+    }
+
+    return `${apiOrigin}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   useEffect(() => {

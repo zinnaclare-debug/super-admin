@@ -37,9 +37,11 @@ class StaffProfileController extends Controller
             ->select('id', 'name', 'level', 'academic_session_id')
             ->get();
 
+        $photoPath = $staffProfile->photo_path ?: $user->photo_path;
+
         $photoUrl = null;
-        if ($staffProfile->photo_path) {
-            $photoUrl = $this->publicUrl($request, $staffProfile->photo_path);
+        if ($photoPath) {
+            $photoUrl = $this->publicUrl($request, $photoPath);
         }
 
         return response()->json([
@@ -56,7 +58,7 @@ class StaffProfileController extends Controller
                     'address' => $staffProfile->address,
                     'position' => $staffProfile->position,
                     'education_level' => $staffProfile->education_level,
-                    'photo_path' => $staffProfile->photo_path,
+                    'photo_path' => $photoPath,
                     'photo_url' => $photoUrl,
                 ],
                 'classes' => $classes,
@@ -90,10 +92,7 @@ class StaffProfileController extends Controller
             return response()->json(['message' => 'Staff profile not found'], 404);
         }
 
-        // Delete old photo if exists
-        if ($staffProfile->photo_path && Storage::disk('public')->exists($staffProfile->photo_path)) {
-            Storage::disk('public')->delete($staffProfile->photo_path);
-        }
+        $oldPath = $staffProfile->photo_path ?: $user->photo_path;
 
         // Store new photo
        $schoolId = $user->school_id;
@@ -104,6 +103,12 @@ $path = $request->file('photo')->store(
 );
 
         $staffProfile->update(['photo_path' => $path]);
+        $user->photo_path = $path;
+        $user->save();
+
+        if ($oldPath && $oldPath !== $path && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
 
         $photoUrl = $this->publicUrl($request, $path);
 
@@ -133,15 +138,17 @@ $path = $request->file('photo')->store(
         }
 
         $staffProfile = $user->staffProfile;
-        if (!$staffProfile || !$staffProfile->photo_path) {
+        $photoPath = $staffProfile?->photo_path ?: $user->photo_path;
+
+        if (!$photoPath) {
             return response()->json(['message' => 'Photo not found'], 404);
         }
 
-        if (!Storage::disk('public')->exists($staffProfile->photo_path)) {
+        if (!Storage::disk('public')->exists($photoPath)) {
             return response()->json(['message' => 'Photo file missing'], 404);
         }
 
-        $fullPath = Storage::disk('public')->path($staffProfile->photo_path);
+        $fullPath = Storage::disk('public')->path($photoPath);
         $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
 
         return response()->file($fullPath, [

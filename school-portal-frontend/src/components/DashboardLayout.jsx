@@ -141,6 +141,8 @@ function DashboardLayout() {
   };
 
   const featureLabel = (value) => String(value || "").replaceAll("_", " ").toUpperCase();
+  const sidebarFeatures =
+    user?.role === "student" ? features.filter((f) => f !== "subjects") : features;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -148,7 +150,7 @@ function DashboardLayout() {
       <aside
         style={{
           width: 240,
-          height: "100vh",
+          minHeight: "100vh",
           background: "#1f2937",
           color: "#fff",
           padding: 20,
@@ -247,12 +249,17 @@ function DashboardLayout() {
               <NavLink to={`/${user.role}/dashboard`} style={linkStyle}>
                 Dashboard
               </NavLink>
+              {user?.role === "student" && (
+                <NavLink to="/student/subjects" style={linkStyle}>
+                  SUBJECTS
+                </NavLink>
+              )}
 
               {/* STAFF / STUDENT FEATURES */}
               <div style={{ marginTop: 20 }}>
                 <strong style={{ fontSize: 13 }}>Features</strong>
                 <ul style={{ marginTop: 10, paddingLeft: 16 }}>
-                  {features.map((f) => (
+                  {sidebarFeatures.map((f) => (
                     <li key={f} style={{ fontSize: 13, opacity: 0.85 }}>
                       {user?.role === "staff" &&
                       (f === "attendance" || f === "behaviour rating") &&

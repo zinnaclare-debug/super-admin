@@ -85,9 +85,11 @@ class ProfileController extends Controller
             }
         }
 
+        $photoPath = $student?->photo_path ?: $user->photo_path;
+
         $photoUrl = null;
-        if ($student && $student->photo_path && Storage::disk('public')->exists($student->photo_path)) {
-            $relativeOrAbsolute = Storage::disk('public')->url($student->photo_path);
+        if ($photoPath && Storage::disk('public')->exists($photoPath)) {
+            $relativeOrAbsolute = Storage::disk('public')->url($photoPath);
             $photoUrl = str_starts_with($relativeOrAbsolute, 'http://')
                 || str_starts_with($relativeOrAbsolute, 'https://')
                 ? $relativeOrAbsolute
@@ -126,6 +128,7 @@ class ProfileController extends Controller
                 ] : null,
                 'current_class' => $currentClass,
                 'current_department' => $currentDepartment,
+                'photo_path' => $photoPath,
                 'photo_url' => $photoUrl,
             ]
         ]);

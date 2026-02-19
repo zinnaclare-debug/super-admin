@@ -227,13 +227,18 @@ public function assignTeacherToSubject(Request $request, SchoolClass $class, Ter
         ->where('school_id', $schoolId)
         ->firstOrFail();
 
+    $sessionTermIds = Term::where('school_id', $schoolId)
+        ->where('academic_session_id', $class->academic_session_id)
+        ->pluck('id')
+        ->all();
+
     TermSubject::where('school_id', $schoolId)
         ->where('class_id', $class->id)
-        ->where('term_id', $term->id)
+        ->whereIn('term_id', $sessionTermIds)
         ->where('subject_id', $subject->id)
         ->update(['teacher_user_id' => $teacher->id]);
 
-    return response()->json(['message' => 'Teacher assigned']);
+    return response()->json(['message' => 'Teacher assigned for all terms in this session']);
 }
 
 public function unassignTeacherFromSubject(Request $request, SchoolClass $class, Term $term, Subject $subject)
@@ -245,13 +250,18 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
     abort_unless($subject->school_id === $schoolId, 403);
     abort_unless($term->academic_session_id === $class->academic_session_id, 400);
 
+    $sessionTermIds = Term::where('school_id', $schoolId)
+        ->where('academic_session_id', $class->academic_session_id)
+        ->pluck('id')
+        ->all();
+
     TermSubject::where('school_id', $schoolId)
         ->where('class_id', $class->id)
-        ->where('term_id', $term->id)
+        ->whereIn('term_id', $sessionTermIds)
         ->where('subject_id', $subject->id)
         ->update(['teacher_user_id' => null]);
 
-    return response()->json(['message' => 'Teacher unassigned']);
+    return response()->json(['message' => 'Teacher unassigned for all terms in this session']);
 }
 
     /**

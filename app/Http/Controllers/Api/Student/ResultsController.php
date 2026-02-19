@@ -15,12 +15,46 @@ use App\Models\TermSubject;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 
 class ResultsController extends Controller
 {
+    private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId): array
+    {
+        $classIds = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('student_id', $studentId)
+            ->pluck('class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (!empty($classIds)) {
+            return array_values(array_unique($classIds));
+        }
+
+        // Backward-compatible fallback for schools still using term enrollments.
+        $enrollmentsQuery = Enrollment::query()
+            ->where('enrollments.student_id', $studentId)
+            ->join('terms', 'terms.id', '=', 'enrollments.term_id')
+            ->where('terms.academic_session_id', $sessionId);
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollmentsQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        return $enrollmentsQuery
+            ->distinct()
+            ->pluck('enrollments.class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
     private function resolveCurrentTermId(int $schoolId, int $sessionId): ?int
     {
         if (Schema::hasColumn('terms', 'is_current')) {
@@ -59,11 +93,6 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $currentTermId = $this->resolveCurrentTermId((int)$schoolId, (int)$session->id);
-        if (!$currentTermId) {
-            return response()->json(['data' => []]);
-        }
-
         $student = Student::where('user_id', $user->id)
             ->where('school_id', $schoolId)
             ->first();
@@ -72,30 +101,38 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $enrollments = Enrollment::query()
-            ->where('enrollments.student_id', $student->id)
-            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
-                $q->where('enrollments.school_id', $schoolId);
-            })
-            ->join('terms', 'terms.id', '=', 'enrollments.term_id')
-            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
-            ->where('terms.academic_session_id', $session->id)
-            ->where('enrollments.term_id', $currentTermId)
-            ->where('classes.school_id', $schoolId)
-            ->select([
-                'enrollments.class_id',
-                'enrollments.term_id',
-                'classes.name as class_name',
-                'classes.level as class_level',
-                'terms.name as term_name',
-            ])
-            ->orderBy('classes.level')
-            ->orderBy('classes.name')
-            ->orderBy('terms.name')
-            ->distinct()
-            ->get();
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (empty($classIds)) {
+            return response()->json(['data' => []]);
+        }
 
-        return response()->json(['data' => $enrollments]);
+        $classes = SchoolClass::where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->whereIn('id', $classIds)
+            ->orderBy('level')
+            ->orderBy('name')
+            ->get(['id', 'name', 'level'])
+            ->keyBy('id');
+
+        $terms = Term::where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->orderBy('id')
+            ->get(['id', 'name']);
+
+        $items = [];
+        foreach ($classes as $class) {
+            foreach ($terms as $term) {
+                $items[] = [
+                    'class_id' => (int) $class->id,
+                    'term_id' => (int) $term->id,
+                    'class_name' => $class->name,
+                    'class_level' => $class->level,
+                    'term_name' => $term->name,
+                ];
+            }
+        }
+
+        return response()->json(['data' => $items]);
     }
 
     // GET /api/student/results?class_id=1&term_id=2
@@ -125,11 +162,6 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $currentTermId = $this->resolveCurrentTermId((int)$schoolId, (int)$session->id);
-        if (!$currentTermId) {
-            return response()->json(['data' => []]);
-        }
-
         $student = Student::where('user_id', $user->id)
             ->where('school_id', $schoolId)
             ->first();
@@ -138,20 +170,16 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $isAssigned = Enrollment::query()
-            ->where('student_id', $student->id)
-            ->where('class_id', $classId)
-            ->where('term_id', $termId)
-            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
-                $q->where('school_id', $schoolId);
-            })
-            ->exists();
-
-        if (!$isAssigned) {
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (!in_array($classId, $classIds, true)) {
             return response()->json(['data' => []]);
         }
 
-        if ($termId !== (int) $currentTermId) {
+        $term = Term::where('id', $termId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+        if (!$term) {
             return response()->json(['data' => []]);
         }
 
@@ -187,11 +215,6 @@ class ResultsController extends Controller
             return response()->json(['message' => 'No current session found'], 422);
         }
 
-        $currentTermId = $this->resolveCurrentTermId((int) $schoolId, (int) $session->id);
-        if (!$currentTermId || $termId !== (int) $currentTermId) {
-            return response()->json(['message' => 'Results download is available for current term only'], 422);
-        }
-
         $student = Student::where('user_id', $user->id)
             ->where('school_id', $schoolId)
             ->first();
@@ -200,16 +223,9 @@ class ResultsController extends Controller
             return response()->json(['message' => 'Student record not found'], 404);
         }
 
-        $isAssigned = Enrollment::query()
-            ->where('student_id', $student->id)
-            ->where('class_id', $classId)
-            ->where('term_id', $termId)
-            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
-                $q->where('school_id', $schoolId);
-            })
-            ->exists();
-        if (!$isAssigned) {
-            return response()->json(['message' => 'You are not enrolled in the selected class/term'], 403);
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (!in_array($classId, $classIds, true)) {
+            return response()->json(['message' => 'You are not enrolled in the selected class for this session'], 403);
         }
 
         $class = SchoolClass::where('id', $classId)
@@ -301,6 +317,14 @@ class ResultsController extends Controller
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');

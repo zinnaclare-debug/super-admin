@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import "./Login.css";
 
 function Login() {
   const navigate = useNavigate();
@@ -51,29 +52,58 @@ function Login() {
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h2>Login</h2>
+    <div className="login-page">
+      <div className="login-shell">
+        <section className="login-hero">
+          <span className="hero-pill">Education Portal</span>
+          <h1>Welcome Back to School</h1>
+          <p>
+            One digital campus for learning, teaching, and school operations.
+            Sign in to access classroom tools, performance records, and your
+            school community.
+          </p>
+          <ul className="hero-list">
+            <li>Classes, assessments, and reports in one place</li>
+            <li>Secure access for students, staff, and administrators</li>
+            <li>Built for daily school activities and communication</li>
+          </ul>
+        </section>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br /><br />
+        <section className="login-card">
+          <h2>Sign In to Continue</h2>
+          <p className="login-subtitle">
+            Use your official school email and password.
+          </p>
 
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br /><br />
+          <form onSubmit={handleSubmit} className="login-form">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              placeholder="you@school.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
 
-        <button disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              placeholder="Enter password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+
+            <button className="login-btn" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

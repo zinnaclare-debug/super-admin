@@ -333,8 +333,8 @@ export default function AcademicSession() {
             {/* ✅ LEVEL CHECKBOXES */}
             <div style={{ marginTop: 14 }}>
               <strong>Select Levels</strong>
-              <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <label>
+              <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "nowrap" }}>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.nursery}
@@ -343,7 +343,7 @@ export default function AcademicSession() {
                   Nursery
                 </label>
 
-                <label>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.primary}
@@ -352,7 +352,7 @@ export default function AcademicSession() {
                   Primary
                 </label>
 
-                <label>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.secondary}
@@ -366,10 +366,25 @@ export default function AcademicSession() {
             {/* ✅ PREVIEW OF WHAT WILL BE CREATED */}
             <div style={{ marginTop: 14 }}>
               <strong>Class Structure Preview</strong>
-              <div style={{ marginTop: 8 }}>
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 12,
+                  alignItems: "start",
+                }}
+              >
                 {previewLevels.map((key) => (
-                  <div key={key} style={{ marginBottom: 10 }}>
-                    <div style={{ marginBottom: 6 }}>
+                  <div
+                    key={key}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      padding: 10,
+                    }}
+                  >
+                    <div style={{ marginBottom: 8 }}>
                       <strong>{LEVEL_LABELS[key]}</strong>
                     </div>
                     <div style={{ display: "grid", gap: 8 }}>
@@ -379,7 +394,7 @@ export default function AcademicSession() {
                           value={className}
                           onChange={(e) => updateClassName(key, idx, e.target.value)}
                           placeholder={(DEFAULT_CLASS_STRUCTURE[key] || [])[idx] || "Class name"}
-                          style={{ width: 320, padding: 8 }}
+                          style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
                           required
                         />
                       ))}
@@ -425,8 +440,8 @@ export default function AcademicSession() {
 
             <div style={{ marginTop: 14 }}>
               <strong>Levels</strong>
-              <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <label>
+              <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "nowrap" }}>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.nursery}
@@ -435,7 +450,7 @@ export default function AcademicSession() {
                   Nursery
                 </label>
 
-                <label>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.primary}
@@ -444,7 +459,7 @@ export default function AcademicSession() {
                   Primary
                 </label>
 
-                <label>
+                <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={selectedLevels.secondary}

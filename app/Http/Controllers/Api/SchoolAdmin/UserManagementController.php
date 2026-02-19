@@ -73,7 +73,7 @@ class UserManagementController extends Controller
             $staff = Staff::where('school_id', $user->school_id)->where('user_id', $user->id)->first();
         }
 
-        $photoPath = $student?->photo_path ?? $staff?->photo_path;
+        $photoPath = $student?->photo_path ?? $staff?->photo_path ?? $user->photo_path;
 
         return response()->json([
             'data' => [
@@ -145,12 +145,18 @@ class UserManagementController extends Controller
         }
         $user->save();
 
+        $existingPhotoPath = $user->role === 'student'
+            ? Student::where('school_id', $user->school_id)->where('user_id', $user->id)->value('photo_path')
+            : Staff::where('school_id', $user->school_id)->where('user_id', $user->id)->value('photo_path');
+
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $dir = "schools/{$user->school_id}/profiles";
             $ext = $request->file('photo')->getClientOriginalExtension();
             $filename = $user->username . '.' . $ext;
             $photoPath = $request->file('photo')->storeAs($dir, $filename, 'public');
+            $user->photo_path = $photoPath;
+            $user->save();
         }
 
         if ($user->role === 'student') {
@@ -201,6 +207,10 @@ class UserManagementController extends Controller
                 $staff->photo_path = $photoPath;
             }
             $staff->save();
+        }
+
+        if ($photoPath && $existingPhotoPath && $existingPhotoPath !== $photoPath && Storage::disk('public')->exists($existingPhotoPath)) {
+            Storage::disk('public')->delete($existingPhotoPath);
         }
 
         return response()->json([

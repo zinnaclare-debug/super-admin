@@ -10,6 +10,7 @@ use App\Models\Term;
 use App\Models\TermSubject;
 use App\Models\TopicMaterial;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -63,27 +64,35 @@ class TopicsController extends Controller
             ->first();
         if (!$student) return response()->json(['data' => []]);
 
-        $enrollQuery = Enrollment::query()->where('student_id', $student->id);
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $enrollQuery->where('school_id', $schoolId);
+        $classIds = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('student_id', $student->id)
+            ->pluck('class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($classIds)) {
+            $enrollQuery = Enrollment::query()->where('student_id', $student->id);
+            if (Schema::hasColumn('enrollments', 'school_id')) {
+                $enrollQuery->where('school_id', $schoolId);
+            }
+
+            $classIds = $enrollQuery
+                ->where('term_id', $currentTermId)
+                ->pluck('class_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
         }
 
-        $enrollments = $enrollQuery
-            ->where('term_id', $currentTermId)
-            ->get(['class_id', 'term_id']);
-        if ($enrollments->isEmpty()) return response()->json(['data' => []]);
+        if (empty($classIds)) return response()->json(['data' => []]);
 
         $termSubjects = TermSubject::query()
             ->where('term_subjects.school_id', $schoolId)
             ->where('term_subjects.term_id', $currentTermId)
-            ->where(function ($q) use ($enrollments) {
-                foreach ($enrollments as $e) {
-                    $q->orWhere(function ($qq) use ($e) {
-                        $qq->where('term_subjects.class_id', $e->class_id)
-                            ->where('term_subjects.term_id', $e->term_id);
-                    });
-                }
-            })
+            ->whereIn('term_subjects.class_id', $classIds)
             ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
             ->orderBy('subjects.name')
             ->get([
