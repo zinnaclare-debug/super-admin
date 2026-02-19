@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 const defaultQuestion = {
   question_text: "",
@@ -15,7 +15,6 @@ const defaultQuestion = {
 };
 
 export default function QuestionBankHome() {
-  const navigate = useNavigate();
   const [subjectsRaw, setSubjectsRaw] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [exams, setExams] = useState([]);
@@ -177,11 +176,7 @@ export default function QuestionBankHome() {
     String(text || "").replace(/^\s*(?:\(?\d+\)?[\).\-\:]*|[ivxlcdm]+[\).\-\:])\s*/i, "").trim();
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Question Bank (Staff)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="Question Bank (Staff)">
 
       <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
         <h3 style={{ marginTop: 0 }}>Filters</h3>
@@ -360,6 +355,6 @@ export default function QuestionBankHome() {
           </table>
         )}
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }

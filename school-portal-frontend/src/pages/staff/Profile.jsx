@@ -7,12 +7,27 @@ export default function StaffProfile() {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [photoVersion, setPhotoVersion] = useState(0);
 
   const load = async () => {
     setLoading(true);
     try {
       const res = await api.get("/api/staff/profile");
-      setMe(res.data.data || res.data); // support either {data:{...}} or {...}
+      const incoming = res.data.data || res.data;
+      setMe((prev) => {
+        if (!incoming) return prev || null;
+        if (!prev?.staff || !incoming?.staff) return incoming;
+
+        // Some backend builds can return null photo fields from /profile
+        // right after upload; keep known values instead of blanking the UI.
+        if (!incoming.staff.photo_url && prev.staff.photo_url) {
+          incoming.staff.photo_url = prev.staff.photo_url;
+        }
+        if (!incoming.staff.photo_path && prev.staff.photo_path) {
+          incoming.staff.photo_path = prev.staff.photo_path;
+        }
+        return incoming;
+      });
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to load staff profile");
     } finally {
@@ -26,27 +41,42 @@ export default function StaffProfile() {
 
   const toAbsoluteUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+
     const base = (api.defaults.baseURL || "").replace(/\/$/, "");
-    if (!base) return url;
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+    const apiOrigin = base ? new URL(base).origin : window.location.origin;
+
+    if (/^(blob:|data:)/i.test(url)) return url;
+
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname.startsWith("/storage/")) {
+          return `${apiOrigin}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        return url;
+      }
+      return url;
+    }
+
+    return `${apiOrigin}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   const photoUrl = useMemo(() => {
     if (!me) return null;
 
-    // Your backend might return photo_url directly
-    if (me.photo_url) return toAbsoluteUrl(me.photo_url);
+    let resolved = null;
+    if (me.photo_url) resolved = toAbsoluteUrl(me.photo_url);
+    else if (me.photo_path) resolved = toAbsoluteUrl(`/storage/${me.photo_path}`);
+    else if (me.staff?.photo_url) resolved = toAbsoluteUrl(me.staff.photo_url);
+    else if (me.staff?.photo_path) resolved = toAbsoluteUrl(`/storage/${me.staff.photo_path}`);
 
-    // Or it might return photo_path like "schools/14/profiles/ABC.png"
-    if (me.photo_path) return toAbsoluteUrl(`/storage/${me.photo_path}`);
+    if (!resolved) return null;
 
-    // Or nested (depends on your API response)
-    if (me.staff?.photo_url) return toAbsoluteUrl(me.staff.photo_url);
-    if (me.staff?.photo_path) return toAbsoluteUrl(`/storage/${me.staff.photo_path}`);
+    const separator = resolved.includes("?") ? "&" : "?";
+    return `${resolved}${separator}v=${photoVersion}`;
 
-    return null;
-  }, [me]);
+  }, [me, photoVersion]);
 
   const uploadPhoto = async () => {
     if (!photoFile) return alert("Select a photo first");
@@ -56,10 +86,27 @@ export default function StaffProfile() {
       const fd = new FormData();
       fd.append("photo", photoFile);
 
-      await api.post("/api/staff/profile/photo", fd, {
+      const res = await api.post("/api/staff/profile/photo", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
+      const uploadedPath = res?.data?.data?.photo_path || "";
+      const uploadedUrl = toAbsoluteUrl(
+        res?.data?.data?.photo_url || (uploadedPath ? `/storage/${uploadedPath}` : "")
+      );
+
+      if (uploadedUrl) {
+        setMe((prev) => ({
+          ...(prev || {}),
+          staff: {
+            ...(prev?.staff || {}),
+            photo_path: uploadedPath || prev?.staff?.photo_path || "",
+            photo_url: uploadedUrl,
+          },
+        }));
+      }
+
+      setPhotoVersion((v) => v + 1);
       alert("Photo uploaded successfully");
       setPhotoFile(null);
       await load();
@@ -80,7 +127,6 @@ export default function StaffProfile() {
       </div>
 
       <div style={{ marginTop: 14, display: "flex", gap: 18, alignItems: "flex-start" }}>
-        {/* Photo */}
         <div style={{ width: 180 }}>
           <div
             style={{
@@ -120,7 +166,6 @@ export default function StaffProfile() {
           </div>
         </div>
 
-        {/* Details */}
         <div style={{ flex: 1 }}>
           <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
             <h3 style={{ marginTop: 0, marginBottom: 10 }}>Account</h3>

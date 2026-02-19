@@ -34,8 +34,8 @@ class StaffProfileController extends Controller
             ->get();
 
         $photoUrl = null;
-        if ($staffProfile->photo_path && Storage::disk('public')->exists($staffProfile->photo_path)) {
-            $photoUrl = Storage::disk('public')->url($staffProfile->photo_path);
+        if ($staffProfile->photo_path) {
+            $photoUrl = $this->publicUrl($request, $staffProfile->photo_path);
         }
 
         return response()->json([
@@ -97,7 +97,7 @@ $path = $request->file('photo')->store(
 
         $staffProfile->update(['photo_path' => $path]);
 
-        $photoUrl = Storage::disk('public')->url($path);
+        $photoUrl = $this->publicUrl($request, $path);
 
         return response()->json([
             'message' => 'Photo uploaded successfully',
@@ -106,5 +106,46 @@ $path = $request->file('photo')->store(
                 'photo_url' => $photoUrl,
             ]
         ], 200);
+    }
+
+    /**
+     * GET /api/staff/profile/photo
+     * Stream current staff profile photo (auth-protected fallback)
+     */
+    public function photo(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->role !== 'staff') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $staffProfile = $user->staffProfile;
+        if (!$staffProfile || !$staffProfile->photo_path) {
+            return response()->json(['message' => 'Photo not found'], 404);
+        }
+
+        if (!Storage::disk('public')->exists($staffProfile->photo_path)) {
+            return response()->json(['message' => 'Photo file missing'], 404);
+        }
+
+        $fullPath = Storage::disk('public')->path($staffProfile->photo_path);
+        $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
+
+        return response()->file($fullPath, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        ]);
+    }
+
+    private function publicUrl(Request $request, string $path): string
+    {
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+
+        if (str_starts_with($relativeOrAbsolute, 'http://') || str_starts_with($relativeOrAbsolute, 'https://')) {
+            return $relativeOrAbsolute;
+        }
+
+        return rtrim($request->getSchemeAndHttpHost(), '/') . '/' . ltrim($relativeOrAbsolute, '/');
     }
 }

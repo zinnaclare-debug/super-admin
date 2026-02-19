@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function ResultsHome() {
   const navigate = useNavigate();
@@ -22,10 +23,7 @@ export default function ResultsHome() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Results</h2>
-      </div>
+    <StaffFeatureLayout title="Results">
 
       {loading ? (
         <p>Loading...</p>
@@ -47,6 +45,6 @@ export default function ResultsHome() {
           ))}
         </div>
       )}
-    </div>
+    </StaffFeatureLayout>
   );
 }

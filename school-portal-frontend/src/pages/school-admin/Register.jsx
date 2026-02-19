@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 
+const toAbsoluteUrl = (url) => {
+  if (!url) return "";
+  if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+  const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -269,7 +276,7 @@ export default function Register() {
           {photoPreview && (
             <div style={{ marginTop: 10 }}>
               <img
-                src={photoPreview}
+                src={toAbsoluteUrl(photoPreview)}
                 alt="preview"
                 style={{
                   width: 110,

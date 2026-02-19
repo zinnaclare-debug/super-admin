@@ -3,7 +3,7 @@ import api from "../../services/api";
 
 const toAbsoluteUrl = (u) => {
   if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
+  if (/^(https?:\/\/|blob:|data:)/i.test(u)) return u;
   const base = (api.defaults.baseURL || "").replace(/\/$/, "");
   return `${base}${u.startsWith("/") ? "" : "/"}${u}`;
 };

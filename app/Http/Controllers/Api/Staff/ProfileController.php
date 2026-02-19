@@ -19,7 +19,11 @@ class ProfileController extends Controller
 
         $photoUrl = null;
         if ($staff && $staff->photo_path) {
-            $photoUrl = Storage::url($staff->photo_path);
+            $relativeOrAbsolute = Storage::disk('public')->url($staff->photo_path);
+            $photoUrl = str_starts_with($relativeOrAbsolute, 'http://')
+                || str_starts_with($relativeOrAbsolute, 'https://')
+                ? $relativeOrAbsolute
+                : url($relativeOrAbsolute);
         }
 
         return response()->json([

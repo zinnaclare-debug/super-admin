@@ -88,7 +88,7 @@ class UserManagementController extends Controller
                 'dob' => $student?->dob ?? $staff?->dob,
                 'address' => $student?->address ?? $staff?->address,
                 'staff_position' => $staff?->position,
-                'photo_url' => $photoPath ? Storage::url($photoPath) : null,
+                'photo_url' => $this->storageUrl($photoPath),
                 'guardian_name' => $guardian?->name,
                 'guardian_email' => $guardian?->email,
                 'guardian_mobile' => $guardian?->mobile,
@@ -254,5 +254,18 @@ class UserManagementController extends Controller
             'message' => 'User status updated',
             'data' => $user->only(['id', 'is_active'])
         ]);
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+        return str_starts_with($relativeOrAbsolute, 'http://')
+            || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
     }
 }

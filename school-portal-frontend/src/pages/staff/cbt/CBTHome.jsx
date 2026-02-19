@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function CBTHome() {
-  const navigate = useNavigate();
   const [subjects, setSubjects] = useState([]);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,11 +96,7 @@ export default function CBTHome() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>CBT (Staff)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="CBT (Staff)">
 
       <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
         <h3 style={{ marginTop: 0 }}>Create CBT Exam</h3>
@@ -295,6 +290,6 @@ export default function CBTHome() {
           </table>
         </div>
       ) : null}
-    </div>
+    </StaffFeatureLayout>
   );
 }

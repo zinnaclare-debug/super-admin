@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function TopicMaterials() {
   const { termSubjectId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
 
   const [materials, setMaterials] = useState([]);
@@ -15,7 +15,7 @@ export default function TopicMaterials() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  const meta = location.state; // subject/class/term info from previous page (optional)
+  const meta = location.state;
 
   const load = async () => {
     setLoading(true);
@@ -29,7 +29,9 @@ export default function TopicMaterials() {
     }
   };
 
-  useEffect(() => { load(); }, [termSubjectId]);
+  useEffect(() => {
+    load();
+  }, [termSubjectId]);
 
   const upload = async (e) => {
     e.preventDefault();
@@ -71,28 +73,15 @@ export default function TopicMaterials() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Subject Materials</h2>
-          {meta && (
-            <div style={{ opacity: 0.8, fontSize: 13, marginTop: 4 }}>
-              {meta.subject_name} • {meta.class_name} • {meta.term_name}
-            </div>
-          )}
-        </div>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
-
+    <StaffFeatureLayout
+      title="Subject Materials"
+      subtitle={meta ? `${meta.subject_name} - ${meta.class_name} (${meta.term_name})` : ""}
+    >
       <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
         <h3 style={{ marginTop: 0 }}>Upload</h3>
 
         <form onSubmit={upload} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title (optional)"
-          />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" />
 
           <input
             type="file"
@@ -130,11 +119,7 @@ export default function TopicMaterials() {
                       <a href={m.file_url} target="_blank" rel="noreferrer">
                         View / Download
                       </a>
-                      <button
-                        type="button"
-                        onClick={() => deleteMaterial(m.id)}
-                        disabled={deletingId === m.id}
-                      >
+                      <button type="button" onClick={() => deleteMaterial(m.id)} disabled={deletingId === m.id}>
                         {deletingId === m.id ? "Deleting..." : "Delete"}
                       </button>
                     </div>
@@ -142,12 +127,14 @@ export default function TopicMaterials() {
                 </tr>
               ))}
               {materials.length === 0 && (
-                <tr><td colSpan="4">No materials uploaded yet.</td></tr>
+                <tr>
+                  <td colSpan="4">No materials uploaded yet.</td>
+                </tr>
               )}
             </tbody>
           </table>
         )}
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }

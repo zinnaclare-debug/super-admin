@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function VirtualClassHome() {
-  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,11 +81,7 @@ export default function VirtualClassHome() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Virtual Class (Staff)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="Virtual Class (Staff)">
 
       <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
         <h3 style={{ marginTop: 0 }}>Create Zoom Class Link</h3>
@@ -192,7 +187,6 @@ export default function VirtualClassHome() {
           </table>
         )}
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }
-

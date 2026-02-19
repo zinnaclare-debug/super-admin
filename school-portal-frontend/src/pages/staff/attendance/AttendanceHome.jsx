@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function AttendanceHome() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -84,11 +83,7 @@ export default function AttendanceHome() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Attendance (Class Teacher)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="Attendance (Class Teacher)">
 
       {message ? (
         <div style={{ marginTop: 12, padding: 10, border: "1px solid #f3c06b", borderRadius: 8 }}>
@@ -208,6 +203,6 @@ export default function AttendanceHome() {
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }

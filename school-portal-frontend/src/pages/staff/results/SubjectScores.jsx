@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 const gradeFromTotal = (total) => {
   if (total >= 70) return "A";
@@ -13,7 +14,6 @@ const gradeFromTotal = (total) => {
 
 export default function SubjectScores() {
   const { termSubjectId } = useParams();
-  const navigate = useNavigate();
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,12 +76,7 @@ export default function SubjectScores() {
   };
 
   return (
-    <div>
-      {/* Navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Enter Results</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="Enter Results">
 
       <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
         CA: 0–30 • Exam: 0–70 • Total: 100 • Grade:
@@ -149,6 +144,6 @@ export default function SubjectScores() {
           </tbody>
         </table>
       )}
-    </div>
+    </StaffFeatureLayout>
   );
 }

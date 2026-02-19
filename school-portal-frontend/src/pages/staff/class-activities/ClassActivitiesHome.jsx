@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -10,7 +10,6 @@ function fileNameFromHeaders(headers, fallback) {
 }
 
 export default function ClassActivitiesHome() {
-  const navigate = useNavigate();
   const [activities, setActivities] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -111,11 +110,7 @@ export default function ClassActivitiesHome() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Class Activities (Staff)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="Class Activities (Staff)">
 
       <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
         <h3 style={{ marginTop: 0 }}>Upload Activity</h3>
@@ -192,6 +187,6 @@ export default function ClassActivitiesHome() {
           </table>
         )}
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }

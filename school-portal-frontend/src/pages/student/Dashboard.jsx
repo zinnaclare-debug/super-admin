@@ -22,6 +22,13 @@ export default function StudentDashboard() {
     load();
   }, []);
 
+  const toAbsoluteUrl = (url) => {
+    if (!url) return "";
+    if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+    const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   const user = profile?.user || {};
   const student = profile?.student || {};
   const guardian = profile?.guardian || null;
@@ -29,7 +36,7 @@ export default function StudentDashboard() {
   const currentTerm = profile?.current_term || null;
   const currentClass = profile?.current_class || null;
   const currentDepartment = profile?.current_department || null;
-  const photoUrl = profile?.photo_url || "";
+  const photoUrl = toAbsoluteUrl(profile?.photo_url || "");
 
   return (
     <div>

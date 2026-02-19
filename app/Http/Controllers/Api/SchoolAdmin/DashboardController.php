@@ -131,6 +131,10 @@ class DashboardController extends Controller
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+        return str_starts_with($relativeOrAbsolute, 'http://')
+            || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
     }
 }

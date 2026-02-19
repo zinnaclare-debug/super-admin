@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
-import { useNavigate } from "react-router-dom";
+import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 export default function ELibraryHome() {
-  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,11 +79,7 @@ export default function ELibraryHome() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>E-Library (Teacher)</h2>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+    <StaffFeatureLayout title="E-Library (Teacher)">
 
       <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
         <h3 style={{ marginTop: 0 }}>Upload Textbook</h3>
@@ -160,6 +155,6 @@ export default function ELibraryHome() {
           </table>
         )}
       </div>
-    </div>
+    </StaffFeatureLayout>
   );
 }

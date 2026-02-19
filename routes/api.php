@@ -266,6 +266,7 @@ Route::patch(
 Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', fn () => response()->json(['message' => 'Staff Dashboard']));
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
+    Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);
     Route::get('/staff/features', [FeatureAccessController::class, 'staffFeatures']);
     Route::get('/staff/results/subjects', [TeacherResultsController::class, 'mySubjects']);

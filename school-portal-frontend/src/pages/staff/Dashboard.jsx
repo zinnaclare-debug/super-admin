@@ -8,6 +8,14 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const toAbsoluteUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+    if (!base) return url;
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -29,6 +37,9 @@ export default function StaffDashboard() {
   const staff = profile?.staff || {};
   const classes = profile?.classes || [];
   const isClassTeacher = classes.length > 0;
+  const staffPhotoUrl = toAbsoluteUrl(
+    staff.photo_url || (staff.photo_path ? `/storage/${staff.photo_path}` : "")
+  );
 
   return (
     <div>
@@ -53,10 +64,10 @@ export default function StaffDashboard() {
           <p style={{ color: "red" }}>{error}</p>
         ) : (
           <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-            {staff.photo_url ? (
+            {staffPhotoUrl ? (
               <div style={{ marginBottom: 16 }}>
                 <img
-                  src={staff.photo_url}
+                  src={staffPhotoUrl}
                   alt="Staff profile"
                   style={{ width: 110, height: 110, borderRadius: 8, objectFit: "cover", border: "1px solid #ddd" }}
                 />

@@ -22,6 +22,13 @@ export default function StudentProfile() {
     load();
   }, []);
 
+  const toAbsoluteUrl = (url) => {
+    if (!url) return "";
+    if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+    const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   const user = data?.user || {};
   const student = data?.student || {};
 
@@ -38,7 +45,7 @@ export default function StudentProfile() {
           {data?.photo_url ? (
             <div style={{ marginBottom: 16 }}>
               <img
-                src={data.photo_url}
+                src={toAbsoluteUrl(data.photo_url)}
                 alt="Student profile"
                 style={{ width: 110, height: 110, borderRadius: 8, objectFit: "cover", border: "1px solid #ddd" }}
               />

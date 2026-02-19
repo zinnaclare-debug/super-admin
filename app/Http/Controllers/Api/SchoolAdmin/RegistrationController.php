@@ -138,7 +138,7 @@ class RegistrationController extends Controller
         return response()->json([
             'message' => 'User registered successfully',
             'username' => $request->username,
-            'photo_url' => $photoPath ? Storage::url($photoPath) : null,
+            'photo_url' => $this->storageUrl($photoPath),
         ], 201);
     }
 
@@ -227,7 +227,7 @@ class RegistrationController extends Controller
         return response()->json([
             'message' => 'Registration successful',
             'username' => $username,
-            'photo_url' => $photoPath ? Storage::url($photoPath) : null,
+            'photo_url' => $this->storageUrl($photoPath),
         ], 201);
     }
 
@@ -249,5 +249,18 @@ class RegistrationController extends Controller
         }
 
         return "{$prefix}-{$surname}{$number}";
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+        return str_starts_with($relativeOrAbsolute, 'http://')
+            || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
     }
 }
