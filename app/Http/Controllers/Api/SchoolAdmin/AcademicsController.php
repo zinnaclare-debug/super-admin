@@ -206,6 +206,48 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
     }
 
     /**
+     * PATCH /api/school-admin/subjects/{subject}
+     * Update subject name/code for this school.
+     */
+    public function updateSubject(Request $request, Subject $subject)
+    {
+        $schoolId = $request->user()->school_id;
+        abort_unless((int) $subject->school_id === (int) $schoolId, 403);
+
+        $payload = $request->validate([
+            'name' => 'required|string|max:100',
+            'code' => 'nullable|string|max:20',
+        ]);
+
+        $name = trim((string) $payload['name']);
+        if ($name === '') {
+            return response()->json(['message' => 'Subject name is required'], 422);
+        }
+
+        $duplicate = Subject::where('school_id', $schoolId)
+            ->where('id', '!=', $subject->id)
+            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json(['message' => 'A subject with this name already exists'], 422);
+        }
+
+        $subject->name = $name;
+        $subject->code = filled($payload['code'] ?? null) ? trim((string) $payload['code']) : null;
+        $subject->save();
+
+        return response()->json([
+            'message' => 'Subject updated successfully',
+            'data' => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'code' => $subject->code,
+            ],
+        ]);
+    }
+
+    /**
      * PATCH /api/school-admin/classes/{class}/terms/{term}/subjects/{subject}/assign-teacher
      * Assign a teacher to a subject for a specific class+term
      */
@@ -277,10 +319,6 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
         abort_unless((int) $subject->school_id === (int) $schoolId, 403);
         abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
 
-        if (strtolower((string) $class->level) !== 'secondary') {
-            return response()->json(['message' => 'CBT publish is only available for secondary classes'], 422);
-        }
-
         $termSubject = TermSubject::query()
             ->where('school_id', $schoolId)
             ->where('class_id', $class->id)
@@ -350,8 +388,8 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
             ->where('id', $termSubject->class_id)
             ->first();
 
-        if (!$class || strtolower((string) $class->level) !== 'secondary') {
-            return response()->json(['message' => 'Only secondary class CBT can be published from this action'], 422);
+        if (!$class) {
+            return response()->json(['message' => 'Class not found for this exam mapping'], 404);
         }
 
         $questionCount = CbtExamQuestion::where('school_id', $schoolId)

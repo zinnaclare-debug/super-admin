@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\CBTExam;
+use App\Models\CbtExam;
 use App\Enums\SchoolFeatureEnum;
 
 class CbtController extends Controller
@@ -30,6 +30,6 @@ class CbtController extends Controller
         );
 
         // Return only this school's CBT exams
-        return CBTExam::where('school_id', $user->school_id)->get();
+        return CbtExam::where('school_id', $user->school_id)->get();
     }
 }

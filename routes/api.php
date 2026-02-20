@@ -227,6 +227,9 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::post('/school-admin/classes/{class}/subjects', [AcademicsController::class, 'createSubjects'])
         ->middleware('feature:academics');
 
+    Route::patch('/school-admin/subjects/{subject}', [AcademicsController::class, 'updateSubject'])
+        ->middleware('feature:academics');
+
     Route::get('/school-admin/classes/{class}/terms/{term}/subjects/{subject}/cbt-exams', [AcademicsController::class, 'cbtExamsForSubject'])
         ->middleware('feature:academics');
 

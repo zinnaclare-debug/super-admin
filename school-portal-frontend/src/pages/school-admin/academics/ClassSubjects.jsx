@@ -17,6 +17,10 @@ export default function ClassSubjects() {
   const [newSubjectCode, setNewSubjectCode] = useState("");
   const [termIdsToApply, setTermIdsToApply] = useState([]);
   const [creating, setCreating] = useState(false);
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [editSubjectName, setEditSubjectName] = useState("");
+  const [editSubjectCode, setEditSubjectCode] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadTerms = async () => {
     const res = await api.get(`/api/school-admin/classes/${classId}/terms`);
@@ -59,7 +63,6 @@ export default function ClassSubjects() {
   const termName = useMemo(() => {
     return terms.find(t => t.id === selectedTermId)?.name || "Term";
   }, [terms, selectedTermId]);
-  const isSecondaryClass = String(cls?.level || "").toLowerCase() === "secondary";
 
   const toggleApplyTerm = (id) => {
     setTermIdsToApply((prev) =>
@@ -89,6 +92,39 @@ export default function ClassSubjects() {
       alert(msg);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEditSubject = (subject) => {
+    setEditingSubject(subject);
+    setEditSubjectName(subject?.name || "");
+    setEditSubjectCode(subject?.code || "");
+  };
+
+  const cancelEditSubject = () => {
+    setEditingSubject(null);
+    setEditSubjectName("");
+    setEditSubjectCode("");
+  };
+
+  const saveEditedSubject = async () => {
+    if (!editingSubject?.id) return;
+    if (!editSubjectName.trim()) return alert("Enter subject name");
+
+    setSavingEdit(true);
+    try {
+      const res = await api.patch(`/api/school-admin/subjects/${editingSubject.id}`, {
+        name: editSubjectName.trim(),
+        code: editSubjectCode.trim() || null,
+      });
+
+      alert(res.data?.message || "Subject updated");
+      await loadSubjects(selectedTermId);
+      cancelEditSubject();
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to update subject");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -127,7 +163,7 @@ export default function ClassSubjects() {
             <th style={{ width: 70 }}>S/N</th>
             <th>Course</th>
             <th style={{ width: 160 }}>Code</th>
-            {isSecondaryClass && <th style={{ width: 160 }}>Action</th>}
+            <th style={{ width: 220 }}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -136,23 +172,22 @@ export default function ClassSubjects() {
               <td>{idx + 1}</td>
               <td>{s.name}</td>
               <td>{s.code || "-"}</td>
-              {isSecondaryClass && (
-                <td>
-                  <button
-                    onClick={() =>
-                      navigate(`/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/cbt`)
-                    }
-                    disabled={!selectedTermId}
-                  >
-                    CBT
-                  </button>
-                </td>
-              )}
+              <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  onClick={() =>
+                    navigate(`/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/cbt`)
+                  }
+                  disabled={!selectedTermId}
+                >
+                  CBT
+                </button>
+                <button onClick={() => startEditSubject(s)}>Edit</button>
+              </td>
             </tr>
           ))}
           {subjects.length === 0 && (
             <tr>
-              <td colSpan={isSecondaryClass ? 4 : 3}>No courses yet for this term.</td>
+              <td colSpan="4">No courses yet for this term.</td>
             </tr>
           )}
         </tbody>
@@ -199,6 +234,35 @@ export default function ClassSubjects() {
           </button>
         </div>
       </div>
+
+      {editingSubject && (
+        <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 14, borderRadius: 10 }}>
+          <h4 style={{ marginTop: 0 }}>Edit Subject</h4>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              value={editSubjectName}
+              onChange={(e) => setEditSubjectName(e.target.value)}
+              placeholder="Subject name"
+              style={{ padding: 10, width: 280 }}
+            />
+            <input
+              value={editSubjectCode}
+              onChange={(e) => setEditSubjectCode(e.target.value)}
+              placeholder="Code (optional)"
+              style={{ padding: 10, width: 180 }}
+            />
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <button onClick={saveEditedSubject} disabled={savingEdit}>
+              {savingEdit ? "Saving..." : "Save Changes"}
+            </button>
+            <button onClick={cancelEditSubject} disabled={savingEdit}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
