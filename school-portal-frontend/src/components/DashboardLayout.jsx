@@ -109,54 +109,23 @@ function DashboardLayout() {
     }
   }, [user]);
 
-  const compactLabel = (value) => {
-    const v = String(value || "").toLowerCase();
-    const map = {
-      dashboard: "DB",
-      payments: "PM",
-      promotion: "PR",
-      subjects: "SB",
-      profile: "PF",
-      results: "RS",
-      cbt: "CB",
-      attendance: "AT",
-      topics: "TP",
-      "e-library": "EL",
-      "class activities": "CA",
-      "virtual class": "VC",
-      "question bank": "QB",
-      "school fees": "SF",
-      "behaviour rating": "BR",
-      users: "US",
-      schools: "SC",
-      overview: "OV",
-      "platform dashboard": "PD",
-      register: "RG",
-      academics: "AC",
-      academic_session: "AS",
-      transcript: "TR",
-      teacher_report: "TE",
-      student_report: "SR",
-    };
-
-    return map[v] || v.slice(0, 2).toUpperCase();
-  };
-
-  const navText = (label) => (isCompactSidebar ? compactLabel(label) : label);
+  const compactSidebarWidth = isCompactSidebar ? 118 : 240;
 
   const linkStyle = ({ isActive }) => ({
     display: "block",
-    padding: isCompactSidebar ? "10px 8px" : "10px 12px",
+    padding: isCompactSidebar ? "8px 6px" : "10px 12px",
     marginBottom: 6,
     borderRadius: 6,
     color: "#fff",
     textAlign: isCompactSidebar ? "center" : "left",
     textDecoration: "none",
     background: isActive ? "#2563eb" : "transparent",
-    whiteSpace: "nowrap",
+    whiteSpace: isCompactSidebar ? "normal" : "nowrap",
     overflow: "hidden",
-    textOverflow: "ellipsis",
-    fontSize: 13,
+    textOverflow: isCompactSidebar ? "clip" : "ellipsis",
+    fontSize: isCompactSidebar ? 11 : 13,
+    lineHeight: isCompactSidebar ? 1.2 : 1.35,
+    wordBreak: isCompactSidebar ? "break-word" : "normal",
   });
 
   const roleFeaturePath = (role, featureKey) => {
@@ -179,10 +148,10 @@ function DashboardLayout() {
     user?.role === "student" ? features.filter((f) => f !== "subjects") : features;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#eef3fb" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#eef3fb", overflowX: "hidden" }}>
       <aside
         style={{
-          width: isCompactSidebar ? 88 : 240,
+          width: compactSidebarWidth,
           minHeight: "100vh",
           background: "#1f2937",
           color: "#fff",
@@ -205,19 +174,19 @@ function DashboardLayout() {
           {user?.role === "super_admin" && (
             <>
               <NavLink to="/super-admin/dashboard" title="Platform Dashboard" style={linkStyle}>
-                {navText("platform dashboard")}
+                {isCompactSidebar ? "PLATFORM DASHBOARD" : "Platform Dashboard"}
               </NavLink>
               <NavLink to="/super-admin" title="Overview" style={linkStyle}>
-                {navText("overview")}
+                {isCompactSidebar ? "OVERVIEW" : "Overview"}
               </NavLink>
               <NavLink to="/super-admin/schools" title="Schools" style={linkStyle}>
-                {navText("schools")}
+                {isCompactSidebar ? "SCHOOLS" : "Schools"}
               </NavLink>
               <NavLink to="/super-admin/users" title="Users" style={linkStyle}>
-                {navText("users")}
+                {isCompactSidebar ? "USERS" : "Users"}
               </NavLink>
               <NavLink to="/super-admin/payments" title="Payments" style={linkStyle}>
-                {navText("payments")}
+                {isCompactSidebar ? "PAYMENTS" : "Payments"}
               </NavLink>
             </>
           )}
@@ -225,13 +194,13 @@ function DashboardLayout() {
           {user?.role === "school_admin" && (
             <>
               <NavLink to="/school/dashboard" title="Dashboard" style={linkStyle}>
-                {navText("dashboard")}
+                {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
               </NavLink>
               <NavLink to="/school/admin/payments" title="Payments" style={linkStyle}>
-                {navText("payments")}
+                {isCompactSidebar ? "PAYMENTS" : "Payments"}
               </NavLink>
               <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle}>
-                {navText("promotion")}
+                {isCompactSidebar ? "PROMOTION" : "Promotion"}
               </NavLink>
 
               {!isCompactSidebar && (
@@ -271,7 +240,7 @@ function DashboardLayout() {
                       title={featureLabel(f.feature)}
                       style={linkStyle}
                     >
-                      {isCompactSidebar ? compactLabel(f.feature) : featureLabel(f.feature)}
+                      {featureLabel(f.feature)}
                     </NavLink>
                   ))}
               </div>
@@ -281,12 +250,12 @@ function DashboardLayout() {
           {(user?.role === "staff" || user?.role === "student") && (
             <>
               <NavLink to={`/${user.role}/dashboard`} title="Dashboard" style={linkStyle}>
-                {navText("dashboard")}
+                {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
               </NavLink>
 
               {user?.role === "student" && (
                 <NavLink to="/student/subjects" title="Subjects" style={linkStyle}>
-                  {navText("subjects")}
+                  {isCompactSidebar ? "SUBJECTS" : "Subjects"}
                 </NavLink>
               )}
 
@@ -311,11 +280,11 @@ function DashboardLayout() {
                             textAlign: isCompactSidebar ? "center" : "left",
                           }}
                         >
-                          {isCompactSidebar ? "CT" : `${featureLabel(f)} (CLASS TEACHER ONLY)`}
+                          {isCompactSidebar ? featureLabel(f) : `${featureLabel(f)} (CLASS TEACHER ONLY)`}
                         </span>
                       ) : (
                         <NavLink title={featureLabel(f)} to={roleFeaturePath(user.role, f)} style={linkStyle}>
-                          {isCompactSidebar ? compactLabel(f) : featureLabel(f)}
+                          {featureLabel(f)}
                         </NavLink>
                       )}
                     </li>
@@ -347,8 +316,11 @@ function DashboardLayout() {
       <main
         style={{
           flex: 1,
+          width: isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",
           minWidth: 0,
-          padding: isCompactSidebar ? 14 : 30,
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          padding: isCompactSidebar ? "10px 8px 10px 10px" : 30,
           overflowX: "hidden",
         }}
       >

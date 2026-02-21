@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Models\SchoolFeature;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
@@ -16,9 +17,20 @@ class DashboardController extends Controller
         $schoolId = $request->user()->school_id;
         $school = School::find($schoolId);
 
-        $students = User::where('school_id', $schoolId)
-            ->where('role', 'student')
-            ->count();
+        $genderStats = User::query()
+            ->from('users')
+            ->leftJoin('students', 'students.user_id', '=', 'users.id')
+            ->where('users.school_id', $schoolId)
+            ->where('users.role', 'student')
+            ->selectRaw('COUNT(users.id) as total_students')
+            ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(students.sex, ''))) IN ('m', 'male') THEN 1 ELSE 0 END) as male_students")
+            ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(students.sex, ''))) IN ('f', 'female') THEN 1 ELSE 0 END) as female_students")
+            ->first();
+
+        $students = (int) ($genderStats->total_students ?? 0);
+        $maleStudents = (int) ($genderStats->male_students ?? 0);
+        $femaleStudents = (int) ($genderStats->female_students ?? 0);
+        $unspecifiedStudents = max(0, $students - ($maleStudents + $femaleStudents));
 
         $staff = User::where('school_id', $schoolId)
             ->where('role', 'staff')
@@ -34,6 +46,9 @@ class DashboardController extends Controller
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
             'students' => $students,
+            'male_students' => $maleStudents,
+            'female_students' => $femaleStudents,
+            'unspecified_students' => $unspecifiedStudents,
             'staff' => $staff,
             'enabled_modules' => $enabledModules,
         ]);

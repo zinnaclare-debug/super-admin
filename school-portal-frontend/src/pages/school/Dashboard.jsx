@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../../services/api";
 import "./Dashboard.css";
 
-import heroArt from "../../assets/dashboard/hero.svg";
+import heroArt from "../../assets/dashboard/features.svg";
+import cbtArt from "../../assets/dashboard/staff.svg";
+import resultsArt from "../../assets/dashboard/hero.svg";
+import classArt from "../../assets/dashboard/modules.svg";
 import brandingArt from "../../assets/dashboard/branding.svg";
-import studentsArt from "../../assets/dashboard/students.svg";
-import staffArt from "../../assets/dashboard/staff.svg";
-import modulesArt from "../../assets/dashboard/modules.svg";
-import featuresArt from "../../assets/dashboard/features.svg";
 
 const toAbsoluteUrl = (u) => {
   if (!u) return "";
@@ -21,11 +20,6 @@ const formatCount = (value) => {
   return Number.isFinite(n) ? n.toLocaleString() : "0";
 };
 
-const toModuleLabel = (value) =>
-  String(value || "")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (x) => x.toUpperCase());
-
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
@@ -33,6 +27,9 @@ function SchoolDashboard() {
     head_of_school_name: "",
     head_signature_url: null,
     students: 0,
+    male_students: 0,
+    female_students: 0,
+    unspecified_students: 0,
     staff: 0,
     enabled_modules: 0,
   });
@@ -57,6 +54,9 @@ function SchoolDashboard() {
           head_of_school_name: res.data?.head_of_school_name ?? "",
           head_signature_url: res.data?.head_signature_url ?? null,
           students: res.data?.students ?? 0,
+          male_students: res.data?.male_students ?? 0,
+          female_students: res.data?.female_students ?? 0,
+          unspecified_students: res.data?.unspecified_students ?? 0,
           staff: res.data?.staff ?? 0,
           enabled_modules: res.data?.enabled_modules ?? 0,
         });
@@ -69,6 +69,9 @@ function SchoolDashboard() {
           head_of_school_name: "",
           head_signature_url: null,
           students: 0,
+          male_students: 0,
+          female_students: 0,
+          unspecified_students: 0,
           staff: 0,
           enabled_modules: 0,
         }));
@@ -80,29 +83,6 @@ function SchoolDashboard() {
 
     load();
   }, []);
-
-  const enabledFeatureNames = useMemo(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("features") || "[]");
-      if (!Array.isArray(raw)) return [];
-
-      if (raw.length > 0 && typeof raw[0] === "object") {
-        return raw
-          .filter((f) => f && f.enabled)
-          .map((f) => toModuleLabel(f.feature))
-          .filter(Boolean);
-      }
-
-      return raw.map((f) => toModuleLabel(f)).filter(Boolean);
-    } catch {
-      return [];
-    }
-  }, [stats.enabled_modules]);
-
-  const moduleHighlights = useMemo(() => {
-    if (enabledFeatureNames.length > 0) return enabledFeatureNames.slice(0, 8);
-    return ["CBT", "Results", "Admissions", "E-Library", "Attendance", "Virtual Class"];
-  }, [enabledFeatureNames]);
 
   const brandingReady =
     Boolean(logoPreview || stats.school_logo_url) &&
@@ -164,39 +144,32 @@ function SchoolDashboard() {
     setHeadSignaturePreview(file ? URL.createObjectURL(file) : null);
   };
 
-  const metricCards = [
+  const featureCards = [
     {
-      key: "students",
-      title: "Students",
-      subtitle: "Total learners",
-      value: loading ? "..." : formatCount(stats.students),
-      art: studentsArt,
-      accent: "sd-metric--blue",
+      key: "cbt",
+      title: "CBT",
+      description: "Computer-based testing with secure timed exams.",
+      art: cbtArt,
     },
     {
-      key: "staff",
-      title: "Staff",
-      subtitle: "Teachers and staff",
-      value: loading ? "..." : formatCount(stats.staff),
-      art: staffArt,
-      accent: "sd-metric--teal",
+      key: "results",
+      title: "Exam Results",
+      description: "Students rejoicing over exam results and performance growth.",
+      art: resultsArt,
     },
     {
-      key: "modules",
-      title: "Modules",
-      subtitle: "Enabled modules",
-      value: loading ? "..." : formatCount(stats.enabled_modules),
-      art: modulesArt,
-      accent: "sd-metric--green",
+      key: "class",
+      title: "Learners in Class",
+      description: "Learners in class with active participation and engagement.",
+      art: classArt,
     },
-    {
-      key: "features",
-      title: "Features",
-      subtitle: "Active tools",
-      value: formatCount(enabledFeatureNames.length || stats.enabled_modules),
-      art: featuresArt,
-      accent: "sd-metric--orange",
-    },
+  ];
+
+  const populationStats = [
+    { key: "male", label: "Total Male Students", value: stats.male_students },
+    { key: "female", label: "Total Female Students", value: stats.female_students },
+    { key: "students", label: "Total Students", value: stats.students },
+    { key: "staff", label: "Total Staff", value: stats.staff },
   ];
 
   return (
@@ -206,47 +179,59 @@ function SchoolDashboard() {
           <p className="sd-kicker">School Admin Dashboard</p>
           <h1>{stats.school_name || "Your School"}</h1>
           <p className="sd-subtext">
-            Manage students, staff, modules and school branding from one modern control center.
+            Modern school operations dashboard for academics, staff, and student performance.
           </p>
 
           <div className="sd-tags">
             <span className="sd-tag">{brandingReady ? "Branding Ready" : "Branding Incomplete"}</span>
-            <span className="sd-tag sd-tag--soft">{formatCount(stats.students)} Students</span>
-            <span className="sd-tag sd-tag--soft">{formatCount(stats.staff)} Staff</span>
+            <span className="sd-tag sd-tag--soft">{formatCount(stats.enabled_modules)} Enabled Modules</span>
           </div>
         </div>
 
         <div className="sd-hero__visual">
-          <img src={heroArt} alt="Education dashboard artwork" />
+          <img src={heroArt} alt="School features illustration" />
         </div>
       </section>
 
-      <section className="sd-metrics">
-        {metricCards.map((item) => (
-          <article key={item.key} className={`sd-card sd-metric ${item.accent}`}>
-            <div>
-              <p className="sd-metric__title">{item.title}</p>
-              <h3>{item.value}</h3>
-              <p className="sd-metric__sub">{item.subtitle}</p>
-            </div>
-            <img src={item.art} alt={`${item.title} illustration`} />
-          </article>
-        ))}
-      </section>
-
-      <section className="sd-card sd-modules">
+      <section className="sd-card sd-main-features">
         <div className="sd-section-head">
-          <h2>Modules and Features</h2>
-          <p>Quick view of tools enabled for your school.</p>
+          <h2>Main Features</h2>
+          <p>Three core tools for academic workflow.</p>
         </div>
 
-        <div className="sd-module-scroll">
-          {moduleHighlights.map((feature, idx) => (
-            <div key={`${feature}-${idx}`} className="sd-module-item">
-              <span>{feature}</span>
+        <div className="sd-features-grid">
+          {featureCards.map((item) => (
+            <article key={item.key} className="sd-feature-card">
+              <img src={item.art} alt={`${item.title} illustration`} />
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="sd-card sd-population">
+        <div className="sd-section-head">
+          <h2>Population Details</h2>
+          <p>Live count by gender, total students, and staff.</p>
+        </div>
+
+        <div className="sd-population-grid">
+          {populationStats.map((item) => (
+            <div key={item.key} className="sd-population-item">
+              <p>{item.label}</p>
+              <h3>{loading ? "..." : formatCount(item.value)}</h3>
             </div>
           ))}
         </div>
+
+        {!loading && Number(stats.unspecified_students || 0) > 0 && (
+          <p className="sd-note">
+            {formatCount(stats.unspecified_students)} student record(s) do not have gender set yet.
+          </p>
+        )}
       </section>
 
       <section className="sd-card sd-branding">
