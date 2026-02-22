@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import heroArt from "../assets/dashboard/hero.svg";
+import graduationArt from "../assets/login/Graduation-cuate.svg";
 import "./Login.css";
 
 function Login() {
@@ -8,6 +10,53 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tenantSchool, setTenantSchool] = useState(null);
+
+  const toAbsoluteUrl = (url) => {
+    if (!url) return "";
+    if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+
+    const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+    const origin = base ? new URL(base).origin : window.location.origin;
+    return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  const tenantLogoUrl = useMemo(() => {
+    if (!tenantSchool?.logo_path) return "";
+    return toAbsoluteUrl(`/storage/${tenantSchool.logo_path}`);
+  }, [tenantSchool]);
+
+  const tenantInitials = useMemo(() => {
+    const name = (tenantSchool?.name || "").trim();
+    if (!name) return "SP";
+
+    return name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+  }, [tenantSchool]);
+
+  useEffect(() => {
+    let active = true;
+
+    api
+      .get("/api/tenant/context")
+      .then((res) => {
+        if (!active) return;
+        if (res?.data?.is_tenant && res?.data?.school) {
+          setTenantSchool(res.data.school);
+        }
+      })
+      .catch(() => {
+        // Keep generic login page on errors / central domain.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,15 +102,45 @@ function Login() {
 
   return (
     <div className="login-page">
+      <div className="login-ambient login-ambient--one" />
+      <div className="login-ambient login-ambient--two" />
       <div className="login-shell">
         <section className="login-hero">
-          <span className="hero-pill">Education Portal</span>
-          <h1>Welcome Back to School</h1>
+          <div className="hero-meta">
+            <span className="hero-pill">Smart School Portal</span>
+            <span className="hero-domain">{window.location.hostname}</span>
+          </div>
+
+          <h1>
+            {tenantSchool?.name
+              ? `Welcome Back to ${tenantSchool.name}`
+              : "Welcome Back to School"}
+          </h1>
+
           <p>
             One digital campus for learning, teaching, and school operations.
             Sign in to access classroom tools, performance records, and your
             school community.
           </p>
+
+          <div className="hero-visual">
+            <img className="hero-visual-main" src={heroArt} alt="School management illustration" />
+            <img className="hero-visual-accent" src={graduationArt} alt="Graduation illustration" />
+            <svg
+              className="hero-orbit"
+              viewBox="0 0 220 220"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="110" cy="110" r="86" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
+              <circle cx="110" cy="110" r="64" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+              <circle cx="34" cy="108" r="6" fill="#f59e0b" />
+              <circle cx="186" cy="108" r="6" fill="#10b981" />
+              <circle cx="110" cy="24" r="6" fill="#38bdf8" />
+              <circle cx="110" cy="196" r="6" fill="#f97316" />
+            </svg>
+          </div>
+
           <ul className="hero-list">
             <li>Classes, assessments, and reports in one place</li>
             <li>Secure access for students, staff, and administrators</li>
@@ -70,9 +149,26 @@ function Login() {
         </section>
 
         <section className="login-card">
-          <h2>Sign In to Continue</h2>
+          <div className="login-brand">
+            <div className="login-mark">
+              {tenantLogoUrl ? (
+                <img src={tenantLogoUrl} alt={`${tenantSchool?.name || "School"} logo`} />
+              ) : (
+                <span>{tenantInitials}</span>
+              )}
+            </div>
+            <div>
+              <h2>Sign In to Continue</h2>
+              <p className="login-school-name">
+                {tenantSchool?.name || "School Portal"}
+              </p>
+            </div>
+          </div>
+
           <p className="login-subtitle">
-            Use your official school email and password.
+            {tenantSchool?.name
+              ? `Use your ${tenantSchool.name} account email and password.`
+              : "Use your official school email and password."}
           </p>
 
           <form onSubmit={handleSubmit} className="login-form">
@@ -102,6 +198,10 @@ function Login() {
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
+
+          <p className="login-help">
+            Protected access. Contact school admin if you cannot sign in.
+          </p>
         </section>
       </div>
     </div>

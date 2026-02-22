@@ -10,6 +10,11 @@ if (! function_exists('school')) {
             return auth()->user()->school;
         }
 
+        $request = request();
+        if ($request) {
+            return $request->attributes->get((string) config('tenancy.request_key', 'tenant_school'));
+        }
+
         return null;
     }
 }
