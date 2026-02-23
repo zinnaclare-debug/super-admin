@@ -7,8 +7,10 @@ use App\Models\AcademicSession;
 use App\Models\School;
 use App\Models\SchoolFeePayment;
 use App\Models\SchoolFeeSetting;
+use App\Models\SchoolClass;
 use App\Models\Term;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PaymentsController extends Controller
 {
@@ -22,10 +24,21 @@ class PaymentsController extends Controller
             ], 422);
         }
 
-        $setting = SchoolFeeSetting::where('school_id', $schoolId)
+        $activeLevels = $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []);
+        $settings = SchoolFeeSetting::where('school_id', $schoolId)
             ->where('academic_session_id', $session->id)
             ->where('term_id', $term->id)
-            ->first();
+            ->get();
+        $settingsByLevel = $settings
+            ->filter(fn ($row) => !empty($row->level))
+            ->keyBy(fn ($row) => strtolower(trim((string) $row->level)));
+        $feesByLevel = [];
+        foreach ($activeLevels as $level) {
+            $feesByLevel[$level] = isset($settingsByLevel[$level])
+                ? (float) $settingsByLevel[$level]->amount_due
+                : null;
+        }
+        $legacySetting = $settings->first(fn ($row) => empty($row->level));
         $school = School::where('id', $schoolId)->first();
 
         return response()->json([
@@ -39,7 +52,9 @@ class PaymentsController extends Controller
                     'id' => $term->id,
                     'name' => $term->name,
                 ],
-                'amount_due' => (float) ($setting?->amount_due ?? 0),
+                'active_levels' => $activeLevels,
+                'fees_by_level' => $feesByLevel,
+                'legacy_amount_due' => $legacySetting ? (float) $legacySetting->amount_due : null,
                 'paystack_subaccount_code' => $school?->paystack_subaccount_code,
             ],
         ]);
@@ -56,7 +71,9 @@ class PaymentsController extends Controller
         }
 
         $payload = $request->validate([
-            'amount_due' => 'required|numeric|min:0',
+            'fees_by_level' => 'sometimes|array',
+            'fees_by_level.*' => 'nullable|numeric|min:0',
+            'amount_due' => 'sometimes|numeric|min:0',
             'paystack_subaccount_code' => [
                 'nullable',
                 'string',
@@ -65,17 +82,61 @@ class PaymentsController extends Controller
             ],
         ]);
 
-        $setting = SchoolFeeSetting::updateOrCreate(
-            [
-                'school_id' => $schoolId,
-                'academic_session_id' => $session->id,
-                'term_id' => $term->id,
-            ],
-            [
-                'amount_due' => round((float) $payload['amount_due'], 2),
-                'set_by_user_id' => $request->user()->id,
-            ]
-        );
+        $activeLevels = $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []);
+        $allowedLevelSet = collect($activeLevels)->flip();
+
+        $normalizedFees = [];
+        if (array_key_exists('fees_by_level', $payload)) {
+            foreach ((array) $payload['fees_by_level'] as $level => $amount) {
+                $normalizedLevel = strtolower(trim((string) $level));
+                if (!$allowedLevelSet->has($normalizedLevel)) {
+                    return response()->json([
+                        'message' => "Invalid level '{$level}' for this session.",
+                    ], 422);
+                }
+                if ($amount === null || $amount === '') {
+                    continue;
+                }
+                $normalizedFees[$normalizedLevel] = round((float) $amount, 2);
+            }
+        }
+
+        DB::transaction(function () use (
+            $schoolId,
+            $session,
+            $term,
+            $request,
+            $normalizedFees,
+            $payload
+        ) {
+            SchoolFeeSetting::where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('term_id', $term->id)
+                ->delete();
+
+            if (!empty($normalizedFees)) {
+                foreach ($normalizedFees as $level => $amountDue) {
+                    SchoolFeeSetting::create([
+                        'school_id' => $schoolId,
+                        'academic_session_id' => $session->id,
+                        'term_id' => $term->id,
+                        'level' => $level,
+                        'amount_due' => $amountDue,
+                        'set_by_user_id' => $request->user()->id,
+                    ]);
+                }
+            } elseif (array_key_exists('amount_due', $payload)) {
+                // Legacy fallback for old clients still sending a single amount.
+                SchoolFeeSetting::create([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $session->id,
+                    'term_id' => $term->id,
+                    'level' => null,
+                    'amount_due' => round((float) $payload['amount_due'], 2),
+                    'set_by_user_id' => $request->user()->id,
+                ]);
+            }
+        });
 
         $school = School::where('id', $schoolId)->first();
         if ($school) {
@@ -83,11 +144,25 @@ class PaymentsController extends Controller
             $school->save();
         }
 
+        $saved = SchoolFeeSetting::where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('term_id', $term->id)
+            ->get();
+        $savedByLevel = $saved
+            ->filter(fn ($row) => !empty($row->level))
+            ->keyBy(fn ($row) => strtolower(trim((string) $row->level)));
+        $feesByLevel = [];
+        foreach ($activeLevels as $level) {
+            $feesByLevel[$level] = isset($savedByLevel[$level])
+                ? (float) $savedByLevel[$level]->amount_due
+                : null;
+        }
+
         return response()->json([
             'message' => 'Payment settings saved.',
             'data' => [
-                'id' => $setting->id,
-                'amount_due' => (float) $setting->amount_due,
+                'active_levels' => $activeLevels,
+                'fees_by_level' => $feesByLevel,
                 'paystack_subaccount_code' => $school?->paystack_subaccount_code,
             ],
         ]);
@@ -174,6 +249,7 @@ class PaymentsController extends Controller
                     'id' => $term->id,
                     'name' => $term->name,
                 ],
+                'active_levels' => $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []),
             ],
         ]);
     }
@@ -199,5 +275,36 @@ class PaymentsController extends Controller
         }
 
         return [$session, $term];
+    }
+
+    private function extractSessionLevels(int $schoolId, int $sessionId, mixed $rawLevels): array
+    {
+        $allowed = ['nursery', 'primary', 'secondary'];
+
+        $levels = collect(is_array($rawLevels) ? $rawLevels : [])
+            ->map(function ($item) {
+                $name = is_array($item) ? ($item['level'] ?? null) : $item;
+                return strtolower(trim((string) $name));
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $levels = array_values(array_unique(array_intersect($levels, $allowed)));
+        if (!empty($levels)) {
+            return $levels;
+        }
+
+        $classLevels = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->pluck('level')
+            ->map(fn ($level) => strtolower(trim((string) $level)))
+            ->filter(fn ($level) => in_array($level, $allowed, true))
+            ->unique()
+            ->values()
+            ->all();
+
+        return !empty($classLevels) ? $classLevels : ['primary', 'secondary'];
     }
 }

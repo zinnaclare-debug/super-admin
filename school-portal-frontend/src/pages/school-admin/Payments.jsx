@@ -3,13 +3,31 @@ import api from "../../services/api";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
+const LEVEL_LABELS = {
+  nursery: "Nursery",
+  primary: "Primary",
+  secondary: "Secondary",
+};
+
+const buildInitialLevelFees = (levels = [], feesByLevel = {}) => {
+  const next = {};
+  levels.forEach((level) => {
+    const raw = feesByLevel?.[level];
+    next[level] = {
+      enabled: raw !== null && raw !== undefined && raw !== "",
+      amount: raw !== null && raw !== undefined && raw !== "" ? String(raw) : "",
+    };
+  });
+  return next;
+};
 
 export default function SchoolAdminPayments() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
-  const [amountDue, setAmountDue] = useState("");
+  const [activeLevels, setActiveLevels] = useState([]);
+  const [levelFees, setLevelFees] = useState({});
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [context, setContext] = useState(null);
   const [sessionConfigError, setSessionConfigError] = useState("");
@@ -25,17 +43,16 @@ export default function SchoolAdminPayments() {
       const data = res.data?.data || null;
       setSessionConfigError("");
       setContext(data);
-      setAmountDue(String(data?.amount_due ?? ""));
+      const levels = Array.isArray(data?.active_levels) ? data.active_levels : [];
+      setActiveLevels(levels);
+      setLevelFees(buildInitialLevelFees(levels, data?.fees_by_level || {}));
       setPaystackSubaccountCode(String(data?.paystack_subaccount_code ?? ""));
     } catch (e) {
       const message = e?.response?.data?.message || "Failed to load payment config.";
-      if (isMissingCurrentSessionTerm(message)) {
-        setSessionConfigError(message);
-      } else {
-        alert(message);
-      }
+      setSessionConfigError(message);
       setContext(null);
-      setAmountDue("");
+      setActiveLevels([]);
+      setLevelFees({});
       setPaystackSubaccountCode("");
     } finally {
       setConfigLoading(false);
@@ -59,11 +76,7 @@ export default function SchoolAdminPayments() {
       if (res.data?.context) setContext((prev) => ({ ...(prev || {}), ...res.data.context }));
     } catch (e) {
       const message = e?.response?.data?.message || "Failed to load payments.";
-      if (isMissingCurrentSessionTerm(message)) {
-        setSessionConfigError(message);
-      } else {
-        alert(message);
-      }
+      if (isMissingCurrentSessionTerm(message)) setSessionConfigError(message);
       setRows([]);
       setMeta(null);
     } finally {
@@ -81,15 +94,27 @@ export default function SchoolAdminPayments() {
   }, [configLoaded, search, page, sessionConfigError]);
 
   const saveConfig = async () => {
-    const amount = Number(amountDue);
-    if (!Number.isFinite(amount) || amount < 0) {
-      return alert("Enter a valid school fee amount.");
+    if (!activeLevels.length) {
+      return alert("No active education levels found for this session.");
+    }
+
+    const payloadFees = {};
+    for (const level of activeLevels) {
+      const row = levelFees[level];
+      if (!row?.enabled) continue;
+
+      const amount = Number(row.amount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return alert(`Enter a valid fee amount for ${LEVEL_LABELS[level] || level}.`);
+      }
+
+      payloadFees[level] = amount;
     }
 
     setSaving(true);
     try {
       await api.put("/api/school-admin/payments/config", {
-        amount_due: amount,
+        fees_by_level: payloadFees,
         paystack_subaccount_code: paystackSubaccountCode.trim() || null,
       });
       alert("Payment settings saved.");
@@ -100,6 +125,26 @@ export default function SchoolAdminPayments() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleLevel = (level, enabled) => {
+    setLevelFees((prev) => ({
+      ...prev,
+      [level]: {
+        enabled,
+        amount: enabled ? prev[level]?.amount || "" : "",
+      },
+    }));
+  };
+
+  const changeLevelAmount = (level, amount) => {
+    setLevelFees((prev) => ({
+      ...prev,
+      [level]: {
+        enabled: true,
+        amount,
+      },
+    }));
   };
 
   return (
@@ -119,17 +164,49 @@ export default function SchoolAdminPayments() {
           <p style={{ margin: "4px 0" }}>
             <strong>Current Term:</strong> {context?.current_term?.name || "-"}
           </p>
-          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <label htmlFor="amount_due"><strong>School Fee Amount (NGN):</strong></label>
-            <input
-              id="amount_due"
-              type="number"
-              min="0"
-              step="0.01"
-              value={amountDue}
-              onChange={(e) => setAmountDue(e.target.value)}
-              style={{ width: 220, padding: 10 }}
-            />
+          <div style={{ marginTop: 12 }}>
+            <strong>School Fee By Education Level (NGN):</strong>
+            {!activeLevels.length ? (
+              <p style={{ margin: "8px 0 0", opacity: 0.8 }}>
+                No active levels found in this session.
+              </p>
+            ) : (
+              <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                {activeLevels.map((level) => (
+                  <div
+                    key={level}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 130 }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(levelFees[level]?.enabled)}
+                        onChange={(e) => toggleLevel(level, e.target.checked)}
+                      />
+                      <span>{LEVEL_LABELS[level] || level}</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={`Enter ${LEVEL_LABELS[level] || level} fee`}
+                      value={levelFees[level]?.amount ?? ""}
+                      disabled={!levelFees[level]?.enabled}
+                      onChange={(e) => changeLevelAmount(level, e.target.value)}
+                      style={{ width: 220, padding: 8 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <label htmlFor="paystack_subaccount_code"><strong>Paystack Subaccount Code:</strong></label>

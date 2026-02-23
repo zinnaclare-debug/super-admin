@@ -10,8 +10,11 @@ use App\Models\SchoolFeeSetting;
 use App\Models\Student;
 use App\Models\Term;
 use Carbon\Carbon;
+use App\Models\Enrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SchoolFeesController extends Controller
@@ -32,10 +35,18 @@ class SchoolFeesController extends Controller
             ], 422);
         }
 
-        $setting = SchoolFeeSetting::where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->where('term_id', $term->id)
-            ->first();
+        $studentLevel = $this->resolveStudentLevel(
+            $schoolId,
+            (int) $student->id,
+            (int) $session->id,
+            (int) $term->id
+        );
+        $setting = $this->resolveFeeSetting(
+            $schoolId,
+            (int) $session->id,
+            (int) $term->id,
+            $studentLevel
+        );
 
         $amountDue = (float) ($setting?->amount_due ?? 0);
         $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
@@ -77,6 +88,8 @@ class SchoolFeesController extends Controller
                     'name' => $term->name,
                 ],
                 'fee' => [
+                    'student_level' => $studentLevel,
+                    'configured_level' => $setting?->level,
                     'amount_due' => $amountDue,
                     'total_paid' => $totalPaid,
                     'outstanding' => $outstanding,
@@ -109,14 +122,25 @@ class SchoolFeesController extends Controller
             ], 422);
         }
 
-        $setting = SchoolFeeSetting::where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->where('term_id', $term->id)
-            ->first();
+        $studentLevel = $this->resolveStudentLevel(
+            $schoolId,
+            (int) $student->id,
+            (int) $session->id,
+            (int) $term->id
+        );
+        $setting = $this->resolveFeeSetting(
+            $schoolId,
+            (int) $session->id,
+            (int) $term->id,
+            $studentLevel
+        );
 
         $amountDue = (float) ($setting?->amount_due ?? 0);
         if ($amountDue <= 0) {
-            return response()->json(['message' => 'School fees have not been configured yet.'], 422);
+            $message = $studentLevel
+                ? "School fees have not been configured for {$studentLevel} level yet."
+                : 'School fees have not been configured yet.';
+            return response()->json(['message' => $message], 422);
         }
 
         $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
@@ -342,5 +366,64 @@ class SchoolFeesController extends Controller
         }
 
         return [$session, $term];
+    }
+
+    private function resolveFeeSetting(int $schoolId, int $sessionId, int $termId, ?string $studentLevel): ?SchoolFeeSetting
+    {
+        $base = SchoolFeeSetting::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId);
+
+        if ($studentLevel) {
+            $match = (clone $base)
+                ->where('level', $studentLevel)
+                ->first();
+            if ($match) {
+                return $match;
+            }
+        }
+
+        $legacy = (clone $base)
+            ->whereNull('level')
+            ->first();
+        if ($legacy) {
+            return $legacy;
+        }
+
+        if (!$studentLevel) {
+            return (clone $base)->orderBy('id')->first();
+        }
+
+        return null;
+    }
+
+    private function resolveStudentLevel(int $schoolId, int $studentId, int $sessionId, int $termId): ?string
+    {
+        $level = Enrollment::query()
+            ->where('enrollments.student_id', $studentId)
+            ->where('enrollments.term_id', $termId)
+            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
+                $q->where('enrollments.school_id', $schoolId);
+            })
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->where('classes.school_id', $schoolId)
+            ->orderByDesc('enrollments.id')
+            ->value('classes.level');
+
+        if (!$level) {
+            $level = DB::table('class_students')
+                ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                ->where('class_students.school_id', $schoolId)
+                ->where('class_students.student_id', $studentId)
+                ->where('class_students.academic_session_id', $sessionId)
+                ->orderByDesc('class_students.id')
+                ->value('classes.level');
+        }
+
+        $normalized = strtolower(trim((string) $level));
+        return in_array($normalized, ['nursery', 'primary', 'secondary'], true)
+            ? $normalized
+            : null;
     }
 }
