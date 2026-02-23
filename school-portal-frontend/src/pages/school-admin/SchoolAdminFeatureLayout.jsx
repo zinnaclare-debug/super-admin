@@ -43,6 +43,7 @@ export default function SchoolAdminFeatureLayout() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: "center",
           gap: 12,
@@ -52,7 +53,7 @@ export default function SchoolAdminFeatureLayout() {
           borderRadius: 10,
         }}
       >
-        <h2 style={{ margin: 0 }}>{titleFromPath(pathname)}</h2>
+        <h2 style={{ margin: 0, fontSize: "clamp(1.05rem, 3.5vw, 1.5rem)" }}>{titleFromPath(pathname)}</h2>
         {showBack ? (
           <button
             onClick={() => navigate(-1)}

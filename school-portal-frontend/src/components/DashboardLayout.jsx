@@ -20,9 +20,16 @@ function DashboardLayout() {
     if (typeof window === "undefined") return false;
     return window.innerWidth <= 900;
   });
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= 768;
+  });
 
   useEffect(() => {
-    const onResize = () => setIsCompactSidebar(window.innerWidth <= 900);
+    const onResize = () => {
+      setIsCompactSidebar(window.innerWidth <= 900);
+      setIsMobile(window.innerWidth <= 768);
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -113,19 +120,19 @@ function DashboardLayout() {
 
   const linkStyle = ({ isActive }) => ({
     display: "block",
-    padding: isCompactSidebar ? "8px 6px" : "10px 12px",
+    padding: isMobile ? "10px 8px" : isCompactSidebar ? "8px 6px" : "10px 12px",
     marginBottom: 6,
     borderRadius: 6,
     color: "#fff",
-    textAlign: isCompactSidebar ? "center" : "left",
+    textAlign: isMobile || isCompactSidebar ? "center" : "left",
     textDecoration: "none",
     background: isActive ? "#2563eb" : "transparent",
-    whiteSpace: isCompactSidebar ? "normal" : "nowrap",
+    whiteSpace: isMobile || isCompactSidebar ? "normal" : "nowrap",
     overflow: "hidden",
-    textOverflow: isCompactSidebar ? "clip" : "ellipsis",
-    fontSize: isCompactSidebar ? 11 : 13,
-    lineHeight: isCompactSidebar ? 1.2 : 1.35,
-    wordBreak: isCompactSidebar ? "break-word" : "normal",
+    textOverflow: isMobile || isCompactSidebar ? "clip" : "ellipsis",
+    fontSize: isMobile ? 12 : isCompactSidebar ? 11 : 13,
+    lineHeight: isMobile || isCompactSidebar ? 1.2 : 1.35,
+    wordBreak: isMobile || isCompactSidebar ? "break-word" : "normal",
   });
 
   const roleFeaturePath = (role, featureKey) => {
@@ -148,20 +155,29 @@ function DashboardLayout() {
     user?.role === "student" ? features.filter((f) => f !== "subjects") : features;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#eef3fb", overflowX: "hidden" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        minHeight: "100vh",
+        background: "#eef3fb",
+        overflowX: "hidden",
+      }}
+    >
       <aside
         style={{
-          width: compactSidebarWidth,
-          minHeight: "100vh",
+          width: isMobile ? "100%" : compactSidebarWidth,
+          maxWidth: isMobile ? "100%" : compactSidebarWidth,
+          minHeight: isMobile ? "auto" : "100vh",
           background: "#1f2937",
           color: "#fff",
-          padding: isCompactSidebar ? "16px 8px" : 20,
+          padding: isMobile ? "14px 10px" : isCompactSidebar ? "16px 8px" : 20,
           overflowY: "auto",
           overflowX: "hidden",
           flexShrink: 0,
         }}
       >
-        {!isCompactSidebar ? (
+        {!isCompactSidebar || isMobile ? (
           <>
             <h3 style={{ margin: 0 }}>Welcome, {user?.name}</h3>
             <p style={{ opacity: 0.8, marginTop: 6 }}>{roleLabel}</p>
@@ -316,12 +332,12 @@ function DashboardLayout() {
       <main
         style={{
           flex: 1,
-          width: isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",
+          width: isMobile ? "100%" : isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",
           minWidth: 0,
           maxWidth: "100%",
           boxSizing: "border-box",
-          padding: isCompactSidebar ? "10px 8px 10px 10px" : 30,
-          overflowX: "hidden",
+          padding: isMobile ? "12px 10px" : isCompactSidebar ? "10px 8px 10px 10px" : 30,
+          overflowX: "auto",
         }}
       >
         <Outlet />

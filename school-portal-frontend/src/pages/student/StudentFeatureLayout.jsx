@@ -32,6 +32,7 @@ export default function StudentFeatureLayout() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: "center",
           gap: 12,
@@ -41,7 +42,7 @@ export default function StudentFeatureLayout() {
           borderRadius: 10,
         }}
       >
-        <h2 style={{ margin: 0 }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: "clamp(1.05rem, 3.5vw, 1.5rem)" }}>{title}</h2>
       </div>
 
       <div style={{ marginTop: 12 }}>

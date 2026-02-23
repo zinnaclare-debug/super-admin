@@ -239,14 +239,30 @@ function Schools() {
     }
   };
 
-  return (
-    <div>
-      <h1>Schools</h1>
+  const formInputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    minHeight: 36,
+    padding: "8px 10px",
+  };
 
-      <form onSubmit={createSchoolWithAdmin} style={{ marginBottom: 20 }}>
+  return (
+    <div style={{ width: "100%", maxWidth: "100%" }}>
+      <h1 style={{ marginTop: 0, fontSize: "clamp(1.7rem, 3vw, 2.4rem)" }}>Schools</h1>
+
+      <form
+        onSubmit={createSchoolWithAdmin}
+        style={{
+          marginBottom: 20,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 8,
+        }}
+      >
         <input
           placeholder="School Name"
           value={schoolName}
+          style={formInputStyle}
           onChange={(e) => {
             const value = e.target.value;
             setSchoolName(value);
@@ -258,6 +274,7 @@ function Schools() {
         <input
           placeholder="Subdomain (e.g. firstschool)"
           value={schoolSubdomain}
+          style={formInputStyle}
           onChange={(e) => {
             setSubdomainTouched(true);
             setSchoolSubdomain(slugifySubdomain(e.target.value));
@@ -266,116 +283,128 @@ function Schools() {
         <input
           placeholder="School Email"
           value={schoolEmail}
+          style={formInputStyle}
           onChange={(e) => setSchoolEmail(e.target.value)}
         />
         <input
           placeholder="Admin Name"
           value={newAdminName}
+          style={formInputStyle}
           onChange={(e) => setNewAdminName(e.target.value)}
         />
         <input
           placeholder="Admin Email"
           value={newAdminEmail}
+          style={formInputStyle}
           onChange={(e) => setNewAdminEmail(e.target.value)}
         />
 
-        {createError && <div style={{ color: "red", marginTop: 8 }}>{createError}</div>}
+        {createError && (
+          <div style={{ color: "red", marginTop: 8, gridColumn: "1 / -1" }}>{createError}</div>
+        )}
 
-        <button type="submit" disabled={creating}>
+        <button
+          type="submit"
+          disabled={creating}
+          style={{ gridColumn: "1 / -1", justifySelf: "start" }}
+        >
           {creating ? "Creating..." : "Create School & Admin"}
         </button>
       </form>
 
       {generatedPassword && (
-        <div style={{ background: "#fef3c7", padding: 15, marginBottom: 20 }}>
+        <div style={{ background: "#fef3c7", padding: 15, marginBottom: 20, wordBreak: "break-word" }}>
           <strong>School Admin Password (show once):</strong>
           <p>{generatedPassword}</p>
         </div>
       )}
 
-      <table border="1" cellPadding="10" cellSpacing="0" width="100%">
-        <thead>
-          <tr>
-            <th>School Name</th>
-            <th>Subdomain</th>
-            <th>School Web Address</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Admin</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {schools.map((s) => (
-            <tr key={s.id}>
-              <td>
-                {editingId === s.id ? (
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} />
-                ) : (
-                  s.name
-                )}
-              </td>
-
-              <td>{s.subdomain || "-"}</td>
-
-              <td>
-                {s.subdomain ? (
-                  <a href={schoolWebAddress(s.subdomain)} target="_blank" rel="noreferrer">
-                    {schoolWebAddress(s.subdomain)}
-                  </a>
-                ) : (
-                  "-"
-                )}
-              </td>
-
-              <td>
-                {editingId === s.id ? (
-                  <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
-                ) : (
-                  s.email
-                )}
-              </td>
-
-              <td>
-                <strong>{s.status === "active" ? "Active" : "Suspended"}</strong>
-              </td>
-
-              <td>
-                {s.admin ? <strong>{s.admin.name}</strong> : <span style={{ color: "red" }}>None</span>}
-              </td>
-
-              <td>
-                {editingId === s.id ? (
-                  <>
-                    <button onClick={() => updateSchool(s.id)}>Save</button>
-                    <button onClick={cancelEdit}>Cancel</button>
-                  </>
-                ) : (
-                  <select
-                    value={actionValues[s.id] || ""}
-                    onChange={(e) => runSchoolAction(s, e.target.value)}
-                  >
-                    <option value="">Select Action</option>
-                    <option value="toggle">
-                      {s.status === "active" ? "Suspend School" : "Activate School"}
-                    </option>
-                    <option value="edit">Edit School</option>
-                    <option value="delete">Delete School</option>
-                    <option value="features">Manage Features</option>
-                    <option value="toggle_results">
-                      {s.results_published ? "Unpublish Results" : "Publish Results"}
-                    </option>
-                    <option value="reset_admin" disabled={!s.admin || resettingAdminId === s.admin?.id}>
-                      {resettingAdminId === s.admin?.id ? "Resetting Admin Password..." : "Reset Admin Password"}
-                    </option>
-                  </select>
-                )}
-              </td>
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <table border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980 }}>
+          <thead>
+            <tr>
+              <th>School Name</th>
+              <th>Subdomain</th>
+              <th>School Web Address</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Admin</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {schools.map((s) => (
+              <tr key={s.id}>
+                <td>
+                  {editingId === s.id ? (
+                    <input style={formInputStyle} value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  ) : (
+                    s.name
+                  )}
+                </td>
+
+                <td>{s.subdomain || "-"}</td>
+
+                <td style={{ wordBreak: "break-word" }}>
+                  {s.subdomain ? (
+                    <a href={schoolWebAddress(s.subdomain)} target="_blank" rel="noreferrer">
+                      {schoolWebAddress(s.subdomain)}
+                    </a>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+
+                <td>
+                  {editingId === s.id ? (
+                    <input style={formInputStyle} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                  ) : (
+                    s.email
+                  )}
+                </td>
+
+                <td>
+                  <strong>{s.status === "active" ? "Active" : "Suspended"}</strong>
+                </td>
+
+                <td>
+                  {s.admin ? <strong>{s.admin.name}</strong> : <span style={{ color: "red" }}>None</span>}
+                </td>
+
+                <td>
+                  {editingId === s.id ? (
+                    <>
+                      <button onClick={() => updateSchool(s.id)}>Save</button>
+                      <button onClick={cancelEdit}>Cancel</button>
+                    </>
+                  ) : (
+                    <select
+                      style={{ width: "100%", minWidth: 190 }}
+                      value={actionValues[s.id] || ""}
+                      onChange={(e) => runSchoolAction(s, e.target.value)}
+                    >
+                      <option value="">Select Action</option>
+                      <option value="toggle">
+                        {s.status === "active" ? "Suspend School" : "Activate School"}
+                      </option>
+                      <option value="edit">Edit School</option>
+                      <option value="delete">Delete School</option>
+                      <option value="features">Manage Features</option>
+                      <option value="toggle_results">
+                        {s.results_published ? "Unpublish Results" : "Publish Results"}
+                      </option>
+                      <option value="reset_admin" disabled={!s.admin || resettingAdminId === s.admin?.id}>
+                        {resettingAdminId === s.admin?.id ? "Resetting Admin Password..." : "Reset Admin Password"}
+                      </option>
+                    </select>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {showFeatureModal && (
         <div style={{ border: "1px solid #000", padding: 20 }}>

@@ -13,6 +13,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -21,6 +27,7 @@ body,
 
 #root {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -38,11 +45,40 @@ body {
   min-height: 100vh;
   color: #111827;
   background-color: #f8fafc;
+  overflow-x: hidden;
 }
 
 h1 {
-  font-size: 3.2em;
+  margin: 0 0 0.6em;
+  font-size: clamp(1.75rem, 3.4vw, 2.6rem);
   line-height: 1.1;
+}
+
+h2,
+h3,
+h4 {
+  margin: 0 0 0.5em;
+  line-height: 1.2;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
 button {
@@ -63,4 +99,29 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (max-width: 900px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 7vw, 2rem);
+  }
+
+  h2 {
+    font-size: clamp(1.2rem, 5.5vw, 1.6rem);
+  }
+
+  h3 {
+    font-size: clamp(1rem, 4.5vw, 1.3rem);
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }
