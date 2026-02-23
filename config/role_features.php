@@ -12,6 +12,7 @@ return [
         'virtual class',
         'question bank',
         'behaviour rating',
+        'announcements',
     ],
 
     'student' => [
@@ -24,5 +25,6 @@ return [
         'cbt',
         'virtual class',
         'school fees',
+        'announcements',
     ],
 ];

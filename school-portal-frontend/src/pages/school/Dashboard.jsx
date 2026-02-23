@@ -23,6 +23,7 @@ const formatCount = (value) => {
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
+    school_location: "",
     school_logo_url: null,
     head_of_school_name: "",
     head_signature_url: null,
@@ -39,6 +40,7 @@ function SchoolDashboard() {
   const [headSignatureFile, setHeadSignatureFile] = useState(null);
   const [headSignaturePreview, setHeadSignaturePreview] = useState(null);
   const [headName, setHeadName] = useState("");
+  const [schoolLocation, setSchoolLocation] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
@@ -50,6 +52,7 @@ function SchoolDashboard() {
         const res = await api.get("/api/school-admin/stats");
         setStats({
           school_name: res.data?.school_name ?? "",
+          school_location: res.data?.school_location ?? "",
           school_logo_url: res.data?.school_logo_url ?? null,
           head_of_school_name: res.data?.head_of_school_name ?? "",
           head_signature_url: res.data?.head_signature_url ?? null,
@@ -61,10 +64,12 @@ function SchoolDashboard() {
           enabled_modules: res.data?.enabled_modules ?? 0,
         });
         setHeadName(res.data?.head_of_school_name ?? "");
+        setSchoolLocation(res.data?.school_location ?? "");
       } catch {
         setStats((prev) => ({
           ...prev,
           school_name: "",
+          school_location: "",
           school_logo_url: null,
           head_of_school_name: "",
           head_signature_url: null,
@@ -76,6 +81,7 @@ function SchoolDashboard() {
           enabled_modules: 0,
         }));
         setHeadName("");
+        setSchoolLocation("");
       } finally {
         setLoading(false);
       }
@@ -91,12 +97,15 @@ function SchoolDashboard() {
 
   const saveBranding = async () => {
     const normalizedName = (headName || "").trim();
+    const normalizedLocation = (schoolLocation || "").trim();
     const existingName = (stats.head_of_school_name || "").trim();
+    const existingLocation = (stats.school_location || "").trim();
     const hasNameChange = normalizedName !== existingName;
+    const hasLocationChange = normalizedLocation !== existingLocation;
     const hasLogo = !!logoFile;
     const hasSignature = !!headSignatureFile;
 
-    if (!hasNameChange && !hasLogo && !hasSignature) {
+    if (!hasNameChange && !hasLocationChange && !hasLogo && !hasSignature) {
       return alert("No branding changes to save.");
     }
 
@@ -104,6 +113,7 @@ function SchoolDashboard() {
     try {
       const fd = new FormData();
       fd.append("head_of_school_name", normalizedName);
+      fd.append("school_location", normalizedLocation);
       if (logoFile) fd.append("logo", logoFile);
       if (headSignatureFile) fd.append("head_signature", headSignatureFile);
 
@@ -115,11 +125,13 @@ function SchoolDashboard() {
       setStats((prev) => ({
         ...prev,
         school_name: data.school_name ?? prev.school_name,
+        school_location: data.school_location ?? prev.school_location,
         school_logo_url: data.school_logo_url ?? prev.school_logo_url,
         head_of_school_name: data.head_of_school_name ?? prev.head_of_school_name,
         head_signature_url: data.head_signature_url ?? prev.head_signature_url,
       }));
       setHeadName(data.head_of_school_name ?? normalizedName);
+      setSchoolLocation(data.school_location ?? normalizedLocation);
       setLogoFile(null);
       setLogoPreview(null);
       setHeadSignatureFile(null);
@@ -274,6 +286,16 @@ function SchoolDashboard() {
                 value={headName}
                 onChange={(e) => setHeadName(e.target.value)}
                 placeholder="Enter head of school name"
+              />
+            </div>
+
+            <div className="sd-field">
+              <label>School Location</label>
+              <input
+                type="text"
+                value={schoolLocation}
+                onChange={(e) => setSchoolLocation(e.target.value)}
+                placeholder="Enter school address/location"
               />
             </div>
 

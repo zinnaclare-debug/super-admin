@@ -9,6 +9,7 @@ class School extends Model
 {
     protected $fillable = [
         'name',
+        'location',
         'username_prefix',
         'email',
         'logo_path',

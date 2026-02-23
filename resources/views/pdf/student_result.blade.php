@@ -4,151 +4,301 @@
     <meta charset="UTF-8">
     <title>Student Result</title>
     <style>
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; }
-        .header-table, .info-table, .result-table, .meta-table, .traits-table { width: 100%; border-collapse: collapse; }
-        .header-table td { vertical-align: top; }
-        .logo { width: 70px; height: 70px; object-fit: contain; }
-        .title { text-align: center; }
-        .title h2 { margin: 0; font-size: 18px; }
-        .title p { margin: 2px 0; }
-        .section { margin-top: 12px; }
-        .info-table td { padding: 4px 6px; border: 1px solid #d4d4d8; }
-        .result-table th, .result-table td,
-        .meta-table th, .meta-table td,
-        .traits-table th, .traits-table td {
-            border: 1px solid #d4d4d8;
-            padding: 6px;
+        @page { margin: 18px; }
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 11px;
+            color: #111827;
         }
-        .result-table th, .meta-table th, .traits-table th {
-            background: #f4f4f5;
+        .sheet {
+            position: relative;
+            border: 1px solid #d1d5db;
+            padding: 10px;
+            overflow: hidden;
+        }
+        .watermark {
+            position: absolute;
+            top: 28%;
+            left: 50%;
+            width: 320px;
+            height: 320px;
+            margin-left: -160px;
+            opacity: 0.07;
+            z-index: 0;
+            object-fit: contain;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header td {
+            border: 1px solid #111;
+            padding: 6px;
+            vertical-align: middle;
+        }
+        .title-wrap {
+            text-align: center;
+        }
+        .title-wrap h1 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: 0.6px;
+        }
+        .title-wrap p {
+            margin: 2px 0 0;
+            font-size: 12px;
+        }
+        .id-photo, .school-logo {
+            width: 78px;
+            height: 78px;
+            border: 1px solid #111;
+            object-fit: cover;
+        }
+        .section-title {
+            margin-top: 8px;
+            border: 1px solid #111;
+            border-bottom: 0;
+            text-align: center;
+            font-weight: bold;
+            padding: 6px 8px;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+        .meta td, .meta th,
+        .scores td, .scores th,
+        .psycho td, .psycho th,
+        .comment td, .comment th,
+        .key-rate td, .key-rate th {
+            border: 1px solid #111;
+            padding: 4px 6px;
+        }
+        .meta th, .scores th, .psycho th, .comment th, .key-rate th {
+            background: #f3f4f6;
             text-align: left;
         }
-        .traits-table td { text-align: center; }
-        .right { text-align: right; }
         .center { text-align: center; }
-        .signature { width: 120px; height: 55px; object-fit: contain; }
-        .footer-block { margin-top: 18px; }
-        .muted { color: #52525b; }
+        .small { font-size: 10px; }
+        .grades-key {
+            margin-top: 4px;
+            border: 1px solid #111;
+            padding: 4px 6px;
+            font-size: 10px;
+        }
+        .psycho-wrap {
+            margin-top: 8px;
+            width: 100%;
+        }
+        .psycho-left {
+            width: 86%;
+            display: inline-block;
+            vertical-align: top;
+        }
+        .psycho-right {
+            width: 13%;
+            display: inline-block;
+            vertical-align: top;
+            margin-left: 1%;
+        }
+        .signature-box {
+            margin-top: 6px;
+            border: 1px solid #111;
+            padding: 6px;
+            min-height: 60px;
+        }
+        .signature {
+            width: 130px;
+            height: 48px;
+            object-fit: contain;
+            border-bottom: 1px dashed #6b7280;
+        }
+        .signature-placeholder {
+            width: 130px;
+            height: 48px;
+            border-bottom: 1px dashed #6b7280;
+        }
     </style>
 </head>
 <body>
-    <table class="header-table">
-        <tr>
-            <td style="width: 80px;">
-                @if($schoolLogoDataUri)
-                    <img class="logo" src="{{ $schoolLogoDataUri }}" alt="School Logo">
-                @endif
-            </td>
-            <td class="title">
-                <h2>{{ strtoupper($school?->name ?? 'SCHOOL') }}</h2>
-                <p>{{ $session?->academic_year ?: $session?->session_name }} - {{ $term?->name }}</p>
-                <p><strong>STUDENT RESULT SHEET</strong></p>
-            </td>
-            <td style="width: 80px;"></td>
-        </tr>
-    </table>
+@php
+    $timesPresent = (int) ($attendance?->days_present ?? 0);
+    $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
+    $totalObtainable = max(1, count($rows)) * 100;
+@endphp
+<div class="sheet">
+    @if($schoolLogoDataUri)
+        <img class="watermark" src="{{ $schoolLogoDataUri }}" alt="">
+    @endif
 
-    <div class="section">
-        <table class="info-table">
+    <div class="content">
+        <table class="header">
             <tr>
-                <td><strong>Student Name</strong></td>
-                <td>{{ $studentUser?->name }}</td>
-                <td><strong>Next Term Begins</strong></td>
-                <td>{{ $nextTermBeginDate ? \Carbon\Carbon::parse($nextTermBeginDate)->format('d M, Y') : '-' }}</td>
-            </tr>
-            <tr>
-                <td><strong>Email</strong></td>
-                <td>{{ $studentUser?->email ?? '-' }}</td>
-                <td><strong>Class</strong></td>
-                <td>{{ $class?->name }} ({{ strtoupper($class?->level) }})</td>
-            </tr>
-            <tr>
-                <td><strong>Class Teacher</strong></td>
-                <td>{{ $classTeacher?->name ?? '-' }}</td>
-                <td><strong>Attendance</strong></td>
-                <td>{{ (int)($attendance?->days_present ?? 0) }} day(s) present</td>
+                <td style="width: 88px;" class="center">
+                    @if($studentPhotoDataUri)
+                        <img class="id-photo" src="{{ $studentPhotoDataUri }}" alt="Student Photo">
+                    @endif
+                </td>
+                <td class="title-wrap">
+                    <h1>{{ strtoupper($school?->name ?? 'SCHOOL NAME') }}</h1>
+                    <p>{{ strtoupper($school?->location ?? 'SCHOOL LOCATION') }}</p>
+                </td>
+                <td style="width: 88px;" class="center">
+                    @if($schoolLogoDataUri)
+                        <img class="school-logo" src="{{ $schoolLogoDataUri }}" alt="School Logo">
+                    @endif
+                </td>
             </tr>
         </table>
-    </div>
 
-    <div class="section">
-        <table class="result-table">
+        <div class="section-title">
+            REPORT SHEET FOR {{ strtoupper($term?->name ?? '-') }} {{ strtoupper($session?->academic_year ?: $session?->session_name ?: '-') }} SESSION
+        </div>
+
+        <table class="meta">
+            <tr>
+                <th style="width: 18%;">NAME</th>
+                <td style="width: 32%;">{{ strtoupper($studentUser?->name ?? '-') }}</td>
+                <th style="width: 18%;">CLASS</th>
+                <td style="width: 32%;">{{ strtoupper($class?->name ?? '-') }}</td>
+            </tr>
+            <tr>
+                <th>SERIAL NO</th>
+                <td>{{ strtoupper($studentUser?->username ?? '-') }}</td>
+                <th>NEXT TERM BEGINS</th>
+                <td>{{ $nextTermBeginDate ? \Carbon\Carbon::parse($nextTermBeginDate)->format('jS M, Y') : '-' }}</td>
+            </tr>
+            <tr>
+                <th>GENDER</th>
+                <td>{{ strtoupper((string)($student?->sex ?? '-')) }}</td>
+                <th>AVERAGE</th>
+                <td>{{ number_format((float) $averageScore, 2) }}</td>
+            </tr>
+            <tr>
+                <th>TIMES PRESENT</th>
+                <td>{{ $timesPresent }}</td>
+                <th>TIMES SCHOOL OPENED</th>
+                <td>{{ $timesOpened }}</td>
+            </tr>
+            <tr>
+                <th>TOTAL OBTAINED</th>
+                <td>{{ $totalScore }}</td>
+                <th>TOTAL OBTAINABLE</th>
+                <td>{{ $totalObtainable }}</td>
+            </tr>
+        </table>
+
+        <table class="scores" style="margin-top: 8px;">
             <thead>
                 <tr>
-                    <th style="width: 45px;">S/N</th>
-                    <th>Subject</th>
-                    <th style="width: 70px;">CA</th>
-                    <th style="width: 70px;">Exam</th>
-                    <th style="width: 70px;">Total</th>
-                    <th style="width: 70px;">Grade</th>
+                    <th style="width: 22%;">SUBJECT</th>
+                    <th style="width: 7%;" class="center">CA</th>
+                    <th style="width: 7%;" class="center">EXAM</th>
+                    <th style="width: 7%;" class="center">TOTAL</th>
+                    <th style="width: 7%;" class="center">MIN</th>
+                    <th style="width: 7%;" class="center">MAX</th>
+                    <th style="width: 10%;" class="center">CLASS AVE</th>
+                    <th style="width: 8%;" class="center">POSITION</th>
+                    <th style="width: 8%;" class="center">GRADE</th>
+                    <th style="width: 17%;" class="center">REMARK</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($rows as $idx => $row)
+                @forelse($rows as $row)
                     <tr>
-                        <td>{{ $idx + 1 }}</td>
-                        <td>{{ $row['subject_name'] }}</td>
+                        <td>{{ strtoupper($row['subject_name']) }}</td>
                         <td class="center">{{ $row['ca'] }}</td>
                         <td class="center">{{ $row['exam'] }}</td>
                         <td class="center">{{ $row['total'] }}</td>
-                        <td class="center">{{ $row['grade'] }}</td>
+                        <td class="center">{{ $row['min_score'] ?? 0 }}</td>
+                        <td class="center">{{ $row['max_score'] ?? 0 }}</td>
+                        <td class="center">{{ number_format((float) ($row['class_average'] ?? 0), 2) }}</td>
+                        <td class="center">{{ $row['position_label'] ?? '-' }}</td>
+                        <td class="center">{{ strtoupper($row['grade']) }}</td>
+                        <td class="center">{{ strtoupper($row['remark'] ?? '-') }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="center">No subject results found.</td>
+                        <td colspan="10" class="center">No result data found.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
 
-    <div class="section">
-        <table class="meta-table">
+        <div class="grades-key">
+            <strong>GRADES:</strong>
+            A [70-100] |
+            B [60-69] |
+            C [50-59] |
+            D [40-49] |
+            E [30-39] |
+            F [0-29]
+        </div>
+
+        <div class="psycho-wrap">
+            <div class="psycho-left">
+                <table class="psycho">
+                    <thead>
+                        <tr>
+                            <th style="width: 75%;">PSYCHOMOTOR</th>
+                            <th style="width: 25%;">RATE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($behaviourTraits as $trait)
+                            <tr>
+                                <td>{{ strtoupper($trait['label']) }}</td>
+                                <td class="center">{{ $trait['value'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="psycho-right">
+                <table class="key-rate small">
+                    <thead>
+                        <tr>
+                            <th>KEY RATE</th>
+                            <th>SET</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>EXCELLENT</td><td class="center">5</td></tr>
+                        <tr><td>VERY GOOD</td><td class="center">4</td></tr>
+                        <tr><td>SATISFACTORY</td><td class="center">3</td></tr>
+                        <tr><td>POOR</td><td class="center">2</td></tr>
+                        <tr><td>VERY POOR</td><td class="center">1</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <table class="comment" style="margin-top: 8px;">
             <tr>
-                <th>Total Score</th>
-                <th>Average</th>
-                <th>Overall Grade</th>
+                <th style="width: 22%;">School Head Name</th>
+                <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
             </tr>
             <tr>
-                <td class="center">{{ $totalScore }}</td>
-                <td class="center">{{ number_format((float)$averageScore, 2) }}</td>
-                <td class="center">{{ $overallGrade }}</td>
+                <th>School Head Comment</th>
+                <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
+            </tr>
+            <tr>
+                <th>Class Teacher Comment</th>
+                <td>{{ strtoupper($teacherComment ?? '-') }}</td>
             </tr>
         </table>
-    </div>
 
-    <div class="section">
-        <table class="traits-table">
-            <thead>
-                <tr>
-                    <th colspan="{{ count($behaviourTraits) }}">Behaviour Traits (1 - 5)</th>
-                </tr>
-                <tr>
-                    @foreach($behaviourTraits as $trait)
-                        <th>{{ $trait['label'] }}</th>
-                    @endforeach
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    @foreach($behaviourTraits as $trait)
-                        <td class="center">{{ $trait['value'] }}</td>
-                    @endforeach
-                </tr>
-            </tbody>
-        </table>
+        <div class="signature-box">
+            <strong>School Head Signature:</strong><br>
+            @if($headSignatureDataUri)
+                <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
+            @else
+                <div class="signature-placeholder"></div>
+            @endif
+        </div>
     </div>
-
-    <div class="section">
-        <strong>Class Teacher Comment:</strong>
-        <p class="muted">{{ $teacherComment }}</p>
-    </div>
-
-    <div class="footer-block">
-        <p><strong>Head of School:</strong> {{ $school?->head_of_school_name ?: '-' }}</p>
-        @if($headSignatureDataUri)
-            <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
-        @endif
-    </div>
+</div>
 </body>
 </html>

@@ -26,6 +26,7 @@ return [
         [ 'key' => 'transcript', 'label' => 'Transcript', 'category' => 'admin' ],
         [ 'key' => 'teacher_report', 'label' => 'Teacher Report', 'category' => 'admin' ],
         [ 'key' => 'student_report', 'label' => 'Student Report', 'category' => 'admin' ],
+        [ 'key' => 'announcements', 'label' => 'Announcement Desk', 'category' => 'admin' ],
     ],
 
     // Legacy synonyms (map legacy key => canonical key)

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import heroArt from "../assets/dashboard/branding.svg";
 import modulesArt from "../assets/dashboard/modules.svg";
 import studentsArt from "../assets/dashboard/students.svg";
+import flyerArt from "../assets/home/lytebridge-flyer.jpeg";
 import "./Home.css";
 
 const FEATURE_LIST = [
@@ -29,6 +30,13 @@ const EXTRA_VALUE = [
   "Role-based access for super admin, school admin, staff, students, and parents.",
   "Real-time operational visibility for academics, attendance, assessments, and billing.",
   "Deployment and migration support for schools moving from manual to digital workflows.",
+];
+
+const CONTACT_LINES = [
+  { phone: "+234 806 798 8449", dial: "+2348067988449", location: "Abuja" },
+  { phone: "+234 9136 806652", dial: "+2349136806652", location: "Ekiti State" },
+  { phone: "+234 816 986 6477", dial: "+2348169866477", location: "Kwara State" },
+  { phone: "+234 706 690 6190", dial: "+2347066906190", location: "Abuja" },
 ];
 
 function Home() {
@@ -112,6 +120,16 @@ function Home() {
           </div>
         </section>
 
+        <section className="home-section home-brochure">
+          <div className="home-section-head">
+            <h2>Platform Brochure</h2>
+            <p>Official Lytebridge school management platform overview.</p>
+          </div>
+          <div className="home-brochure-frame">
+            <img src={flyerArt} alt="Lytebridge school management platform brochure" />
+          </div>
+        </section>
+
         <section className="home-section">
           <div className="home-section-head">
             <h2>Additional Value</h2>
@@ -129,15 +147,27 @@ function Home() {
 
         <section className="home-section home-contact">
           <img src={studentsArt} alt="Students and collaboration" />
-          <div>
-            <h2>Ready to launch your school portal?</h2>
+          <div className="home-contact-copy">
+            <h2>Contact Lytebridge</h2>
             <p>
-              This platform is built to improve teaching, learning, school administration, and
-              parent engagement through modern digital tools.
+              Reach us directly from any location below for onboarding, school setup, pricing, and
+              support.
             </p>
+            <div className="home-contact-grid">
+              {CONTACT_LINES.map((line) => (
+                <a key={`${line.phone}-${line.location}`} className="home-contact-card" href={`tel:${line.dial}`}>
+                  <span className="home-contact-phone">{line.phone}</span>
+                  <span className="home-contact-state">{line.location}</span>
+                </a>
+              ))}
+            </div>
             <div className="home-contact-actions">
-              <a href="tel:08067988449">Call 08067988449</a>
-              <a href="mailto:lytebridgeprofessionalservices@gmail.com">Send Email</a>
+              <a href="mailto:lytebridgeprofessionalservices@gmail.com">
+                lytebridgeprofessionalservices@gmail.com
+              </a>
+              <a href="https://wa.me/2348067988449" target="_blank" rel="noreferrer">
+                WhatsApp Chat
+              </a>
             </div>
           </div>
         </section>

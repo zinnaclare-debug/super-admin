@@ -20,6 +20,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/promotion")) return "Promotion";
   if (pathname.startsWith("/school/admin/teacher_report")) return "Teacher Report";
   if (pathname.startsWith("/school/admin/student_report")) return "Student Report";
+  if (pathname.startsWith("/school/admin/announcements")) return "Announcement Desk";
   if (pathname.startsWith("/school/admin/register")) return "Register";
   return "School Admin";
 }

@@ -11,6 +11,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [tenantSchool, setTenantSchool] = useState(null);
+  const [logoLoadError, setLogoLoadError] = useState(false);
 
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
@@ -22,8 +23,13 @@ function Login() {
   };
 
   const tenantLogoUrl = useMemo(() => {
-    if (!tenantSchool?.logo_path) return "";
-    return toAbsoluteUrl(`/storage/${tenantSchool.logo_path}`);
+    if (tenantSchool?.logo_url) {
+      return toAbsoluteUrl(tenantSchool.logo_url);
+    }
+    if (tenantSchool?.logo_path) {
+      return toAbsoluteUrl(`/storage/${tenantSchool.logo_path}`);
+    }
+    return "";
   }, [tenantSchool]);
 
   const tenantInitials = useMemo(() => {
@@ -57,6 +63,10 @@ function Login() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [tenantLogoUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -109,6 +119,14 @@ function Login() {
           <div className="hero-meta">
             <span className="hero-pill">Smart School Portal</span>
             <span className="hero-domain">{window.location.hostname}</span>
+            {tenantLogoUrl && !logoLoadError && (
+              <img
+                className="hero-school-logo"
+                src={tenantLogoUrl}
+                alt={`${tenantSchool?.name || "School"} logo`}
+                onError={() => setLogoLoadError(true)}
+              />
+            )}
           </div>
 
           <h1>
@@ -151,8 +169,12 @@ function Login() {
         <section className="login-card">
           <div className="login-brand">
             <div className="login-mark">
-              {tenantLogoUrl ? (
-                <img src={tenantLogoUrl} alt={`${tenantSchool?.name || "School"} logo`} />
+              {tenantLogoUrl && !logoLoadError ? (
+                <img
+                  src={tenantLogoUrl}
+                  alt={`${tenantSchool?.name || "School"} logo`}
+                  onError={() => setLogoLoadError(true)}
+                />
               ) : (
                 <span>{tenantInitials}</span>
               )}

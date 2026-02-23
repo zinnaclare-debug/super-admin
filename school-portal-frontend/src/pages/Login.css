@@ -146,6 +146,16 @@
   text-overflow: ellipsis;
 }
 
+.hero-school-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
+  object-fit: cover;
+  box-shadow: 0 6px 16px rgba(3, 38, 63, 0.28);
+}
+
 .login-hero h1 {
   margin: 10px 0 0;
   font-size: clamp(1.45rem, 2.6vw, 2.3rem);
@@ -454,6 +464,11 @@
 
   .hero-domain {
     max-width: 100%;
+  }
+
+  .hero-school-logo {
+    width: 40px;
+    height: 40px;
   }
 
   .login-card {

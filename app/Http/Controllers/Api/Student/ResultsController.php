@@ -270,6 +270,7 @@ class ResultsController extends Controller
         }
 
         $school = $user->school;
+        $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
 
         $totalScore = (int) collect($rows)->sum('total');
         $subjectCount = max(1, count($rows));
@@ -283,6 +284,7 @@ class ResultsController extends Controller
         if ($teacherComment === '') {
             $teacherComment = $this->defaultTeacherComment($overallGrade);
         }
+        $schoolHeadComment = $this->defaultHeadComment($overallGrade);
 
         $behaviourTraits = [
             ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
@@ -306,11 +308,14 @@ class ResultsController extends Controller
             'averageScore' => $averageScore,
             'overallGrade' => $overallGrade,
             'attendance' => $attendance,
+            'attendanceSetting' => $attendanceSetting,
             'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
             'teacherComment' => $teacherComment,
+            'schoolHeadComment' => $schoolHeadComment,
             'classTeacher' => $classTeacher,
             'behaviourTraits' => $behaviourTraits,
             'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
+            'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
             'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
         ])->render();
 
@@ -343,7 +348,7 @@ class ResultsController extends Controller
 
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
-        return TermSubject::query()
+        $subjects = TermSubject::query()
             ->where('term_subjects.school_id', $schoolId)
             ->where('term_subjects.class_id', $classId)
             ->where('term_subjects.term_id', $termId)
@@ -356,28 +361,106 @@ class ResultsController extends Controller
                 'term_subjects.id as term_subject_id',
                 'subjects.name as subject_name',
                 'subjects.code as subject_code',
+                'results.student_id as result_student_id',
                 'results.ca',
                 'results.exam',
             ])
             ->orderBy('subjects.name')
-            ->get()
-            ->map(function ($r) {
+            ->get();
+
+        $termSubjectIds = $subjects->pluck('term_subject_id')->map(fn ($id) => (int) $id)->all();
+        $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds);
+
+        return $subjects
+            ->map(function ($r) use ($subjectStats, $studentId) {
                 $ca = (int) ($r->ca ?? 0);
                 $exam = (int) ($r->exam ?? 0);
                 $total = $ca + $exam;
+                $termSubjectId = (int) $r->term_subject_id;
+                $stats = $subjectStats[$termSubjectId] ?? null;
+                $position = $stats['positions'][$studentId] ?? null;
 
                 return [
-                    'term_subject_id' => (int) $r->term_subject_id,
+                    'term_subject_id' => $termSubjectId,
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
                     'ca' => $ca,
                     'exam' => $exam,
                     'total' => $total,
+                    'min_score' => $stats['min_score'] ?? 0,
+                    'max_score' => $stats['max_score'] ?? 0,
+                    'class_average' => $stats['class_average'] ?? 0,
+                    'position' => $position,
+                    'position_label' => $position ? $this->ordinalPosition($position) : '-',
                     'grade' => $this->gradeFromTotal($total),
+                    'remark' => $this->remarkFromTotal($total),
                 ];
             })
             ->values()
             ->all();
+    }
+
+    private function buildSubjectStats(int $schoolId, array $termSubjectIds): array
+    {
+        if (empty($termSubjectIds)) {
+            return [];
+        }
+
+        $rows = DB::table('results')
+            ->where('school_id', $schoolId)
+            ->whereIn('term_subject_id', $termSubjectIds)
+            ->select(['term_subject_id', 'student_id', 'ca', 'exam'])
+            ->get();
+
+        $grouped = $rows->groupBy(fn ($r) => (int) $r->term_subject_id);
+        $stats = [];
+
+        foreach ($grouped as $termSubjectId => $subjectRows) {
+            $totals = $subjectRows
+                ->map(fn ($row) => [
+                    'student_id' => (int) $row->student_id,
+                    'total' => (int) $row->ca + (int) $row->exam,
+                ])
+                ->values();
+
+            if ($totals->isEmpty()) {
+                $stats[(int) $termSubjectId] = [
+                    'min_score' => 0,
+                    'max_score' => 0,
+                    'class_average' => 0,
+                    'positions' => [],
+                ];
+                continue;
+            }
+
+            $minScore = (int) $totals->min('total');
+            $maxScore = (int) $totals->max('total');
+            $classAverage = (float) round((float) $totals->avg('total'), 2);
+
+            $sorted = $totals->sortByDesc('total')->values();
+            $positions = [];
+            $previousTotal = null;
+            $previousRank = 0;
+
+            foreach ($sorted as $index => $row) {
+                $rank = ($previousTotal !== null && $row['total'] === $previousTotal)
+                    ? $previousRank
+                    : ($index + 1);
+
+                $positions[$row['student_id']] = $rank;
+                $previousTotal = $row['total'];
+                $previousRank = $rank;
+            }
+
+            $stats[(int) $termSubjectId] = [
+                'min_score' => $minScore,
+                'max_score' => $maxScore,
+                'class_average' => $classAverage,
+                'positions' => $positions,
+            ];
+        }
+
+        return $stats;
     }
 
     private function gradeFromTotal(int $total): string
@@ -392,6 +475,36 @@ class ResultsController extends Controller
         };
     }
 
+    private function remarkFromTotal(int $total): string
+    {
+        return match (true) {
+            $total >= 70 => 'EXCELLENT',
+            $total >= 60 => 'VERY GOOD',
+            $total >= 50 => 'GOOD',
+            $total >= 40 => 'FAIR',
+            default => 'NEEDS IMPROVEMENT',
+        };
+    }
+
+    private function ordinalPosition(int $position): string
+    {
+        if ($position <= 0) {
+            return '-';
+        }
+
+        $mod100 = $position % 100;
+        if ($mod100 >= 11 && $mod100 <= 13) {
+            return $position . 'th';
+        }
+
+        return match ($position % 10) {
+            1 => $position . 'st',
+            2 => $position . 'nd',
+            3 => $position . 'rd',
+            default => $position . 'th',
+        };
+    }
+
     private function defaultTeacherComment(string $grade): string
     {
         return match ($grade) {
@@ -401,6 +514,18 @@ class ResultsController extends Controller
             'D' => 'Fair performance. Needs more attention and practice.',
             'E' => 'Below average performance. Improvement is required.',
             default => 'Poor performance. Immediate intervention is advised.',
+        };
+    }
+
+    private function defaultHeadComment(string $grade): string
+    {
+        return match ($grade) {
+            'A' => 'Impressive performance. Keep aiming higher and stay focused.',
+            'B' => 'Very good result. With more effort, you can reach excellent level.',
+            'C' => 'Good progress. Stay consistent and improve in weaker subjects.',
+            'D' => 'You can do better. More reading and guidance are needed.',
+            'E' => 'Significant improvement is required. Parents and teachers should monitor closely.',
+            default => 'Performance is below expectation. Immediate academic support is required.',
         };
     }
 

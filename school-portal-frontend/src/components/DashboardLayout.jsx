@@ -142,6 +142,7 @@ function DashboardLayout() {
       "virtual class": "virtual-class",
       "question bank": "question-bank",
       "school fees": "school-fees",
+      announcements: "announcements",
       subjects: "subjects",
       cbt: "cbt",
       attendance: "attendance",

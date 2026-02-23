@@ -23,12 +23,14 @@ use App\Http\Controllers\Api\SchoolAdmin\AcademicsController;
 use App\Http\Controllers\Api\SchoolAdmin\PaymentsController as SchoolAdminPaymentsController;
 use App\Http\Controllers\Api\SchoolAdmin\PromotionController;
 use App\Http\Controllers\Api\SchoolAdmin\ReportsController;
+use App\Http\Controllers\Api\SchoolAdmin\AnnouncementController as SchoolAdminAnnouncementController;
 
 use App\Http\Controllers\Api\Staff\TeacherResultsController;
 use App\Http\Controllers\Api\Staff\StaffProfileController;
 
 use App\Http\Controllers\Api\Staff\TeacherTopicsController;
 use App\Http\Controllers\Api\Staff\ELibraryController as StaffELibraryController;
+use App\Http\Controllers\Api\Staff\AnnouncementController as StaffAnnouncementController;
 use App\Http\Controllers\Api\Student\ELibraryController as StudentELibraryController;
 use App\Http\Controllers\Api\Staff\VirtualClassesController as StaffVirtualClassesController;
 use App\Http\Controllers\Api\Staff\QuestionBankController as StaffQuestionBankController;
@@ -43,6 +45,7 @@ use App\Http\Controllers\Api\Student\TopicsController as StudentTopicsController
 use App\Http\Controllers\Api\Student\VirtualClassesController as StudentVirtualClassesController;
 use App\Http\Controllers\Api\Student\CbtController as StudentCbtController;
 use App\Http\Controllers\Api\Student\SchoolFeesController as StudentSchoolFeesController;
+use App\Http\Controllers\Api\Student\AnnouncementController as StudentAnnouncementController;
 
 
 
@@ -107,6 +110,15 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/payments', [SchoolAdminPaymentsController::class, 'index'])
         ->middleware('feature:school fees');
+
+    Route::get('/school-admin/announcements', [SchoolAdminAnnouncementController::class, 'index'])
+        ->middleware('feature:announcements');
+    Route::post('/school-admin/announcements', [SchoolAdminAnnouncementController::class, 'store'])
+        ->middleware('feature:announcements');
+    Route::patch('/school-admin/announcements/{announcement}', [SchoolAdminAnnouncementController::class, 'update'])
+        ->middleware('feature:announcements');
+    Route::delete('/school-admin/announcements/{announcement}', [SchoolAdminAnnouncementController::class, 'destroy'])
+        ->middleware('feature:announcements');
 
     // ✅ Registration
     Route::post('/school-admin/register/preview', [RegistrationController::class, 'preview'])
@@ -270,6 +282,8 @@ Route::patch(
 // staff
 Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', fn () => response()->json(['message' => 'Staff Dashboard']));
+    Route::get('/staff/announcements', [StaffAnnouncementController::class, 'index'])
+        ->middleware('feature:announcements');
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);
@@ -333,6 +347,8 @@ Route::middleware(['auth:sanctum', 'role:student'])->get('/student/dashboard',
 
 
 Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
+    Route::get('/student/announcements', [StudentAnnouncementController::class, 'index'])
+        ->middleware('feature:announcements');
     Route::get('/student/features', [FeatureAccessController::class, 'studentFeatures']);
     Route::get('/student/profile', [\App\Http\Controllers\Api\Student\ProfileController::class, 'me']);
     Route::get('/student/school-fees', [StudentSchoolFeesController::class, 'index'])

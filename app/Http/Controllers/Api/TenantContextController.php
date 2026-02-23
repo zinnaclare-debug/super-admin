@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TenantContextController extends Controller
 {
@@ -27,8 +28,22 @@ class TenantContextController extends Controller
                 'name' => $tenantSchool->name,
                 'subdomain' => $tenantSchool->subdomain,
                 'logo_path' => $tenantSchool->logo_path,
+                'logo_url' => $this->storageUrl($tenantSchool->logo_path),
             ],
         ]);
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+        return str_starts_with($relativeOrAbsolute, 'http://')
+            || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
     }
 
     private function resolveTenantSchool(Request $request): ?School
@@ -69,4 +84,3 @@ class TenantContextController extends Controller
         return School::query()->where('subdomain', $subdomain)->first();
     }
 }
-

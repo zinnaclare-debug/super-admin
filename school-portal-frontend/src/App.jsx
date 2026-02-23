@@ -42,6 +42,7 @@ import SchoolAdminPayments from "./pages/school-admin/Payments";
 import Promotion from "./pages/school-admin/Promotion";
 import TeacherReport from "./pages/school-admin/reports/TeacherReport";
 import StudentReport from "./pages/school-admin/reports/StudentReport";
+import AnnouncementDesk from "./pages/school-admin/AnnouncementDesk";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
 
@@ -66,6 +67,7 @@ import ClassActivitiesHome from "./pages/staff/class-activities/ClassActivitiesH
 import VirtualClassHome from "./pages/staff/virtual-class/VirtualClassHome";
 import QuestionBankHome from "./pages/staff/question-bank/QuestionBankHome";
 import CBTHome from "./pages/staff/cbt/CBTHome";
+import StaffAnnouncementsHome from "./pages/staff/announcements/AnnouncementsHome";
 import StudentELibrary from "./pages/student/e-library/StudentELibrary";
 import StudentResultsHome from "./pages/student/results/ResultsHome";
 import StudentProfile from "./pages/student/Profile";
@@ -75,6 +77,7 @@ import StudentVirtualClassHome from "./pages/student/virtual-class/VirtualClassH
 import StudentCBTHome from "./pages/student/cbt/CBTHome";
 import StudentSchoolFees from "./pages/student/SchoolFees";
 import StudentSubjectsHome from "./pages/student/subjects/SubjectsHome";
+import StudentAnnouncementsHome from "./pages/student/announcements/AnnouncementsHome";
 import StudentFeatureLayout from "./pages/student/StudentFeatureLayout";
 
 
@@ -161,6 +164,7 @@ function App() {
         <Route path="admin/promotion" element={<Promotion />} />
         <Route path="admin/teacher_report" element={<TeacherReport />} />
         <Route path="admin/student_report" element={<StudentReport />} />
+        <Route path="admin/announcements" element={<AnnouncementDesk />} />
         </Route>
 
       </Route>
@@ -176,6 +180,7 @@ function App() {
       >
         <Route path="dashboard" element={<StaffDashboard />} />
        <Route path="profile" element={<StaffProfile />} />
+        <Route path="announcements" element={<StaffAnnouncementsHome />} />
         <Route path="results" element={<ResultsHome />} />
         <Route path="results/:termSubjectId" element={<SubjectScores />} />
         <Route path=":featureKey" element={<FeaturePage />} />
@@ -203,6 +208,7 @@ function App() {
         <Route element={<StudentFeatureLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="announcements" element={<StudentAnnouncementsHome />} />
           <Route path="results" element={<StudentResultsHome />} />
           <Route path="profile" element={<StudentProfile />} />
           <Route path="subjects" element={<StudentSubjectsHome />} />
