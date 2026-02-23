@@ -47,15 +47,16 @@
 
 .home-brand-name {
   margin: 0;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--home-navy);
-  font-size: 0.96rem;
+  font-size: 1.03rem;
 }
 
 .home-brand-sub {
   margin: 2px 0 0;
   color: #48617f;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -244,7 +245,7 @@
 }
 
 .home-value-wrap {
-  margin-top: 12px;
+  margin-top: 6px;
   display: grid;
   grid-template-columns: 1fr 0.9fr;
   gap: 12px;
@@ -255,8 +256,17 @@
   margin: 0;
   padding-left: 20px;
   color: #26415f;
+  font-size: 1rem;
   display: grid;
   gap: 8px;
+}
+
+.home-section--value .home-section-head h2 {
+  font-size: clamp(1.38rem, 3.2vw, 2rem);
+}
+
+.home-section--value .home-section-head p {
+  font-size: 1rem;
 }
 
 .home-value-wrap img {

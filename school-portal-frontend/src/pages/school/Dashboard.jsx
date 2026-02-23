@@ -20,6 +20,9 @@ const formatCount = (value) => {
   return Number.isFinite(n) ? n.toLocaleString() : "0";
 };
 
+const MAX_BRANDING_UPLOAD_BYTES = 2 * 1024 * 1024;
+const ALLOWED_BRANDING_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
@@ -138,7 +141,11 @@ function SchoolDashboard() {
       setHeadSignaturePreview(null);
       alert("Branding updated");
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to update branding");
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to update branding");
     } finally {
       setSavingBranding(false);
     }
@@ -146,12 +153,40 @@ function SchoolDashboard() {
 
   const onPickLogo = (e) => {
     const file = e.target.files?.[0] || null;
+    if (file && !ALLOWED_BRANDING_TYPES.includes(file.type)) {
+      alert("Logo must be JPG, PNG, or WEBP.");
+      e.target.value = "";
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
+    if (file && file.size > MAX_BRANDING_UPLOAD_BYTES) {
+      alert("Logo is too large. Max size is 2MB.");
+      e.target.value = "";
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
     setLogoFile(file);
     setLogoPreview(file ? URL.createObjectURL(file) : null);
   };
 
   const onPickSignature = (e) => {
     const file = e.target.files?.[0] || null;
+    if (file && !ALLOWED_BRANDING_TYPES.includes(file.type)) {
+      alert("Signature must be JPG, PNG, or WEBP.");
+      e.target.value = "";
+      setHeadSignatureFile(null);
+      setHeadSignaturePreview(null);
+      return;
+    }
+    if (file && file.size > MAX_BRANDING_UPLOAD_BYTES) {
+      alert("Signature is too large. Max size is 2MB.");
+      e.target.value = "";
+      setHeadSignatureFile(null);
+      setHeadSignaturePreview(null);
+      return;
+    }
     setHeadSignatureFile(file);
     setHeadSignaturePreview(file ? URL.createObjectURL(file) : null);
   };

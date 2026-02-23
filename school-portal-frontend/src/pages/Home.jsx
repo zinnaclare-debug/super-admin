@@ -120,7 +120,7 @@ function Home() {
           </div>
         </section>
 
-        <section className="home-section">
+        <section className="home-section home-section--value">
           <div className="home-section-head">
             <h2>Additional Value</h2>
             <p>What schools also get from Lytebridge.</p>
