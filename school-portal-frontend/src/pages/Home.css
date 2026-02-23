@@ -49,13 +49,14 @@
   margin: 0;
   font-weight: 900;
   color: var(--home-navy);
-  font-size: 1.03rem;
+  font-size: 1.16rem;
+  line-height: 1.12;
 }
 
 .home-brand-sub {
   margin: 2px 0 0;
   color: #48617f;
-  font-size: 0.82rem;
+  font-size: 0.93rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -245,10 +246,10 @@
 }
 
 .home-value-wrap {
-  margin-top: 6px;
+  margin-top: 2px;
   display: grid;
   grid-template-columns: 1fr 0.9fr;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -258,7 +259,7 @@
   color: #26415f;
   font-size: 1rem;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .home-section--value .home-section-head h2 {
@@ -266,6 +267,7 @@
 }
 
 .home-section--value .home-section-head p {
+  margin-top: 2px;
   font-size: 1rem;
 }
 
@@ -405,11 +407,11 @@
   }
 
   .home-brand-name {
-    font-size: 0.84rem;
+    font-size: 0.95rem;
   }
 
   .home-brand-sub {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
   }
 
   .home-login-btn {

@@ -3,6 +3,8 @@ import api from "../../services/api";
 import FeatureTable from "../../components/FeatureTable";
 import { FEATURE_DEFINITIONS } from "../../config/features";
 
+const DEFAULT_TENANCY_BASE_DOMAIN = "lyt.com.ng";
+
 function Schools() {
   const [schools, setSchools] = useState([]);
 
@@ -49,8 +51,21 @@ function Schools() {
     const envBase = import.meta.env.VITE_TENANCY_BASE_DOMAIN?.trim();
     if (envBase) return envBase.toLowerCase();
 
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+    if (apiBase) {
+      try {
+        const apiHost = new URL(apiBase).hostname.toLowerCase();
+        if (apiHost.startsWith("www.")) return apiHost.slice(4);
+        if (apiHost !== "localhost" && !/^\d+\.\d+\.\d+\.\d+$/.test(apiHost)) return apiHost;
+      } catch {
+        // Ignore parse failures and continue with runtime host fallback.
+      }
+    }
+
     const host = window.location.hostname.toLowerCase();
-    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return host;
+    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      return DEFAULT_TENANCY_BASE_DOMAIN;
+    }
     if (host.endsWith(".lvh.me")) return "lvh.me";
     if (host.startsWith("www.")) return host.slice(4);
 
@@ -61,9 +76,10 @@ function Schools() {
 
   const schoolWebAddress = (subdomain) => {
     if (!subdomain) return "-";
-    const protocol = window.location.protocol;
+    const baseDomain = getBaseDomain();
+    const protocol = baseDomain === DEFAULT_TENANCY_BASE_DOMAIN ? "https:" : window.location.protocol;
     const port = window.location.port ? `:${window.location.port}` : "";
-    return `${protocol}//${subdomain}.${getBaseDomain()}${port}`;
+    return `${protocol}//${subdomain}.${baseDomain}${port}`;
   };
 
   const loadSchools = async () => {

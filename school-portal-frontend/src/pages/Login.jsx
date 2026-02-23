@@ -36,6 +36,10 @@ function Login() {
 
   const heroLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandBanner;
   const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
+  const isLytCentralDomain = useMemo(() => {
+    const host = window.location.hostname.toLowerCase();
+    return host === "lyt.com.ng" || host === "www.lyt.com.ng";
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -104,7 +108,7 @@ function Login() {
   };
 
   return (
-    <div className="login-page">
+    <div className={`login-page${isLytCentralDomain ? " login-page--compact" : ""}`}>
       <div className="login-ambient login-ambient--one" />
       <div className="login-ambient login-ambient--two" />
       <div className="login-shell">

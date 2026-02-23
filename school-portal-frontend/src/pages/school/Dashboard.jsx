@@ -21,7 +21,7 @@ const formatCount = (value) => {
 };
 
 const MAX_BRANDING_UPLOAD_BYTES = 2 * 1024 * 1024;
-const ALLOWED_BRANDING_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_BRANDING_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 function SchoolDashboard() {
   const [stats, setStats] = useState({
