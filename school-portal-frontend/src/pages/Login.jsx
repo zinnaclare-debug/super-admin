@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import heroArt from "../assets/dashboard/hero.svg";
 import graduationArt from "../assets/login/Graduation-cuate.svg";
+import brandBanner from "../assets/home/lytebridge-brand.jpg";
+import brandLogo from "../assets/home/lytebridge-logo.png";
 import "./Login.css";
 
 function Login() {
@@ -32,17 +34,8 @@ function Login() {
     return "";
   }, [tenantSchool]);
 
-  const tenantInitials = useMemo(() => {
-    const name = (tenantSchool?.name || "").trim();
-    if (!name) return "SP";
-
-    return name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  }, [tenantSchool]);
+  const heroLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandBanner;
+  const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
 
   useEffect(() => {
     let active = true;
@@ -119,14 +112,14 @@ function Login() {
           <div className="hero-meta">
             <span className="hero-pill">Smart School Portal</span>
             <span className="hero-domain">{window.location.hostname}</span>
-            {tenantLogoUrl && !logoLoadError && (
-              <img
-                className="hero-school-logo"
-                src={tenantLogoUrl}
-                alt={`${tenantSchool?.name || "School"} logo`}
-                onError={() => setLogoLoadError(true)}
-              />
-            )}
+            <img
+              className="hero-school-logo"
+              src={heroLogoUrl}
+              alt={`${tenantSchool?.name || "Lytebridge"} logo`}
+              onError={() => {
+                if (tenantLogoUrl) setLogoLoadError(true);
+              }}
+            />
           </div>
 
           <h1>
@@ -169,15 +162,13 @@ function Login() {
         <section className="login-card">
           <div className="login-brand">
             <div className="login-mark">
-              {tenantLogoUrl && !logoLoadError ? (
-                <img
-                  src={tenantLogoUrl}
-                  alt={`${tenantSchool?.name || "School"} logo`}
-                  onError={() => setLogoLoadError(true)}
-                />
-              ) : (
-                <span>{tenantInitials}</span>
-              )}
+              <img
+                src={cardLogoUrl}
+                alt={`${tenantSchool?.name || "Lytebridge"} logo`}
+                onError={() => {
+                  if (tenantLogoUrl) setLogoLoadError(true);
+                }}
+              />
             </div>
             <div>
               <h2>Sign In to Continue</h2>

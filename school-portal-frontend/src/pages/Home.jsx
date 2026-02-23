@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import heroArt from "../assets/dashboard/branding.svg";
 import modulesArt from "../assets/dashboard/modules.svg";
-import studentsArt from "../assets/dashboard/students.svg";
 import flyerArt from "../assets/home/lytebridge-flyer.jpeg";
+import brandArt from "../assets/home/lytebridge-brand.jpg";
 import "./Home.css";
 
 const FEATURE_LIST = [
@@ -33,10 +33,10 @@ const EXTRA_VALUE = [
 ];
 
 const CONTACT_LINES = [
-  { phone: "+234 806 798 8449", dial: "+2348067988449", location: "Abuja" },
-  { phone: "+234 9136 806652", dial: "+2349136806652", location: "Ekiti State" },
+  { phone: "+234 806 798 8449", dial: "+2348067988449", location: "FCT" },
+  { phone: "+234 9136806652", dial: "+2349136806652", location: "Ekiti State" },
   { phone: "+234 816 986 6477", dial: "+2348169866477", location: "Kwara State" },
-  { phone: "+234 706 690 6190", dial: "+2347066906190", location: "Abuja" },
+  { phone: "+234 706 690 6190", dial: "+2347066906190", location: "FCT" },
 ];
 
 function Home() {
@@ -44,7 +44,7 @@ function Home() {
     <div className="home-page">
       <header className="home-nav">
         <div className="home-brand">
-          <span className="home-brand-mark">L</span>
+          <img className="home-brand-logo" src={brandArt} alt="Lytebridge Professional Services logo" />
           <div>
             <p className="home-brand-name">Lytebridge Professional Service LTD</p>
             <p className="home-brand-sub">School Management Platform</p>
@@ -120,16 +120,6 @@ function Home() {
           </div>
         </section>
 
-        <section className="home-section home-brochure">
-          <div className="home-section-head">
-            <h2>Platform Brochure</h2>
-            <p>Official Lytebridge school management platform overview.</p>
-          </div>
-          <div className="home-brochure-frame">
-            <img src={flyerArt} alt="Lytebridge school management platform brochure" />
-          </div>
-        </section>
-
         <section className="home-section">
           <div className="home-section-head">
             <h2>Additional Value</h2>
@@ -141,17 +131,16 @@ function Home() {
                 <li key={item}>{item}</li>
               ))}
             </ul>
-            <img src={modulesArt} alt="Modules and workflows" />
+            <img src={flyerArt} alt="Lytebridge school management platform brochure" />
           </div>
         </section>
 
         <section className="home-section home-contact">
-          <img src={studentsArt} alt="Students and collaboration" />
+          <img src={modulesArt} alt="Modules and workflows" />
           <div className="home-contact-copy">
-            <h2>Contact Lytebridge</h2>
+            <h2>Ready to launch your school portal?</h2>
             <p>
-              Reach us directly from any location below for onboarding, school setup, pricing, and
-              support.
+              Reach us for onboarding, deployment, support, and account setup across Nigeria.
             </p>
             <div className="home-contact-grid">
               {CONTACT_LINES.map((line) => (
