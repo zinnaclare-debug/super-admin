@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 // Public
 import Login from "./pages/Login";
+import Home from "./pages/Home";
 
 // Super Admin
 import Dashboard from "./pages/Dashboard";
@@ -85,6 +86,7 @@ function App() {
   return (
     <Routes>
       {/* PUBLIC */}
+      <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
 
       {/* SUPER ADMIN */}
@@ -216,7 +218,7 @@ function App() {
       </Route>
 
       {/* FALLBACK */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
