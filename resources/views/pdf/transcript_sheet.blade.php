@@ -6,10 +6,10 @@
     <style>
         @page { margin: 18px; }
         body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #111827; }
-        .sheet { position: relative; border: 1px solid #d1d5db; padding: 10px; overflow: hidden; }
+        .sheet { position: relative; border: 1px solid #d1d5db; padding: 10px; }
         .watermark {
-            position: absolute;
-            top: 30%;
+            position: fixed;
+            top: 34%;
             left: 50%;
             width: 300px;
             height: 300px;
