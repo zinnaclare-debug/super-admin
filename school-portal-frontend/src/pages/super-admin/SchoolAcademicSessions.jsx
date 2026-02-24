@@ -127,7 +127,17 @@ export default function SchoolAcademicSessions() {
                     </button>
                   )}
 
-                  {session.status === "completed" && <span>Is Completed</span>}
+                  {session.status === "completed" && (
+                    <>
+                      <button
+                        onClick={() => updateStatus(session.id, "current")}
+                        disabled={updatingId === session.id}
+                      >
+                        {updatingId === session.id ? "Updating..." : "Set Current"}
+                      </button>
+                      <span style={{ marginLeft: 8 }}>Is Completed</span>
+                    </>
+                  )}
 
                   <button
                     onClick={() => deleteSession(session.id)}
