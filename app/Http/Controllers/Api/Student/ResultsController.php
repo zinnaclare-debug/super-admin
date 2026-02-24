@@ -637,6 +637,7 @@ class ResultsController extends Controller
         $sessionName = strtoupper((string) (data_get($viewData, 'session.academic_year') ?: data_get($viewData, 'session.session_name', '-')));
         $teacherComment = strtoupper((string) data_get($viewData, 'teacherComment', '-'));
         $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
+        $classTeacherName = strtoupper((string) data_get($viewData, 'classTeacher.name', '-'));
         $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
         $total = (int) data_get($viewData, 'totalScore', 0);
         $schoolLogoDataUri = (string) data_get($viewData, 'schoolLogoDataUri', '');
@@ -716,10 +717,8 @@ class ResultsController extends Controller
             . '<thead><tr><th style="width:35%;">Subject</th><th style="width:10%;">CA</th><th style="width:10%;">Exam</th><th style="width:10%;">Total</th><th style="width:10%;">Grade</th><th style="width:25%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
-            . '<table class="meta">'
-            . '<tr><th style="width:24%;">Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
-            . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
-            . '</table>'
+            . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
+            . '<td style="width:82%;">A [70-100] | B [60-69] | C [50-59] | D [40-49] | E [30-39] | F [0-29]</td></tr></table>'
             . '<table class="grid"><tr><td style="width:74%;">'
             . '<table><thead><tr><th style="width:80%;">PSYCHOMOTOR</th><th style="width:20%;">RATE</th></tr></thead><tbody>'
             . $behaviourHtml
@@ -733,8 +732,13 @@ class ResultsController extends Controller
             . '<tr><td>VERY POOR</td><td style="text-align:center;">1</td></tr>'
             . '</tbody></table>'
             . '</td></tr></table>'
-            . '<table class="meta"><tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
-            . '<tr><th>School Head Signature</th><td>' . $signatureBlock . '</td></tr></table>'
+            . '<table class="meta">'
+            . '<tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
+            . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
+            . '<tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr>'
+            . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
+            . '</table>'
+            . '<table class="meta"><tr><th style="width:24%;">School Head Signature</th><td>' . $signatureBlock . '</td></tr></table>'
             . '</body></html>';
 
         return $this->renderPdfFromHtml($html);

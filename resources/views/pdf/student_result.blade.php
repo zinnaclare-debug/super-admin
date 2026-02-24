@@ -298,6 +298,10 @@
                 <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
             </tr>
             <tr>
+                <th>Class Teacher Name</th>
+                <td>{{ strtoupper($classTeacher?->name ?? '-') }}</td>
+            </tr>
+            <tr>
                 <th>Class Teacher Comment</th>
                 <td>{{ strtoupper($teacherComment ?? '-') }}</td>
             </tr>
