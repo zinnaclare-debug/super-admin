@@ -804,24 +804,19 @@ class ReportsController extends Controller
 
     private function subjectShortCode(string $subjectName, string $subjectCode = ''): string
     {
-        $code = strtoupper(trim($subjectCode));
-        if ($code !== '') {
-            return $code;
+        $baseCode = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($subjectCode)));
+        $nameLetters = preg_replace('/[^A-Z]/', '', strtoupper(trim($subjectName)));
+        $combined = (string) $baseCode;
+
+        if (strlen($combined) < 3) {
+            $combined .= (string) $nameLetters;
         }
 
-        $words = preg_split('/\s+/', trim($subjectName)) ?: [];
-        $abbr = '';
-        foreach ($words as $word) {
-            if ($word === '') {
-                continue;
-            }
-            $abbr .= strtoupper(substr($word, 0, 1));
-            if (strlen($abbr) >= 4) {
-                break;
-            }
+        if ($combined === '') {
+            $combined = 'SUB';
         }
 
-        return $abbr !== '' ? $abbr : strtoupper(substr(trim($subjectName), 0, 4));
+        return substr(str_pad($combined, 3, 'X'), 0, 3);
     }
 
     private function ordinalPosition(int $position): string

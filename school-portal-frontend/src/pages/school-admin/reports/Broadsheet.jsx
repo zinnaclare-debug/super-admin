@@ -50,6 +50,7 @@ export default function Broadsheet() {
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [searching, setSearching] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -177,6 +178,40 @@ export default function Broadsheet() {
     }
   };
 
+  const previewBroadsheetPdf = async () => {
+    if (!canSearch) return;
+    setPreviewing(true);
+    setError("");
+    try {
+      const res = await api.get("/api/school-admin/reports/broadsheet/download", {
+        params: requestParams(),
+        responseType: "blob",
+      });
+
+      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
+      if (contentType.includes("application/json")) {
+        const msg = await messageFromBlobError(res.data, "Failed to preview broadsheet PDF.");
+        throw new Error(msg);
+      }
+
+      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 15000);
+    } catch (e) {
+      if (e?.response?.data instanceof Blob) {
+        const msg = await messageFromBlobError(e.response.data, "Failed to preview broadsheet PDF.");
+        setError(msg);
+      } else {
+        setError(e?.response?.data?.message || e?.message || "Failed to preview broadsheet PDF.");
+      }
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   return (
     <div className="broadsheet-page">
       <div className="broadsheet-card">
@@ -222,6 +257,9 @@ export default function Broadsheet() {
         <div className="broadsheet-actions">
           <button onClick={searchBroadsheet} disabled={!canSearch || searching || loadingOptions}>
             {searching ? "Searching..." : "Search"}
+          </button>
+          <button className="tertiary" onClick={previewBroadsheetPdf} disabled={!canSearch || previewing}>
+            {previewing ? "Opening Preview..." : "Preview PDF"}
           </button>
           <button className="secondary" onClick={downloadBroadsheet} disabled={!canSearch || downloading}>
             {downloading ? "Downloading..." : "Download Broadsheet"}
