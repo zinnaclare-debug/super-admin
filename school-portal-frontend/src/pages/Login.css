@@ -298,31 +298,35 @@
 }
 
 .login-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  display: grid;
+  gap: 10px;
 }
 
 .login-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 100%;
+  min-height: 72px;
+  border-radius: 12px;
   background: #ffffff;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  color: #ffffff;
-  font-size: 1rem;
-  font-weight: 800;
   border: 1px solid #bfdbfe;
+  padding: 6px 10px;
 }
 
 .login-mark img {
-  width: 100%;
+  width: auto;
   height: 100%;
+  max-width: 100%;
   object-fit: contain;
   background: #ffffff;
-  padding: 3px;
+  padding: 0;
+}
+
+.login-brand-copy {
+  display: grid;
+  gap: 3px;
 }
 
 .login-card h2 {
@@ -497,6 +501,10 @@
 
 .login-page--compact .login-card {
   padding: 12px 10px 9px;
+}
+
+.login-page--compact .login-mark {
+  min-height: 64px;
 }
 
 .login-page--compact .login-subtitle {

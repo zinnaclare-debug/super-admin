@@ -42,6 +42,8 @@ import SchoolAdminPayments from "./pages/school-admin/Payments";
 import Promotion from "./pages/school-admin/Promotion";
 import TeacherReport from "./pages/school-admin/reports/TeacherReport";
 import StudentReport from "./pages/school-admin/reports/StudentReport";
+import Broadsheet from "./pages/school-admin/reports/Broadsheet";
+import Transcript from "./pages/school-admin/reports/Transcript";
 import AnnouncementDesk from "./pages/school-admin/AnnouncementDesk";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
@@ -162,6 +164,8 @@ function App() {
         />
         <Route path="admin/payments" element={<SchoolAdminPayments />} />
         <Route path="admin/promotion" element={<Promotion />} />
+        <Route path="admin/broadsheet" element={<Broadsheet />} />
+        <Route path="admin/transcript" element={<Transcript />} />
         <Route path="admin/teacher_report" element={<TeacherReport />} />
         <Route path="admin/student_report" element={<StudentReport />} />
         <Route path="admin/announcements" element={<AnnouncementDesk />} />

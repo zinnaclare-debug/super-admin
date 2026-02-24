@@ -7,6 +7,8 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/academics",
   "/school/admin/payments",
   "/school/admin/promotion",
+  "/school/admin/broadsheet",
+  "/school/admin/transcript",
   "/school/admin/teacher_report",
   "/school/admin/student_report",
 ]);
@@ -18,6 +20,8 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/classes")) return "Class Setup";
   if (pathname.startsWith("/school/admin/payments")) return "Payments";
   if (pathname.startsWith("/school/admin/promotion")) return "Promotion";
+  if (pathname.startsWith("/school/admin/broadsheet")) return "Broadsheet";
+  if (pathname.startsWith("/school/admin/transcript")) return "Transcript";
   if (pathname.startsWith("/school/admin/teacher_report")) return "Teacher Report";
   if (pathname.startsWith("/school/admin/student_report")) return "Student Report";
   if (pathname.startsWith("/school/admin/announcements")) return "Announcement Desk";

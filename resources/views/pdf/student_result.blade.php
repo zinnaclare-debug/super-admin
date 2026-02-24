@@ -1,8 +1,11 @@
+@php($embedded = (bool) ($embedded ?? false))
+@if(!$embedded)
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Student Result</title>
+@endif
     <style>
         @page { margin: 18px; }
         body {
@@ -121,8 +124,10 @@
             border-bottom: 1px dashed #6b7280;
         }
     </style>
+@if(!$embedded)
 </head>
 <body>
+@endif
 @php
     $timesPresent = (int) ($attendance?->days_present ?? 0);
     $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
@@ -300,5 +305,7 @@
         </div>
     </div>
 </div>
+@if(!$embedded)
 </body>
 </html>
+@endif

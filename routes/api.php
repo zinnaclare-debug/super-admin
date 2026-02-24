@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\SchoolAdmin\AcademicsController;
 use App\Http\Controllers\Api\SchoolAdmin\PaymentsController as SchoolAdminPaymentsController;
 use App\Http\Controllers\Api\SchoolAdmin\PromotionController;
 use App\Http\Controllers\Api\SchoolAdmin\ReportsController;
+use App\Http\Controllers\Api\SchoolAdmin\TranscriptController;
 use App\Http\Controllers\Api\SchoolAdmin\AnnouncementController as SchoolAdminAnnouncementController;
 
 use App\Http\Controllers\Api\Staff\TeacherResultsController;
@@ -196,6 +197,12 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:teacher_report');
     Route::get('/school-admin/reports/student', [ReportsController::class, 'student'])
         ->middleware('feature:student_report');
+    Route::get('/school-admin/transcript/options', [TranscriptController::class, 'options'])
+        ->middleware('feature:transcript');
+    Route::get('/school-admin/transcript', [TranscriptController::class, 'show'])
+        ->middleware('feature:transcript');
+    Route::get('/school-admin/transcript/download', [TranscriptController::class, 'download'])
+        ->middleware('feature:transcript');
 
        
     Route::get('/school-admin/classes/{class}/eligible-teachers', [ClassManagementController::class, 'eligibleTeachers']);

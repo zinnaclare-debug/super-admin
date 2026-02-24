@@ -174,7 +174,7 @@ function Login() {
                 }}
               />
             </div>
-            <div>
+            <div className="login-brand-copy">
               <h2>Sign In to Continue</h2>
               <p className="login-school-name">
                 {tenantSchool?.name || "School Portal"}
