@@ -858,43 +858,58 @@ class ReportsController extends Controller
 
     private function pdfResponse(string $title, string $schoolName, array $context, $rows, string $prefix)
     {
-        $html = view('pdf.school_admin_report', [
-            'title' => $title,
-            'schoolName' => $schoolName,
-            'context' => $context,
-            'rows' => $rows,
-        ])->render();
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
 
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-        if (!is_dir($dompdfTempDir)) {
-            @mkdir($dompdfTempDir, 0775, true);
+            $html = view('pdf.school_admin_report', [
+                'title' => $title,
+                'schoolName' => $schoolName,
+                'context' => $context,
+                'rows' => $rows,
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $sessionName = $context['current_session']['session_name'] ?? $context['current_session']['academic_year'] ?? 'session';
+            $termName = $context['selected_term']['name'] ?? 'term';
+            $filename = sprintf(
+                '%s_%s_%s.pdf',
+                Str::slug($prefix),
+                Str::slug((string) $sessionName),
+                Str::slug((string) $termName)
+            );
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('School admin report PDF generation failed', [
+                'title' => $title,
+                'prefix' => $prefix,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Unable to generate report PDF right now.',
+            ], 500);
         }
-        $options->set('tempDir', $dompdfTempDir);
-        $options->set('fontDir', $dompdfTempDir);
-        $options->set('fontCache', $dompdfTempDir);
-        $options->set('chroot', base_path());
-
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
-        $sessionName = $context['current_session']['session_name'] ?? $context['current_session']['academic_year'] ?? 'session';
-        $termName = $context['selected_term']['name'] ?? 'term';
-        $filename = sprintf(
-            '%s_%s_%s.pdf',
-            Str::slug($prefix),
-            Str::slug((string) $sessionName),
-            Str::slug((string) $termName)
-        );
-
-        return response($dompdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
     }
 
     private function resultsPublished(Request $request): bool

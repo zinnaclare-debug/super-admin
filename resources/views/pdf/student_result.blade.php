@@ -132,6 +132,14 @@
     $timesPresent = (int) ($attendance?->days_present ?? 0);
     $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
     $totalObtainable = max(1, count($rows)) * 100;
+    $nextTermBeginLabel = '-';
+    if (!empty($nextTermBeginDate)) {
+        try {
+            $nextTermBeginLabel = \Carbon\Carbon::parse($nextTermBeginDate)->format('jS M, Y');
+        } catch (\Throwable $e) {
+            $nextTermBeginLabel = '-';
+        }
+    }
 @endphp
 <div class="sheet">
     @if($schoolLogoDataUri)
@@ -173,7 +181,7 @@
                 <th>SERIAL NO</th>
                 <td>{{ strtoupper($studentUser?->username ?? '-') }}</td>
                 <th>NEXT TERM BEGINS</th>
-                <td>{{ $nextTermBeginDate ? \Carbon\Carbon::parse($nextTermBeginDate)->format('jS M, Y') : '-' }}</td>
+                <td>{{ $nextTermBeginLabel }}</td>
             </tr>
             <tr>
                 <th>GENDER</th>

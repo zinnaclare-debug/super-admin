@@ -181,24 +181,24 @@ class TranscriptController extends Controller
             ], 404);
         }
 
-        $htmlParts = [];
-        $entryCount = count($entries);
-        foreach ($entries as $index => $entry) {
-            $viewData = $entry['view_data'];
-            $viewData['embedded'] = true;
-            $htmlParts[] = view('pdf.student_result', $viewData)->render();
-            if ($index < $entryCount - 1) {
-                $htmlParts[] = '<div style="page-break-after: always;"></div>';
-            }
-        }
-
-        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
-            . implode("\n", $htmlParts)
-            . '</body></html>';
-
         try {
             @set_time_limit(120);
             @ini_set('memory_limit', '512M');
+
+            $htmlParts = [];
+            $entryCount = count($entries);
+            foreach ($entries as $index => $entry) {
+                $viewData = $entry['view_data'];
+                $viewData['embedded'] = true;
+                $htmlParts[] = view('pdf.student_result', $viewData)->render();
+                if ($index < $entryCount - 1) {
+                    $htmlParts[] = '<div style="page-break-after: always;"></div>';
+                }
+            }
+
+            $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
+                . implode("\n", $htmlParts)
+                . '</body></html>';
 
             $options = new Options();
             $options->set('isHtml5ParserEnabled', true);
