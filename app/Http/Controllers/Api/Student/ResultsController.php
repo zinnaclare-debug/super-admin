@@ -325,8 +325,14 @@ class ResultsController extends Controller
                 'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
             ];
 
+            $viewDataWithAssets = $viewData;
+            $viewDataWithoutAssets = $viewData;
+            $viewDataWithoutAssets['schoolLogoDataUri'] = null;
+            $viewDataWithoutAssets['studentPhotoDataUri'] = null;
+            $viewDataWithoutAssets['headSignatureDataUri'] = null;
+
             try {
-                $pdfOutput = $this->renderStudentResultPdf($viewData);
+                $pdfOutput = $this->renderStudentResultPdf($viewDataWithAssets);
             } catch (Throwable $pdfError) {
                 Log::warning('Student result PDF primary render failed, retrying without embedded images', [
                     'school_id' => $schoolId,
@@ -337,14 +343,10 @@ class ResultsController extends Controller
                     'error' => $pdfError->getMessage(),
                 ]);
 
-                $viewData['schoolLogoDataUri'] = null;
-                $viewData['studentPhotoDataUri'] = null;
-                $viewData['headSignatureDataUri'] = null;
-
                 try {
-                    $pdfOutput = $this->renderStudentResultPdf($viewData);
+                    $pdfOutput = $this->renderStudentResultPdf($viewDataWithoutAssets);
                 } catch (Throwable $fallbackError) {
-                    Log::warning('Student result PDF image-free render failed, using simplified template', [
+                    Log::warning('Student result PDF image-free render failed, trying simplified template with assets', [
                         'school_id' => $schoolId,
                         'user_id' => $user->id ?? null,
                         'student_id' => $student->id ?? null,
@@ -353,7 +355,20 @@ class ResultsController extends Controller
                         'error' => $fallbackError->getMessage(),
                     ]);
 
-                    $pdfOutput = $this->renderSimpleStudentResultPdf($viewData);
+                    try {
+                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithAssets);
+                    } catch (Throwable $simpleWithAssetError) {
+                        Log::warning('Student result simplified template with assets failed, using simplified template without assets', [
+                            'school_id' => $schoolId,
+                            'user_id' => $user->id ?? null,
+                            'student_id' => $student->id ?? null,
+                            'class_id' => $classId,
+                            'term_id' => $termId,
+                            'error' => $simpleWithAssetError->getMessage(),
+                        ]);
+
+                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithoutAssets);
+                    }
                 }
             }
 
@@ -624,6 +639,11 @@ class ResultsController extends Controller
         $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
         $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
         $total = (int) data_get($viewData, 'totalScore', 0);
+        $schoolLogoDataUri = (string) data_get($viewData, 'schoolLogoDataUri', '');
+        $studentPhotoDataUri = (string) data_get($viewData, 'studentPhotoDataUri', '');
+        $headSignatureDataUri = (string) data_get($viewData, 'headSignatureDataUri', '');
+        $behaviourTraits = (array) data_get($viewData, 'behaviourTraits', []);
+        $headName = strtoupper((string) data_get($viewData, 'school.head_of_school_name', '-'));
 
         $rowsHtml = '';
         foreach ((array) data_get($viewData, 'rows', []) as $row) {
@@ -648,19 +668,45 @@ class ResultsController extends Controller
             $rowsHtml = '<tr><td colspan="6" style="text-align:center;">No result data found.</td></tr>';
         }
 
+        $behaviourHtml = '';
+        foreach ($behaviourTraits as $trait) {
+            $label = strtoupper((string) ($trait['label'] ?? '-'));
+            $value = (int) ($trait['value'] ?? 0);
+            $behaviourHtml .= '<tr><td>' . e($label) . '</td><td style="text-align:center;">' . $value . '</td></tr>';
+        }
+        if ($behaviourHtml === '') {
+            $behaviourHtml = '<tr><td colspan="2" style="text-align:center;">No behaviour data</td></tr>';
+        }
+
+        $studentPhotoBlock = $studentPhotoDataUri !== ''
+            ? '<img src="' . e($studentPhotoDataUri) . '" alt="Student Photo" style="width:72px;height:72px;object-fit:cover;border:1px solid #222;" />'
+            : '<div style="width:72px;height:72px;border:1px solid #222;"></div>';
+        $schoolLogoBlock = $schoolLogoDataUri !== ''
+            ? '<img src="' . e($schoolLogoDataUri) . '" alt="School Logo" style="width:72px;height:72px;object-fit:contain;border:1px solid #222;" />'
+            : '<div style="width:72px;height:72px;border:1px solid #222;"></div>';
+
+        $signatureBlock = $headSignatureDataUri !== ''
+            ? '<img src="' . e($headSignatureDataUri) . '" alt="Head Signature" style="width:140px;height:48px;object-fit:contain;border-bottom:1px dashed #6b7280;" />'
+            : '<div style="width:140px;height:48px;border-bottom:1px dashed #6b7280;"></div>';
+
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
-            . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;color:#111;}'
-            . 'h1{margin:0;font-size:18px;text-align:center;}'
-            . 'h2{margin:4px 0 10px 0;font-size:12px;text-align:center;font-weight:600;}'
+            . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:9px;color:#111;}'
+            . 'h1{margin:0;font-size:16px;text-align:center;}'
+            . 'h2{margin:3px 0 8px 0;font-size:11px;text-align:center;font-weight:600;}'
             . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
             . 'th,td{border:1px solid #222;padding:4px;}'
             . 'th{background:#f3f4f6;text-align:left;}'
-            . '.meta td,.meta th{font-size:10px;}'
+            . '.meta td,.meta th{font-size:9px;}'
+            . '.grid{width:100%;margin-top:8px;}'
+            . '.grid td{vertical-align:top;border:0;padding:0;}'
+            . '.section-title{font-weight:bold;margin-top:8px;}'
             . '</style></head><body>'
+            . '<table class="grid"><tr><td style="width:80px;">' . $studentPhotoBlock . '</td><td>'
             . '<h1>' . e($schoolName) . '</h1>'
             . '<h2>' . e($schoolLocation) . '</h2>'
             . '<h2>RESULT SHEET FOR ' . e($termName) . ' - ' . e($sessionName) . '</h2>'
+            . '</td><td style="width:80px;text-align:right;">' . $schoolLogoBlock . '</td></tr></table>'
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
             . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
@@ -674,6 +720,21 @@ class ResultsController extends Controller
             . '<tr><th style="width:24%;">Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
             . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
             . '</table>'
+            . '<table class="grid"><tr><td style="width:74%;">'
+            . '<table><thead><tr><th style="width:80%;">PSYCHOMOTOR</th><th style="width:20%;">RATE</th></tr></thead><tbody>'
+            . $behaviourHtml
+            . '</tbody></table>'
+            . '</td><td style="width:2%;"></td><td style="width:24%;">'
+            . '<table><thead><tr><th>KEY RATE</th><th>SET</th></tr></thead><tbody>'
+            . '<tr><td>EXCELLENT</td><td style="text-align:center;">5</td></tr>'
+            . '<tr><td>VERY GOOD</td><td style="text-align:center;">4</td></tr>'
+            . '<tr><td>SATISFACTORY</td><td style="text-align:center;">3</td></tr>'
+            . '<tr><td>POOR</td><td style="text-align:center;">2</td></tr>'
+            . '<tr><td>VERY POOR</td><td style="text-align:center;">1</td></tr>'
+            . '</tbody></table>'
+            . '</td></tr></table>'
+            . '<table class="meta"><tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
+            . '<tr><th>School Head Signature</th><td>' . $signatureBlock . '</td></tr></table>'
             . '</body></html>';
 
         return $this->renderPdfFromHtml($html);
