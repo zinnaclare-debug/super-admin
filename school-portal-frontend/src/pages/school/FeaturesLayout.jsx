@@ -1,9 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { FEATURE_DEFINITIONS } from "../../config/features";
+import { getStoredFeatures, getStoredUser } from "../../utils/authStorage";
 
 function FeaturesLayout() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  const enabledFeatures = JSON.parse(localStorage.getItem("features") || "[]");
+  const user = getStoredUser();
+  const enabledFeatures = getStoredFeatures();
+
+  if (!user) return null;
 
   const isEnabled = (key) =>
     enabledFeatures.some((f) => f.feature === key && f.enabled);

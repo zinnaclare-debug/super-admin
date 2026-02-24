@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import FeatureModal from "../../components/FeatureModal";
+import { clearAuthState, getStoredToken, getStoredUser } from "../../utils/authStorage";
 
 function SuperAdminSchools() {
   const [schools, setSchools] = useState([]);
@@ -21,15 +22,14 @@ function SuperAdminSchools() {
       const status = err.response?.status;
       if (status === 401) {
         // Unauthorized — token invalid/expired (clear session)
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearAuthState();
         navigate("/login", { replace: true });
         return;
       }
       if (status === 403) {
         // Forbidden — keep session but inform user and navigate to their dashboard
         alert("Access denied: you do not have permission to view this page.");
-        const current = JSON.parse(localStorage.getItem("user") || "null");
+        const current = getStoredUser();
         if (current?.role === "school_admin") {
           navigate("/school/dashboard", { replace: true });
         } else {
@@ -42,19 +42,12 @@ function SuperAdminSchools() {
   };
  
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    let user = null;
-
-    try {
-      user = JSON.parse(localStorage.getItem("user"));
-    } catch (e) {
-      user = null;
-    }
+    const token = getStoredToken();
+    const user = getStoredUser();
 
     // If no auth info, clear and redirect to login
     if (!token || !user) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      clearAuthState();
       navigate("/login", { replace: true });
       return;
     }

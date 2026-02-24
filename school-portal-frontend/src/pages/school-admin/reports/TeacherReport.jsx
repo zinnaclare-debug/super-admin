@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import { getStoredUser } from "../../../utils/authStorage";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
@@ -12,7 +13,7 @@ export default function TeacherReport() {
   const [sessionConfigError, setSessionConfigError] = useState("");
 
   const schoolName = useMemo(() => {
-    const u = JSON.parse(localStorage.getItem("user") || "null");
+    const u = getStoredUser();
     return u?.school?.name || u?.school_name || "School";
   }, []);
 

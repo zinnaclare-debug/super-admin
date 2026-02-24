@@ -1,21 +1,22 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { clearAuthState, getStoredUser } from "../utils/authStorage";
 
 function StudentDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (!userData) {
+    const currentUser = getStoredUser();
+    if (!currentUser) {
       navigate("/login", { replace: true });
       return;
     }
-    setUser(JSON.parse(userData));
+    setUser(currentUser);
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuthState();
     navigate("/login", { replace: true });
   };
 

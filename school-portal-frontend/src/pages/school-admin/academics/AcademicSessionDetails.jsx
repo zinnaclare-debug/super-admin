@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import { getStoredUser } from "../../../utils/authStorage";
 
 export default function AcademicSessionDetails() {
   const { sessionId } = useParams();
@@ -16,7 +17,7 @@ export default function AcademicSessionDetails() {
   const [deptLevel, setDeptLevel] = useState(null);
 
   const schoolName = useMemo(() => {
-    const u = JSON.parse(localStorage.getItem("user") || "null");
+    const u = getStoredUser();
     return u?.school?.name || u?.school_name || "School";
   }, []);
 

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getStoredToken } from "../utils/authStorage";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -14,7 +15,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = getStoredToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

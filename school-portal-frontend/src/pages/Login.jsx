@@ -5,6 +5,7 @@ import heroArt from "../assets/dashboard/hero.svg";
 import graduationArt from "../assets/login/Graduation-cuate.svg";
 import brandBanner from "../assets/home/lytebridge-brand.jpg";
 import brandLogo from "../assets/home/lytebridge-logo.png";
+import { setAuthState, setStoredFeatures } from "../utils/authStorage";
 import "./Login.css";
 
 function Login() {
@@ -79,18 +80,15 @@ function Login() {
       const { token, user } = res.data;
 
       // 2️⃣ STORE AUTH
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      setAuthState({ token, user });
+      setStoredFeatures([]);
 
       // 3️⃣ ROUTE BASED ON ROLE
       if (user.role === "super_admin") {
         navigate("/super-admin", { replace: true });
       } else if (user.role === "school_admin") {
         const featuresRes = await api.get("/api/schools/features");
-        localStorage.setItem(
-          "features",
-          JSON.stringify(featuresRes.data.data || featuresRes.data)
-        );
+        setStoredFeatures(featuresRes.data.data || featuresRes.data);
         navigate("/school/dashboard", { replace: true });
       } else if (user.role === "staff") {
         navigate("/staff/dashboard", { replace: true });

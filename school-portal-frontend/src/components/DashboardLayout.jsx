@@ -1,16 +1,18 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import {
+  clearAuthState,
+  getStoredToken,
+  getStoredUser,
+  setStoredFeatures,
+} from "../utils/authStorage";
 
 function DashboardLayout() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "null");
-    } catch {
-      return null;
-    }
+    return getStoredUser();
   });
 
   const [features, setFeatures] = useState([]);
@@ -43,7 +45,7 @@ function DashboardLayout() {
         .then((res) => {
           const data = res.data.data || [];
           setFeatures(data);
-          localStorage.setItem("features", JSON.stringify(data));
+          setStoredFeatures(data);
         })
         .catch(() => {});
       return;
@@ -79,14 +81,14 @@ function DashboardLayout() {
   }, [user]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getStoredToken();
     if (!token || !user) {
       navigate("/login", { replace: true });
     }
   }, [navigate, user]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuthState();
     navigate("/login", { replace: true });
   };
 
@@ -149,6 +151,24 @@ function DashboardLayout() {
       "behaviour rating": "behaviour-rating",
     };
     return `/${role}/${map[featureKey] || encodeURIComponent(featureKey)}`;
+  };
+
+  const adminFeaturePath = (featureKey) => {
+    const normalized = String(featureKey || "").trim().toLowerCase();
+    const map = {
+      register: "register",
+      users: "users",
+      academics: "academics",
+      academic_session: "academic_session",
+      promotion: "promotion",
+      broadsheet: "broadsheet",
+      transcript: "transcript",
+      teacher_report: "teacher_report",
+      student_report: "student_report",
+      announcements: "announcements",
+      "announcement desk": "announcements",
+    };
+    return `/school/admin/${map[normalized] || encodeURIComponent(normalized)}`;
   };
 
   const featureLabel = (value) => String(value || "").replaceAll("_", " ").toUpperCase();
@@ -252,8 +272,8 @@ function DashboardLayout() {
                 {showAdminFeatures &&
                   adminFeatures.map((f) => (
                     <NavLink
-                      key={f.feature}
-                      to={`/school/admin/${f.feature}`}
+                      key={String(f.feature || "").trim()}
+                      to={adminFeaturePath(f.feature)}
                       title={featureLabel(f.feature)}
                       style={linkStyle}
                     >

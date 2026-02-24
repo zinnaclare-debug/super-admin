@@ -56,10 +56,8 @@ class LoginController extends Controller
             ], 403);
         }
 
-
-        // revoke old tokens
-        $user->tokens()->delete();
-
+        // Keep existing tokens so the same account can stay logged in on multiple devices.
+        // If you later want limits, prune old tokens with a retention policy instead of deleting all.
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
