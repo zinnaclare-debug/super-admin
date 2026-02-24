@@ -10,7 +10,8 @@ class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, ...$roles)
     {
-        $user = $request->user();
+        // Prefer Sanctum token-authenticated user for API role checks.
+        $user = $request->user('sanctum') ?? $request->user();
 
         // Debug: log the current user role and requested path (temporary)
         try {

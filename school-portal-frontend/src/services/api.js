@@ -11,7 +11,8 @@ const api = axios.create({
     "X-Requested-With": "XMLHttpRequest",
     Accept: "application/json",
   },
-  withCredentials: true,
+  // Bearer-token auth only; avoid cookie/session auth bleed between roles.
+  withCredentials: false,
 });
 
 api.interceptors.request.use((config) => {
@@ -21,7 +22,5 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
-
-api.defaults.withCredentials = true;
 
 export default api;
