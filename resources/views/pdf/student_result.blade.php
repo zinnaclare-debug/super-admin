@@ -10,7 +10,7 @@
         @page { margin: 18px; }
         body {
             font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 11px;
+            font-size: 7px;
             color: #111827;
         }
         .sheet {

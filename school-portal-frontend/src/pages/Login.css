@@ -304,7 +304,7 @@
 
 .login-mark {
   width: 100%;
-  min-height: 72px;
+  min-height: 86px;
   border-radius: 12px;
   background: #ffffff;
   display: flex;
@@ -316,9 +316,10 @@
 }
 
 .login-mark img {
-  width: auto;
-  height: 100%;
+  width: 100%;
+  height: auto;
   max-width: 100%;
+  max-height: 72px;
   object-fit: contain;
   background: #ffffff;
   padding: 0;
@@ -504,7 +505,11 @@
 }
 
 .login-page--compact .login-mark {
-  min-height: 64px;
+  min-height: 74px;
+}
+
+.login-page--compact .login-mark img {
+  max-height: 62px;
 }
 
 .login-page--compact .login-subtitle {
