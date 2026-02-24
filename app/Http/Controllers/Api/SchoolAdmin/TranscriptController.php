@@ -95,7 +95,8 @@ class TranscriptController extends Controller
             $terms,
             $student,
             $studentUser,
-            $school
+            $school,
+            false
         );
 
         if (empty($entries)) {
@@ -172,7 +173,8 @@ class TranscriptController extends Controller
             $terms,
             $student,
             $studentUser,
-            $school
+            $school,
+            true
         );
 
         if (empty($entries)) {
@@ -372,7 +374,8 @@ class TranscriptController extends Controller
         Collection $terms,
         Student $student,
         User $studentUser,
-        $school
+        $school,
+        bool $withEmbeddedAssets = true
     ): array {
         $entries = [];
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
@@ -464,9 +467,9 @@ class TranscriptController extends Controller
                 'schoolHeadComment' => $schoolHeadComment,
                 'classTeacher' => $classTeacher,
                 'behaviourTraits' => $behaviourTraits,
-                'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
-                'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
-                'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
+                'schoolLogoDataUri' => $withEmbeddedAssets ? $this->toDataUri($school?->logo_path) : null,
+                'studentPhotoDataUri' => $withEmbeddedAssets ? $this->toDataUri($studentPhotoPath) : null,
+                'headSignatureDataUri' => $withEmbeddedAssets ? $this->toDataUri($school?->head_signature_path) : null,
             ];
 
             $entries[] = [
@@ -757,8 +760,18 @@ class TranscriptController extends Controller
             return null;
         }
 
-        $mime = mime_content_type($fullPath) ?: 'image/png';
-        $base64 = base64_encode((string) file_get_contents($fullPath));
+        $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
+        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+
+        $binary = @file_get_contents($fullPath);
+        if (!is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        $base64 = base64_encode($binary);
 
         return "data:{$mime};base64,{$base64}";
     }

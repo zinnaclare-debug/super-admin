@@ -16,9 +16,11 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ResultsController extends Controller
 {
@@ -244,106 +246,124 @@ class ResultsController extends Controller
             return response()->json(['message' => 'Term not found'], 404);
         }
 
-        $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
 
-        $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
-            ->where('class_id', $classId)
-            ->where('term_id', $termId)
-            ->where('student_id', $student->id)
-            ->first();
+            $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
 
-        $attendance = StudentAttendance::where('school_id', $schoolId)
-            ->where('class_id', $classId)
-            ->where('term_id', $termId)
-            ->where('student_id', $student->id)
-            ->first();
-        $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
-            ->where('class_id', $classId)
-            ->where('term_id', $termId)
-            ->first();
+            $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->where('student_id', $student->id)
+                ->first();
 
-        $classTeacher = null;
-        if ($class->class_teacher_user_id) {
-            $classTeacher = \App\Models\User::where('id', $class->class_teacher_user_id)
-                ->where('school_id', $schoolId)
-                ->first(['id', 'name', 'email']);
+            $attendance = StudentAttendance::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->where('student_id', $student->id)
+                ->first();
+            $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->first();
+
+            $classTeacher = null;
+            if ($class->class_teacher_user_id) {
+                $classTeacher = \App\Models\User::where('id', $class->class_teacher_user_id)
+                    ->where('school_id', $schoolId)
+                    ->first(['id', 'name', 'email']);
+            }
+
+            $school = $user->school;
+            $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
+
+            $totalScore = (int) collect($rows)->sum('total');
+            $subjectCount = max(1, count($rows));
+            $averageScore = (float) round($totalScore / $subjectCount, 2);
+            $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+
+            $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
+            if ($teacherComment === '') {
+                $teacherComment = (string) ($attendance?->comment ?? '');
+            }
+            if ($teacherComment === '') {
+                $teacherComment = $this->defaultTeacherComment($overallGrade);
+            }
+            $schoolHeadComment = $this->defaultHeadComment($overallGrade);
+
+            $behaviourTraits = [
+                ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
+                ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
+                ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
+                ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
+                ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
+                ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
+                ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
+            ];
+
+            $html = view('pdf.student_result', [
+                'school' => $school,
+                'session' => $session,
+                'term' => $term,
+                'class' => $class,
+                'student' => $student,
+                'studentUser' => $user,
+                'rows' => $rows,
+                'totalScore' => $totalScore,
+                'averageScore' => $averageScore,
+                'overallGrade' => $overallGrade,
+                'attendance' => $attendance,
+                'attendanceSetting' => $attendanceSetting,
+                'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
+                'teacherComment' => $teacherComment,
+                'schoolHeadComment' => $schoolHeadComment,
+                'classTeacher' => $classTeacher,
+                'behaviourTraits' => $behaviourTraits,
+                'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
+                'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
+                'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $safeStudent = Str::slug((string) $user->name ?: 'student');
+            $safeTerm = Str::slug((string) $term->name ?: 'term');
+            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+            $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Student result PDF generation failed', [
+                'school_id' => $schoolId,
+                'user_id' => $user->id ?? null,
+                'student_id' => $student->id ?? null,
+                'class_id' => $classId,
+                'term_id' => $termId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Unable to generate result PDF. Please check student/session data and branding images.',
+            ], 500);
         }
-
-        $school = $user->school;
-        $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
-
-        $totalScore = (int) collect($rows)->sum('total');
-        $subjectCount = max(1, count($rows));
-        $averageScore = (float) round($totalScore / $subjectCount, 2);
-        $overallGrade = $this->gradeFromTotal((int) round($averageScore));
-
-        $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
-        if ($teacherComment === '') {
-            $teacherComment = (string) ($attendance?->comment ?? '');
-        }
-        if ($teacherComment === '') {
-            $teacherComment = $this->defaultTeacherComment($overallGrade);
-        }
-        $schoolHeadComment = $this->defaultHeadComment($overallGrade);
-
-        $behaviourTraits = [
-            ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-            ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-            ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-            ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-            ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-            ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-            ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-        ];
-
-        $html = view('pdf.student_result', [
-            'school' => $school,
-            'session' => $session,
-            'term' => $term,
-            'class' => $class,
-            'student' => $student,
-            'studentUser' => $user,
-            'rows' => $rows,
-            'totalScore' => $totalScore,
-            'averageScore' => $averageScore,
-            'overallGrade' => $overallGrade,
-            'attendance' => $attendance,
-            'attendanceSetting' => $attendanceSetting,
-            'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
-            'teacherComment' => $teacherComment,
-            'schoolHeadComment' => $schoolHeadComment,
-            'classTeacher' => $classTeacher,
-            'behaviourTraits' => $behaviourTraits,
-            'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
-            'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
-            'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
-        ])->render();
-
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-        if (!is_dir($dompdfTempDir)) {
-            @mkdir($dompdfTempDir, 0775, true);
-        }
-        $options->set('tempDir', $dompdfTempDir);
-        $options->set('fontDir', $dompdfTempDir);
-        $options->set('fontCache', $dompdfTempDir);
-        $options->set('chroot', base_path());
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
-        $safeStudent = Str::slug((string) $user->name ?: 'student');
-        $safeTerm = Str::slug((string) $term->name ?: 'term');
-        $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-        $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
-
-        return response($dompdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
     }
 
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
@@ -540,8 +560,23 @@ class ResultsController extends Controller
             return null;
         }
 
-        $mime = mime_content_type($fullPath) ?: 'image/png';
-        $base64 = base64_encode((string) file_get_contents($fullPath));
+        $size = @filesize($fullPath);
+        if (is_int($size) && $size > 700 * 1024) {
+            return null;
+        }
+
+        $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
+        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+
+        $binary = @file_get_contents($fullPath);
+        if (!is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        $base64 = base64_encode($binary);
 
         return "data:{$mime};base64,{$base64}";
     }
