@@ -340,7 +340,21 @@ class ResultsController extends Controller
                 $viewData['schoolLogoDataUri'] = null;
                 $viewData['studentPhotoDataUri'] = null;
                 $viewData['headSignatureDataUri'] = null;
-                $pdfOutput = $this->renderStudentResultPdf($viewData);
+
+                try {
+                    $pdfOutput = $this->renderStudentResultPdf($viewData);
+                } catch (Throwable $fallbackError) {
+                    Log::warning('Student result PDF image-free render failed, using simplified template', [
+                        'school_id' => $schoolId,
+                        'user_id' => $user->id ?? null,
+                        'student_id' => $student->id ?? null,
+                        'class_id' => $classId,
+                        'term_id' => $termId,
+                        'error' => $fallbackError->getMessage(),
+                    ]);
+
+                    $pdfOutput = $this->renderSimpleStudentResultPdf($viewData);
+                }
             }
 
             $safeStudent = Str::slug((string) $user->name ?: 'student');
@@ -594,6 +608,80 @@ class ResultsController extends Controller
     private function renderStudentResultPdf(array $viewData): string
     {
         $html = view('pdf.student_result', $viewData)->render();
+        return $this->renderPdfFromHtml($html);
+    }
+
+    private function renderSimpleStudentResultPdf(array $viewData): string
+    {
+        $schoolName = strtoupper((string) data_get($viewData, 'school.name', 'SCHOOL'));
+        $schoolLocation = strtoupper((string) data_get($viewData, 'school.location', ''));
+        $studentName = strtoupper((string) data_get($viewData, 'studentUser.name', '-'));
+        $studentSerial = strtoupper((string) data_get($viewData, 'studentUser.username', '-'));
+        $className = strtoupper((string) data_get($viewData, 'class.name', '-'));
+        $termName = strtoupper((string) data_get($viewData, 'term.name', '-'));
+        $sessionName = strtoupper((string) (data_get($viewData, 'session.academic_year') ?: data_get($viewData, 'session.session_name', '-')));
+        $teacherComment = strtoupper((string) data_get($viewData, 'teacherComment', '-'));
+        $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
+        $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
+        $total = (int) data_get($viewData, 'totalScore', 0);
+
+        $rowsHtml = '';
+        foreach ((array) data_get($viewData, 'rows', []) as $row) {
+            $subject = strtoupper((string) ($row['subject_name'] ?? '-'));
+            $ca = (int) ($row['ca'] ?? 0);
+            $exam = (int) ($row['exam'] ?? 0);
+            $score = (int) ($row['total'] ?? 0);
+            $grade = strtoupper((string) ($row['grade'] ?? '-'));
+            $remark = strtoupper((string) ($row['remark'] ?? '-'));
+
+            $rowsHtml .= '<tr>'
+                . '<td>' . e($subject) . '</td>'
+                . '<td style="text-align:center;">' . $ca . '</td>'
+                . '<td style="text-align:center;">' . $exam . '</td>'
+                . '<td style="text-align:center;">' . $score . '</td>'
+                . '<td style="text-align:center;">' . e($grade) . '</td>'
+                . '<td>' . e($remark) . '</td>'
+                . '</tr>';
+        }
+
+        if ($rowsHtml === '') {
+            $rowsHtml = '<tr><td colspan="6" style="text-align:center;">No result data found.</td></tr>';
+        }
+
+        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
+            . '<style>'
+            . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;color:#111;}'
+            . 'h1{margin:0;font-size:18px;text-align:center;}'
+            . 'h2{margin:4px 0 10px 0;font-size:12px;text-align:center;font-weight:600;}'
+            . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
+            . 'th,td{border:1px solid #222;padding:4px;}'
+            . 'th{background:#f3f4f6;text-align:left;}'
+            . '.meta td,.meta th{font-size:10px;}'
+            . '</style></head><body>'
+            . '<h1>' . e($schoolName) . '</h1>'
+            . '<h2>' . e($schoolLocation) . '</h2>'
+            . '<h2>RESULT SHEET FOR ' . e($termName) . ' - ' . e($sessionName) . '</h2>'
+            . '<table class="meta">'
+            . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
+            . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
+            . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
+            . '</table>'
+            . '<table>'
+            . '<thead><tr><th style="width:35%;">Subject</th><th style="width:10%;">CA</th><th style="width:10%;">Exam</th><th style="width:10%;">Total</th><th style="width:10%;">Grade</th><th style="width:25%;">Remark</th></tr></thead>'
+            . '<tbody>' . $rowsHtml . '</tbody>'
+            . '</table>'
+            . '<table class="meta">'
+            . '<tr><th style="width:24%;">Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
+            . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
+            . '</table>'
+            . '</body></html>';
+
+        return $this->renderPdfFromHtml($html);
+    }
+
+    private function renderPdfFromHtml(string $html): string
+    {
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
 
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
