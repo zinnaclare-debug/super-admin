@@ -689,10 +689,16 @@ class ResultsController extends Controller
         $signatureBlock = $headSignatureDataUri !== ''
             ? '<img src="' . e($headSignatureDataUri) . '" alt="Head Signature" style="width:140px;height:48px;object-fit:contain;border-bottom:1px dashed #6b7280;" />'
             : '<div style="width:140px;height:48px;border-bottom:1px dashed #6b7280;"></div>';
+        $watermarkBlock = $schoolLogoDataUri !== ''
+            ? '<img class="wm" src="' . e($schoolLogoDataUri) . '" alt="" />'
+            : '';
 
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
             . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:9px;color:#111;}'
+            . '.sheet{position:relative;border:1px solid #d1d5db;padding:10px;overflow:hidden;}'
+            . '.wm{position:absolute;top:28%;left:50%;width:300px;height:300px;margin-left:-150px;opacity:.07;object-fit:contain;z-index:0;}'
+            . '.content{position:relative;z-index:1;}'
             . 'h1{margin:0;font-size:16px;text-align:center;}'
             . 'h2{margin:3px 0 8px 0;font-size:11px;text-align:center;font-weight:600;}'
             . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
@@ -702,7 +708,7 @@ class ResultsController extends Controller
             . '.grid{width:100%;margin-top:8px;}'
             . '.grid td{vertical-align:top;border:0;padding:0;}'
             . '.section-title{font-weight:bold;margin-top:8px;}'
-            . '</style></head><body>'
+            . '</style></head><body><div class="sheet">' . $watermarkBlock . '<div class="content">'
             . '<table class="grid"><tr><td style="width:80px;">' . $studentPhotoBlock . '</td><td>'
             . '<h1>' . e($schoolName) . '</h1>'
             . '<h2>' . e($schoolLocation) . '</h2>'
@@ -739,7 +745,7 @@ class ResultsController extends Controller
             . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
             . '</table>'
             . '<table class="meta"><tr><th style="width:24%;">School Head Signature</th><td>' . $signatureBlock . '</td></tr></table>'
-            . '</body></html>';
+            . '</div></div></body></html>';
 
         return $this->renderPdfFromHtml($html);
     }

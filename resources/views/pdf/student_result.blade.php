@@ -91,20 +91,14 @@
             padding: 4px 6px;
             font-size: 10px;
         }
-        .psycho-wrap {
+        .psycho-grid {
             margin-top: 8px;
             width: 100%;
         }
-        .psycho-left {
-            width: 86%;
-            display: inline-block;
+        .psycho-grid td {
+            border: 0;
+            padding: 0;
             vertical-align: top;
-        }
-        .psycho-right {
-            width: 13%;
-            display: inline-block;
-            vertical-align: top;
-            margin-left: 1%;
         }
         .signature-box {
             margin-top: 6px;
@@ -250,43 +244,46 @@
             F [0-29]
         </div>
 
-        <div class="psycho-wrap">
-            <div class="psycho-left">
-                <table class="psycho">
-                    <thead>
-                        <tr>
-                            <th style="width: 75%;">PSYCHOMOTOR</th>
-                            <th style="width: 25%;">RATE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($behaviourTraits as $trait)
+        <table class="psycho-grid">
+            <tr>
+                <td style="width: 74%;">
+                    <table class="psycho">
+                        <thead>
                             <tr>
-                                <td>{{ strtoupper($trait['label']) }}</td>
-                                <td class="center">{{ $trait['value'] }}</td>
+                                <th style="width: 75%;">PSYCHOMOTOR</th>
+                                <th style="width: 25%;">RATE</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="psycho-right">
-                <table class="key-rate small">
-                    <thead>
-                        <tr>
-                            <th>KEY RATE</th>
-                            <th>SET</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>EXCELLENT</td><td class="center">5</td></tr>
-                        <tr><td>VERY GOOD</td><td class="center">4</td></tr>
-                        <tr><td>SATISFACTORY</td><td class="center">3</td></tr>
-                        <tr><td>POOR</td><td class="center">2</td></tr>
-                        <tr><td>VERY POOR</td><td class="center">1</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        </thead>
+                        <tbody>
+                            @foreach($behaviourTraits as $trait)
+                                <tr>
+                                    <td>{{ strtoupper($trait['label']) }}</td>
+                                    <td class="center">{{ $trait['value'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </td>
+                <td style="width: 2%;"></td>
+                <td style="width: 24%;">
+                    <table class="key-rate small">
+                        <thead>
+                            <tr>
+                                <th>KEY RATE</th>
+                                <th>SET</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>EXCELLENT</td><td class="center">5</td></tr>
+                            <tr><td>VERY GOOD</td><td class="center">4</td></tr>
+                            <tr><td>SATISFACTORY</td><td class="center">3</td></tr>
+                            <tr><td>POOR</td><td class="center">2</td></tr>
+                            <tr><td>VERY POOR</td><td class="center">1</td></tr>
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        </table>
 
         <table class="comment" style="margin-top: 8px;">
             <tr>
