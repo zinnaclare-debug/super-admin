@@ -74,6 +74,7 @@ class TranscriptController extends Controller
             $school,
             false
         );
+        $entries = $this->filterGradedEntries($entries);
 
         if (empty($entries)) {
             return response()->json([
@@ -144,6 +145,7 @@ class TranscriptController extends Controller
             $school,
             true
         );
+        $entries = $this->filterGradedEntries($entries);
 
         if (empty($entries)) {
             return response()->json([
@@ -182,6 +184,7 @@ class TranscriptController extends Controller
                     $school,
                     false
                 );
+                $entriesNoAssets = $this->filterGradedEntries($entriesNoAssets);
 
                 if (empty($entriesNoAssets)) {
                     return response()->json([
@@ -253,20 +256,24 @@ class TranscriptController extends Controller
 
     private function renderTranscriptPdfFromEntries(array $entries): string
     {
-        $htmlParts = [];
-        $entryCount = count($entries);
-        foreach ($entries as $index => $entry) {
-            $viewData = $entry['view_data'];
-            $viewData['embedded'] = true;
-            $htmlParts[] = view('pdf.student_result', $viewData)->render();
-            if ($index < $entryCount - 1) {
-                $htmlParts[] = '<div style="height: 26px;"></div>';
-            }
-        }
+        $entries = array_values($entries);
+        $firstViewData = $entries[0]['view_data'] ?? [];
+        $lastViewData = $entries[count($entries) - 1]['view_data'] ?? $firstViewData;
 
-        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
-            . implode("\n", $htmlParts)
-            . '</body></html>';
+        $html = view('pdf.transcript_sheet', [
+            'entries' => $entries,
+            'school' => $firstViewData['school'] ?? null,
+            'student' => $firstViewData['student'] ?? null,
+            'studentUser' => $firstViewData['studentUser'] ?? null,
+            'schoolLogoDataUri' => $firstViewData['schoolLogoDataUri'] ?? null,
+            'studentPhotoDataUri' => $firstViewData['studentPhotoDataUri'] ?? null,
+            'headSignatureDataUri' => $lastViewData['headSignatureDataUri'] ?? ($firstViewData['headSignatureDataUri'] ?? null),
+            'behaviourTraits' => $lastViewData['behaviourTraits'] ?? [],
+            'schoolHeadComment' => $lastViewData['schoolHeadComment'] ?? '-',
+            'teacherComment' => $lastViewData['teacherComment'] ?? '-',
+            'classTeacher' => $lastViewData['classTeacher'] ?? null,
+        ])->render();
+
         $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
 
         $options = new Options();
@@ -677,6 +684,9 @@ class TranscriptController extends Controller
             }
 
             $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
+            $gradedRows = array_values(array_filter($rows, function (array $row) {
+                return (bool) ($row['has_result'] ?? false);
+            }));
 
             $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
                 ->where('class_id', $class->id)
@@ -702,8 +712,8 @@ class TranscriptController extends Controller
                     ->first(['id', 'name', 'email']);
             }
 
-            $totalScore = (int) collect($rows)->sum('total');
-            $subjectCount = max(1, count($rows));
+            $totalScore = (int) collect($gradedRows)->sum('total');
+            $subjectCount = max(1, count($gradedRows));
             $averageScore = (float) round($totalScore / $subjectCount, 2);
             $overallGrade = $this->gradeFromTotal((int) round($averageScore));
 
@@ -766,11 +776,12 @@ class TranscriptController extends Controller
                     'level' => $class->level,
                 ],
                 'summary' => [
-                    'subjects_count' => count($rows),
+                    'subjects_count' => count($gradedRows),
                     'total_score' => $totalScore,
                     'average_score' => $averageScore,
                     'overall_grade' => $overallGrade,
                 ],
+                'is_graded' => count($gradedRows) > 0,
                 'rows' => $rows,
                 'view_data' => $viewData,
             ];
@@ -867,6 +878,7 @@ class TranscriptController extends Controller
                 $ca = (int) ($r->ca ?? 0);
                 $exam = (int) ($r->exam ?? 0);
                 $total = $ca + $exam;
+                $hasResult = !is_null($r->result_student_id);
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
                 $position = $stats['positions'][$studentId] ?? null;
@@ -875,6 +887,7 @@ class TranscriptController extends Controller
                     'term_subject_id' => $termSubjectId,
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
+                    'has_result' => $hasResult,
                     'ca' => $ca,
                     'exam' => $exam,
                     'total' => $total,
@@ -882,13 +895,30 @@ class TranscriptController extends Controller
                     'max_score' => $stats['max_score'] ?? 0,
                     'class_average' => $stats['class_average'] ?? 0,
                     'position' => $position,
-                    'position_label' => $position ? $this->ordinalPosition($position) : '-',
-                    'grade' => $this->gradeFromTotal($total),
-                    'remark' => $this->remarkFromTotal($total),
+                    'position_label' => ($position && $hasResult) ? $this->ordinalPosition($position) : '-',
+                    'grade' => $hasResult ? $this->gradeFromTotal($total) : '-',
+                    'remark' => $hasResult ? $this->remarkFromTotal($total) : '-',
                 ];
             })
             ->values()
             ->all();
+    }
+
+    private function filterGradedEntries(array $entries): array
+    {
+        return array_values(array_filter($entries, function (array $entry) {
+            if (!empty($entry['is_graded'])) {
+                return true;
+            }
+
+            foreach ((array) ($entry['rows'] ?? []) as $row) {
+                if (!empty($row['has_result'])) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
     }
 
     private function buildSubjectStats(int $schoolId, array $termSubjectIds): array
