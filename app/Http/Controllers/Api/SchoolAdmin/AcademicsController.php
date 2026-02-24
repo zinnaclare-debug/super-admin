@@ -156,19 +156,19 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
             'subjects' => 'required|array|min:1',
             'subjects.*.name' => 'required|string|max:100',
             'subjects.*.code' => 'nullable|string|max:20',
-            'term_ids' => 'required|array|min:1',
+            // accepted for backward compatibility; ignored in favor of full-session assignment
+            'term_ids' => 'sometimes|array|min:1',
             'term_ids.*' => 'integer',
         ]);
 
-        // validate term IDs belong to this school + same session as class
+        // Always apply new subjects across all terms in this class session.
         $termIds = Term::where('school_id', $schoolId)
             ->where('academic_session_id', $class->academic_session_id)
-            ->whereIn('id', $payload['term_ids'])
             ->pluck('id')
             ->toArray();
 
-        if (count($termIds) !== count($payload['term_ids'])) {
-            return response()->json(['message' => 'Invalid terms selected'], 422);
+        if (empty($termIds)) {
+            return response()->json(['message' => 'No terms found for this class session'], 422);
         }
 
         $hasSchoolId = Schema::hasColumn('term_subjects', 'school_id');
@@ -200,7 +200,7 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
             }
 
             return response()->json([
-                'message' => 'Subjects created and assigned to terms'
+                'message' => 'Subjects created and assigned for the whole session'
             ], 201);
         });
     }

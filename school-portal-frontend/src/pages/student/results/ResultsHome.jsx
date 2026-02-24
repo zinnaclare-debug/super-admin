@@ -8,6 +8,21 @@ function fileNameFromHeaders(headers, fallback) {
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
 }
 
+async function messageFromBlobError(blob, fallback) {
+  try {
+    const text = await blob.text();
+    if (!text) return fallback;
+    try {
+      const parsed = JSON.parse(text);
+      return parsed?.message || fallback;
+    } catch {
+      return text;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
 export default function StudentResultsHome() {
   const [classes, setClasses] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -81,7 +96,17 @@ export default function StudentResultsHome() {
         },
         responseType: "blob",
       });
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
+      if (contentType.includes("application/json")) {
+        const message = await messageFromBlobError(res.data, "Failed to download result PDF");
+        throw new Error(message);
+      }
+
+      const pdfBlob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: "application/pdf" });
+
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = fileNameFromHeaders(
@@ -93,7 +118,12 @@ export default function StudentResultsHome() {
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to download result PDF");
+      if (e?.response?.data instanceof Blob) {
+        const message = await messageFromBlobError(e.response.data, "Failed to download result PDF");
+        alert(message);
+      } else {
+        alert(e?.response?.data?.message || e?.message || "Failed to download result PDF");
+      }
     } finally {
       setDownloading(false);
     }

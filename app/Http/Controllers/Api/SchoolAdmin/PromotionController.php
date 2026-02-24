@@ -178,12 +178,20 @@ class PromotionController extends Controller
         DB::transaction(function () use (
             $schoolId,
             $session,
-            $term,
             $class,
             $nextClass,
             $student,
             $currentClassEnrollment
         ) {
+            $sessionTermIds = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
             $alreadyInNextClass = DB::table('class_students')
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', $session->id)
@@ -211,16 +219,52 @@ class PromotionController extends Controller
                 ->where('student_id', $student->id)
                 ->delete();
 
-            $enrollmentQuery = DB::table('enrollments')
-                ->where('student_id', $student->id)
-                ->where('class_id', $class->id)
-                ->where('term_id', $term->id);
+            foreach ($sessionTermIds as $termId) {
+                $oldEnrollmentQuery = DB::table('enrollments')
+                    ->where('student_id', $student->id)
+                    ->where('class_id', $class->id)
+                    ->where('term_id', $termId);
 
-            if (Schema::hasColumn('enrollments', 'school_id')) {
-                $enrollmentQuery->where('school_id', $schoolId);
+                $nextEnrollmentQuery = DB::table('enrollments')
+                    ->where('student_id', $student->id)
+                    ->where('class_id', $nextClass->id)
+                    ->where('term_id', $termId);
+
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $oldEnrollmentQuery->where('school_id', $schoolId);
+                    $nextEnrollmentQuery->where('school_id', $schoolId);
+                }
+
+                $nextExists = $nextEnrollmentQuery->exists();
+
+                if ($nextExists) {
+                    $oldEnrollmentQuery->delete();
+                    continue;
+                }
+
+                $updated = $oldEnrollmentQuery->update([
+                    'class_id' => $nextClass->id,
+                    'updated_at' => now(),
+                ]);
+
+                if ($updated > 0) {
+                    continue;
+                }
+
+                $insertData = [
+                    'student_id' => $student->id,
+                    'class_id' => $nextClass->id,
+                    'term_id' => $termId,
+                    'department_id' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $insertData['school_id'] = $schoolId;
+                }
+
+                DB::table('enrollments')->insert($insertData);
             }
-
-            $enrollmentQuery->update(['class_id' => $nextClass->id]);
         });
 
         return response()->json([
@@ -264,4 +308,3 @@ class PromotionController extends Controller
         return [$session, $term];
     }
 }
-

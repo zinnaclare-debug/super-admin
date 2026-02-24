@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
 use App\Models\Staff;
+use App\Models\Term;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ClassManagementController extends Controller
 {
@@ -155,7 +157,16 @@ class ClassManagementController extends Controller
             'student_user_ids.*' => 'integer|exists:users,id',
         ]);
 
-        DB::transaction(function () use ($schoolId, $class, $payload) {
+        $sessionTermIds = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($schoolId, $class, $payload, $sessionTermIds) {
             foreach ($payload['student_user_ids'] as $studentUserId) {
                 // resolve student record for this user
                 $student = \App\Models\Student::where('user_id', $studentUserId)
@@ -174,10 +185,32 @@ class ClassManagementController extends Controller
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]);
+
+                // Mirror enrollment across all terms in this academic session.
+                foreach ($sessionTermIds as $termId) {
+                    $where = [
+                        'student_id' => $student->id,
+                        'class_id' => $class->id,
+                        'term_id' => $termId,
+                    ];
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $where['school_id'] = $schoolId;
+                    }
+
+                    $exists = DB::table('enrollments')->where($where)->exists();
+                    if (! $exists) {
+                        DB::table('enrollments')->insert([
+                            ...$where,
+                            'department_id' => null,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
             }
         });
 
-        return response()->json(['message' => 'Students enrolled']);
+        return response()->json(['message' => 'Students enrolled for all terms in this session']);
     }
 
     // GET /api/school-admin/classes/{class}/terms/{term}/courses  (placeholder)

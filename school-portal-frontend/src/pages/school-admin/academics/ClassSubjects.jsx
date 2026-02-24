@@ -15,7 +15,6 @@ export default function ClassSubjects() {
   // create modal-ish section
   const [newSubjectName, setNewSubjectName] = useState("");
   const [newSubjectCode, setNewSubjectCode] = useState("");
-  const [termIdsToApply, setTermIdsToApply] = useState([]);
   const [creating, setCreating] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [editSubjectName, setEditSubjectName] = useState("");
@@ -49,13 +48,6 @@ export default function ClassSubjects() {
 
   useEffect(() => { loadAll(); }, [classId]);
 
-  // default apply to selected term if user hasn't toggled any
-  useEffect(() => {
-    if (selectedTermId && termIdsToApply.length === 0) {
-      setTermIdsToApply([selectedTermId]);
-    }
-  }, [selectedTermId]);
-
   useEffect(() => {
     if (selectedTermId) loadSubjects(selectedTermId);
   }, [selectedTermId]);
@@ -64,26 +56,17 @@ export default function ClassSubjects() {
     return terms.find(t => t.id === selectedTermId)?.name || "Term";
   }, [terms, selectedTermId]);
 
-  const toggleApplyTerm = (id) => {
-    setTermIdsToApply((prev) =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
   const createSubject = async () => {
     if (!newSubjectName.trim()) return alert("Enter subject name");
-    if (termIdsToApply.length === 0) return alert("Select term(s) to apply");
 
     setCreating(true);
     try {
       const res = await api.post(`/api/school-admin/classes/${classId}/subjects`, {
         subjects: [{ name: newSubjectName, code: newSubjectCode || null }],
-        term_ids: termIdsToApply,
       });
 
       setNewSubjectName("");
       setNewSubjectCode("");
-      // keep term selection so user can add multiple subjects quickly
       await loadSubjects(selectedTermId);
       alert(res.data?.message || "Subject saved!");
     } catch (e) {
@@ -195,7 +178,7 @@ export default function ClassSubjects() {
 
       {/* create subject */}
       <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 14, borderRadius: 10 }}>
-        <h4 style={{ marginTop: 0 }}>Create Subject (Apply to selected term(s))</h4>
+        <h4 style={{ marginTop: 0 }}>Create Subject (Applies to whole session)</h4>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <input
@@ -212,24 +195,8 @@ export default function ClassSubjects() {
           />
         </div>
 
-        <div style={{ marginTop: 10 }}>
-          <strong>Apply to:</strong>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-            {terms.map((t) => (
-              <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={termIdsToApply.includes(t.id)}
-                  onChange={() => toggleApplyTerm(t.id)}
-                />
-                {t.name}
-              </label>
-            ))}
-          </div>
-        </div>
-
         <div style={{ marginTop: 12 }}>
-          <button onClick={createSubject} disabled={creating || termIdsToApply.length === 0}>
+          <button onClick={createSubject} disabled={creating}>
             {creating ? 'Saving...' : 'Save Subject'}
           </button>
         </div>

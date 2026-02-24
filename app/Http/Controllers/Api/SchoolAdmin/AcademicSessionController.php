@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\SchoolClass;
 use App\Models\Term;
+use App\Models\TermSubject;
 use App\Models\LevelDepartment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 
 class AcademicSessionController extends Controller
@@ -110,6 +112,8 @@ public function store(Request $request)
                 ]);
             }
         }
+
+        $this->copyPreviousSessionSubjectMappings($schoolId, (int) $session->id);
 
         return response()->json(['data' => $session], 201);
     });
@@ -346,5 +350,101 @@ public function store(Request $request)
         $term->delete();
 
         return response()->json(['message' => 'Term deleted']);
+    }
+
+    private function copyPreviousSessionSubjectMappings(int $schoolId, int $newSessionId): void
+    {
+        $previousSession = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', '!=', $newSessionId)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $previousSession) {
+            return;
+        }
+
+        $previousTerms = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $previousSession->id)
+            ->get(['id', 'name']);
+        $newTerms = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $newSessionId)
+            ->get(['id', 'name']);
+
+        if ($previousTerms->isEmpty() || $newTerms->isEmpty()) {
+            return;
+        }
+
+        $previousTermNameById = $previousTerms->mapWithKeys(
+            fn ($term) => [(int) $term->id => strtolower(trim((string) $term->name))]
+        );
+        $newTermByName = $newTerms->keyBy(fn ($term) => strtolower(trim((string) $term->name)));
+
+        $previousClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $previousSession->id)
+            ->get(['id', 'level', 'name'])
+            ->keyBy(fn ($class) => strtolower((string) $class->level) . '|' . strtolower(trim((string) $class->name)));
+        $newClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $newSessionId)
+            ->get(['id', 'level', 'name']);
+
+        if ($previousClasses->isEmpty() || $newClasses->isEmpty()) {
+            return;
+        }
+
+        $hasSchoolId = Schema::hasColumn('term_subjects', 'school_id');
+        $hasTeacherUserId = Schema::hasColumn('term_subjects', 'teacher_user_id');
+
+        foreach ($newClasses as $newClass) {
+            $classKey = strtolower((string) $newClass->level) . '|' . strtolower(trim((string) $newClass->name));
+            $previousClass = $previousClasses->get($classKey);
+            if (! $previousClass) {
+                continue;
+            }
+
+            $assignmentQuery = TermSubject::query()
+                ->where('class_id', $previousClass->id)
+                ->whereIn('term_id', $previousTerms->pluck('id'));
+            if ($hasSchoolId) {
+                $assignmentQuery->where('school_id', $schoolId);
+            }
+
+            $assignments = $assignmentQuery->get();
+            if ($assignments->isEmpty()) {
+                continue;
+            }
+
+            foreach ($assignments as $assignment) {
+                $oldTermName = $previousTermNameById->get((int) $assignment->term_id);
+                if (! $oldTermName) {
+                    continue;
+                }
+
+                $newTerm = $newTermByName->get($oldTermName);
+                if (! $newTerm) {
+                    continue;
+                }
+
+                $where = [
+                    'class_id' => (int) $newClass->id,
+                    'term_id' => (int) $newTerm->id,
+                    'subject_id' => (int) $assignment->subject_id,
+                ];
+                if ($hasSchoolId) {
+                    $where['school_id'] = $schoolId;
+                }
+
+                $values = [];
+                if ($hasTeacherUserId) {
+                    $values['teacher_user_id'] = $assignment->teacher_user_id;
+                }
+
+                TermSubject::updateOrCreate($where, $values);
+            }
+        }
     }
 }

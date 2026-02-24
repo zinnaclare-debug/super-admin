@@ -262,6 +262,22 @@ foreach ($defs as $def) {
         });
     }
 
+    /**
+     * Delete a school's academic session.
+     */
+    public function destroyAcademicSession(School $school, AcademicSession $session)
+    {
+        if ((int) $session->school_id !== (int) $school->id) {
+            return response()->json(['message' => 'Session does not belong to this school.'], 422);
+        }
+
+        $session->delete();
+
+        return response()->json([
+            'message' => 'Academic session deleted successfully.',
+        ]);
+    }
+
     private function normalizeSubdomain(?string $subdomain): string
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $subdomain))) ?? '';

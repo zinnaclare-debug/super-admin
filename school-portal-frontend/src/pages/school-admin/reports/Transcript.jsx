@@ -9,6 +9,21 @@ function fileNameFromHeaders(headers, fallback) {
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
 }
 
+async function messageFromBlobError(blob, fallback) {
+  try {
+    const text = await blob.text();
+    if (!text) return fallback;
+    try {
+      const parsed = JSON.parse(text);
+      return parsed?.message || fallback;
+    } catch {
+      return text;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
 export default function Transcript() {
   const [sessions, setSessions] = useState([]);
   const [email, setEmail] = useState("");
@@ -152,7 +167,16 @@ export default function Transcript() {
         responseType: "blob",
       });
 
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
+      if (contentType.includes("application/json")) {
+        const message = await messageFromBlobError(res.data, "Failed to download transcript PDF.");
+        throw new Error(message);
+      }
+
+      const pdfBlob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: "application/pdf" });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = fileNameFromHeaders(res.headers, "student_transcript.pdf");
@@ -161,7 +185,12 @@ export default function Transcript() {
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
     } catch (e) {
-      setError(e?.response?.data?.message || "Failed to download transcript PDF.");
+      if (e?.response?.data instanceof Blob) {
+        const message = await messageFromBlobError(e.response.data, "Failed to download transcript PDF.");
+        setError(message);
+      } else {
+        setError(e?.response?.data?.message || e?.message || "Failed to download transcript PDF.");
+      }
     } finally {
       setDownloading(false);
     }

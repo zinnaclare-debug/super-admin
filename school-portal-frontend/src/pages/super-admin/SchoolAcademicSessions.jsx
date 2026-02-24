@@ -51,6 +51,22 @@ export default function SchoolAcademicSessions() {
     }
   };
 
+  const deleteSession = async (sessionId) => {
+    if (!window.confirm("Delete this academic session? This will remove classes/terms tied to it.")) {
+      return;
+    }
+
+    setUpdatingId(sessionId);
+    try {
+      await api.delete(`/api/super-admin/schools/${schoolId}/academic-sessions/${sessionId}`);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete session.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <div>
       <div
@@ -112,6 +128,14 @@ export default function SchoolAcademicSessions() {
                   )}
 
                   {session.status === "completed" && <span>Is Completed</span>}
+
+                  <button
+                    onClick={() => deleteSession(session.id)}
+                    disabled={updatingId === session.id}
+                    style={{ marginLeft: 8, color: "#b91c1c" }}
+                  >
+                    {updatingId === session.id ? "Deleting..." : "Delete"}
+                  </button>
                 </td>
               </tr>
             ))}
