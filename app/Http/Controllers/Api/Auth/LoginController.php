@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\School;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
 {
@@ -16,32 +17,29 @@ class LoginController extends Controller
             'password' => 'required',
         ]);
 
-        if (!Auth::attempt($credentials)) {
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
         }
 
-        $user = Auth::user();
-
         if (!$user->is_active) {
-    Auth::logout();
-    return response()->json(['message' => 'Account disabled'], 403);
-}
+            return response()->json(['message' => 'Account disabled'], 403);
+        }
 
         $requestKey = (string) config('tenancy.request_key', 'tenant_school');
         $tenantSchool = $request->attributes->get($requestKey) ?? $this->resolveTenantSchool($request);
 
         if ($tenantSchool) {
             if ($user->role === 'super_admin' || empty($user->school_id)) {
-                Auth::logout();
                 return response()->json([
                     'message' => 'Super admin accounts must sign in from the central domain.',
                 ], 403);
             }
 
             if ((int) $user->school_id !== (int) $tenantSchool->id) {
-                Auth::logout();
                 return response()->json([
                     'message' => 'This account does not belong to this school subdomain.',
                 ], 403);
@@ -50,7 +48,6 @@ class LoginController extends Controller
             (bool) config('tenancy.require_subdomain_for_school_users', false)
             && !empty($user->school_id)
         ) {
-            Auth::logout();
             return response()->json([
                 'message' => 'Use your school subdomain to sign in.',
             ], 403);
