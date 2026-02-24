@@ -239,7 +239,7 @@ class TranscriptController extends Controller
                     'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 ]);
             } catch (Throwable $fallbackError) {
-                Log::error('Transcript PDF generation failed after fallback', [
+                Log::warning('Transcript PDF generation failed after no-asset fallback, trying simplified transcript renderer', [
                     'school_id' => $schoolId,
                     'student_user_id' => $studentUser->id ?? null,
                     'session_id' => $session->id ?? null,
@@ -247,9 +247,32 @@ class TranscriptController extends Controller
                     'error' => $fallbackError->getMessage(),
                 ]);
 
-                return response()->json([
-                    'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
-                ], 500);
+                try {
+                    $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entriesNoAssets);
+                    $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+                    $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+                    $scopeSuffix = $scope === 'all'
+                        ? 'all_terms'
+                        : Str::slug((string) (($entriesNoAssets[0]['term']['name'] ?? 'term')));
+                    $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+
+                    return response($simplePdfOutput, 200, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    ]);
+                } catch (Throwable $simpleFallbackError) {
+                    Log::error('Transcript PDF generation failed after simplified fallback', [
+                        'school_id' => $schoolId,
+                        'student_user_id' => $studentUser->id ?? null,
+                        'session_id' => $session->id ?? null,
+                        'scope' => $scope,
+                        'error' => $simpleFallbackError->getMessage(),
+                    ]);
+
+                    return response()->json([
+                        'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
+                    ], 500);
+                }
             }
         }
     }
@@ -270,6 +293,110 @@ class TranscriptController extends Controller
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
             . implode("\n", $htmlParts)
             . '</body></html>';
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return $dompdf->output();
+    }
+
+    private function renderSimpleTranscriptPdfFromEntries(array $entries): string
+    {
+        $pages = [];
+        $count = count($entries);
+        foreach ($entries as $index => $entry) {
+            $viewData = $entry['view_data'] ?? [];
+            $schoolName = strtoupper((string) data_get($viewData, 'school.name', 'SCHOOL'));
+            $schoolLocation = strtoupper((string) data_get($viewData, 'school.location', ''));
+            $studentName = strtoupper((string) data_get($viewData, 'studentUser.name', '-'));
+            $studentSerial = strtoupper((string) data_get($viewData, 'studentUser.username', '-'));
+            $className = strtoupper((string) data_get($viewData, 'class.name', '-'));
+            $termName = strtoupper((string) data_get($viewData, 'term.name', '-'));
+            $sessionName = strtoupper((string) (data_get($viewData, 'session.academic_year') ?: data_get($viewData, 'session.session_name', '-')));
+            $teacherComment = strtoupper((string) data_get($viewData, 'teacherComment', '-'));
+            $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
+            $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
+            $total = (int) data_get($viewData, 'totalScore', 0);
+            $rows = (array) data_get($viewData, 'rows', []);
+
+            $rowsHtml = '';
+            foreach ($rows as $row) {
+                $subject = strtoupper((string) ($row['subject_name'] ?? '-'));
+                $ca = (int) ($row['ca'] ?? 0);
+                $exam = (int) ($row['exam'] ?? 0);
+                $score = (int) ($row['total'] ?? 0);
+                $grade = strtoupper((string) ($row['grade'] ?? '-'));
+                $remark = strtoupper((string) ($row['remark'] ?? '-'));
+
+                $rowsHtml .= '<tr>'
+                    . '<td>' . e($subject) . '</td>'
+                    . '<td style="text-align:center;">' . $ca . '</td>'
+                    . '<td style="text-align:center;">' . $exam . '</td>'
+                    . '<td style="text-align:center;">' . $score . '</td>'
+                    . '<td style="text-align:center;">' . e($grade) . '</td>'
+                    . '<td>' . e($remark) . '</td>'
+                    . '</tr>';
+            }
+
+            if ($rowsHtml === '') {
+                $rowsHtml = '<tr><td colspan="6" style="text-align:center;">No result data found.</td></tr>';
+            }
+
+            $pageHtml = '<div class="page">'
+                . '<h1>' . e($schoolName) . '</h1>'
+                . '<h2>' . e($schoolLocation) . '</h2>'
+                . '<h3>TRANSCRIPT FOR ' . e($termName) . ' - ' . e($sessionName) . '</h3>'
+                . '<table class="meta">'
+                . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
+                . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
+                . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
+                . '</table>'
+                . '<table>'
+                . '<thead><tr><th style="width:35%;">Subject</th><th style="width:10%;">CA</th><th style="width:10%;">Exam</th><th style="width:10%;">Total</th><th style="width:10%;">Grade</th><th style="width:25%;">Remark</th></tr></thead>'
+                . '<tbody>' . $rowsHtml . '</tbody>'
+                . '</table>'
+                . '<table class="meta">'
+                . '<tr><th style="width:24%;">School Head Comment</th><td>' . e($headComment) . '</td></tr>'
+                . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
+                . '</table>'
+                . '</div>';
+
+            $pages[] = $pageHtml;
+            if ($index < $count - 1) {
+                $pages[] = '<div style="page-break-after: always;"></div>';
+            }
+        }
+
+        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Transcript</title>'
+            . '<style>'
+            . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;color:#111;}'
+            . 'h1{margin:0;font-size:18px;text-align:center;}'
+            . 'h2{margin:4px 0 8px 0;font-size:12px;text-align:center;}'
+            . 'h3{margin:0 0 8px 0;font-size:11px;text-align:center;font-weight:600;}'
+            . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
+            . 'th,td{border:1px solid #222;padding:4px;}'
+            . 'th{background:#f3f4f6;text-align:left;}'
+            . '.meta td,.meta th{font-size:10px;}'
+            . '</style></head><body>'
+            . implode("\n", $pages)
+            . '</body></html>';
+
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
 
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
@@ -791,34 +918,42 @@ class TranscriptController extends Controller
 
     private function toDataUri(?string $storagePath): ?string
     {
-        if (!$storagePath) {
+        try {
+            if (!$storagePath) {
+                return null;
+            }
+
+            $fullPath = Storage::disk('public')->path($storagePath);
+            if (!is_file($fullPath)) {
+                return null;
+            }
+
+            // Oversized images can break Dompdf on lower-memory servers.
+            $size = @filesize($fullPath);
+            if (is_int($size) && $size > 700 * 1024) {
+                return null;
+            }
+
+            $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
+            $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
+            if (!in_array($mime, $allowedMimes, true)) {
+                return null;
+            }
+
+            $binary = @file_get_contents($fullPath);
+            if (!is_string($binary) || $binary === '') {
+                return null;
+            }
+
+            $base64 = base64_encode($binary);
+
+            return "data:{$mime};base64,{$base64}";
+        } catch (Throwable $e) {
+            Log::warning('Failed to build transcript image data URI', [
+                'path' => $storagePath,
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
-
-        $fullPath = Storage::disk('public')->path($storagePath);
-        if (!is_file($fullPath)) {
-            return null;
-        }
-
-        // Oversized images can break Dompdf on lower-memory servers.
-        $size = @filesize($fullPath);
-        if (is_int($size) && $size > 700 * 1024) {
-            return null;
-        }
-
-        $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
-        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
-        if (!in_array($mime, $allowedMimes, true)) {
-            return null;
-        }
-
-        $binary = @file_get_contents($fullPath);
-        if (!is_string($binary) || $binary === '') {
-            return null;
-        }
-
-        $base64 = base64_encode($binary);
-
-        return "data:{$mime};base64,{$base64}";
     }
 }
