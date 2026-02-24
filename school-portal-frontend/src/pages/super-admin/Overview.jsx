@@ -130,7 +130,20 @@ function SuperAdminSchools() {
           {schools.map((school) => (
             <tr key={school.id}>
               <td>
-                <strong>{school.name}</strong>
+                <button
+                  onClick={() => navigate(`/super-admin/schools/${school.id}/academic-sessions`)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#2563eb",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    textDecoration: "underline",
+                    padding: 0,
+                  }}
+                >
+                  {school.name}
+                </button>
               </td>
 
               <td>{school.email}</td>

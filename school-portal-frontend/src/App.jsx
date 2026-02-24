@@ -12,6 +12,7 @@ import Schools from "./pages/super-admin/Schools";
 import Users from "./pages/super-admin/Users";
 import SchoolUsersByLevel from "./pages/super-admin/SchoolUsersByLevel";
 import SuperAdminPayments from "./pages/super-admin/Payments";
+import SchoolAcademicSessions from "./pages/super-admin/SchoolAcademicSessions";
 
 // School Admin
 import SchoolDashboard from "./pages/school/Dashboard";
@@ -106,6 +107,7 @@ function App() {
         <Route index element={<Overview />} />
         <Route path="overview" element={<Overview />} />
         <Route path="schools" element={<Schools />} />
+        <Route path="schools/:schoolId/academic-sessions" element={<SchoolAcademicSessions />} />
         <Route path="users" element={<Users />} />
         <Route path="users/:schoolId" element={<SchoolUsersByLevel />} />
         <Route path="dashboard" element={<Dashboard />} />

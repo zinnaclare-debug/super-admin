@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../../services/api";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const LEVEL_KEYS = ["nursery", "primary", "secondary"];
 
@@ -23,24 +23,25 @@ const LEVEL_LABELS = {
   secondary: "Secondary",
 };
 
+const formatSessionStatus = (status) => {
+  const value = String(status || "").toLowerCase();
+  if (value === "current") return "Current";
+  if (value === "completed") return "Completed";
+  if (value === "pending") return "Pending";
+  return "Pending";
+};
+
 export default function AcademicSession() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // modal
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editing, setEditing] = useState(null);
-
-  // form
   const [sessionName, setSessionName] = useState("");
   const [academicYear, setAcademicYear] = useState("");
-  const [makeCurrent, setMakeCurrent] = useState(false);
-
-  // ✅ checkbox state (what you requested)
   const [selectedLevels, setSelectedLevels] = useState({
     nursery: true,
     primary: true,
@@ -53,7 +54,7 @@ export default function AcademicSession() {
     try {
       const res = await api.get("/api/school-admin/academic-sessions");
       setRows(res.data.data || []);
-    } catch (e) {
+    } catch {
       alert("Failed to load academic sessions");
     } finally {
       setLoading(false);
@@ -65,24 +66,17 @@ export default function AcademicSession() {
   }, []);
 
   useEffect(() => {
-    if (location?.pathname?.includes("academic_session/manage")) {
-      const editRow = location?.state?.edit;
-      if (editRow) {
-        openEdit(editRow);
-      } else {
-        openCreate();
-      }
+    if (!location?.pathname?.includes("academic_session/manage")) return;
+    const editRow = location?.state?.edit;
+    if (editRow) {
+      openEdit(editRow);
+    } else {
+      openCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.pathname, location?.state]);
 
-  const currentSession = useMemo(
-    () => rows.find((r) => r.status === "current"),
-    [rows]
-  );
-
-  const getSelectedLevelArray = () =>
-    LEVEL_KEYS.filter((k) => selectedLevels[k]);
+  const getSelectedLevelArray = () => LEVEL_KEYS.filter((key) => selectedLevels[key]);
 
   const toggleLevel = (key) => {
     setSelectedLevels((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -91,25 +85,27 @@ export default function AcademicSession() {
   const openCreate = () => {
     setSessionName("");
     setAcademicYear("");
-    setMakeCurrent(false);
     setSelectedLevels({ nursery: true, primary: true, secondary: true });
     setClassStructure(DEFAULT_CLASS_STRUCTURE);
     setShowCreate(true);
+    setShowEdit(false);
+    setEditing(null);
   };
 
   const openEdit = (row) => {
-    console.log('openEdit', row);
     setEditing(row);
     setSessionName(row.session_name || "");
     setAcademicYear(row.academic_year || "");
-    // row.levels is expected like ["nursery","secondary"]
+
     const rowLevels = Array.isArray(row.levels) ? row.levels : [];
     setSelectedLevels({
       nursery: rowLevels.includes("nursery"),
       primary: rowLevels.includes("primary"),
       secondary: rowLevels.includes("secondary"),
     });
+
     setShowEdit(true);
+    setShowCreate(false);
   };
 
   const createSession = async (e) => {
@@ -133,9 +129,8 @@ export default function AcademicSession() {
       await api.post("/api/school-admin/academic-sessions", {
         session_name: sessionName,
         academic_year: academicYear,
-        status: makeCurrent ? "current" : "completed",
         class_structure: classStructurePayload,
-        levels, // ✅ SEND ARRAY OF KEYS
+        levels,
       });
       setShowCreate(false);
       await load();
@@ -157,7 +152,7 @@ export default function AcademicSession() {
       await api.put(`/api/school-admin/academic-sessions/${editing.id}`, {
         session_name: sessionName,
         academic_year: academicYear,
-        levels, // ✅ SEND ARRAY OF KEYS
+        levels,
       });
       setShowEdit(false);
       setEditing(null);
@@ -167,45 +162,6 @@ export default function AcademicSession() {
     }
   };
 
-  const deleteSession = async (id) => {
-    if (!window.confirm("Delete this academic session?")) return;
-    try {
-      console.log('deleteSession', id);
-      await api.delete(`/api/school-admin/academic-sessions/${id}`);
-      await load();
-    } catch (e) {
-      console.error('deleteSession error', e);
-      alert("Failed to delete: " + (e?.response?.data?.message || e.message || e));
-    }
-  };
-
-  // ⚠️ Your backend routes currently use PATCH status endpoint, not these POST endpoints
-  // If you still have set-current/mark-completed routes, keep them.
-  // Otherwise replace these with PATCH call (I’ll show below).
-  const setCurrent = async (id) => {
-    try {
-      // ✅ preferred: PATCH /status
-      await api.patch(`/api/school-admin/academic-sessions/${id}/status`, {
-        status: "current",
-      });
-      await load();
-    } catch (e) {
-      alert("Failed to set current");
-    }
-  };
-
-  const markCompleted = async (id) => {
-    try {
-      await api.patch(`/api/school-admin/academic-sessions/${id}/status`, {
-        status: "completed",
-      });
-      await load();
-    } catch (e) {
-      alert("Failed to mark completed");
-    }
-  };
-
-  const previewLevels = getSelectedLevelArray();
   const updateClassName = (levelKey, index, value) => {
     setClassStructure((prev) => ({
       ...prev,
@@ -213,12 +169,14 @@ export default function AcademicSession() {
     }));
   };
 
+  const previewLevels = getSelectedLevelArray();
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <p style={{ marginTop: 6, opacity: 0.75 }}>
-            Manage school academic years and set a single current session.
+            Manage academic sessions. Super admin controls session status.
           </p>
         </div>
 
@@ -242,12 +200,12 @@ export default function AcademicSession() {
           </thead>
 
           <tbody>
-            {rows.map((r, idx) => (
-              <tr key={r.id}>
+            {rows.map((row, idx) => (
+              <tr key={row.id}>
                 <td>{idx + 1}</td>
                 <td>
                   <button
-                    onClick={() => navigate(`/school/admin/academic_session/${r.id}`)}
+                    onClick={() => navigate(`/school/admin/academic_session/${row.id}`)}
                     style={{
                       background: "transparent",
                       border: "none",
@@ -256,26 +214,15 @@ export default function AcademicSession() {
                       fontWeight: "bold",
                     }}
                   >
-                    {r.session_name}
+                    {row.session_name}
                   </button>
                 </td>
-                <td>{r.academic_year || "N/A"}</td>
+                <td>{row.academic_year || "N/A"}</td>
                 <td>
-                  <strong>{r.status === "current" ? "Current" : "Completed"}</strong>
+                  <strong>{formatSessionStatus(row.status)}</strong>
                 </td>
-                <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => openEdit(r)}>Edit</button>
-                  <button onClick={() => deleteSession(r.id)} style={{ color: "red" }}>
-                    Delete
-                  </button>
-
-                  {r.status !== "current" && (
-                    <button onClick={() => setCurrent(r.id)}>Set Current</button>
-                  )}
-
-                  {r.status === "current" && (
-                    <button onClick={() => markCompleted(r.id)}>Mark Completed</button>
-                  )}
+                <td>
+                  <button onClick={() => openEdit(row)}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -291,17 +238,9 @@ export default function AcademicSession() {
         </table>
       )}
 
-      {/* CREATE MODAL */}
       {showCreate && (
         <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 16, borderRadius: 10 }}>
           <h3>Create Academic Session</h3>
-
-          {currentSession && (
-            <p style={{ background: "#fff7ed", padding: 10, borderRadius: 8 }}>
-              Current session is <strong>{currentSession.session_name}</strong>. If you set this new
-              session as current, the old one will automatically become completed.
-            </p>
-          )}
 
           <form onSubmit={createSession}>
             <input
@@ -319,18 +258,6 @@ export default function AcademicSession() {
               style={{ width: 260, padding: 10, marginLeft: 10 }}
             />
 
-            <div style={{ marginTop: 10 }}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={makeCurrent}
-                  onChange={(e) => setMakeCurrent(e.target.checked)}
-                />{" "}
-                Set as Current
-              </label>
-            </div>
-
-            {/* ✅ LEVEL CHECKBOXES */}
             <div style={{ marginTop: 14 }}>
               <strong>Select Levels</strong>
               <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "nowrap" }}>
@@ -342,7 +269,6 @@ export default function AcademicSession() {
                   />{" "}
                   Nursery
                 </label>
-
                 <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
@@ -351,7 +277,6 @@ export default function AcademicSession() {
                   />{" "}
                   Primary
                 </label>
-
                 <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
@@ -363,7 +288,6 @@ export default function AcademicSession() {
               </div>
             </div>
 
-            {/* ✅ PREVIEW OF WHAT WILL BE CREATED */}
             <div style={{ marginTop: 14 }}>
               <strong>Class Structure Preview</strong>
               <div
@@ -401,9 +325,7 @@ export default function AcademicSession() {
                     </div>
                   </div>
                 ))}
-                {previewLevels.length === 0 && (
-                  <p style={{ color: "red" }}>Select at least one level.</p>
-                )}
+                {previewLevels.length === 0 && <p style={{ color: "red" }}>Select at least one level.</p>}
               </div>
             </div>
 
@@ -417,7 +339,6 @@ export default function AcademicSession() {
         </div>
       )}
 
-      {/* EDIT MODAL */}
       {showEdit && editing && (
         <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 16, borderRadius: 10 }}>
           <h3>Edit Academic Session</h3>
@@ -449,7 +370,6 @@ export default function AcademicSession() {
                   />{" "}
                   Nursery
                 </label>
-
                 <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
@@ -458,7 +378,6 @@ export default function AcademicSession() {
                   />{" "}
                   Primary
                 </label>
-
                 <label style={{ whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"

@@ -80,6 +80,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::delete('/super-admin/schools/{school}', [SchoolController::class, 'destroy']);
     Route::patch('/super-admin/schools/{school}/toggle', [SchoolController::class, 'toggle']);
     Route::patch('/super-admin/schools/{school}/toggle-results', [SchoolController::class, 'toggleResultsPublish']);
+    Route::get('/super-admin/schools/{school}/academic-sessions', [SchoolController::class, 'academicSessions']);
+    Route::patch('/super-admin/schools/{school}/academic-sessions/{session}/status', [SchoolController::class, 'updateAcademicSessionStatus']);
 
     Route::post('/super-admin/schools/create-with-admin', [SchoolController::class, 'createWithAdmin']);
     Route::post('/super-admin/schools/{school}/assign-admin', [SchoolController::class, 'assignAdmin']);
@@ -159,12 +161,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::put('/school-admin/academic-sessions/{session}', [AcademicSessionController::class, 'update'])
         ->middleware('feature:academic_session');
 
-    Route::delete('/school-admin/academic-sessions/{session}', [AcademicSessionController::class, 'destroy'])
-        ->middleware('feature:academic_session');
 
     // ✅ Your controller uses setStatus() so keep this name
-    Route::patch('/school-admin/academic-sessions/{session}/status', [AcademicSessionController::class, 'setStatus'])
-        ->middleware('feature:academic_session');
 
     // ✅ Academic Structure (Details page + Departments per level)
     Route::get('/school-admin/academic-sessions/{session}/details', [AcademicStructureController::class, 'details'])

@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 
+const formatSessionStatus = (status) => {
+  const value = String(status || "").toLowerCase();
+  if (value === "current") return "Current";
+  if (value === "completed") return "Completed";
+  if (value === "pending") return "Pending";
+  return "Pending";
+};
+
 export default function AcademicSessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
@@ -9,10 +17,9 @@ export default function AcademicSessions() {
 
   const load = async () => {
     try {
-      // TODO: replace with your real endpoint
       const res = await api.get("/api/school-admin/academic-sessions");
       setSessions(res.data.data || []);
-    } catch (e) {
+    } catch {
       alert("Failed to load academic sessions");
     } finally {
       setLoading(false);
@@ -28,7 +35,7 @@ export default function AcademicSessions() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button onClick={() => navigate('/school/admin/academic_session/manage')}>
+        <button onClick={() => navigate("/school/admin/academic_session/manage")}>
           + Create Session
         </button>
       </div>
@@ -44,55 +51,33 @@ export default function AcademicSessions() {
         </thead>
 
         <tbody>
-          {sessions.map((s, idx) => (
-            <tr key={s.id}>
+          {sessions.map((session, idx) => (
+            <tr key={session.id}>
               <td>{idx + 1}</td>
               <td>
                 <button
-                  onClick={() => navigate(`/school/admin/academic_session/${s.id}`)}
-                  style={{ background: "transparent", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: "bold" }}
+                  onClick={() => navigate(`/school/admin/academic_session/${session.id}`)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#2563eb",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
                 >
-                  {s.academic_year || s.session_name || "N/A"}
+                  {session.academic_year || session.session_name || "N/A"}
                 </button>
               </td>
               <td>
-                <strong>{s.status === "current" ? "Current" : "Completed"}</strong>
+                <strong>{formatSessionStatus(session.status)}</strong>
               </td>
               <td>
                 <button
                   onClick={() =>
-                    navigate("/school/admin/academic_session/manage", { state: { edit: s } })
+                    navigate("/school/admin/academic_session/manage", { state: { edit: session } })
                   }
                 >
                   Edit
-                </button>{" "}
-                <button
-                  onClick={async () => {
-                    if (!window.confirm("Delete this academic session?")) return;
-                    try {
-                      await api.delete(`/api/school-admin/academic-sessions/${s.id}`);
-                      await load();
-                    } catch (e) {
-                      alert(e.response?.data?.message || "Failed to delete session");
-                    }
-                  }}
-                  style={{ color: "red" }}
-                >
-                  Delete
-                </button>{" "}
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.patch(`/api/school-admin/academic-sessions/${s.id}/status`, {
-                        status: s.status === "current" ? "completed" : "current",
-                      });
-                      await load();
-                    } catch (e) {
-                      alert("Failed to toggle status");
-                    }
-                  }}
-                >
-                  {s.status === "current" ? "Set Completed" : "Set Current"}
                 </button>
               </td>
             </tr>

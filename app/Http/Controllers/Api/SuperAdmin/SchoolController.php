@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\School;
 use App\Models\SchoolFeature;
+use App\Models\AcademicSession;
+use App\Models\Term;
 
 class SchoolController extends Controller
 {
@@ -179,6 +181,85 @@ foreach ($defs as $def) {
             'message' => 'School results publication updated',
             'results_published' => (bool) $school->results_published,
         ]);
+    }
+
+    /**
+     * List academic sessions for one school.
+     */
+    public function academicSessions(School $school)
+    {
+        $sessions = AcademicSession::query()
+            ->where('school_id', $school->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json([
+            'school' => [
+                'id' => $school->id,
+                'name' => $school->name,
+                'subdomain' => $school->subdomain,
+            ],
+            'data' => $sessions,
+        ]);
+    }
+
+    /**
+     * Super admin controls session lifecycle: pending -> current -> completed.
+     */
+    public function updateAcademicSessionStatus(Request $request, School $school, AcademicSession $session)
+    {
+        if ((int) $session->school_id !== (int) $school->id) {
+            return response()->json(['message' => 'Session does not belong to this school.'], 422);
+        }
+
+        $payload = $request->validate([
+            'status' => 'required|in:pending,current,completed',
+        ]);
+
+        return DB::transaction(function () use ($school, $session, $payload) {
+            $status = $payload['status'];
+
+            if ($status === 'current') {
+                AcademicSession::query()
+                    ->where('school_id', $school->id)
+                    ->where('status', 'current')
+                    ->where('id', '!=', $session->id)
+                    ->update(['status' => 'completed']);
+
+                $hasCurrentTerm = Term::query()
+                    ->where('school_id', $school->id)
+                    ->where('academic_session_id', $session->id)
+                    ->where('is_current', true)
+                    ->exists();
+
+                if (! $hasCurrentTerm) {
+                    Term::query()
+                        ->where('school_id', $school->id)
+                        ->where('academic_session_id', $session->id)
+                        ->update(['is_current' => false]);
+
+                    $firstTerm = Term::query()
+                        ->where('school_id', $school->id)
+                        ->where('academic_session_id', $session->id)
+                        ->orderBy('id')
+                        ->first();
+
+                    if ($firstTerm) {
+                        $firstTerm->update(['is_current' => true]);
+                    }
+                }
+            } else {
+                // Non-current sessions should not own a current term.
+                Term::query()
+                    ->where('school_id', $school->id)
+                    ->where('academic_session_id', $session->id)
+                    ->update(['is_current' => false]);
+            }
+
+            $session->update(['status' => $status]);
+
+            return response()->json(['data' => $session]);
+        });
     }
 
     private function normalizeSubdomain(?string $subdomain): string

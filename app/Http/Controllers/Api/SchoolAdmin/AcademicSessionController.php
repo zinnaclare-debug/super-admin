@@ -39,7 +39,6 @@ public function store(Request $request)
     $data = $request->validate([
         'session_name'  => 'required|string|max:50', // e.g. 2025/2026
         'academic_year' => 'nullable|string|max:20',
-        'status'        => 'nullable|in:current,completed',
         'levels'        => 'required|array|min:1',
         'levels.*'      => 'in:nursery,primary,secondary',
         'class_structure' => 'nullable|array',
@@ -53,18 +52,12 @@ public function store(Request $request)
 
     return DB::transaction(function () use ($schoolId, $data) {
 
-        // If creating as current, demote old current
-        if (($data['status'] ?? 'completed') === 'current') {
-            AcademicSession::where('school_id', $schoolId)
-                ->where('status', 'current')
-                ->update(['status' => 'completed']);
-        }
-
         $session = AcademicSession::create([
             'school_id'     => $schoolId,
             'session_name'  => $data['session_name'],
             'academic_year' => $data['academic_year'] ?? $data['session_name'],
-            'status'        => $data['status'] ?? 'completed',
+            // Session lifecycle is controlled by super admin.
+            'status'        => 'pending',
             'levels'        => array_values($data['levels']), // ✅ store selected only
         ]);
 
@@ -76,7 +69,7 @@ public function store(Request $request)
                 'academic_session_id' => $session->id,
                 'name' => $name,
             ], [
-                'is_current' => (($data['status'] ?? 'completed') === 'current' && $idx === 0),
+                'is_current' => false,
             ]);
         }
 
@@ -154,12 +147,9 @@ public function store(Request $request)
      */
     public function destroy(Request $request, AcademicSession $session)
     {
-        $schoolId = $request->user()->school_id;
-        abort_unless($session->school_id === $schoolId, 403);
-
-        $session->delete();
-
-        return response()->json(['message' => 'Session deleted']);
+        return response()->json([
+            'message' => 'Only super admin can delete academic sessions.',
+        ], 403);
     }
 
     /**
@@ -168,44 +158,9 @@ public function store(Request $request)
      */
     public function setStatus(Request $request, AcademicSession $session)
     {
-        $schoolId = $request->user()->school_id;
-        abort_unless($session->school_id === $schoolId, 403);
-
-        $payload = $request->validate([
-            'status' => 'required|in:current,completed',
-        ]);
-
-        // If setting as current, mark all other sessions as completed
-        if ($payload['status'] === 'current') {
-            AcademicSession::where('school_id', $schoolId)
-                ->where('status', 'current')
-                ->where('id', '!=', $session->id)
-                ->update(['status' => 'completed']);
-
-            $currentTermExists = Term::where('school_id', $schoolId)
-                ->where('academic_session_id', $session->id)
-                ->where('is_current', true)
-                ->exists();
-
-            if (!$currentTermExists) {
-                $firstTerm = Term::where('school_id', $schoolId)
-                    ->where('academic_session_id', $session->id)
-                    ->orderBy('id')
-                    ->first();
-
-                if ($firstTerm) {
-                    Term::where('school_id', $schoolId)
-                        ->where('academic_session_id', $session->id)
-                        ->update(['is_current' => false]);
-
-                    $firstTerm->update(['is_current' => true]);
-                }
-            }
-        }
-
-        $session->update(['status' => $payload['status']]);
-
-        return response()->json(['data' => $session]);
+        return response()->json([
+            'message' => 'Only super admin can change academic session status.',
+        ], 403);
     }
 
     /**
