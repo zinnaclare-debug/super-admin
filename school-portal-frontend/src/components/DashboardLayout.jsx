@@ -7,6 +7,12 @@ import {
   getStoredUser,
   setStoredFeatures,
 } from "../utils/authStorage";
+import {
+  getLatestAnnouncement,
+  getSeenAnnouncementRank,
+  markAnnouncementSeen,
+  unreadAnnouncementCount,
+} from "../utils/announcementNotifier";
 
 function DashboardLayout() {
   const navigate = useNavigate();
@@ -19,6 +25,8 @@ function DashboardLayout() {
   const [resultsPublished, setResultsPublished] = useState(false);
   const [canAccessClassTeacherFeatures, setCanAccessClassTeacherFeatures] = useState(false);
   const [showAdminFeatures, setShowAdminFeatures] = useState(false);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.innerWidth <= 900;
@@ -82,6 +90,38 @@ function DashboardLayout() {
           console.error("Features fetch error:", err.message);
         });
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user?.role || (user.role !== "staff" && user.role !== "student")) {
+      setAnnouncementUnreadCount(0);
+      setLatestAnnouncement(null);
+      return;
+    }
+
+    let active = true;
+
+    const loadAnnouncements = async () => {
+      try {
+        const res = await api.get(`/api/${user.role}/announcements`);
+        const items = res?.data?.data || [];
+        if (!active) return;
+
+        const latest = getLatestAnnouncement(items);
+        const seenRank = getSeenAnnouncementRank(user, user.role);
+        setLatestAnnouncement(latest);
+        setAnnouncementUnreadCount(unreadAnnouncementCount(items, seenRank));
+      } catch {
+        if (!active) return;
+        setAnnouncementUnreadCount(0);
+        setLatestAnnouncement(null);
+      }
+    };
+
+    loadAnnouncements();
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -184,6 +224,14 @@ function DashboardLayout() {
   const featureLabel = (value) => String(value || "").replaceAll("_", " ").toUpperCase();
   const sidebarFeatures =
     user?.role === "student" ? features.filter((f) => f !== "subjects") : features;
+  const isAnnouncementFeature = (value) => String(value || "").toLowerCase() === "announcements";
+
+  const handleOpenAnnouncements = () => {
+    if (latestAnnouncement && user?.role) {
+      markAnnouncementSeen(user, user.role, latestAnnouncement);
+      setAnnouncementUnreadCount(0);
+    }
+  };
 
   return (
     <div
@@ -330,8 +378,35 @@ function DashboardLayout() {
                           {isCompactSidebar ? featureLabel(f) : `${featureLabel(f)} (CLASS TEACHER ONLY)`}
                         </span>
                       ) : (
-                        <NavLink title={featureLabel(f)} to={roleFeaturePath(user.role, f)} style={linkStyle}>
-                          {featureLabel(f)}
+                        <NavLink
+                          title={featureLabel(f)}
+                          to={roleFeaturePath(user.role, f)}
+                          style={linkStyle}
+                          onClick={isAnnouncementFeature(f) ? handleOpenAnnouncements : undefined}
+                        >
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <span>{featureLabel(f)}</span>
+                            {isAnnouncementFeature(f) && announcementUnreadCount > 0 ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  background: "#b91c1c",
+                                  borderRadius: 999,
+                                  padding: "1px 6px",
+                                  fontSize: 10,
+                                  color: "#fff",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                <span role="img" aria-label="new announcements">
+                                  🔔
+                                </span>
+                                {announcementUnreadCount}
+                              </span>
+                            ) : null}
+                          </span>
                         </NavLink>
                       )}
                     </li>

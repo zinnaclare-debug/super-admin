@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
+import { getLatestAnnouncement, markAnnouncementSeen } from "../../../utils/announcementNotifier";
+import { getStoredUser } from "../../../utils/authStorage";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -21,7 +23,13 @@ export default function AnnouncementsHome() {
       setError("");
       try {
         const res = await api.get("/api/staff/announcements");
-        setItems(res?.data?.data || []);
+        const data = res?.data?.data || [];
+        setItems(data);
+
+        const latest = getLatestAnnouncement(data);
+        if (latest) {
+          markAnnouncementSeen(getStoredUser(), "staff", latest);
+        }
       } catch (err) {
         setError(err?.response?.data?.message || "Failed to load announcements.");
         setItems([]);
@@ -58,4 +66,3 @@ export default function AnnouncementsHome() {
     </div>
   );
 }
-

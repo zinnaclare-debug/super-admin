@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import {
+  getLatestAnnouncement,
+  getSeenAnnouncementRank,
+  markAnnouncementSeen,
+  unreadAnnouncementCount,
+} from "../../utils/announcementNotifier";
+import { getStoredUser } from "../../utils/authStorage";
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -20,6 +31,35 @@ export default function StudentDashboard() {
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAnnouncements = async () => {
+      try {
+        const res = await api.get("/api/student/announcements");
+        const items = res?.data?.data || [];
+        if (!active) return;
+
+        const storedUser = getStoredUser();
+        const latest = getLatestAnnouncement(items);
+        const seenRank = getSeenAnnouncementRank(storedUser, "student");
+
+        setLatestAnnouncement(latest);
+        setAnnouncementUnreadCount(unreadAnnouncementCount(items, seenRank));
+      } catch {
+        if (!active) return;
+        setLatestAnnouncement(null);
+        setAnnouncementUnreadCount(0);
+      }
+    };
+
+    loadAnnouncements();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const toAbsoluteUrl = (url) => {
@@ -57,6 +97,15 @@ export default function StudentDashboard() {
     (student?.photo_path ? `/storage/${student.photo_path}` : "");
   const photoUrl = toAbsoluteUrl(rawPhotoUrl);
 
+  const openAnnouncements = () => {
+    const storedUser = getStoredUser();
+    if (latestAnnouncement) {
+      markAnnouncementSeen(storedUser, "student", latestAnnouncement);
+      setAnnouncementUnreadCount(0);
+    }
+    navigate("/student/announcements");
+  };
+
   return (
     <div>
       {loading ? (
@@ -65,6 +114,26 @@ export default function StudentDashboard() {
         <p style={{ color: "red" }}>{error}</p>
       ) : (
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 10 }}>
+          {announcementUnreadCount > 0 && latestAnnouncement ? (
+            <div
+              style={{
+                marginBottom: 12,
+                border: "1px solid #facc15",
+                background: "#fef9c3",
+                borderRadius: 10,
+                padding: 12,
+              }}
+            >
+              <p style={{ margin: 0, fontWeight: 700 }}>
+                🔔 {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
+              </p>
+              <p style={{ margin: "6px 0 8px" }}>
+                Latest: <strong>{latestAnnouncement.title}</strong>
+              </p>
+              <button onClick={openAnnouncements}>Open Announcement Desk</button>
+            </div>
+          ) : null}
+
           <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{ marginTop: 0 }}>Student Details</h3>

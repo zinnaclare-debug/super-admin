@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import {
+  getLatestAnnouncement,
+  getSeenAnnouncementRank,
+  markAnnouncementSeen,
+  unreadAnnouncementCount,
+} from "../../utils/announcementNotifier";
+import { getStoredUser } from "../../utils/authStorage";
 
 export default function StaffDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
 
   const toAbsoluteUrl = (url) => {
     if (!url) return null;
@@ -48,6 +57,35 @@ export default function StaffDashboard() {
     load();
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadAnnouncements = async () => {
+      try {
+        const res = await api.get("/api/staff/announcements");
+        const items = res?.data?.data || [];
+        if (!active) return;
+
+        const storedUser = getStoredUser();
+        const latest = getLatestAnnouncement(items);
+        const seenRank = getSeenAnnouncementRank(storedUser, "staff");
+
+        setLatestAnnouncement(latest);
+        setAnnouncementUnreadCount(unreadAnnouncementCount(items, seenRank));
+      } catch {
+        if (!active) return;
+        setLatestAnnouncement(null);
+        setAnnouncementUnreadCount(0);
+      }
+    };
+
+    loadAnnouncements();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const user = profile?.user || {};
   const staff = profile?.staff || {};
   const classes = profile?.classes || [];
@@ -56,9 +94,39 @@ export default function StaffDashboard() {
     staff.photo_url || (staff.photo_path ? `/storage/${staff.photo_path}` : "")
   );
 
+  const openAnnouncements = () => {
+    const storedUser = getStoredUser();
+    if (latestAnnouncement) {
+      markAnnouncementSeen(storedUser, "staff", latestAnnouncement);
+      setAnnouncementUnreadCount(0);
+    }
+    navigate("/staff/announcements");
+  };
+
   return (
     <div>
       <h1>Staff Dashboard</h1>
+
+      {announcementUnreadCount > 0 && latestAnnouncement ? (
+        <div
+          style={{
+            marginTop: 12,
+            marginBottom: 10,
+            border: "1px solid #facc15",
+            background: "#fef9c3",
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 700 }}>
+            🔔 {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
+          </p>
+          <p style={{ margin: "6px 0 8px" }}>
+            Latest: <strong>{latestAnnouncement.title}</strong>
+          </p>
+          <button onClick={openAnnouncements}>Open Announcement Desk</button>
+        </div>
+      ) : null}
 
       {/* Quick Access Buttons */}
       <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
