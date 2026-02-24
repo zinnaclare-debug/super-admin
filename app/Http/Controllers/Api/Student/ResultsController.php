@@ -472,6 +472,140 @@ class ResultsController extends Controller
         );
     }
 
+    // GET /api/school-admin/reports/student-result?student=...&academic_session_id=...&term_id=...
+    public function showForSchoolAdmin(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($actor->role === 'school_admin', 403);
+
+        if (!$actor->school || !$actor->school->results_published) {
+            return response()->json(['message' => 'Results are not yet published for your school'], 403);
+        }
+
+        $payload = $request->validate([
+            'student' => 'nullable|string',
+            'email' => 'nullable|string',
+            'academic_session_id' => 'required|integer',
+            'term_id' => 'required|integer',
+        ]);
+
+        $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
+        if ($identifier === '') {
+            return response()->json(['message' => 'Provide student email or name'], 422);
+        }
+
+        $schoolId = (int) $actor->school_id;
+        $resolved = $this->resolveStudentByIdentifier($schoolId, $identifier);
+        if (!$resolved) {
+            return response()->json(['message' => 'Student not found for the supplied search value'], 404);
+        }
+        [$studentUser, $student] = $resolved;
+
+        $session = AcademicSession::where('id', (int) $payload['academic_session_id'])
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$session) {
+            return response()->json(['message' => 'Academic session not found'], 422);
+        }
+
+        $term = Term::where('id', (int) $payload['term_id'])
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$term) {
+            return response()->json(['message' => 'Term not found for selected session'], 404);
+        }
+
+        $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
+        if (!$classId) {
+            return response()->json([
+                'data' => [],
+                'context' => [
+                    'student' => [
+                        'id' => (int) $studentUser->id,
+                        'name' => $studentUser->name,
+                        'email' => $studentUser->email,
+                        'username' => $studentUser->username,
+                    ],
+                    'selected_session' => [
+                        'id' => (int) $session->id,
+                        'session_name' => $session->session_name,
+                        'academic_year' => $session->academic_year,
+                    ],
+                    'selected_term' => [
+                        'id' => (int) $term->id,
+                        'name' => $term->name,
+                    ],
+                ],
+                'message' => 'No class enrollment/result found for the selected student, session and term.',
+            ]);
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$class) {
+            $class = SchoolClass::where('id', $classId)
+                ->where('school_id', $schoolId)
+                ->first();
+        }
+        if (!$class) {
+            return response()->json(['message' => 'Class not found'], 404);
+        }
+
+        $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
+        $totalScore = (int) collect($rows)->sum('total');
+        $subjectCount = max(1, count($rows));
+        $averageScore = (float) round($totalScore / $subjectCount, 2);
+        $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+
+        return response()->json([
+            'data' => [[
+                'session' => [
+                    'id' => (int) $session->id,
+                    'session_name' => $session->session_name,
+                    'academic_year' => $session->academic_year,
+                ],
+                'term' => [
+                    'id' => (int) $term->id,
+                    'name' => $term->name,
+                    'is_current' => (bool) $term->is_current,
+                ],
+                'class' => [
+                    'id' => (int) $class->id,
+                    'name' => $class->name,
+                    'level' => $class->level,
+                ],
+                'summary' => [
+                    'subjects_count' => count($rows),
+                    'total_score' => $totalScore,
+                    'average_score' => $averageScore,
+                    'overall_grade' => $overallGrade,
+                ],
+                'rows' => $rows,
+            ]],
+            'context' => [
+                'student' => [
+                    'id' => (int) $studentUser->id,
+                    'name' => $studentUser->name,
+                    'email' => $studentUser->email,
+                    'username' => $studentUser->username,
+                ],
+                'selected_session' => [
+                    'id' => (int) $session->id,
+                    'session_name' => $session->session_name,
+                    'academic_year' => $session->academic_year,
+                ],
+                'selected_term' => [
+                    'id' => (int) $term->id,
+                    'name' => $term->name,
+                ],
+            ],
+            'message' => count($rows) === 0 ? 'No result records found for the selected criteria.' : null,
+        ]);
+    }
+
     private function resolveStudentByIdentifier(int $schoolId, string $identifier): ?array
     {
         $identifier = strtolower(trim($identifier));

@@ -187,37 +187,7 @@ class TranscriptController extends Controller
             @set_time_limit(120);
             @ini_set('memory_limit', '512M');
 
-            $htmlParts = [];
-            $entryCount = count($entries);
-            foreach ($entries as $index => $entry) {
-                $viewData = $entry['view_data'];
-                $viewData['embedded'] = true;
-                $htmlParts[] = view('pdf.student_result', $viewData)->render();
-                if ($index < $entryCount - 1) {
-                    $htmlParts[] = '<div style="page-break-after: always;"></div>';
-                }
-            }
-
-            $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
-                . implode("\n", $htmlParts)
-                . '</body></html>';
-
-            $options = new Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-            if (!is_dir($dompdfTempDir)) {
-                @mkdir($dompdfTempDir, 0775, true);
-            }
-            $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfTempDir);
-            $options->set('chroot', base_path());
-
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
+            $pdfOutput = $this->renderTranscriptPdfFromEntries($entries);
 
             $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
@@ -226,12 +196,12 @@ class TranscriptController extends Controller
                 : Str::slug((string) (($entries[0]['term']['name'] ?? 'term')));
             $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
 
-            return response($dompdf->output(), 200, [
+            return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]);
         } catch (Throwable $e) {
-            Log::error('Transcript PDF generation failed', [
+            Log::warning('Transcript PDF generation failed with embedded assets, retrying without assets', [
                 'school_id' => $schoolId,
                 'student_user_id' => $studentUser->id ?? null,
                 'session_id' => $session->id ?? null,
@@ -239,10 +209,86 @@ class TranscriptController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
-            ], 500);
+            try {
+                $entriesNoAssets = $this->buildTranscriptEntries(
+                    $schoolId,
+                    $session,
+                    $terms,
+                    $student,
+                    $studentUser,
+                    $school,
+                    false
+                );
+
+                if (empty($entriesNoAssets)) {
+                    return response()->json([
+                        'message' => 'No result records found for the selected criteria.',
+                    ], 404);
+                }
+
+                $pdfOutput = $this->renderTranscriptPdfFromEntries($entriesNoAssets);
+                $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+                $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+                $scopeSuffix = $scope === 'all'
+                    ? 'all_terms'
+                    : Str::slug((string) (($entriesNoAssets[0]['term']['name'] ?? 'term')));
+                $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+
+                return response($pdfOutput, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                ]);
+            } catch (Throwable $fallbackError) {
+                Log::error('Transcript PDF generation failed after fallback', [
+                    'school_id' => $schoolId,
+                    'student_user_id' => $studentUser->id ?? null,
+                    'session_id' => $session->id ?? null,
+                    'scope' => $scope,
+                    'error' => $fallbackError->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
+                ], 500);
+            }
         }
+    }
+
+    private function renderTranscriptPdfFromEntries(array $entries): string
+    {
+        $htmlParts = [];
+        $entryCount = count($entries);
+        foreach ($entries as $index => $entry) {
+            $viewData = $entry['view_data'];
+            $viewData['embedded'] = true;
+            $htmlParts[] = view('pdf.student_result', $viewData)->render();
+            if ($index < $entryCount - 1) {
+                $htmlParts[] = '<div style="page-break-after: always;"></div>';
+            }
+        }
+
+        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Transcript</title></head><body>'
+            . implode("\n", $htmlParts)
+            . '</body></html>';
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return $dompdf->output();
     }
 
     private function sessionsWithTerms(int $schoolId): Collection

@@ -37,10 +37,7 @@ class ReportsController extends Controller
             ], 403);
         }
 
-        $request->query->set('scope', 'single');
-        $request->merge(['scope' => 'single']);
-
-        return app(TranscriptController::class)->show($request);
+        return app(StudentResultsController::class)->showForSchoolAdmin($request);
     }
 
     // GET /api/school-admin/reports/student-result/download?email=...&academic_session_id=...&term_id=...
