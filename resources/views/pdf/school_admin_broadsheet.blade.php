@@ -64,6 +64,7 @@
 @php
     $sessionLabel = strtoupper((string) ($session?->academic_year ?: $session?->session_name ?: '-'));
     $levelLabel = strtoupper((string) ($level ?? '-'));
+    $departmentLabel = strtoupper((string) ($department ?: 'ALL'));
     $nowLabel = now()->format('n/j/Y g:i A');
 @endphp
 
@@ -75,6 +76,7 @@
 <div class="title">
     <h1>{{ strtoupper((string) ($schoolName ?: 'SCHOOL NAME')) }}</h1>
     <h2>ANNUAL BROADSHEET FOR {{ $levelLabel }} - {{ $sessionLabel }} SESSION</h2>
+    <h2>DEPARTMENT: {{ $departmentLabel }}</h2>
 </div>
 
 <table>

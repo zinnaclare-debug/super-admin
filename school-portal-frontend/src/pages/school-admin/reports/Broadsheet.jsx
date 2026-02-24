@@ -44,6 +44,8 @@ export default function Broadsheet() {
   const [sessionId, setSessionId] = useState("");
   const [levelOptions, setLevelOptions] = useState([]);
   const [level, setLevel] = useState("");
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [department, setDepartment] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [rows, setRows] = useState([]);
   const [context, setContext] = useState(null);
@@ -61,16 +63,22 @@ export default function Broadsheet() {
 
   const canSearch = Boolean(selectedSession) && Boolean(level);
 
-  const loadOptions = async () => {
+  const loadOptions = async (nextSessionId = "", nextLevel = "") => {
     setLoadingOptions(true);
     setError("");
     try {
-      const res = await api.get("/api/school-admin/reports/broadsheet/options");
+      const params = {};
+      if (nextSessionId) params.academic_session_id = nextSessionId;
+      if (nextLevel) params.level = nextLevel;
+
+      const res = await api.get("/api/school-admin/reports/broadsheet/options", { params });
       const payload = res.data?.data || {};
       const loadedSessions = payload.sessions || [];
       const loadedLevels = payload.levels || [];
+      const loadedDepartments = payload.departments || [];
       setSessions(loadedSessions);
       setLevelOptions(loadedLevels);
+      setDepartmentOptions(loadedDepartments);
 
       if (loadedSessions.length > 0) {
         const selected = payload.selected_session_id || loadedSessions[0].id;
@@ -79,29 +87,17 @@ export default function Broadsheet() {
         setSessionId("");
       }
       setLevel(payload.selected_level || loadedLevels[0] || "");
+      setDepartment(payload.selected_department || "");
     } catch (e) {
       setSessions([]);
       setLevelOptions([]);
+      setDepartmentOptions([]);
       setSessionId("");
       setLevel("");
+      setDepartment("");
       setError(e?.response?.data?.message || "Failed to load broadsheet options.");
     } finally {
       setLoadingOptions(false);
-    }
-  };
-
-  const loadLevelsForSession = async (nextSessionId) => {
-    try {
-      const res = await api.get("/api/school-admin/reports/broadsheet/options", {
-        params: { academic_session_id: nextSessionId },
-      });
-      const payload = res.data?.data || {};
-      const nextLevels = payload.levels || [];
-      setLevelOptions(nextLevels);
-      setLevel(payload.selected_level || nextLevels[0] || "");
-    } catch {
-      setLevelOptions([]);
-      setLevel("");
     }
   };
 
@@ -113,6 +109,7 @@ export default function Broadsheet() {
     const params = {};
     if (selectedSession?.id) params.academic_session_id = selectedSession.id;
     if (level) params.level = level;
+    if (department) params.department = department;
     return params;
   };
 
@@ -130,6 +127,8 @@ export default function Broadsheet() {
       setRows(data.rows || []);
       setContext(res.data?.context || null);
       setLevelOptions(res.data?.context?.levels || levelOptions);
+      setDepartmentOptions(res.data?.context?.departments || departmentOptions);
+      setDepartment(res.data?.context?.selected_department || "");
       setMessage((data.rows || []).length === 0 ? "No broadsheet data found for this filter." : "");
     } catch (e) {
       setSubjects([]);
@@ -224,7 +223,7 @@ export default function Broadsheet() {
               onChange={(e) => {
                 const value = e.target.value;
                 setSessionId(value);
-                loadLevelsForSession(value);
+                loadOptions(value, "");
               }}
               disabled={loadingOptions}
             >
@@ -242,12 +241,33 @@ export default function Broadsheet() {
             <select
               id="broadsheet-level"
               value={level}
-              onChange={(e) => setLevel(e.target.value)}
+              onChange={(e) => {
+                const nextLevel = e.target.value;
+                setLevel(nextLevel);
+                loadOptions(sessionId || selectedSession?.id || "", nextLevel);
+              }}
               disabled={loadingOptions}
             >
               {(levelOptions || []).map((value) => (
                 <option key={value} value={value}>
                   {levelLabel(value)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="broadsheet-field">
+            <label htmlFor="broadsheet-department">Department</label>
+            <select
+              id="broadsheet-department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">All Departments</option>
+              {(departmentOptions || []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
                 </option>
               ))}
             </select>
@@ -269,7 +289,7 @@ export default function Broadsheet() {
         {context?.session ? (
           <p className="broadsheet-meta">
             Session: {context.session.session_name || context.session.academic_year || "-"} | Level:{" "}
-            {levelLabel(context.level)}
+            {levelLabel(context.level)} | Department: {context.selected_department || "All"}
           </p>
         ) : null}
 

@@ -11,6 +11,7 @@ use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -52,11 +53,12 @@ class ReportsController extends Controller
         return app(StudentResultsController::class)->downloadForSchoolAdmin($request);
     }
 
-    // GET /api/school-admin/reports/broadsheet/options
+    // GET /api/school-admin/reports/broadsheet/options?academic_session_id=1&level=secondary
     public function broadsheetOptions(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
         $requestedSessionId = (int) $request->query('academic_session_id', 0);
+        $requestedLevel = strtolower(trim((string) $request->query('level', '')));
         $sessions = AcademicSession::where('school_id', $schoolId)
             ->orderByDesc('id')
             ->get(['id', 'session_name', 'academic_year', 'status']);
@@ -75,12 +77,19 @@ class ReportsController extends Controller
                     'selected_session_id' => null,
                     'levels' => [],
                     'selected_level' => null,
+                    'departments' => [],
+                    'selected_department' => null,
                 ],
             ]);
         }
 
         $levels = $this->sessionLevelOptions($schoolId, (int) $selectedSession->id);
-        $selectedLevel = $levels[0] ?? null;
+        $selectedLevel = in_array($requestedLevel, $levels, true)
+            ? $requestedLevel
+            : ($levels[0] ?? null);
+        $departments = $selectedLevel
+            ? $this->sessionDepartmentOptions($schoolId, (int) $selectedSession->id, $selectedLevel)
+            : [];
 
         return response()->json([
             'data' => [
@@ -96,16 +105,19 @@ class ReportsController extends Controller
                 'selected_session_id' => (int) $selectedSession->id,
                 'levels' => $levels,
                 'selected_level' => $selectedLevel,
+                'departments' => $departments,
+                'selected_department' => null,
             ],
         ]);
     }
 
-    // GET /api/school-admin/reports/broadsheet?academic_session_id=1&level=secondary
+    // GET /api/school-admin/reports/broadsheet?academic_session_id=1&level=secondary&department=Science
     public function broadsheet(Request $request)
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
             'level' => 'nullable|in:nursery,primary,secondary',
+            'department' => 'nullable|string|max:100',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -128,7 +140,15 @@ class ReportsController extends Controller
             $level = $levels[0];
         }
 
-        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level);
+        $departments = $this->sessionDepartmentOptions($schoolId, (int) $session->id, $level);
+        $selectedDepartment = $this->resolveDepartmentFilter((string) ($payload['department'] ?? ''), $departments);
+        if (($payload['department'] ?? null) && $selectedDepartment === null) {
+            return response()->json([
+                'message' => 'Invalid department selected for the chosen level.',
+            ], 422);
+        }
+
+        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level, $selectedDepartment);
 
         return response()->json([
             'data' => $broadsheet,
@@ -141,16 +161,19 @@ class ReportsController extends Controller
                 ],
                 'level' => $level,
                 'levels' => $levels,
+                'departments' => $departments,
+                'selected_department' => $selectedDepartment,
             ],
         ]);
     }
 
-    // GET /api/school-admin/reports/broadsheet/download?academic_session_id=1&level=secondary
+    // GET /api/school-admin/reports/broadsheet/download?academic_session_id=1&level=secondary&department=Science
     public function broadsheetDownload(Request $request)
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
             'level' => 'nullable|in:nursery,primary,secondary',
+            'department' => 'nullable|string|max:100',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -173,7 +196,15 @@ class ReportsController extends Controller
             $level = $levels[0];
         }
 
-        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level);
+        $departments = $this->sessionDepartmentOptions($schoolId, (int) $session->id, $level);
+        $selectedDepartment = $this->resolveDepartmentFilter((string) ($payload['department'] ?? ''), $departments);
+        if (($payload['department'] ?? null) && $selectedDepartment === null) {
+            return response()->json([
+                'message' => 'Invalid department selected for the chosen level.',
+            ], 422);
+        }
+
+        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level, $selectedDepartment);
         if (empty($broadsheet['subjects']) || empty($broadsheet['rows'])) {
             return response()->json([
                 'message' => 'No broadsheet result data found for the selected filters.',
@@ -186,6 +217,7 @@ class ReportsController extends Controller
                 'schoolName' => $schoolName,
                 'session' => $session,
                 'level' => $level,
+                'department' => $selectedDepartment,
                 'subjects' => $broadsheet['subjects'],
                 'rows' => $broadsheet['rows'],
             ])->render();
@@ -211,7 +243,12 @@ class ReportsController extends Controller
             $dompdf->render();
 
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-            $filename = sprintf('broadsheet_%s_%s.pdf', Str::slug($level), $safeSession);
+            $filename = sprintf(
+                'broadsheet_%s%s_%s.pdf',
+                Str::slug($level),
+                $selectedDepartment ? ('_' . Str::slug($selectedDepartment)) : '',
+                $safeSession
+            );
 
             return response($dompdf->output(), 200, [
                 'Content-Type' => 'application/pdf',
@@ -222,6 +259,7 @@ class ReportsController extends Controller
                 'school_id' => $schoolId,
                 'session_id' => $session->id,
                 'level' => $level,
+                'department' => $selectedDepartment,
                 'error' => $e->getMessage(),
             ]);
 
@@ -500,7 +538,63 @@ class ReportsController extends Controller
         return $levels;
     }
 
-    private function buildBroadsheetData(int $schoolId, int $sessionId, string $level): array
+    private function sessionDepartmentOptions(int $schoolId, int $sessionId, string $level): array
+    {
+        $fromLevelDepartments = [];
+        if (Schema::hasTable('level_departments')) {
+            $fromLevelDepartments = DB::table('level_departments')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $sessionId)
+                ->where('level', strtolower($level))
+                ->orderBy('name')
+                ->pluck('name')
+                ->map(fn ($name) => trim((string) $name))
+                ->filter()
+                ->unique(fn ($name) => strtolower($name))
+                ->values()
+                ->all();
+        }
+
+        if (!empty($fromLevelDepartments)) {
+            return $fromLevelDepartments;
+        }
+
+        if (!Schema::hasTable('class_departments')) {
+            return [];
+        }
+
+        return DB::table('class_departments')
+            ->join('classes', 'classes.id', '=', 'class_departments.class_id')
+            ->where('class_departments.school_id', $schoolId)
+            ->where('classes.school_id', $schoolId)
+            ->where('classes.academic_session_id', $sessionId)
+            ->where('classes.level', strtolower($level))
+            ->orderBy('class_departments.name')
+            ->pluck('class_departments.name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->unique(fn ($name) => strtolower($name))
+            ->values()
+            ->all();
+    }
+
+    private function resolveDepartmentFilter(string $requestedDepartment, array $departmentOptions): ?string
+    {
+        $requestedDepartment = trim($requestedDepartment);
+        if ($requestedDepartment === '') {
+            return null;
+        }
+
+        foreach ($departmentOptions as $department) {
+            if (strcasecmp((string) $department, $requestedDepartment) === 0) {
+                return (string) $department;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildBroadsheetData(int $schoolId, int $sessionId, string $level, ?string $departmentName = null): array
     {
         $classes = DB::table('classes')
             ->where('school_id', $schoolId)
@@ -547,6 +641,31 @@ class ReportsController extends Controller
                 'subjects' => [],
                 'rows' => [],
             ];
+        }
+
+        $departmentStudentIdSet = null;
+        if ($departmentName !== null && $departmentName !== '') {
+            $departmentStudentIds = DB::table('enrollments')
+                ->join('class_departments', 'class_departments.id', '=', 'enrollments.department_id')
+                ->whereIn('enrollments.class_id', $classIds)
+                ->whereIn('enrollments.term_id', $termIds)
+                ->where('class_departments.school_id', $schoolId)
+                ->whereRaw('LOWER(class_departments.name) = ?', [strtolower($departmentName)])
+                ->pluck('enrollments.student_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (empty($departmentStudentIds)) {
+                return [
+                    'classes' => $classList->all(),
+                    'subjects' => [],
+                    'rows' => [],
+                ];
+            }
+
+            $departmentStudentIdSet = array_fill_keys($departmentStudentIds, true);
         }
 
         $termSubjects = DB::table('term_subjects')
@@ -612,7 +731,7 @@ class ReportsController extends Controller
             $subjectKeyById[(int) $subject['id']] = (string) $subject['id'];
         }
 
-        $resultRows = DB::table('results')
+        $resultRowsQuery = DB::table('results')
             ->where('results.school_id', $schoolId)
             ->whereIn('results.term_subject_id', array_keys($termSubjectMetaById))
             ->select([
@@ -620,8 +739,11 @@ class ReportsController extends Controller
                 'results.term_subject_id',
                 'results.ca',
                 'results.exam',
-            ])
-            ->get();
+            ]);
+        if ($departmentStudentIdSet !== null) {
+            $resultRowsQuery->whereIn('results.student_id', array_keys($departmentStudentIdSet));
+        }
+        $resultRows = $resultRowsQuery->get();
 
         $studentsFromClassStudents = DB::table('class_students as cs')
             ->join('students as s', 's.id', '=', 'cs.student_id')
@@ -642,6 +764,9 @@ class ReportsController extends Controller
         $studentMeta = [];
         foreach ($studentsFromClassStudents as $row) {
             $studentId = (int) $row->student_id;
+            if ($departmentStudentIdSet !== null && !isset($departmentStudentIdSet[$studentId])) {
+                continue;
+            }
             $classStudentId = (int) $row->class_student_id;
             if (!isset($studentMeta[$studentId]) || $classStudentId > $studentMeta[$studentId]['class_student_id']) {
                 $studentMeta[$studentId] = [
@@ -672,6 +797,9 @@ class ReportsController extends Controller
 
             foreach ($studentsFromResults as $row) {
                 $studentId = (int) $row->student_id;
+                if ($departmentStudentIdSet !== null && !isset($departmentStudentIdSet[$studentId])) {
+                    continue;
+                }
                 $studentMeta[$studentId] = [
                     'class_student_id' => 0,
                     'class_id' => (int) $row->class_id,
