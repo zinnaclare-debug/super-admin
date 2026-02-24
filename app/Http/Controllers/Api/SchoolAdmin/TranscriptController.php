@@ -44,12 +44,8 @@ class TranscriptController extends Controller
     {
         $payload = $request->validate([
             'email' => 'required|email',
-            'academic_session_id' => 'nullable|integer',
-            'scope' => 'nullable|in:single,all',
-            'term_id' => 'nullable|integer',
         ]);
 
-        $scope = (string) ($payload['scope'] ?? 'single');
         $email = strtolower(trim((string) $payload['email']));
         $schoolId = (int) $request->user()->school_id;
         $school = $request->user()->school()->first();
@@ -58,25 +54,6 @@ class TranscriptController extends Controller
         if ($sessions->isEmpty()) {
             return response()->json([
                 'message' => 'No academic session configured for this school.',
-            ], 422);
-        }
-
-        $session = $this->resolveSession($sessions, (int) ($payload['academic_session_id'] ?? 0));
-        if (!$session) {
-            return response()->json([
-                'message' => 'Selected academic session was not found.',
-            ], 422);
-        }
-
-        $terms = $this->resolveTerms(
-            $session->terms ?? collect(),
-            $scope,
-            (int) ($payload['term_id'] ?? 0)
-        );
-
-        if ($terms->isEmpty()) {
-            return response()->json([
-                'message' => 'No term is available for the selected session.',
             ], 422);
         }
 
@@ -89,10 +66,9 @@ class TranscriptController extends Controller
 
         [$studentUser, $student] = $resolved;
 
-        $entries = $this->buildTranscriptEntries(
+        $entries = $this->buildTranscriptEntriesAcrossSessions(
             $schoolId,
-            $session,
-            $terms,
+            $sessions,
             $student,
             $studentUser,
             $school,
@@ -102,7 +78,15 @@ class TranscriptController extends Controller
         if (empty($entries)) {
             return response()->json([
                 'data' => [],
-                'context' => $this->contextPayload($sessions, $session, $terms, $scope, $studentUser),
+                'context' => [
+                    'student' => [
+                        'id' => (int) $studentUser->id,
+                        'name' => $studentUser->name,
+                        'email' => $studentUser->email,
+                        'username' => $studentUser->username,
+                    ],
+                    'entries_count' => 0,
+                ],
                 'message' => 'No result records found for the selected criteria.',
             ]);
         }
@@ -114,7 +98,15 @@ class TranscriptController extends Controller
 
         return response()->json([
             'data' => $data,
-            'context' => $this->contextPayload($sessions, $session, $terms, $scope, $studentUser),
+            'context' => [
+                'student' => [
+                    'id' => (int) $studentUser->id,
+                    'name' => $studentUser->name,
+                    'email' => $studentUser->email,
+                    'username' => $studentUser->username,
+                ],
+                'entries_count' => count($data),
+            ],
         ]);
     }
 
@@ -122,12 +114,8 @@ class TranscriptController extends Controller
     {
         $payload = $request->validate([
             'email' => 'required|email',
-            'academic_session_id' => 'nullable|integer',
-            'scope' => 'nullable|in:single,all',
-            'term_id' => 'nullable|integer',
         ]);
 
-        $scope = (string) ($payload['scope'] ?? 'single');
         $email = strtolower(trim((string) $payload['email']));
         $schoolId = (int) $request->user()->school_id;
         $school = $request->user()->school()->first();
@@ -136,25 +124,6 @@ class TranscriptController extends Controller
         if ($sessions->isEmpty()) {
             return response()->json([
                 'message' => 'No academic session configured for this school.',
-            ], 422);
-        }
-
-        $session = $this->resolveSession($sessions, (int) ($payload['academic_session_id'] ?? 0));
-        if (!$session) {
-            return response()->json([
-                'message' => 'Selected academic session was not found.',
-            ], 422);
-        }
-
-        $terms = $this->resolveTerms(
-            $session->terms ?? collect(),
-            $scope,
-            (int) ($payload['term_id'] ?? 0)
-        );
-
-        if ($terms->isEmpty()) {
-            return response()->json([
-                'message' => 'No term is available for the selected session.',
             ], 422);
         }
 
@@ -167,10 +136,9 @@ class TranscriptController extends Controller
 
         [$studentUser, $student] = $resolved;
 
-        $entries = $this->buildTranscriptEntries(
+        $entries = $this->buildTranscriptEntriesAcrossSessions(
             $schoolId,
-            $session,
-            $terms,
+            $sessions,
             $student,
             $studentUser,
             $school,
@@ -190,11 +158,7 @@ class TranscriptController extends Controller
             $pdfOutput = $this->renderTranscriptPdfFromEntries($entries);
 
             $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-            $scopeSuffix = $scope === 'all'
-                ? 'all_terms'
-                : Str::slug((string) (($entries[0]['term']['name'] ?? 'term')));
-            $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+            $filename = "{$safeStudent}_full_transcript.pdf";
 
             return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
@@ -204,16 +168,15 @@ class TranscriptController extends Controller
             Log::warning('Transcript PDF generation failed with embedded assets, retrying without assets', [
                 'school_id' => $schoolId,
                 'student_user_id' => $studentUser->id ?? null,
-                'session_id' => $session->id ?? null,
-                'scope' => $scope,
+                'session_id' => null,
+                'scope' => 'all',
                 'error' => $e->getMessage(),
             ]);
 
             try {
-                $entriesNoAssets = $this->buildTranscriptEntries(
+                $entriesNoAssets = $this->buildTranscriptEntriesAcrossSessions(
                     $schoolId,
-                    $session,
-                    $terms,
+                    $sessions,
                     $student,
                     $studentUser,
                     $school,
@@ -228,11 +191,7 @@ class TranscriptController extends Controller
 
                 $pdfOutput = $this->renderTranscriptPdfFromEntries($entriesNoAssets);
                 $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-                $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-                $scopeSuffix = $scope === 'all'
-                    ? 'all_terms'
-                    : Str::slug((string) (($entriesNoAssets[0]['term']['name'] ?? 'term')));
-                $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+                $filename = "{$safeStudent}_full_transcript.pdf";
 
                 return response($pdfOutput, 200, [
                     'Content-Type' => 'application/pdf',
@@ -242,36 +201,51 @@ class TranscriptController extends Controller
                 Log::warning('Transcript PDF generation failed after no-asset fallback, trying simplified transcript renderer', [
                     'school_id' => $schoolId,
                     'student_user_id' => $studentUser->id ?? null,
-                    'session_id' => $session->id ?? null,
-                    'scope' => $scope,
+                    'session_id' => null,
+                    'scope' => 'all',
                     'error' => $fallbackError->getMessage(),
                 ]);
 
                 try {
-                    $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entriesNoAssets);
+                    $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entries);
                     $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-                    $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-                    $scopeSuffix = $scope === 'all'
-                        ? 'all_terms'
-                        : Str::slug((string) (($entriesNoAssets[0]['term']['name'] ?? 'term')));
-                    $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+                    $filename = "{$safeStudent}_full_transcript.pdf";
 
                     return response($simplePdfOutput, 200, [
                         'Content-Type' => 'application/pdf',
                         'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                     ]);
                 } catch (Throwable $simpleFallbackError) {
-                    Log::error('Transcript PDF generation failed after simplified fallback', [
+                    Log::warning('Transcript simplified renderer with assets failed, retrying without assets', [
                         'school_id' => $schoolId,
                         'student_user_id' => $studentUser->id ?? null,
-                        'session_id' => $session->id ?? null,
-                        'scope' => $scope,
+                        'session_id' => null,
+                        'scope' => 'all',
                         'error' => $simpleFallbackError->getMessage(),
                     ]);
 
-                    return response()->json([
-                        'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
-                    ], 500);
+                    try {
+                        $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entriesNoAssets);
+                        $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+                        $filename = "{$safeStudent}_full_transcript.pdf";
+
+                        return response($simplePdfOutput, 200, [
+                            'Content-Type' => 'application/pdf',
+                            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                        ]);
+                    } catch (Throwable $simpleNoAssetError) {
+                        Log::error('Transcript PDF generation failed after simplified no-asset fallback', [
+                            'school_id' => $schoolId,
+                            'student_user_id' => $studentUser->id ?? null,
+                            'session_id' => null,
+                            'scope' => 'all',
+                            'error' => $simpleNoAssetError->getMessage(),
+                        ]);
+
+                        return response()->json([
+                            'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
+                        ], 500);
+                    }
                 }
             }
         }
@@ -286,7 +260,7 @@ class TranscriptController extends Controller
             $viewData['embedded'] = true;
             $htmlParts[] = view('pdf.student_result', $viewData)->render();
             if ($index < $entryCount - 1) {
-                $htmlParts[] = '<div style="page-break-after: always;"></div>';
+                $htmlParts[] = '<div style="height: 26px;"></div>';
             }
         }
 
@@ -378,7 +352,7 @@ class TranscriptController extends Controller
 
             $pages[] = $pageHtml;
             if ($index < $count - 1) {
-                $pages[] = '<div style="page-break-after: always;"></div>';
+                $pages[] = '<div style="height: 26px;"></div>';
             }
         }
 
@@ -539,6 +513,136 @@ class TranscriptController extends Controller
             ] : null,
             'sessions' => $this->sessionsPayload($sessions),
         ];
+    }
+
+    private function buildTranscriptEntriesAcrossSessions(
+        int $schoolId,
+        Collection $sessions,
+        Student $student,
+        User $studentUser,
+        $school,
+        bool $withEmbeddedAssets = true
+    ): array {
+        $entries = [];
+
+        $orderedSessions = $sessions->sortBy(function (AcademicSession $session) {
+            $year = (string) ($session->academic_year ?? '');
+            if (preg_match('/(\d{4})/', $year, $m)) {
+                return (int) $m[1];
+            }
+            return (int) $session->id;
+        })->values();
+
+        foreach ($orderedSessions as $session) {
+            $sessionTerms = collect($session->terms ?? [])->sortBy('id')->values();
+            if ($sessionTerms->isEmpty()) {
+                continue;
+            }
+
+            $sessionEntries = $this->buildTranscriptEntries(
+                $schoolId,
+                $session,
+                $sessionTerms,
+                $student,
+                $studentUser,
+                $school,
+                $withEmbeddedAssets
+            );
+
+            foreach ($sessionEntries as $entry) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $this->sortTranscriptEntries($entries);
+    }
+
+    private function sortTranscriptEntries(array $entries): array
+    {
+        usort($entries, function (array $a, array $b) {
+            $classRankA = $this->classSortRank((string) ($a['class']['name'] ?? ''), (string) ($a['class']['level'] ?? ''));
+            $classRankB = $this->classSortRank((string) ($b['class']['name'] ?? ''), (string) ($b['class']['level'] ?? ''));
+            if ($classRankA !== $classRankB) {
+                return $classRankA <=> $classRankB;
+            }
+
+            $termRankA = $this->termSortRank((string) ($a['term']['name'] ?? ''));
+            $termRankB = $this->termSortRank((string) ($b['term']['name'] ?? ''));
+            if ($termRankA !== $termRankB) {
+                return $termRankA <=> $termRankB;
+            }
+
+            $sessionRankA = $this->sessionSortRank(
+                (string) ($a['session']['academic_year'] ?? ''),
+                (int) ($a['session']['id'] ?? 0)
+            );
+            $sessionRankB = $this->sessionSortRank(
+                (string) ($b['session']['academic_year'] ?? ''),
+                (int) ($b['session']['id'] ?? 0)
+            );
+            if ($sessionRankA !== $sessionRankB) {
+                return $sessionRankA <=> $sessionRankB;
+            }
+
+            return strcmp(
+                strtolower((string) ($a['class']['name'] ?? '')),
+                strtolower((string) ($b['class']['name'] ?? ''))
+            );
+        });
+
+        return $entries;
+    }
+
+    private function sessionSortRank(string $academicYear, int $fallbackId): int
+    {
+        if (preg_match('/(\d{4})/', $academicYear, $m)) {
+            return (int) $m[1];
+        }
+        return $fallbackId;
+    }
+
+    private function classSortRank(string $className, string $classLevel): int
+    {
+        $name = strtolower(trim($className));
+        $level = strtolower(trim($classLevel));
+
+        $num = 0;
+        if (preg_match('/(\d{1,2})/', $name, $n)) {
+            $num = (int) $n[1];
+        }
+
+        if (preg_match('/\b(jss?|js|junior\s*secondary)\b/', $name)) {
+            return 300 + ($num > 0 ? $num : 99);
+        }
+        if (preg_match('/\b(sss?|ss|senior\s*secondary)\b/', $name)) {
+            return 400 + ($num > 0 ? $num : 99);
+        }
+        if (preg_match('/\b(primary|pry|pri)\b/', $name) || $level === 'primary') {
+            return 200 + ($num > 0 ? $num : 99);
+        }
+        if (preg_match('/\b(nursery|creche|kg|kindergarten)\b/', $name) || $level === 'nursery') {
+            return 100 + ($num > 0 ? $num : 99);
+        }
+        if ($level === 'secondary') {
+            return 350 + ($num > 0 ? $num : 99);
+        }
+
+        return 900 + ($num > 0 ? $num : 99);
+    }
+
+    private function termSortRank(string $termName): int
+    {
+        $name = strtolower(trim($termName));
+        if (str_contains($name, 'first') || preg_match('/\b1(st)?\b/', $name)) {
+            return 1;
+        }
+        if (str_contains($name, 'second') || preg_match('/\b2(nd)?\b/', $name)) {
+            return 2;
+        }
+        if (str_contains($name, 'third') || preg_match('/\b3(rd)?\b/', $name)) {
+            return 3;
+        }
+        return 9;
     }
 
     private function buildTranscriptEntries(
