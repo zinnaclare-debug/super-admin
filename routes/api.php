@@ -194,8 +194,24 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     Route::get('/school-admin/reports/teacher', [ReportsController::class, 'teacher'])
         ->middleware('feature:teacher_report');
+    Route::get('/school-admin/reports/teacher/download', [ReportsController::class, 'teacherDownload'])
+        ->middleware('feature:teacher_report');
     Route::get('/school-admin/reports/student', [ReportsController::class, 'student'])
         ->middleware('feature:student_report');
+    Route::get('/school-admin/reports/student/download', [ReportsController::class, 'studentDownload'])
+        ->middleware('feature:student_report');
+    Route::get('/school-admin/reports/student-result/options', [ReportsController::class, 'studentResultOptions'])
+        ->middleware('feature:student_report');
+    Route::get('/school-admin/reports/student-result', [ReportsController::class, 'studentResult'])
+        ->middleware('feature:student_report');
+    Route::get('/school-admin/reports/student-result/download', [ReportsController::class, 'studentResultDownload'])
+        ->middleware('feature:student_report');
+    Route::get('/school-admin/reports/broadsheet/options', [ReportsController::class, 'broadsheetOptions'])
+        ->middleware('feature:broadsheet');
+    Route::get('/school-admin/reports/broadsheet', [ReportsController::class, 'broadsheet'])
+        ->middleware('feature:broadsheet');
+    Route::get('/school-admin/reports/broadsheet/download', [ReportsController::class, 'broadsheetDownload'])
+        ->middleware('feature:broadsheet');
     Route::get('/school-admin/transcript/options', [TranscriptController::class, 'options'])
         ->middleware('feature:transcript');
     Route::get('/school-admin/transcript', [TranscriptController::class, 'show'])

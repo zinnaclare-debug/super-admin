@@ -1,0 +1,110 @@
+.broadsheet-page {
+  display: grid;
+  gap: 16px;
+}
+
+.broadsheet-card {
+  background: #fff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.broadsheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.broadsheet-field {
+  display: grid;
+  gap: 6px;
+}
+
+.broadsheet-field label {
+  font-size: 13px;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.broadsheet-field select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.broadsheet-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.broadsheet-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.broadsheet-actions button.secondary {
+  background: #0f766e;
+}
+
+.broadsheet-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.broadsheet-meta {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #334155;
+}
+
+.broadsheet-error {
+  margin: 10px 0 0;
+  color: #b91c1c;
+}
+
+.broadsheet-message {
+  margin: 10px 0 0;
+  color: #1f2937;
+}
+
+.broadsheet-table-wrap {
+  background: #fff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 10px;
+  overflow-x: auto;
+}
+
+.broadsheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.broadsheet-table th,
+.broadsheet-table td {
+  border: 1px solid #e2e8f0;
+  padding: 7px 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.broadsheet-table th {
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.broadsheet-table td:nth-child(2),
+.broadsheet-table td:nth-child(3) {
+  text-align: left;
+}

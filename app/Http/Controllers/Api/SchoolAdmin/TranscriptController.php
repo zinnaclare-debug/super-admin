@@ -18,9 +18,11 @@ use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 class TranscriptController extends Controller
 {
@@ -194,34 +196,51 @@ class TranscriptController extends Controller
             . implode("\n", $htmlParts)
             . '</body></html>';
 
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-        if (!is_dir($dompdfTempDir)) {
-            @mkdir($dompdfTempDir, 0775, true);
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+            $scopeSuffix = $scope === 'all'
+                ? 'all_terms'
+                : Str::slug((string) (($entries[0]['term']['name'] ?? 'term')));
+            $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Transcript PDF generation failed', [
+                'school_id' => $schoolId,
+                'student_user_id' => $studentUser->id ?? null,
+                'session_id' => $session->id ?? null,
+                'scope' => $scope,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
+            ], 500);
         }
-        $options->set('tempDir', $dompdfTempDir);
-        $options->set('fontDir', $dompdfTempDir);
-        $options->set('fontCache', $dompdfTempDir);
-        $options->set('chroot', base_path());
-
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
-        $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-        $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-        $scopeSuffix = $scope === 'all'
-            ? 'all_terms'
-            : Str::slug((string) (($entries[0]['term']['name'] ?? 'term')));
-        $filename = "{$safeStudent}_{$safeSession}_{$scopeSuffix}_transcript.pdf";
-
-        return response($dompdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
     }
 
     private function sessionsWithTerms(int $schoolId): Collection
@@ -729,6 +748,12 @@ class TranscriptController extends Controller
 
         $fullPath = Storage::disk('public')->path($storagePath);
         if (!is_file($fullPath)) {
+            return null;
+        }
+
+        // Oversized images can break Dompdf on lower-memory servers.
+        $size = @filesize($fullPath);
+        if (is_int($size) && $size > 700 * 1024) {
             return null;
         }
 
