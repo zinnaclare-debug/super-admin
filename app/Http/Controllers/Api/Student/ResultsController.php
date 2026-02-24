@@ -302,7 +302,7 @@ class ResultsController extends Controller
                 ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
             ];
 
-            $html = view('pdf.student_result', [
+            $viewData = [
                 'school' => $school,
                 'session' => $session,
                 'term' => $term,
@@ -323,30 +323,32 @@ class ResultsController extends Controller
                 'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
                 'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
                 'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
-            ])->render();
+            ];
 
-            $options = new Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-            if (!is_dir($dompdfTempDir)) {
-                @mkdir($dompdfTempDir, 0775, true);
+            try {
+                $pdfOutput = $this->renderStudentResultPdf($viewData);
+            } catch (Throwable $pdfError) {
+                Log::warning('Student result PDF primary render failed, retrying without embedded images', [
+                    'school_id' => $schoolId,
+                    'user_id' => $user->id ?? null,
+                    'student_id' => $student->id ?? null,
+                    'class_id' => $classId,
+                    'term_id' => $termId,
+                    'error' => $pdfError->getMessage(),
+                ]);
+
+                $viewData['schoolLogoDataUri'] = null;
+                $viewData['studentPhotoDataUri'] = null;
+                $viewData['headSignatureDataUri'] = null;
+                $pdfOutput = $this->renderStudentResultPdf($viewData);
             }
-            $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfTempDir);
-            $options->set('chroot', base_path());
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
 
             $safeStudent = Str::slug((string) $user->name ?: 'student');
             $safeTerm = Str::slug((string) $term->name ?: 'term');
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
             $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
 
-            return response($dompdf->output(), 200, [
+            return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]);
@@ -551,33 +553,65 @@ class ResultsController extends Controller
 
     private function toDataUri(?string $storagePath): ?string
     {
-        if (!$storagePath) {
+        try {
+            if (!$storagePath) {
+                return null;
+            }
+
+            $fullPath = Storage::disk('public')->path($storagePath);
+            if (!is_file($fullPath)) {
+                return null;
+            }
+
+            $size = @filesize($fullPath);
+            if (is_int($size) && $size > 700 * 1024) {
+                return null;
+            }
+
+            $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
+            $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
+            if (!in_array($mime, $allowedMimes, true)) {
+                return null;
+            }
+
+            $binary = @file_get_contents($fullPath);
+            if (!is_string($binary) || $binary === '') {
+                return null;
+            }
+
+            $base64 = base64_encode($binary);
+
+            return "data:{$mime};base64,{$base64}";
+        } catch (Throwable $e) {
+            Log::warning('Failed to build image data URI for student result PDF', [
+                'path' => $storagePath,
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
+    }
 
-        $fullPath = Storage::disk('public')->path($storagePath);
-        if (!is_file($fullPath)) {
-            return null;
+    private function renderStudentResultPdf(array $viewData): string
+    {
+        $html = view('pdf.student_result', $viewData)->render();
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
         }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
 
-        $size = @filesize($fullPath);
-        if (is_int($size) && $size > 700 * 1024) {
-            return null;
-        }
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
 
-        $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
-        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
-        if (!in_array($mime, $allowedMimes, true)) {
-            return null;
-        }
-
-        $binary = @file_get_contents($fullPath);
-        if (!is_string($binary) || $binary === '') {
-            return null;
-        }
-
-        $base64 = base64_encode($binary);
-
-        return "data:{$mime};base64,{$base64}";
+        return $dompdf->output();
     }
 }
