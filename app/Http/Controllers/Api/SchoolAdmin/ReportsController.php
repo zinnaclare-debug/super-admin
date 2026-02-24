@@ -18,12 +18,24 @@ class ReportsController extends Controller
     // GET /api/school-admin/reports/student-result/options
     public function studentResultOptions(Request $request)
     {
+        if (! $this->resultsPublished($request)) {
+            return response()->json([
+                'message' => 'Results are not yet published for your school.',
+            ], 403);
+        }
+
         return app(TranscriptController::class)->options($request);
     }
 
     // GET /api/school-admin/reports/student-result?email=...&academic_session_id=...&term_id=...
     public function studentResult(Request $request)
     {
+        if (! $this->resultsPublished($request)) {
+            return response()->json([
+                'message' => 'Results are not yet published for your school.',
+            ], 403);
+        }
+
         $request->query->set('scope', 'single');
         $request->merge(['scope' => 'single']);
 
@@ -33,6 +45,12 @@ class ReportsController extends Controller
     // GET /api/school-admin/reports/student-result/download?email=...&academic_session_id=...&term_id=...
     public function studentResultDownload(Request $request)
     {
+        if (! $this->resultsPublished($request)) {
+            return response()->json([
+                'message' => 'Results are not yet published for your school.',
+            ], 403);
+        }
+
         $request->query->set('scope', 'single');
         $request->merge(['scope' => 'single']);
 
@@ -877,5 +895,11 @@ class ReportsController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    private function resultsPublished(Request $request): bool
+    {
+        $school = $request->user()?->school;
+        return (bool) ($school?->results_published);
     }
 }

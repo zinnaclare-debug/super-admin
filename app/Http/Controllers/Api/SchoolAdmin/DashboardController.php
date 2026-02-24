@@ -46,6 +46,7 @@ class DashboardController extends Controller
             'school_logo_url' => $this->storageUrl($school?->logo_path),
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
+            'results_published' => (bool) ($school?->results_published),
             'students' => $students,
             'male_students' => $maleStudents,
             'female_students' => $femaleStudents,

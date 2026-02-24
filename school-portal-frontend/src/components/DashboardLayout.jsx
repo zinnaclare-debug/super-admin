@@ -16,6 +16,7 @@ function DashboardLayout() {
   });
 
   const [features, setFeatures] = useState([]);
+  const [resultsPublished, setResultsPublished] = useState(false);
   const [canAccessClassTeacherFeatures, setCanAccessClassTeacherFeatures] = useState(false);
   const [showAdminFeatures, setShowAdminFeatures] = useState(false);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => {
@@ -40,12 +41,15 @@ function DashboardLayout() {
     if (!user?.role) return;
 
     if (user.role === "school_admin") {
-      api
-        .get("/api/schools/features")
-        .then((res) => {
-          const data = res.data.data || [];
+      Promise.all([
+        api.get("/api/schools/features"),
+        api.get("/api/school-admin/stats").catch(() => null),
+      ])
+        .then(([featuresRes, statsRes]) => {
+          const data = featuresRes?.data?.data || [];
           setFeatures(data);
           setStoredFeatures(data);
+          setResultsPublished(Boolean(statsRes?.data?.results_published));
         })
         .catch(() => {});
       return;
@@ -98,8 +102,13 @@ function DashboardLayout() {
   );
 
   const adminFeatures = useMemo(
-    () => features.filter((f) => f.enabled && f.category === "admin"),
-    [features]
+    () =>
+      features.filter((f) => {
+        if (!f.enabled || f.category !== "admin") return false;
+        if (String(f.feature || "").toLowerCase() === "student_result" && !resultsPublished) return false;
+        return true;
+      }),
+    [features, resultsPublished]
   );
 
   const roleLabel = useMemo(() => {
@@ -165,6 +174,7 @@ function DashboardLayout() {
       transcript: "transcript",
       teacher_report: "teacher_report",
       student_report: "student_report",
+      student_result: "student_result",
       announcements: "announcements",
       "announcement desk": "announcements",
     };

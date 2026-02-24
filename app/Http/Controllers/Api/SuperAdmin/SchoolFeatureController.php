@@ -57,10 +57,16 @@ class SchoolFeatureController extends Controller
             $rec = $school->features()->where('feature', $def['key'])->first();
 
             if (! $rec) {
+                $defaultEnabled = false;
+                if (($def['key'] ?? '') === 'student_result') {
+                    $studentReport = $school->features()->where('feature', 'student_report')->first();
+                    $defaultEnabled = (bool) ($studentReport?->enabled);
+                }
+
                 $rec = SchoolFeature::create([
                     'school_id' => $school->id,
                     'feature' => $def['key'],
-                    'enabled' => false,
+                    'enabled' => $defaultEnabled,
                 ]);
             }
 

@@ -201,11 +201,11 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/reports/student/download', [ReportsController::class, 'studentDownload'])
         ->middleware('feature:student_report');
     Route::get('/school-admin/reports/student-result/options', [ReportsController::class, 'studentResultOptions'])
-        ->middleware('feature:student_report');
+        ->middleware('feature:student_result');
     Route::get('/school-admin/reports/student-result', [ReportsController::class, 'studentResult'])
-        ->middleware('feature:student_report');
+        ->middleware('feature:student_result');
     Route::get('/school-admin/reports/student-result/download', [ReportsController::class, 'studentResultDownload'])
-        ->middleware('feature:student_report');
+        ->middleware('feature:student_result');
     Route::get('/school-admin/reports/broadsheet/options', [ReportsController::class, 'broadsheetOptions'])
         ->middleware('feature:broadsheet');
     Route::get('/school-admin/reports/broadsheet', [ReportsController::class, 'broadsheet'])

@@ -11,6 +11,7 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/transcript",
   "/school/admin/teacher_report",
   "/school/admin/student_report",
+  "/school/admin/student_result",
 ]);
 
 function titleFromPath(pathname) {
@@ -24,6 +25,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/transcript")) return "Transcript";
   if (pathname.startsWith("/school/admin/teacher_report")) return "Teacher Report";
   if (pathname.startsWith("/school/admin/student_report")) return "Student Report";
+  if (pathname.startsWith("/school/admin/student_result")) return "Student Result";
   if (pathname.startsWith("/school/admin/announcements")) return "Announcement Desk";
   if (pathname.startsWith("/school/admin/register")) return "Register";
   return "School Admin";
