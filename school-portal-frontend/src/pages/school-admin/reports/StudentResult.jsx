@@ -26,14 +26,10 @@ async function messageFromBlobError(blob, fallback) {
 
 export default function StudentResult() {
   const [sessions, setSessions] = useState([]);
-  const [email, setEmail] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [termId, setTermId] = useState("");
-  const [entry, setEntry] = useState(null);
-  const [context, setContext] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [searching, setSearching] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -51,7 +47,7 @@ export default function StudentResult() {
       terms[0];
   }, [selectedSession, termId]);
 
-  const canSearch = email.trim().length > 0 && selectedSession && selectedTerm;
+  const canDownload = studentSearch.trim().length > 0 && selectedSession && selectedTerm;
 
   const loadOptions = async () => {
     setLoadingOptions(true);
@@ -110,72 +106,18 @@ export default function StudentResult() {
 
   const requestParams = () => {
     const params = {
-      email: email.trim(),
+      student: studentSearch.trim(),
     };
     if (selectedSession?.id) params.academic_session_id = selectedSession.id;
     if (selectedTerm?.id) params.term_id = selectedTerm.id;
     return params;
   };
 
-  const searchResult = async () => {
-    if (!canSearch) return;
-    setSearching(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await api.get("/api/school-admin/reports/student-result", {
-        params: requestParams(),
-      });
-      const data = res.data?.data || [];
-      setEntry(data[0] || null);
-      setContext(res.data?.context || null);
-      setMessage(res.data?.message || (data.length === 0 ? "No result record found." : ""));
-    } catch (e) {
-      setEntry(null);
-      setContext(null);
-      setMessage("");
-      setError(e?.response?.data?.message || "Failed to load student result.");
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const previewPdf = async () => {
-    if (!canSearch) return;
-    setPreviewing(true);
-    setError("");
-    try {
-      const res = await api.get("/api/school-admin/reports/student-result/download", {
-        params: requestParams(),
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const msg = await messageFromBlobError(res.data, "Failed to preview student result PDF.");
-        throw new Error(msg);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      window.open(blobUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 15000);
-    } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const msg = await messageFromBlobError(e.response.data, "Failed to preview student result PDF.");
-        setError(msg);
-      } else {
-        setError(e?.response?.data?.message || e?.message || "Failed to preview student result PDF.");
-      }
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
   const downloadPdf = async () => {
-    if (!canSearch) return;
+    if (!canDownload) return;
     setDownloading(true);
     setError("");
+    setMessage("");
     try {
       const res = await api.get("/api/school-admin/reports/student-result/download", {
         params: requestParams(),
@@ -197,6 +139,7 @@ export default function StudentResult() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
+      setMessage("Student result downloaded successfully.");
     } catch (e) {
       if (e?.response?.data instanceof Blob) {
         const msg = await messageFromBlobError(e.response.data, "Failed to download student result PDF.");
@@ -214,13 +157,13 @@ export default function StudentResult() {
       <div className="student-result-card">
         <div className="student-result-grid">
           <div className="student-result-field">
-            <label htmlFor="student-result-email">Student Email</label>
+            <label htmlFor="student-result-email">Student Email or Name</label>
             <input
               id="student-result-email"
-              type="email"
-              placeholder="student@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="student@example.com or full name"
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
             />
           </div>
 
@@ -266,84 +209,14 @@ export default function StudentResult() {
         </div>
 
         <div className="student-result-actions">
-          <button onClick={searchResult} disabled={!canSearch || searching || loadingOptions}>
-            {searching ? "Searching..." : "Search"}
-          </button>
-          <button className="tertiary" onClick={previewPdf} disabled={!canSearch || previewing}>
-            {previewing ? "Opening Preview..." : "Preview Result"}
-          </button>
-          <button className="secondary" onClick={downloadPdf} disabled={!canSearch || downloading}>
-            {downloading ? "Downloading..." : "Download Result"}
+          <button className="secondary" onClick={downloadPdf} disabled={!canDownload || downloading || loadingOptions}>
+            {downloading ? "Searching & Downloading..." : "Search & Download Result"}
           </button>
         </div>
 
         {error ? <p className="student-result-error">{error}</p> : null}
         {message ? <p className="student-result-message">{message}</p> : null}
       </div>
-
-      {context?.student ? (
-        <div className="student-result-meta">
-          <p>
-            <strong>Student:</strong> {context.student.name} ({context.student.email})
-          </p>
-          <p>
-            <strong>Session:</strong>{" "}
-            {context.selected_session?.session_name || context.selected_session?.academic_year || "-"}
-          </p>
-        </div>
-      ) : null}
-
-      {entry ? (
-        <div className="student-result-entry">
-          <div className="student-result-entry-head">
-            <h3>{entry.term?.name || "Term Result"}</h3>
-            <p>
-              {entry.class?.name || "-"} | Average: {Number(entry.summary?.average_score || 0).toFixed(2)} | Grade:{" "}
-              {entry.summary?.overall_grade || "-"}
-            </p>
-          </div>
-
-          <div className="student-result-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>CA</th>
-                  <th>Exam</th>
-                  <th>Total</th>
-                  <th>Min</th>
-                  <th>Max</th>
-                  <th>Class Ave</th>
-                  <th>Position</th>
-                  <th>Grade</th>
-                  <th>Remark</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(entry.rows || []).map((row) => (
-                  <tr key={row.term_subject_id}>
-                    <td>{row.subject_name}</td>
-                    <td>{row.ca}</td>
-                    <td>{row.exam}</td>
-                    <td>{row.total}</td>
-                    <td>{row.min_score}</td>
-                    <td>{row.max_score}</td>
-                    <td>{Number(row.class_average || 0).toFixed(2)}</td>
-                    <td>{row.position_label || "-"}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.remark}</td>
-                  </tr>
-                ))}
-                {(entry.rows || []).length === 0 ? (
-                  <tr>
-                    <td colSpan="10">No records found for this student and term.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

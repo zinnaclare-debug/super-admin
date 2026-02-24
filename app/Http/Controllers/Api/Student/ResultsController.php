@@ -12,6 +12,7 @@ use App\Models\StudentBehaviourRating;
 use App\Models\Term;
 use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
+use App\Models\User;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -385,6 +386,347 @@ class ResultsController extends Controller
             Log::error('Student result PDF generation failed', [
                 'school_id' => $schoolId,
                 'user_id' => $user->id ?? null,
+                'student_id' => $student->id ?? null,
+                'class_id' => $classId,
+                'term_id' => $termId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Unable to generate result PDF. Please check student/session data and branding images.',
+            ], 500);
+        }
+    }
+
+    // GET /api/school-admin/reports/student-result/download?student=...&academic_session_id=...&term_id=...
+    public function downloadForSchoolAdmin(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($actor->role === 'school_admin', 403);
+
+        if (!$actor->school || !$actor->school->results_published) {
+            return response()->json(['message' => 'Results are not yet published for your school'], 403);
+        }
+
+        $payload = $request->validate([
+            'student' => 'nullable|string',
+            'email' => 'nullable|string',
+            'academic_session_id' => 'required|integer',
+            'term_id' => 'required|integer',
+        ]);
+
+        $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
+        if ($identifier === '') {
+            return response()->json(['message' => 'Provide student email or name'], 422);
+        }
+
+        $schoolId = (int) $actor->school_id;
+        $resolved = $this->resolveStudentByIdentifier($schoolId, $identifier);
+        if (!$resolved) {
+            return response()->json(['message' => 'Student not found for the supplied search value'], 404);
+        }
+        [$studentUser, $student] = $resolved;
+
+        $session = AcademicSession::where('id', (int) $payload['academic_session_id'])
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$session) {
+            return response()->json(['message' => 'Academic session not found'], 422);
+        }
+
+        $term = Term::where('id', (int) $payload['term_id'])
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$term) {
+            return response()->json(['message' => 'Term not found for selected session'], 404);
+        }
+
+        $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
+        if (!$classId) {
+            return response()->json(['message' => 'No class enrollment/result found for the selected student, session and term'], 404);
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$class) {
+            $class = SchoolClass::where('id', $classId)
+                ->where('school_id', $schoolId)
+                ->first();
+        }
+        if (!$class) {
+            return response()->json(['message' => 'Class not found'], 404);
+        }
+
+        return $this->downloadPdfForResolvedStudent(
+            $actor,
+            $studentUser,
+            $student,
+            $session,
+            $term,
+            $class,
+            $classId,
+            (int) $term->id
+        );
+    }
+
+    private function resolveStudentByIdentifier(int $schoolId, string $identifier): ?array
+    {
+        $identifier = strtolower(trim($identifier));
+        if ($identifier === '') {
+            return null;
+        }
+
+        $query = User::query()
+            ->where('school_id', $schoolId)
+            ->where('role', 'student');
+
+        if (str_contains($identifier, '@')) {
+            $query->whereRaw('LOWER(email) = ?', [$identifier]);
+        } else {
+            $like = '%' . $identifier . '%';
+            $query->where(function ($q) use ($identifier, $like) {
+                $q->whereRaw('LOWER(name) = ?', [$identifier])
+                    ->orWhereRaw('LOWER(username) = ?', [$identifier])
+                    ->orWhereRaw('LOWER(email) = ?', [$identifier])
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$like]);
+            });
+            $query->orderByRaw(
+                'CASE WHEN LOWER(name)=? THEN 0 WHEN LOWER(username)=? THEN 1 WHEN LOWER(email)=? THEN 2 ELSE 3 END',
+                [$identifier, $identifier, $identifier]
+            );
+        }
+
+        $studentUser = $query
+            ->orderBy('name')
+            ->first(['id', 'name', 'email', 'username', 'photo_path', 'school_id']);
+
+        if (!$studentUser) {
+            return null;
+        }
+
+        $student = Student::where('school_id', $schoolId)
+            ->where('user_id', (int) $studentUser->id)
+            ->first();
+
+        if (!$student) {
+            return null;
+        }
+
+        return [$studentUser, $student];
+    }
+
+    private function resolveClassIdForTerm(int $schoolId, int $sessionId, int $termId, int $studentId): ?int
+    {
+        $classFromResults = DB::table('results')
+            ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+            ->where('results.school_id', $schoolId)
+            ->where('results.student_id', $studentId)
+            ->where('term_subjects.term_id', $termId)
+            ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($q) use ($schoolId) {
+                $q->where('term_subjects.school_id', $schoolId);
+            })
+            ->orderByDesc('results.id')
+            ->value('term_subjects.class_id');
+
+        if ($classFromResults) {
+            return (int) $classFromResults;
+        }
+
+        $classFromClassStudents = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('student_id', $studentId)
+            ->where('academic_session_id', $sessionId)
+            ->orderByDesc('id')
+            ->value('class_id');
+
+        if ($classFromClassStudents) {
+            return (int) $classFromClassStudents;
+        }
+
+        $classFromEnrollmentTerm = Enrollment::query()
+            ->where('enrollments.student_id', $studentId)
+            ->where('enrollments.term_id', $termId)
+            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
+                $q->where('enrollments.school_id', $schoolId);
+            })
+            ->orderByDesc('enrollments.id')
+            ->value('enrollments.class_id');
+
+        if ($classFromEnrollmentTerm) {
+            return (int) $classFromEnrollmentTerm;
+        }
+
+        $classFromEnrollmentSession = Enrollment::query()
+            ->where('enrollments.student_id', $studentId)
+            ->join('terms', 'terms.id', '=', 'enrollments.term_id')
+            ->where('terms.academic_session_id', $sessionId)
+            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
+                $q->where('enrollments.school_id', $schoolId);
+            })
+            ->orderByDesc('enrollments.id')
+            ->value('enrollments.class_id');
+
+        return $classFromEnrollmentSession ? (int) $classFromEnrollmentSession : null;
+    }
+
+    private function downloadPdfForResolvedStudent(
+        User $actor,
+        User $studentUser,
+        Student $student,
+        AcademicSession $session,
+        Term $term,
+        SchoolClass $class,
+        int $classId,
+        int $termId
+    ) {
+        $schoolId = (int) $actor->school_id;
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+
+            $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->where('student_id', $student->id)
+                ->first();
+
+            $attendance = StudentAttendance::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->where('student_id', $student->id)
+                ->first();
+            $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('term_id', $termId)
+                ->first();
+
+            $classTeacher = null;
+            if ($class->class_teacher_user_id) {
+                $classTeacher = User::where('id', $class->class_teacher_user_id)
+                    ->where('school_id', $schoolId)
+                    ->first(['id', 'name', 'email']);
+            }
+
+            $school = $actor->school ?: $actor->school()->first();
+            $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
+
+            $totalScore = (int) collect($rows)->sum('total');
+            $subjectCount = max(1, count($rows));
+            $averageScore = (float) round($totalScore / $subjectCount, 2);
+            $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+
+            $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
+            if ($teacherComment === '') {
+                $teacherComment = (string) ($attendance?->comment ?? '');
+            }
+            if ($teacherComment === '') {
+                $teacherComment = $this->defaultTeacherComment($overallGrade);
+            }
+            $schoolHeadComment = $this->defaultHeadComment($overallGrade);
+
+            $behaviourTraits = [
+                ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
+                ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
+                ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
+                ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
+                ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
+                ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
+                ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
+            ];
+
+            $viewData = [
+                'school' => $school,
+                'session' => $session,
+                'term' => $term,
+                'class' => $class,
+                'student' => $student,
+                'studentUser' => $studentUser,
+                'rows' => $rows,
+                'totalScore' => $totalScore,
+                'averageScore' => $averageScore,
+                'overallGrade' => $overallGrade,
+                'attendance' => $attendance,
+                'attendanceSetting' => $attendanceSetting,
+                'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
+                'teacherComment' => $teacherComment,
+                'schoolHeadComment' => $schoolHeadComment,
+                'classTeacher' => $classTeacher,
+                'behaviourTraits' => $behaviourTraits,
+                'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
+                'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
+                'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
+            ];
+
+            $viewDataWithAssets = $viewData;
+            $viewDataWithoutAssets = $viewData;
+            $viewDataWithoutAssets['schoolLogoDataUri'] = null;
+            $viewDataWithoutAssets['studentPhotoDataUri'] = null;
+            $viewDataWithoutAssets['headSignatureDataUri'] = null;
+
+            try {
+                $pdfOutput = $this->renderStudentResultPdf($viewDataWithAssets);
+            } catch (Throwable $pdfError) {
+                Log::warning('School-admin student result PDF primary render failed, retrying without embedded images', [
+                    'school_id' => $schoolId,
+                    'actor_user_id' => $actor->id ?? null,
+                    'student_user_id' => $studentUser->id ?? null,
+                    'student_id' => $student->id ?? null,
+                    'class_id' => $classId,
+                    'term_id' => $termId,
+                    'error' => $pdfError->getMessage(),
+                ]);
+
+                try {
+                    $pdfOutput = $this->renderStudentResultPdf($viewDataWithoutAssets);
+                } catch (Throwable $fallbackError) {
+                    Log::warning('School-admin student result image-free render failed, trying simplified template with assets', [
+                        'school_id' => $schoolId,
+                        'actor_user_id' => $actor->id ?? null,
+                        'student_user_id' => $studentUser->id ?? null,
+                        'student_id' => $student->id ?? null,
+                        'class_id' => $classId,
+                        'term_id' => $termId,
+                        'error' => $fallbackError->getMessage(),
+                    ]);
+
+                    try {
+                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithAssets);
+                    } catch (Throwable $simpleWithAssetError) {
+                        Log::warning('School-admin student result simplified template with assets failed, using simplified template without assets', [
+                            'school_id' => $schoolId,
+                            'actor_user_id' => $actor->id ?? null,
+                            'student_user_id' => $studentUser->id ?? null,
+                            'student_id' => $student->id ?? null,
+                            'class_id' => $classId,
+                            'term_id' => $termId,
+                            'error' => $simpleWithAssetError->getMessage(),
+                        ]);
+
+                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithoutAssets);
+                    }
+                }
+            }
+
+            $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+            $safeTerm = Str::slug((string) ($term->name ?: 'term'));
+            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+            $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
+
+            return response($pdfOutput, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('School-admin student result PDF generation failed', [
+                'school_id' => $schoolId,
+                'actor_user_id' => $actor->id ?? null,
+                'student_user_id' => $studentUser->id ?? null,
                 'student_id' => $student->id ?? null,
                 'class_id' => $classId,
                 'term_id' => $termId,

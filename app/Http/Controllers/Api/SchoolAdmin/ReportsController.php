@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Student\ResultsController as StudentResultsController;
 use App\Models\AcademicSession;
 use App\Models\Term;
 use Dompdf\Dompdf;
@@ -51,10 +52,7 @@ class ReportsController extends Controller
             ], 403);
         }
 
-        $request->query->set('scope', 'single');
-        $request->merge(['scope' => 'single']);
-
-        return app(TranscriptController::class)->download($request);
+        return app(StudentResultsController::class)->downloadForSchoolAdmin($request);
     }
 
     // GET /api/school-admin/reports/broadsheet/options
