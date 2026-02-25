@@ -10,6 +10,7 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
+use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -149,7 +150,8 @@ class UserManagementController extends Controller
                 'message' => 'Invalid education level selected.',
             ], 422);
         }
-        if (!empty($validated['password'])) {
+        $plainPassword = !empty($validated['password']) ? (string) $validated['password'] : null;
+        if ($plainPassword !== null) {
             $user->password = Hash::make($validated['password']);
         }
         $user->save();
@@ -222,6 +224,12 @@ class UserManagementController extends Controller
             Storage::disk('public')->delete($existingPhotoPath);
         }
 
+        UserCredentialStore::sync(
+            $user,
+            $plainPassword,
+            (int) $request->user()->id
+        );
+
         return response()->json([
             'message' => 'User updated successfully',
             'data' => $user->only(['id', 'name', 'email', 'role']),
@@ -247,6 +255,12 @@ class UserManagementController extends Controller
 
         $user->password = Hash::make($payload['password']);
         $user->save();
+
+        UserCredentialStore::sync(
+            $user,
+            (string) $payload['password'],
+            (int) $request->user()->id
+        );
 
         return response()->json([
             'message' => 'Password reset successfully',

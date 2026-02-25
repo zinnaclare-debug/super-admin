@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\SuperAdmin\PaymentsController as SuperAdminPayments
 
 use App\Http\Controllers\Api\SchoolAdmin\RegistrationController;
 use App\Http\Controllers\Api\SchoolAdmin\UserManagementController;
+use App\Http\Controllers\Api\SchoolAdmin\LoginDetailsController;
 use App\Http\Controllers\Api\SchoolAdmin\AcademicSessionController;
 use App\Http\Controllers\Api\SchoolAdmin\AcademicStructureController;
 use App\Http\Controllers\Api\SchoolAdmin\DashboardController as SchoolAdminDashboardController;
@@ -142,6 +143,11 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     // ✅ Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
+        ->middleware('feature:users');
+
+    Route::get('/school-admin/users/login-details', [LoginDetailsController::class, 'index'])
+        ->middleware('feature:users');
+    Route::get('/school-admin/users/login-details/download', [LoginDetailsController::class, 'download'])
         ->middleware('feature:users');
 
     Route::get('/school-admin/users/{user}', [UserManagementController::class, 'show'])

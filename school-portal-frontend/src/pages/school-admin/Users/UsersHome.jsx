@@ -27,6 +27,9 @@ export default function UsersHome() {
         <NavLink to="student/active" style={btnStyle}>
           Students
         </NavLink>
+        <NavLink to="login-details" style={btnStyle}>
+          Login Details
+        </NavLink>
       </div>
 
       <Outlet />

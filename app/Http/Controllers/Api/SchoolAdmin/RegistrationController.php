@@ -10,6 +10,7 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
+use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -87,6 +88,12 @@ class RegistrationController extends Controller
             'password' => Hash::make($request->password),
             'role' => $request->role,
         ]);
+
+        UserCredentialStore::sync(
+            $user,
+            (string) $request->password,
+            (int) $request->user()->id
+        );
 
         if ($request->role === 'student') {
             Student::create([
@@ -176,6 +183,12 @@ class RegistrationController extends Controller
             'password' => Hash::make($request->password),
             'role' => $request->role,
         ]);
+
+        UserCredentialStore::sync(
+            $user,
+            (string) $request->password,
+            (int) $request->user()->id
+        );
 
         if ($request->role === 'student') {
             Student::create([
