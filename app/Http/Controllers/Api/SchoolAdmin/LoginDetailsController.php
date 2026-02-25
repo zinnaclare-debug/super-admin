@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class LoginDetailsController extends Controller
@@ -63,17 +64,19 @@ class LoginDetailsController extends Controller
 
     private function buildRows(int $schoolId, ?string $role = null): array
     {
+        $hasCredentialTable = Schema::hasTable('user_login_credentials');
+
         $users = User::query()
             ->where('school_id', $schoolId)
             ->whereIn('role', ['student', 'staff'])
             ->when($role, fn ($q) => $q->where('role', $role))
-            ->with('loginCredential')
+            ->when($hasCredentialTable, fn ($q) => $q->with('loginCredential'))
             ->orderBy('role')
             ->orderBy('name')
             ->get();
 
-        return $users->values()->map(function (User $user, int $index) {
-            $credential = $user->loginCredential;
+        return $users->values()->map(function (User $user, int $index) use ($hasCredentialTable) {
+            $credential = $hasCredentialTable ? $user->loginCredential : null;
             $password = UserCredentialStore::reveal($credential?->password_encrypted);
 
             return [
@@ -100,4 +103,3 @@ class LoginDetailsController extends Controller
         return implode(',', $escaped);
     }
 }
-
