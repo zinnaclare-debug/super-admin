@@ -134,7 +134,9 @@ export default function Promotion() {
             {selectedClass.name} ({selectedClass.level})
           </h3>
           <p style={{ marginTop: 0, opacity: 0.75 }}>
-            {nextClass ? `Next Class: ${nextClass.name}` : "This is the final class for this level."}
+            {nextClass
+              ? `Next Class: ${nextClass.name}${students[0]?.next_session?.session_name ? ` | Session: ${students[0].next_session.session_name}` : ""}`
+              : "This is the final class for this level."}
           </p>
 
           {loadingStudents ? (
@@ -162,9 +164,11 @@ export default function Promotion() {
                       >
                         {promotingStudentId === row.student_id
                           ? "Promoting..."
-                          : row.can_promote
-                            ? "Promote"
-                            : "Promoted"}
+                          : row.already_promoted
+                            ? "Promoted"
+                            : row.can_promote
+                              ? "Promote"
+                              : "No Next Class"}
                       </button>
                     </td>
                   </tr>
