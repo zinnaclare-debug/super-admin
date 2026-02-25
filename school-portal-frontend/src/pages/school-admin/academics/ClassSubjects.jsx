@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 
+const BULK_SUBJECT_ROWS = 20;
+const createEmptyBulkRows = () =>
+  Array.from({ length: BULK_SUBJECT_ROWS }, () => ({ name: "", code: "" }));
+
 export default function ClassSubjects() {
   const { classId } = useParams();
   const navigate = useNavigate();
@@ -13,8 +17,7 @@ export default function ClassSubjects() {
   const [loading, setLoading] = useState(true);
 
   // create modal-ish section
-  const [newSubjectName, setNewSubjectName] = useState("");
-  const [newSubjectCode, setNewSubjectCode] = useState("");
+  const [bulkSubjects, setBulkSubjects] = useState(createEmptyBulkRows);
   const [creating, setCreating] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [editSubjectName, setEditSubjectName] = useState("");
@@ -56,17 +59,33 @@ export default function ClassSubjects() {
     return terms.find(t => t.id === selectedTermId)?.name || "Term";
   }, [terms, selectedTermId]);
 
+  const updateBulkSubject = (index, field, value) => {
+    setBulkSubjects((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
+
   const createSubject = async () => {
-    if (!newSubjectName.trim()) return alert("Enter subject name");
+    const payloadSubjects = bulkSubjects
+      .map((row) => ({
+        name: String(row.name || "").trim(),
+        code: String(row.code || "").trim(),
+      }))
+      .filter((row) => row.name !== "")
+      .map((row) => ({
+        name: row.name,
+        code: row.code || null,
+      }));
+
+    if (payloadSubjects.length === 0) return alert("Enter at least one subject name");
 
     setCreating(true);
     try {
       const res = await api.post(`/api/school-admin/classes/${classId}/subjects`, {
-        subjects: [{ name: newSubjectName, code: newSubjectCode || null }],
+        subjects: payloadSubjects,
       });
 
-      setNewSubjectName("");
-      setNewSubjectCode("");
+      setBulkSubjects(createEmptyBulkRows());
       await loadSubjects(selectedTermId);
       alert(res.data?.message || "Subject saved!");
     } catch (e) {
@@ -179,25 +198,35 @@ export default function ClassSubjects() {
       {/* create subject */}
       <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 14, borderRadius: 10 }}>
         <h4 style={{ marginTop: 0 }}>Create Subject (Applies to whole session)</h4>
+        <p style={{ marginTop: 0, opacity: 0.75, fontSize: 13 }}>
+          Fill up to 20 subjects at once. Leave unused rows blank.
+        </p>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
-            value={newSubjectName}
-            onChange={(e) => setNewSubjectName(e.target.value)}
-            placeholder="Subject name e.g. Mathematics"
-            style={{ padding: 10, width: 280 }}
-          />
-          <input
-            value={newSubjectCode}
-            onChange={(e) => setNewSubjectCode(e.target.value)}
-            placeholder="Code (optional)"
-            style={{ padding: 10, width: 180 }}
-          />
+        <div style={{ display: "grid", gap: 8 }}>
+          {bulkSubjects.map((row, idx) => (
+            <div key={`bulk-subject-row-${idx}`} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <input
+                value={row.name}
+                onChange={(e) => updateBulkSubject(idx, "name", e.target.value)}
+                placeholder={`Subject ${idx + 1} name`}
+                style={{ padding: 10, width: 320 }}
+              />
+              <input
+                value={row.code}
+                onChange={(e) => updateBulkSubject(idx, "code", e.target.value)}
+                placeholder="Short code (optional)"
+                style={{ padding: 10, width: 180 }}
+              />
+            </div>
+          ))}
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
           <button onClick={createSubject} disabled={creating}>
-            {creating ? 'Saving...' : 'Save Subject'}
+            {creating ? "Saving..." : "Save Subjects"}
+          </button>
+          <button type="button" onClick={() => setBulkSubjects(createEmptyBulkRows())} disabled={creating}>
+            Clear All
           </button>
         </div>
       </div>
