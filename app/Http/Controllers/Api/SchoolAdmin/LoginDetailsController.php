@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\School;
 use App\Models\User;
 use App\Support\UserCredentialStore;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class LoginDetailsController extends Controller
 {
@@ -19,13 +23,15 @@ class LoginDetailsController extends Controller
             'role' => ['nullable', Rule::in(['student', 'staff'])],
             'level' => ['nullable', 'string', 'max:60'],
             'department' => ['nullable', 'string', 'max:80'],
+            'class_id' => ['nullable', 'integer'],
         ]);
 
         $result = $this->buildRows(
             $schoolId,
             $payload['role'] ?? null,
             $payload['level'] ?? null,
-            $payload['department'] ?? null
+            $payload['department'] ?? null,
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null
         );
 
         return response()->json([
@@ -41,13 +47,15 @@ class LoginDetailsController extends Controller
             'role' => ['nullable', Rule::in(['student', 'staff'])],
             'level' => ['nullable', 'string', 'max:60'],
             'department' => ['nullable', 'string', 'max:80'],
+            'class_id' => ['nullable', 'integer'],
         ]);
 
         $result = $this->buildRows(
             $schoolId,
             $payload['role'] ?? null,
             $payload['level'] ?? null,
-            $payload['department'] ?? null
+            $payload['department'] ?? null,
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null
         );
         $rows = $result['rows'];
         $lines = [];
@@ -56,6 +64,7 @@ class LoginDetailsController extends Controller
             'Name',
             'Role',
             'Education Level',
+            'Class',
             'Department',
             'Username',
             'Email',
@@ -69,6 +78,7 @@ class LoginDetailsController extends Controller
                 $row['name'],
                 $row['role'],
                 $row['level'],
+                $row['class_name'],
                 $row['department'],
                 $row['username'],
                 $row['email'],
@@ -85,11 +95,74 @@ class LoginDetailsController extends Controller
         ]);
     }
 
+    public function downloadPdf(Request $request)
+    {
+        $schoolId = (int) $request->user()->school_id;
+        $payload = $request->validate([
+            'role' => ['nullable', Rule::in(['student', 'staff'])],
+            'level' => ['nullable', 'string', 'max:60'],
+            'department' => ['nullable', 'string', 'max:80'],
+            'class_id' => ['nullable', 'integer'],
+        ]);
+
+        $result = $this->buildRows(
+            $schoolId,
+            $payload['role'] ?? null,
+            $payload['level'] ?? null,
+            $payload['department'] ?? null,
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null
+        );
+        $rows = $result['rows'] ?? [];
+        $school = School::query()->find($schoolId);
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.user_login_details', [
+                'school' => $school,
+                'rows' => $rows,
+                'filters' => $result['meta']['selected'] ?? [],
+                'generatedAt' => now(),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+
+            $fileName = 'user_login_details_' . now()->format('Ymd_His') . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate PDF download.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function buildRows(
         int $schoolId,
         ?string $role = null,
         ?string $level = null,
-        ?string $department = null
+        ?string $department = null,
+        ?int $classId = null
     ): array
     {
         $hasCredentialTable = Schema::hasTable('user_login_credentials');
@@ -155,6 +228,8 @@ class LoginDetailsController extends Controller
                 ->orderByDesc('enrollments.id')
                 ->select([
                     'enrollments.student_id',
+                    'classes.id as class_id',
+                    'classes.name as class_name',
                     'classes.level as class_level',
                     'class_departments.name as department_name',
                     'enrollments.term_id',
@@ -177,6 +252,8 @@ class LoginDetailsController extends Controller
                 ->map(function ($rows) {
                     $row = $rows->first();
                     return [
+                        'class_id' => !empty($row->class_id) ? (int) $row->class_id : null,
+                        'class_name' => trim((string) ($row->class_name ?? '')),
                         'level' => strtolower(trim((string) ($row->class_level ?? ''))),
                         'department' => trim((string) ($row->department_name ?? '')),
                     ];
@@ -195,12 +272,16 @@ class LoginDetailsController extends Controller
             $userId = (int) $user->id;
 
             $level = '';
+            $classId = null;
+            $className = '';
             $department = '';
             if ((string) $user->role === 'staff') {
                 $level = (string) ($staffLevelByUserId[$userId] ?? '');
             } elseif ((string) $user->role === 'student') {
                 $studentId = (int) ($studentIdByUserId[$userId] ?? 0);
                 $profile = $studentId ? ($studentProfileByStudentId[$studentId] ?? null) : null;
+                $classId = isset($profile['class_id']) ? (int) $profile['class_id'] : null;
+                $className = trim((string) ($profile['class_name'] ?? ''));
                 $level = strtolower(trim((string) ($profile['level'] ?? '')));
                 $department = trim((string) ($profile['department'] ?? ''));
             }
@@ -210,6 +291,8 @@ class LoginDetailsController extends Controller
                 'name' => (string) $user->name,
                 'role' => (string) $user->role,
                 'level' => $level,
+                'class_id' => $classId,
+                'class_name' => $className,
                 'department' => $department,
                 'username' => (string) ($user->username ?? ''),
                 'email' => (string) ($user->email ?? ''),
@@ -220,10 +303,50 @@ class LoginDetailsController extends Controller
 
         $levelFilter = strtolower(trim((string) $level));
         $departmentFilter = strtolower(trim((string) $department));
+        $classFilter = (int) ($classId ?? 0);
+
+        $classOptionsQuery = DB::table('classes')
+            ->where('school_id', $schoolId)
+            ->orderBy('level')
+            ->orderBy('name')
+            ->select(['id', 'name', 'level']);
+
+        if ($currentSessionId) {
+            $classOptionsQuery->where('academic_session_id', (int) $currentSessionId);
+        }
+        if ($levelFilter !== '') {
+            $classOptionsQuery->where('level', $levelFilter);
+        }
+
+        $classOptions = $classOptionsQuery
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id' => (int) $row->id,
+                    'name' => trim((string) ($row->name ?? '')),
+                    'level' => strtolower(trim((string) ($row->level ?? ''))),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $validClassId = null;
+        if ($classFilter > 0) {
+            foreach ($classOptions as $item) {
+                if ((int) ($item['id'] ?? 0) === $classFilter) {
+                    $validClassId = $classFilter;
+                    break;
+                }
+            }
+        }
 
         $filteredRows = $rawRows
-            ->filter(function (array $row) use ($levelFilter, $departmentFilter) {
+            ->filter(function (array $row) use ($levelFilter, $departmentFilter, $validClassId) {
                 if ($levelFilter !== '' && strtolower((string) ($row['level'] ?? '')) !== $levelFilter) {
+                    return false;
+                }
+
+                if ($validClassId !== null && (int) ($row['class_id'] ?? 0) !== $validClassId) {
                     return false;
                 }
 
@@ -260,10 +383,12 @@ class LoginDetailsController extends Controller
             'rows' => $filteredRows,
             'meta' => [
                 'levels' => $levels,
+                'classes' => $classOptions,
                 'departments' => $departments,
                 'selected' => [
                     'role' => $role,
                     'level' => $levelFilter !== '' ? $levelFilter : null,
+                    'class_id' => $validClassId,
                     'department' => $departmentFilter !== '' ? $departmentFilter : null,
                 ],
             ],

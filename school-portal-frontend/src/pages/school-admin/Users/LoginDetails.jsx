@@ -17,10 +17,13 @@ export default function LoginDetails() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [role, setRole] = useState("");
   const [level, setLevel] = useState("");
+  const [classId, setClassId] = useState("");
   const [department, setDepartment] = useState("");
   const [levels, setLevels] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
 
@@ -30,6 +33,7 @@ export default function LoginDetails() {
       const params = {};
       if (role) params.role = role;
       if (level) params.level = level;
+      if (classId) params.class_id = classId;
       if (department) params.department = department;
 
       const res = await api.get("/api/school-admin/users/login-details", {
@@ -37,11 +41,13 @@ export default function LoginDetails() {
       });
       setRows(Array.isArray(res.data?.data) ? res.data.data : []);
       setLevels(Array.isArray(res.data?.meta?.levels) ? res.data.meta.levels : []);
+      setClasses(Array.isArray(res.data?.meta?.classes) ? res.data.meta.classes : []);
       setDepartments(Array.isArray(res.data?.meta?.departments) ? res.data.meta.departments : []);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load login details.");
       setRows([]);
       setLevels([]);
+      setClasses([]);
       setDepartments([]);
     } finally {
       setLoading(false);
@@ -51,7 +57,15 @@ export default function LoginDetails() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, level, department]);
+  }, [role, level, classId, department]);
+
+  useEffect(() => {
+    if (!classId) return;
+    const exists = classes.some((item) => String(item?.id) === String(classId));
+    if (!exists) {
+      setClassId("");
+    }
+  }, [classId, classes]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -70,6 +84,7 @@ export default function LoginDetails() {
       const params = {};
       if (role) params.role = role;
       if (level) params.level = level;
+      if (classId) params.class_id = classId;
       if (department) params.department = department;
 
       const res = await api.get("/api/school-admin/users/login-details/download", {
@@ -93,6 +108,36 @@ export default function LoginDetails() {
     }
   };
 
+  const downloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const params = {};
+      if (role) params.role = role;
+      if (level) params.level = level;
+      if (classId) params.class_id = classId;
+      if (department) params.department = department;
+
+      const res = await api.get("/api/school-admin/users/login-details/download/pdf", {
+        params,
+        responseType: "blob",
+      });
+
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, "user_login_details.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download login details PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -107,6 +152,14 @@ export default function LoginDetails() {
           {levels.map((value) => (
             <option key={value} value={value}>
               {prettyLevel(value)}
+            </option>
+          ))}
+        </select>
+        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ padding: 8 }}>
+          <option value="">All classes</option>
+          {classes.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
             </option>
           ))}
         </select>
@@ -125,7 +178,10 @@ export default function LoginDetails() {
           style={{ padding: 8, width: 320 }}
         />
         <button onClick={download} disabled={downloading}>
-          {downloading ? "Downloading..." : "Download CSV"}
+          {downloading ? "Downloading..." : "Download Excel (CSV)"}
+        </button>
+        <button onClick={downloadPdf} disabled={downloadingPdf}>
+          {downloadingPdf ? "Downloading..." : "Download PDF"}
         </button>
       </div>
 
@@ -143,6 +199,7 @@ export default function LoginDetails() {
               <th>Name</th>
               <th>Role</th>
               <th>Education Level</th>
+              <th>Class</th>
               <th>Department</th>
               <th>Username</th>
               <th>Email</th>
@@ -157,6 +214,7 @@ export default function LoginDetails() {
                 <td>{row.name || "-"}</td>
                 <td>{row.role || "-"}</td>
                 <td>{prettyLevel(row.level || "") || "-"}</td>
+                <td>{row.class_name || "-"}</td>
                 <td>{row.department || "-"}</td>
                 <td>{row.username || "-"}</td>
                 <td>{row.email || "-"}</td>
@@ -166,7 +224,7 @@ export default function LoginDetails() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="9" style={{ textAlign: "center", opacity: 0.7 }}>
+                <td colSpan="10" style={{ textAlign: "center", opacity: 0.7 }}>
                   No login details found.
                 </td>
               </tr>

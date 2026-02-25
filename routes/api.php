@@ -154,6 +154,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:users');
     Route::get('/school-admin/users/login-details/download', [LoginDetailsController::class, 'download'])
         ->middleware('feature:users');
+    Route::get('/school-admin/users/login-details/download/pdf', [LoginDetailsController::class, 'downloadPdf'])
+        ->middleware('feature:users');
 
     Route::get('/school-admin/users/{user}', [UserManagementController::class, 'show'])
         ->middleware('feature:users');
