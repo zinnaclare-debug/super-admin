@@ -28,7 +28,7 @@
         .school-wrap { text-align: center; }
         .school-wrap h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; }
         .school-wrap p { margin: 3px 0 0; font-size: 10px; }
-        .term-title {
+        .session-title {
             margin-top: 10px;
             border: 1px solid #111;
             border-bottom: 0;
@@ -38,14 +38,24 @@
             padding: 5px 6px;
             letter-spacing: 0.4px;
         }
-        .grade-box td, .grade-box th { text-align: center; }
+        .term-panels { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .term-panels td { border: 0; padding: 0 4px; vertical-align: top; }
+        .term-card { border: 1px solid #111; }
+        .term-card-title {
+            padding: 4px 6px;
+            border-bottom: 1px solid #111;
+            text-align: center;
+            font-weight: 700;
+            background: #f8fafc;
+        }
+        .term-card table { margin-top: 0; }
+        .term-gap { height: 12px; }
         .grade-key { margin-top: 10px; border: 1px solid #111; padding: 5px 6px; font-size: 8px; }
         .ratings-grid { margin-top: 6px; width: 100%; }
         .ratings-grid td { border: 0; padding: 0; vertical-align: top; }
         .signature-box { margin-top: 8px; border: 1px solid #111; padding: 6px; min-height: 58px; }
         .signature { width: 120px; height: 44px; object-fit: contain; border-bottom: 1px dashed #6b7280; }
         .signature-placeholder { width: 120px; height: 44px; border-bottom: 1px dashed #6b7280; }
-        .term-gap { height: 12px; }
     </style>
 </head>
 <body>
@@ -96,79 +106,55 @@
             </tr>
         </table>
 
-        @foreach($entries as $entry)
+        @foreach((array) ($groups ?? []) as $group)
             @php
-                $rows = (array) ($entry['rows'] ?? []);
-                $gradedRows = array_values(array_filter($rows, fn($r) => !empty($r['has_result'])));
-                $termName = strtoupper((string) data_get($entry, 'term.name', '-'));
-                $className = strtoupper((string) data_get($entry, 'class.name', '-'));
-                $sessionName = strtoupper((string) (data_get($entry, 'session.academic_year') ?: data_get($entry, 'session.session_name', '-')));
-                $totalScore = (int) data_get($entry, 'summary.total_score', 0);
-                $averageScore = number_format((float) data_get($entry, 'summary.average_score', 0), 2);
-                $overallGrade = strtoupper((string) data_get($entry, 'summary.overall_grade', '-'));
+                $sessionName = strtoupper((string) (data_get($group, 'session.academic_year') ?: data_get($group, 'session.session_name', '-')));
+                $className = strtoupper((string) data_get($group, 'class.name', '-'));
+                $termPanels = (array) ($group['terms'] ?? []);
             @endphp
 
-            @if(!empty($gradedRows))
-                <div class="term-title">TRANSCRIPT FOR {{ $termName }}</div>
-                <table>
-                    <tr>
-                        <th style="width: 18%;">SESSION</th>
-                        <td style="width: 32%;">{{ $sessionName }}</td>
-                        <th style="width: 18%;">CLASS</th>
-                        <td style="width: 32%;">{{ $className }}</td>
-                    </tr>
-                </table>
+            <div class="session-title">
+                SESSION: {{ $sessionName }} | CLASS: {{ $className }}
+            </div>
 
-                <table>
-                    <thead>
-                    <tr>
-                        <th style="width: 24%;">SUBJECT</th>
-                        <th style="width: 8%;" class="center">CA</th>
-                        <th style="width: 8%;" class="center">EXAM</th>
-                        <th style="width: 8%;" class="center">TOTAL</th>
-                        <th style="width: 8%;" class="center">MIN</th>
-                        <th style="width: 8%;" class="center">MAX</th>
-                        <th style="width: 10%;" class="center">CLASS AVE</th>
-                        <th style="width: 8%;" class="center">POS</th>
-                        <th style="width: 8%;" class="center">GRADE</th>
-                        <th style="width: 18%;" class="center">REMARK</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @foreach($rows as $row)
-                        @php $hasResult = (bool) ($row['has_result'] ?? false); @endphp
-                        <tr>
-                            <td>{{ strtoupper((string) ($row['subject_name'] ?? '-')) }}</td>
-                            <td class="center">{{ $hasResult ? (int) ($row['ca'] ?? 0) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? (int) ($row['exam'] ?? 0) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? (int) ($row['total'] ?? 0) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? (int) ($row['min_score'] ?? 0) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? (int) ($row['max_score'] ?? 0) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? number_format((float) ($row['class_average'] ?? 0), 2) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? ($row['position_label'] ?? '-') : '-' }}</td>
-                            <td class="center">{{ $hasResult ? strtoupper((string) ($row['grade'] ?? '-')) : '-' }}</td>
-                            <td class="center">{{ $hasResult ? strtoupper((string) ($row['remark'] ?? '-')) : '-' }}</td>
-                        </tr>
+            <table class="term-panels">
+                <tr>
+                    @foreach($termPanels as $termPanel)
+                        <td>
+                            <div class="term-card">
+                                <div class="term-card-title">{{ strtoupper((string) ($termPanel['name'] ?? '-')) }}</div>
+                                <table>
+                                    <thead>
+                                    <tr>
+                                        <th style="width: 46%;">SUBJECT</th>
+                                        <th style="width: 16%;" class="center">TOTAL</th>
+                                        <th style="width: 22%;" class="center">ANNUAL AVG</th>
+                                        <th style="width: 16%;" class="center">GRADE</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    @forelse((array) ($termPanel['rows'] ?? []) as $row)
+                                        <tr>
+                                            <td>{{ strtoupper((string) ($row['subject_name'] ?? '-')) }}</td>
+                                            <td class="center">{{ $row['total'] === null ? '-' : (int) $row['total'] }}</td>
+                                            <td class="center">{{ $row['annual_average'] === null ? '-' : number_format((float) $row['annual_average'], 2) }}</td>
+                                            <td class="center">{{ strtoupper((string) ($row['grade'] ?? '-')) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="center">No graded result.</td>
+                                        </tr>
+                                    @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
                     @endforeach
-                    </tbody>
-                </table>
+                </tr>
+            </table>
 
-                <table class="grade-box" style="margin-top: 5px;">
-                    <tr>
-                        <th style="width: 33%;">TOTAL SCORE</th>
-                        <th style="width: 33%;">AVERAGE SCORE</th>
-                        <th style="width: 34%;">OVERALL GRADE</th>
-                    </tr>
-                    <tr>
-                        <td>{{ $totalScore }}</td>
-                        <td>{{ $averageScore }}</td>
-                        <td>{{ $overallGrade }}</td>
-                    </tr>
-                </table>
-
-                @if(!$loop->last)
-                    <div class="term-gap"></div>
-                @endif
+            @if(!$loop->last)
+                <div class="term-gap"></div>
             @endif
         @endforeach
 
@@ -251,3 +237,4 @@
 </div>
 </body>
 </html>
+

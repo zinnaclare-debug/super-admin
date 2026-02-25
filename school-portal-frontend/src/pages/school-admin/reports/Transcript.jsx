@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import api from "../../../services/api";
 import "./Transcript.css";
 
@@ -24,6 +24,96 @@ async function messageFromBlobError(blob, fallback) {
   }
 }
 
+function gradeFromAverage(avg) {
+  if (avg >= 70) return "A";
+  if (avg >= 60) return "B";
+  if (avg >= 50) return "C";
+  if (avg >= 40) return "D";
+  if (avg >= 30) return "E";
+  return "F";
+}
+
+function termSlot(termName) {
+  const name = String(termName || "").toLowerCase();
+  if (name.includes("first") || /\b1(st)?\b/.test(name)) return "first";
+  if (name.includes("second") || /\b2(nd)?\b/.test(name)) return "second";
+  if (name.includes("third") || /\b3(rd)?\b/.test(name)) return "third";
+  return null;
+}
+
+function groupTermEntries(entries) {
+  if ((entries || []).length > 0 && Array.isArray(entries[0]?.terms) && !entries[0]?.term) {
+    return entries;
+  }
+
+  const map = new Map();
+
+  (entries || []).forEach((entry) => {
+    const sessionId = Number(entry?.session?.id || 0);
+    const classId = Number(entry?.class?.id || 0);
+    const key = `${sessionId}|${classId}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        session: entry?.session || {},
+        class: entry?.class || {},
+        subjects: new Map(),
+      });
+    }
+
+    const slot = termSlot(entry?.term?.name);
+    if (!slot) return;
+
+    (entry?.rows || []).forEach((row) => {
+      if (!row?.has_result) return;
+      const subjectName = String(row?.subject_name || "").trim();
+      if (!subjectName) return;
+      const subjectKey = `${subjectName.toLowerCase()}|${String(row?.subject_code || "").toLowerCase()}`;
+
+      const group = map.get(key);
+      if (!group.subjects.has(subjectKey)) {
+        group.subjects.set(subjectKey, {
+          subject_name: subjectName,
+          totals: { first: null, second: null, third: null },
+        });
+      }
+
+      group.subjects.get(subjectKey).totals[slot] = Number(row?.total ?? 0);
+    });
+  });
+
+  return Array.from(map.values()).map((group) => {
+    const subjects = Array.from(group.subjects.values()).sort((a, b) =>
+      String(a.subject_name || "").localeCompare(String(b.subject_name || ""), undefined, { sensitivity: "base" })
+    );
+
+    const termRows = { first: [], second: [], third: [] };
+    subjects.forEach((subject) => {
+      const values = [subject.totals.first, subject.totals.second, subject.totals.third].filter((v) => v !== null);
+      const annualAverage = values.length ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null;
+      const annualGrade = annualAverage === null ? "-" : gradeFromAverage(Math.round(annualAverage));
+
+      ["first", "second", "third"].forEach((slot) => {
+        termRows[slot].push({
+          subject_name: subject.subject_name,
+          total: subject.totals[slot],
+          annual_average: annualAverage,
+          grade: annualGrade,
+        });
+      });
+    });
+
+    return {
+      session: group.session,
+      class: group.class,
+      terms: [
+        { slot: "first", name: "First Term", rows: termRows.first },
+        { slot: "second", name: "Second Term", rows: termRows.second },
+        { slot: "third", name: "Third Term", rows: termRows.third },
+      ],
+    };
+  });
+}
+
 export default function Transcript() {
   const [email, setEmail] = useState("");
   const [entries, setEntries] = useState([]);
@@ -34,6 +124,7 @@ export default function Transcript() {
   const [message, setMessage] = useState("");
 
   const canSearch = email.trim().length > 0;
+  const groupedEntries = useMemo(() => groupTermEntries(entries), [entries]);
 
   const requestParams = () => ({
     email: email.trim(),
@@ -136,59 +227,52 @@ export default function Transcript() {
             <strong>Student:</strong> {context.student.name} ({context.student.email})
           </p>
           <p>
-            <strong>Total Results:</strong> {Number(context.entries_count || entries.length || 0)}
+            <strong>Total Sessions:</strong> {Number(context.entries_count || groupedEntries.length || 0)}
           </p>
         </div>
       ) : null}
 
-      {entries.map((entry) => (
-        <div className="transcript-entry" key={`${entry.session?.id || "s"}-${entry.class?.id || "c"}-${entry.term?.id || "t"}`}>
+      {groupedEntries.map((group, groupIndex) => (
+        <div className="transcript-entry" key={`${group.session?.id || "s"}-${group.class?.id || "c"}-${groupIndex}`}>
           <div className="transcript-entry-head">
-            <h3>{entry.term?.name || "Term Result"}</h3>
-            <p>
-              {entry.class?.name || "-"} | {entry.session?.academic_year || entry.session?.session_name || "-"} | Average:{" "}
-              {Number(entry.summary?.average_score || 0).toFixed(2)} | Grade: {entry.summary?.overall_grade || "-"}
-            </p>
+            <h3>
+              {group.session?.academic_year || group.session?.session_name || "-"} | {group.class?.name || "-"}
+            </h3>
           </div>
 
-          <div className="transcript-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>CA</th>
-                  <th>Exam</th>
-                  <th>Total</th>
-                  <th>Min</th>
-                  <th>Max</th>
-                  <th>Class Ave</th>
-                  <th>Position</th>
-                  <th>Grade</th>
-                  <th>Remark</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(entry.rows || []).map((row) => (
-                  <tr key={row.term_subject_id}>
-                    <td>{row.subject_name}</td>
-                    <td>{row.ca}</td>
-                    <td>{row.exam}</td>
-                    <td>{row.total}</td>
-                    <td>{row.min_score}</td>
-                    <td>{row.max_score}</td>
-                    <td>{Number(row.class_average || 0).toFixed(2)}</td>
-                    <td>{row.position_label || "-"}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.remark}</td>
-                  </tr>
-                ))}
-                {(entry.rows || []).length === 0 ? (
-                  <tr>
-                    <td colSpan="10">No records found for this term.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <div className="transcript-terms-grid">
+            {(group.terms || []).map((term) => (
+              <div className="transcript-term-card" key={`${groupIndex}-${term.slot}`}>
+                <div className="transcript-term-title">{term.name}</div>
+                <div className="transcript-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Total</th>
+                        <th>Annual Average</th>
+                        <th>Grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(term.rows || []).map((row, idx) => (
+                        <tr key={`${term.slot}-${idx}-${row.subject_name}`}>
+                          <td>{row.subject_name}</td>
+                          <td>{row.total === null ? "-" : row.total}</td>
+                          <td>{row.annual_average === null ? "-" : Number(row.annual_average).toFixed(2)}</td>
+                          <td>{row.grade}</td>
+                        </tr>
+                      ))}
+                      {(term.rows || []).length === 0 ? (
+                        <tr>
+                          <td colSpan="4">No graded records.</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}

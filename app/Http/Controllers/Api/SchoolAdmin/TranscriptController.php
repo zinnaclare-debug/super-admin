@@ -92,13 +92,15 @@ class TranscriptController extends Controller
             ]);
         }
 
-        $data = array_map(function (array $entry) {
+        $termEntries = array_map(function (array $entry) {
             unset($entry['view_data']);
             return $entry;
         }, $entries);
+        $groupedEntries = $this->groupEntriesBySessionClass($termEntries);
 
         return response()->json([
-            'data' => $data,
+            'data' => $groupedEntries,
+            'term_entries' => $termEntries,
             'context' => [
                 'student' => [
                     'id' => (int) $studentUser->id,
@@ -106,7 +108,7 @@ class TranscriptController extends Controller
                     'email' => $studentUser->email,
                     'username' => $studentUser->username,
                 ],
-                'entries_count' => count($data),
+                'entries_count' => count($groupedEntries),
             ],
         ]);
     }
@@ -257,11 +259,15 @@ class TranscriptController extends Controller
     private function renderTranscriptPdfFromEntries(array $entries): string
     {
         $entries = array_values($entries);
+        $groups = $this->groupEntriesBySessionClass(array_map(function (array $entry) {
+            unset($entry['view_data']);
+            return $entry;
+        }, $entries));
         $firstViewData = $entries[0]['view_data'] ?? [];
         $lastViewData = $entries[count($entries) - 1]['view_data'] ?? $firstViewData;
 
         $html = view('pdf.transcript_sheet', [
-            'entries' => $entries,
+            'groups' => $groups,
             'school' => $firstViewData['school'] ?? null,
             'student' => $firstViewData['student'] ?? null,
             'studentUser' => $firstViewData['studentUser'] ?? null,
@@ -298,69 +304,64 @@ class TranscriptController extends Controller
 
     private function renderSimpleTranscriptPdfFromEntries(array $entries): string
     {
-        $pages = [];
-        $count = count($entries);
-        foreach ($entries as $index => $entry) {
-            $viewData = $entry['view_data'] ?? [];
-            $schoolName = strtoupper((string) data_get($viewData, 'school.name', 'SCHOOL'));
-            $schoolLocation = strtoupper((string) data_get($viewData, 'school.location', ''));
-            $studentName = strtoupper((string) data_get($viewData, 'studentUser.name', '-'));
-            $studentSerial = strtoupper((string) data_get($viewData, 'studentUser.username', '-'));
-            $className = strtoupper((string) data_get($viewData, 'class.name', '-'));
-            $termName = strtoupper((string) data_get($viewData, 'term.name', '-'));
-            $sessionName = strtoupper((string) (data_get($viewData, 'session.academic_year') ?: data_get($viewData, 'session.session_name', '-')));
-            $teacherComment = strtoupper((string) data_get($viewData, 'teacherComment', '-'));
-            $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
-            $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
-            $total = (int) data_get($viewData, 'totalScore', 0);
-            $rows = (array) data_get($viewData, 'rows', []);
+        $entries = array_values($entries);
+        $groups = $this->groupEntriesBySessionClass(array_map(function (array $entry) {
+            unset($entry['view_data']);
+            return $entry;
+        }, $entries));
 
-            $rowsHtml = '';
-            foreach ($rows as $row) {
-                $subject = strtoupper((string) ($row['subject_name'] ?? '-'));
-                $ca = (int) ($row['ca'] ?? 0);
-                $exam = (int) ($row['exam'] ?? 0);
-                $score = (int) ($row['total'] ?? 0);
-                $grade = strtoupper((string) ($row['grade'] ?? '-'));
-                $remark = strtoupper((string) ($row['remark'] ?? '-'));
+        $firstViewData = $entries[0]['view_data'] ?? [];
+        $lastViewData = $entries[count($entries) - 1]['view_data'] ?? $firstViewData;
+        $schoolName = strtoupper((string) data_get($firstViewData, 'school.name', 'SCHOOL'));
+        $schoolLocation = strtoupper((string) data_get($firstViewData, 'school.location', ''));
+        $studentName = strtoupper((string) data_get($firstViewData, 'studentUser.name', '-'));
+        $studentSerial = strtoupper((string) data_get($firstViewData, 'studentUser.username', '-'));
+        $teacherComment = strtoupper((string) data_get($lastViewData, 'teacherComment', '-'));
+        $headComment = strtoupper((string) data_get($lastViewData, 'schoolHeadComment', '-'));
+        $headName = strtoupper((string) data_get($firstViewData, 'school.head_of_school_name', '-'));
 
-                $rowsHtml .= '<tr>'
-                    . '<td>' . e($subject) . '</td>'
-                    . '<td style="text-align:center;">' . $ca . '</td>'
-                    . '<td style="text-align:center;">' . $exam . '</td>'
-                    . '<td style="text-align:center;">' . $score . '</td>'
-                    . '<td style="text-align:center;">' . e($grade) . '</td>'
-                    . '<td>' . e($remark) . '</td>'
-                    . '</tr>';
+        $groupBlocks = [];
+        foreach ($groups as $group) {
+            $sessionName = strtoupper((string) (data_get($group, 'session.academic_year') ?: data_get($group, 'session.session_name', '-')));
+            $className = strtoupper((string) data_get($group, 'class.name', '-'));
+
+            $termCells = [];
+            foreach ((array) ($group['terms'] ?? []) as $termPanel) {
+                $panelRowsHtml = '';
+                foreach ((array) ($termPanel['rows'] ?? []) as $row) {
+                    $panelRowsHtml .= '<tr>'
+                        . '<td>' . e(strtoupper((string) ($row['subject_name'] ?? '-'))) . '</td>'
+                        . '<td style="text-align:center;">' . ($row['total'] === null ? '-' : (int) $row['total']) . '</td>'
+                        . '<td style="text-align:center;">' . ($row['annual_average'] === null ? '-' : number_format((float) $row['annual_average'], 2)) . '</td>'
+                        . '<td style="text-align:center;">' . e(strtoupper((string) ($row['grade'] ?? '-'))) . '</td>'
+                        . '</tr>';
+                }
+
+                if ($panelRowsHtml === '') {
+                    $panelRowsHtml = '<tr><td colspan="4" style="text-align:center;">No graded result.</td></tr>';
+                }
+
+                $termCells[] = '<td style="width:33.33%; vertical-align:top; border:0; padding:0 4px;">'
+                    . '<div style="border:1px solid #222;">'
+                    . '<div style="padding:4px 6px; border-bottom:1px solid #222; font-weight:700; text-align:center;">'
+                    . e(strtoupper((string) ($termPanel['name'] ?? '-')))
+                    . '</div>'
+                    . '<table style="width:100%; border-collapse:collapse; margin-top:0;">'
+                    . '<thead><tr><th style="width:46%;">SUBJECT</th><th style="width:16%; text-align:center;">TOTAL</th><th style="width:22%; text-align:center;">ANNUAL AVG</th><th style="width:16%; text-align:center;">GRADE</th></tr></thead>'
+                    . '<tbody>' . $panelRowsHtml . '</tbody>'
+                    . '</table>'
+                    . '</div>'
+                    . '</td>';
             }
 
-            if ($rowsHtml === '') {
-                $rowsHtml = '<tr><td colspan="6" style="text-align:center;">No result data found.</td></tr>';
-            }
-
-            $pageHtml = '<div class="page">'
-                . '<h1>' . e($schoolName) . '</h1>'
-                . '<h2>' . e($schoolLocation) . '</h2>'
-                . '<h3>TRANSCRIPT FOR ' . e($termName) . ' - ' . e($sessionName) . '</h3>'
-                . '<table class="meta">'
-                . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
-                . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
-                . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
-                . '</table>'
-                . '<table>'
-                . '<thead><tr><th style="width:35%;">Subject</th><th style="width:10%;">CA</th><th style="width:10%;">Exam</th><th style="width:10%;">Total</th><th style="width:10%;">Grade</th><th style="width:25%;">Remark</th></tr></thead>'
-                . '<tbody>' . $rowsHtml . '</tbody>'
-                . '</table>'
-                . '<table class="meta">'
-                . '<tr><th style="width:24%;">School Head Comment</th><td>' . e($headComment) . '</td></tr>'
-                . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
-                . '</table>'
+            $groupBlocks[] = '<div style="margin-top:10px;">'
+                . '<div style="border:1px solid #222; border-bottom:0; padding:5px 6px; font-weight:700; text-align:center;">'
+                . 'SESSION: ' . e($sessionName) . ' | CLASS: ' . e($className)
+                . '</div>'
+                . '<table style="width:100%; border-collapse:collapse; margin-top:0;"><tr>'
+                . implode('', $termCells)
+                . '</tr></table>'
                 . '</div>';
-
-            $pages[] = $pageHtml;
-            if ($index < $count - 1) {
-                $pages[] = '<div style="height: 26px;"></div>';
-            }
         }
 
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Transcript</title>'
@@ -368,13 +369,22 @@ class TranscriptController extends Controller
             . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;color:#111;}'
             . 'h1{margin:0;font-size:18px;text-align:center;}'
             . 'h2{margin:4px 0 8px 0;font-size:12px;text-align:center;}'
-            . 'h3{margin:0 0 8px 0;font-size:11px;text-align:center;font-weight:600;}'
             . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
             . 'th,td{border:1px solid #222;padding:4px;}'
             . 'th{background:#f3f4f6;text-align:left;}'
             . '.meta td,.meta th{font-size:10px;}'
             . '</style></head><body>'
-            . implode("\n", $pages)
+            . '<h1>' . e($schoolName) . '</h1>'
+            . '<h2>' . e($schoolLocation) . '</h2>'
+            . '<table class="meta">'
+            . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
+            . '</table>'
+            . implode("\n", $groupBlocks)
+            . '<table class="meta" style="margin-top:10px;">'
+            . '<tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
+            . '<tr><th style="width:24%;">School Head Comment</th><td>' . e($headComment) . '</td></tr>'
+            . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
+            . '</table>'
             . '</body></html>';
 
         $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
@@ -919,6 +929,107 @@ class TranscriptController extends Controller
 
             return false;
         }));
+    }
+
+    private function groupEntriesBySessionClass(array $entries): array
+    {
+        $groups = [];
+        $orderedTermSlots = ['first', 'second', 'third'];
+
+        foreach ($entries as $entry) {
+            $sessionId = (int) data_get($entry, 'session.id', 0);
+            $classId = (int) data_get($entry, 'class.id', 0);
+            $groupKey = $sessionId . '|' . $classId;
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'session' => (array) ($entry['session'] ?? []),
+                    'class' => (array) ($entry['class'] ?? []),
+                    'subjects' => [],
+                ];
+            }
+
+            $termName = (string) data_get($entry, 'term.name', '');
+            $termRank = $this->termSortRank($termName);
+            $termSlot = match ($termRank) {
+                1 => 'first',
+                2 => 'second',
+                3 => 'third',
+                default => null,
+            };
+
+            if ($termSlot === null) {
+                continue;
+            }
+
+            foreach ((array) ($entry['rows'] ?? []) as $row) {
+                if (empty($row['has_result'])) {
+                    continue;
+                }
+
+                $subjectName = trim((string) ($row['subject_name'] ?? ''));
+                if ($subjectName === '') {
+                    continue;
+                }
+
+                $subjectKey = strtolower($subjectName) . '|' . strtolower((string) ($row['subject_code'] ?? ''));
+                if (!isset($groups[$groupKey]['subjects'][$subjectKey])) {
+                    $groups[$groupKey]['subjects'][$subjectKey] = [
+                        'subject_name' => $subjectName,
+                        'subject_code' => (string) ($row['subject_code'] ?? ''),
+                        'totals' => ['first' => null, 'second' => null, 'third' => null],
+                    ];
+                }
+
+                $groups[$groupKey]['subjects'][$subjectKey]['totals'][$termSlot] = (int) ($row['total'] ?? 0);
+            }
+        }
+
+        $result = [];
+        foreach ($groups as $group) {
+            $subjects = array_values($group['subjects']);
+            usort($subjects, function (array $a, array $b) {
+                return strcasecmp((string) ($a['subject_name'] ?? ''), (string) ($b['subject_name'] ?? ''));
+            });
+
+            $termRows = ['first' => [], 'second' => [], 'third' => []];
+            foreach ($subjects as $subject) {
+                $totals = (array) ($subject['totals'] ?? []);
+                $scores = array_values(array_filter([
+                    $totals['first'] ?? null,
+                    $totals['second'] ?? null,
+                    $totals['third'] ?? null,
+                ], fn ($v) => $v !== null));
+
+                $annualAverage = !empty($scores)
+                    ? (float) round(array_sum($scores) / count($scores), 2)
+                    : null;
+                $annualGrade = $annualAverage !== null
+                    ? $this->gradeFromTotal((int) round($annualAverage))
+                    : '-';
+
+                foreach ($orderedTermSlots as $slot) {
+                    $termRows[$slot][] = [
+                        'subject_name' => $subject['subject_name'] ?? '-',
+                        'total' => $totals[$slot] ?? null,
+                        'annual_average' => $annualAverage,
+                        'grade' => $annualGrade,
+                    ];
+                }
+            }
+
+            $group['terms'] = [
+                ['slot' => 'first', 'name' => 'First Term', 'rows' => $termRows['first']],
+                ['slot' => 'second', 'name' => 'Second Term', 'rows' => $termRows['second']],
+                ['slot' => 'third', 'name' => 'Third Term', 'rows' => $termRows['third']],
+            ];
+            $group['subjects_count'] = count($subjects);
+            unset($group['subjects']);
+
+            $result[] = $group;
+        }
+
+        return $result;
     }
 
     private function buildSubjectStats(int $schoolId, array $termSubjectIds): array
