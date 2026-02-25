@@ -53,12 +53,14 @@ class ReportsController extends Controller
         return app(StudentResultsController::class)->downloadForSchoolAdmin($request);
     }
 
-    // GET /api/school-admin/reports/broadsheet/options?academic_session_id=1&level=secondary
+    // GET /api/school-admin/reports/broadsheet/options?academic_session_id=1&level=secondary&department=Science&class_id=10
     public function broadsheetOptions(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
         $requestedSessionId = (int) $request->query('academic_session_id', 0);
         $requestedLevel = strtolower(trim((string) $request->query('level', '')));
+        $requestedDepartment = trim((string) $request->query('department', ''));
+        $requestedClassId = (int) $request->query('class_id', 0);
         $sessions = AcademicSession::where('school_id', $schoolId)
             ->orderByDesc('id')
             ->get(['id', 'session_name', 'academic_year', 'status']);
@@ -79,6 +81,8 @@ class ReportsController extends Controller
                     'selected_level' => null,
                     'departments' => [],
                     'selected_department' => null,
+                    'classes' => [],
+                    'selected_class_id' => null,
                 ],
             ]);
         }
@@ -90,6 +94,16 @@ class ReportsController extends Controller
         $departments = $selectedLevel
             ? $this->sessionDepartmentOptions($schoolId, (int) $selectedSession->id, $selectedLevel)
             : [];
+        $selectedDepartment = $this->resolveDepartmentFilter($requestedDepartment, $departments);
+        $classes = $selectedLevel
+            ? $this->sessionClassOptions(
+                $schoolId,
+                (int) $selectedSession->id,
+                $selectedLevel,
+                $selectedDepartment
+            )
+            : [];
+        $selectedClassId = $this->resolveClassFilter($requestedClassId, $classes);
 
         return response()->json([
             'data' => [
@@ -106,18 +120,21 @@ class ReportsController extends Controller
                 'levels' => $levels,
                 'selected_level' => $selectedLevel,
                 'departments' => $departments,
-                'selected_department' => null,
+                'selected_department' => $selectedDepartment,
+                'classes' => $classes,
+                'selected_class_id' => $selectedClassId,
             ],
         ]);
     }
 
-    // GET /api/school-admin/reports/broadsheet?academic_session_id=1&level=secondary&department=Science
+    // GET /api/school-admin/reports/broadsheet?academic_session_id=1&level=secondary&department=Science&class_id=10
     public function broadsheet(Request $request)
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
             'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
+            'class_id' => 'nullable|integer',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -148,7 +165,23 @@ class ReportsController extends Controller
             ], 422);
         }
 
-        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level, $selectedDepartment);
+        $classes = $this->sessionClassOptions($schoolId, (int) $session->id, $level, $selectedDepartment);
+        $selectedClassId = $this->resolveClassFilter((int) ($payload['class_id'] ?? 0), $classes);
+        if (($payload['class_id'] ?? null) && $selectedClassId === null) {
+            return response()->json([
+                'message' => 'Invalid class selected for the chosen filters.',
+            ], 422);
+        }
+
+        $broadsheet = $this->buildBroadsheetData(
+            $schoolId,
+            (int) $session->id,
+            $level,
+            $selectedDepartment,
+            $selectedClassId
+        );
+        $selectedClassName = collect($classes)
+            ->firstWhere('id', $selectedClassId)['name'] ?? null;
 
         return response()->json([
             'data' => $broadsheet,
@@ -163,17 +196,21 @@ class ReportsController extends Controller
                 'levels' => $levels,
                 'departments' => $departments,
                 'selected_department' => $selectedDepartment,
+                'classes' => $classes,
+                'selected_class_id' => $selectedClassId,
+                'selected_class_name' => $selectedClassName,
             ],
         ]);
     }
 
-    // GET /api/school-admin/reports/broadsheet/download?academic_session_id=1&level=secondary&department=Science
+    // GET /api/school-admin/reports/broadsheet/download?academic_session_id=1&level=secondary&department=Science&class_id=10
     public function broadsheetDownload(Request $request)
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
             'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
+            'class_id' => 'nullable|integer',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -204,7 +241,21 @@ class ReportsController extends Controller
             ], 422);
         }
 
-        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level, $selectedDepartment);
+        $classes = $this->sessionClassOptions($schoolId, (int) $session->id, $level, $selectedDepartment);
+        $selectedClassId = $this->resolveClassFilter((int) ($payload['class_id'] ?? 0), $classes);
+        if (($payload['class_id'] ?? null) && $selectedClassId === null) {
+            return response()->json([
+                'message' => 'Invalid class selected for the chosen filters.',
+            ], 422);
+        }
+
+        $broadsheet = $this->buildBroadsheetData(
+            $schoolId,
+            (int) $session->id,
+            $level,
+            $selectedDepartment,
+            $selectedClassId
+        );
         if (empty($broadsheet['subjects']) || empty($broadsheet['rows'])) {
             return response()->json([
                 'message' => 'No broadsheet result data found for the selected filters.',
@@ -213,11 +264,14 @@ class ReportsController extends Controller
 
         try {
             $schoolName = $request->user()?->school?->name ?? 'School';
+            $selectedClassName = collect($classes)
+                ->firstWhere('id', $selectedClassId)['name'] ?? null;
             $html = view('pdf.school_admin_broadsheet', [
                 'schoolName' => $schoolName,
                 'session' => $session,
                 'level' => $level,
                 'department' => $selectedDepartment,
+                'className' => $selectedClassName,
                 'subjects' => $broadsheet['subjects'],
                 'rows' => $broadsheet['rows'],
             ])->render();
@@ -244,9 +298,10 @@ class ReportsController extends Controller
 
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
             $filename = sprintf(
-                'broadsheet_%s%s_%s.pdf',
+                'broadsheet_%s%s%s_%s.pdf',
                 Str::slug($level),
                 $selectedDepartment ? ('_' . Str::slug($selectedDepartment)) : '',
+                $selectedClassName ? ('_' . Str::slug($selectedClassName)) : '',
                 $safeSession
             );
 
@@ -260,6 +315,7 @@ class ReportsController extends Controller
                 'session_id' => $session->id,
                 'level' => $level,
                 'department' => $selectedDepartment,
+                'class_id' => $selectedClassId,
                 'error' => $e->getMessage(),
             ]);
 
@@ -586,13 +642,72 @@ class ReportsController extends Controller
         return null;
     }
 
-    private function buildBroadsheetData(int $schoolId, int $sessionId, string $level, ?string $departmentName = null): array
+    private function sessionClassOptions(
+        int $schoolId,
+        int $sessionId,
+        string $level,
+        ?string $departmentName = null
+    ): array {
+        $query = DB::table('classes')
+            ->where('classes.school_id', $schoolId)
+            ->where('classes.academic_session_id', $sessionId)
+            ->where('classes.level', strtolower($level))
+            ->select(['classes.id', 'classes.name', 'classes.level']);
+
+        if ($departmentName !== null && $departmentName !== '' && Schema::hasTable('class_departments')) {
+            $query
+                ->join('class_departments', function ($join) use ($schoolId, $departmentName) {
+                    $join->on('class_departments.class_id', '=', 'classes.id')
+                        ->where('class_departments.school_id', '=', $schoolId)
+                        ->whereRaw('LOWER(class_departments.name) = ?', [strtolower($departmentName)]);
+                })
+                ->distinct();
+        }
+
+        return $query->get()
+            ->map(function ($row) {
+                return [
+                    'id' => (int) $row->id,
+                    'name' => (string) $row->name,
+                    'level' => strtolower((string) $row->level),
+                ];
+            })
+            ->sortBy(fn ($item) => $this->classOrderIndex((string) $item['name']))
+            ->values()
+            ->all();
+    }
+
+    private function resolveClassFilter(int $requestedClassId, array $classOptions): ?int
     {
-        $classes = DB::table('classes')
+        if ($requestedClassId <= 0) {
+            return null;
+        }
+
+        foreach ($classOptions as $classOption) {
+            if ((int) ($classOption['id'] ?? 0) === $requestedClassId) {
+                return $requestedClassId;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildBroadsheetData(
+        int $schoolId,
+        int $sessionId,
+        string $level,
+        ?string $departmentName = null,
+        ?int $classId = null
+    ): array
+    {
+        $classesQuery = DB::table('classes')
             ->where('school_id', $schoolId)
             ->where('academic_session_id', $sessionId)
-            ->where('level', $level)
-            ->get(['id', 'name', 'level']);
+            ->where('level', $level);
+        if ($classId !== null && $classId > 0) {
+            $classesQuery->where('id', $classId);
+        }
+        $classes = $classesQuery->get(['id', 'name', 'level']);
 
         if ($classes->isEmpty()) {
             return [
