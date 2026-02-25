@@ -28,6 +28,12 @@
         .school-wrap { text-align: center; }
         .school-wrap h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; }
         .school-wrap p { margin: 3px 0 0; font-size: 10px; }
+        .transcript-headline {
+            margin: 4px 0 0;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+        }
         .session-title {
             border: 1px solid #111;
             border-bottom: 0;
@@ -87,6 +93,7 @@
                 <td class="school-wrap">
                     <h1>{{ $schoolName }}</h1>
                     <p>{{ $schoolAddress }}</p>
+                    <p class="transcript-headline">STUDENT TRANSCRIPT</p>
                 </td>
                 <td style="width: 82px;" class="center">
                     @if(!empty($schoolLogoDataUri))

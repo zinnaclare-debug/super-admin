@@ -316,9 +316,12 @@ class TranscriptController extends Controller
         $schoolLocation = strtoupper((string) data_get($firstViewData, 'school.location', ''));
         $studentName = strtoupper((string) data_get($firstViewData, 'studentUser.name', '-'));
         $studentSerial = strtoupper((string) data_get($firstViewData, 'studentUser.username', '-'));
+        $studentEmail = (string) data_get($firstViewData, 'studentUser.email', '-');
         $teacherComment = strtoupper((string) data_get($lastViewData, 'teacherComment', '-'));
         $headComment = strtoupper((string) data_get($lastViewData, 'schoolHeadComment', '-'));
         $headName = strtoupper((string) data_get($firstViewData, 'school.head_of_school_name', '-'));
+        $schoolLogoDataUri = (string) data_get($firstViewData, 'schoolLogoDataUri', '');
+        $studentPhotoDataUri = (string) data_get($firstViewData, 'studentPhotoDataUri', '');
 
         $pageBlocks = [];
         $groupPages = array_chunk($groups, 3);
@@ -373,17 +376,36 @@ class TranscriptController extends Controller
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Transcript</title>'
             . '<style>'
             . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;color:#111;}'
+            . '.sheet{position:relative;border:1px solid #d1d5db;padding:10px;overflow:hidden;}'
+            . '.wm{position:fixed;top:34%;left:50%;width:300px;height:300px;margin-left:-150px;opacity:.06;object-fit:contain;z-index:0;}'
+            . '.content{position:relative;z-index:1;}'
             . 'h1{margin:0;font-size:18px;text-align:center;}'
-            . 'h2{margin:4px 0 8px 0;font-size:12px;text-align:center;}'
+            . 'h2{margin:3px 0 0 0;font-size:11px;text-align:center;}'
+            . 'h3{margin:3px 0 8px 0;font-size:11px;text-align:center;letter-spacing:.8px;}'
             . 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
             . 'th,td{border:1px solid #222;padding:4px;}'
             . 'th{background:#f3f4f6;text-align:left;}'
             . '.meta td,.meta th{font-size:10px;}'
-            . '</style></head><body>'
+            . '.head td{border:1px solid #222;padding:4px;vertical-align:middle;}'
+            . '</style></head><body><div class="sheet">'
+            . ($schoolLogoDataUri !== '' ? '<img class="wm" src="' . e($schoolLogoDataUri) . '" alt="" />' : '')
+            . '<div class="content">'
+            . '<table class="head"><tr>'
+            . '<td style="width:82px;text-align:center;">'
+            . ($studentPhotoDataUri !== '' ? '<img src="' . e($studentPhotoDataUri) . '" alt="Student Photo" style="width:72px;height:72px;object-fit:cover;border:1px solid #222;" />' : '<div style="width:72px;height:72px;border:1px solid #222;"></div>')
+            . '</td>'
+            . '<td>'
             . '<h1>' . e($schoolName) . '</h1>'
             . '<h2>' . e($schoolLocation) . '</h2>'
+            . '<h3>STUDENT TRANSCRIPT</h3>'
+            . '</td>'
+            . '<td style="width:82px;text-align:center;">'
+            . ($schoolLogoDataUri !== '' ? '<img src="' . e($schoolLogoDataUri) . '" alt="School Logo" style="width:72px;height:72px;object-fit:contain;border:1px solid #222;" />' : '<div style="width:72px;height:72px;border:1px solid #222;"></div>')
+            . '</td>'
+            . '</tr></table>'
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
+            . '<tr><th>Email</th><td colspan="3">' . e($studentEmail) . '</td></tr>'
             . '</table>'
             . implode("\n", $pageBlocks)
             . '<table class="meta" style="margin-top:10px;">'
@@ -391,7 +413,7 @@ class TranscriptController extends Controller
             . '<tr><th style="width:24%;">School Head Comment</th><td>' . e($headComment) . '</td></tr>'
             . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
             . '</table>'
-            . '</body></html>';
+            . '</div></div></body></html>';
 
         $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
 
