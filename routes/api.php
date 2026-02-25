@@ -103,6 +103,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/stats', [SchoolAdminDashboardController::class, 'stats']);
     Route::post('/school-admin/logo', [SchoolAdminDashboardController::class, 'uploadLogo']);
     Route::post('/school-admin/branding', [SchoolAdminDashboardController::class, 'upsertBranding']);
+    Route::get('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'examRecord']);
+    Route::put('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'upsertExamRecord']);
 
     // ✅ School features (school admin only)
     Route::get('/schools/features', [SchoolFeatureController::class, 'index']);

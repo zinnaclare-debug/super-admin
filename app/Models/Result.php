@@ -11,6 +11,11 @@ class Result extends Model
     'term_subject_id',
     'student_id',
     'ca',
+    'ca_breakdown',
     'exam',
+  ];
+
+  protected $casts = [
+    'ca_breakdown' => 'array',
   ];
 }

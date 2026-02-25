@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
+use App\Models\School;
 use App\Models\Student;
 use App\Models\StudentAttendance;
 use App\Models\StudentBehaviourRating;
@@ -13,6 +14,7 @@ use App\Models\Term;
 use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
+use App\Support\AssessmentSchema;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -188,7 +190,10 @@ class ResultsController extends Controller
 
         $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
 
-        return response()->json(['data' => $rows]);
+        return response()->json([
+            'data' => $rows,
+            'assessment_schema' => $this->assessmentSchemaForSchool($schoolId),
+        ]);
     }
 
     // GET /api/student/results/download?class_id=1&term_id=2
@@ -279,6 +284,7 @@ class ResultsController extends Controller
             $school = $user->school;
             $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
 
+            $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
             $totalScore = (int) collect($rows)->sum('total');
             $subjectCount = max(1, count($rows));
             $averageScore = (float) round($totalScore / $subjectCount, 2);
@@ -321,6 +327,7 @@ class ResultsController extends Controller
                 'schoolHeadComment' => $schoolHeadComment,
                 'classTeacher' => $classTeacher,
                 'behaviourTraits' => $behaviourTraits,
+                'assessmentSchema' => $assessmentSchema,
                 'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
                 'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
                 'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
@@ -555,6 +562,7 @@ class ResultsController extends Controller
         }
 
         $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
+        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
         $totalScore = (int) collect($rows)->sum('total');
         $subjectCount = max(1, count($rows));
         $averageScore = (float) round($totalScore / $subjectCount, 2);
@@ -584,6 +592,7 @@ class ResultsController extends Controller
                     'overall_grade' => $overallGrade,
                 ],
                 'rows' => $rows,
+                'assessment_schema' => $assessmentSchema,
             ]],
             'context' => [
                 'student' => [
@@ -602,6 +611,7 @@ class ResultsController extends Controller
                     'name' => $term->name,
                 ],
             ],
+            'assessment_schema' => $assessmentSchema,
             'message' => count($rows) === 0 ? 'No result records found for the selected criteria.' : null,
         ]);
     }
@@ -750,6 +760,7 @@ class ResultsController extends Controller
             $school = $actor->school ?: $actor->school()->first();
             $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
+            $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
             $totalScore = (int) collect($rows)->sum('total');
             $subjectCount = max(1, count($rows));
             $averageScore = (float) round($totalScore / $subjectCount, 2);
@@ -792,6 +803,7 @@ class ResultsController extends Controller
                 'schoolHeadComment' => $schoolHeadComment,
                 'classTeacher' => $classTeacher,
                 'behaviourTraits' => $behaviourTraits,
+                'assessmentSchema' => $assessmentSchema,
                 'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
                 'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
                 'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
@@ -875,6 +887,8 @@ class ResultsController extends Controller
 
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
+        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+
         $subjects = TermSubject::query()
             ->where('term_subjects.school_id', $schoolId)
             ->where('term_subjects.class_id', $classId)
@@ -890,6 +904,7 @@ class ResultsController extends Controller
                 'subjects.code as subject_code',
                 'results.student_id as result_student_id',
                 'results.ca',
+                'results.ca_breakdown',
                 'results.exam',
             ])
             ->orderBy('subjects.name')
@@ -899,9 +914,14 @@ class ResultsController extends Controller
         $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds);
 
         return $subjects
-            ->map(function ($r) use ($subjectStats, $studentId) {
-                $ca = (int) ($r->ca ?? 0);
-                $exam = (int) ($r->exam ?? 0);
+            ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema) {
+                $caBreakdown = AssessmentSchema::normalizeBreakdown(
+                    $r->ca_breakdown ?? null,
+                    $assessmentSchema,
+                    (int) ($r->ca ?? 0)
+                );
+                $ca = AssessmentSchema::breakdownTotal($caBreakdown);
+                $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
                 $total = $ca + $exam;
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
@@ -912,6 +932,8 @@ class ResultsController extends Controller
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
                     'ca' => $ca,
+                    'ca_breakdown' => $caBreakdown,
+                    'ca_breakdown_text' => AssessmentSchema::formatBreakdown($caBreakdown, $assessmentSchema),
                     'exam' => $exam,
                     'total' => $total,
                     'min_score' => $stats['min_score'] ?? 0,
@@ -988,6 +1010,20 @@ class ResultsController extends Controller
         }
 
         return $stats;
+    }
+
+    private function assessmentSchemaForSchool(int $schoolId): array
+    {
+        static $cache = [];
+
+        if (isset($cache[$schoolId])) {
+            return $cache[$schoolId];
+        }
+
+        $schema = School::where('id', $schoolId)->value('assessment_schema');
+        $cache[$schoolId] = AssessmentSchema::normalizeSchema($schema);
+
+        return $cache[$schoolId];
     }
 
     private function gradeFromTotal(int $total): string
@@ -1121,6 +1157,12 @@ class ResultsController extends Controller
         $headSignatureDataUri = (string) data_get($viewData, 'headSignatureDataUri', '');
         $behaviourTraits = (array) data_get($viewData, 'behaviourTraits', []);
         $headName = strtoupper((string) data_get($viewData, 'school.head_of_school_name', '-'));
+        $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
+        $caSummaryParts = [];
+        foreach (AssessmentSchema::activeCaIndices($assessmentSchema) as $index) {
+            $caSummaryParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
+        }
+        $assessmentSummary = implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')';
 
         $rowsHtml = '';
         foreach ((array) data_get($viewData, 'rows', []) as $row) {
@@ -1130,10 +1172,12 @@ class ResultsController extends Controller
             $score = (int) ($row['total'] ?? 0);
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
+            $caDetails = strtoupper((string) ($row['ca_breakdown_text'] ?? '-'));
 
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
                 . '<td style="text-align:center;">' . $ca . '</td>'
+                . '<td>' . e($caDetails) . '</td>'
                 . '<td style="text-align:center;">' . $exam . '</td>'
                 . '<td style="text-align:center;">' . $score . '</td>'
                 . '<td style="text-align:center;">' . e($grade) . '</td>'
@@ -1142,7 +1186,7 @@ class ResultsController extends Controller
         }
 
         if ($rowsHtml === '') {
-            $rowsHtml = '<tr><td colspan="6" style="text-align:center;">No result data found.</td></tr>';
+            $rowsHtml = '<tr><td colspan="7" style="text-align:center;">No result data found.</td></tr>';
         }
 
         $behaviourHtml = '';
@@ -1194,9 +1238,10 @@ class ResultsController extends Controller
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
             . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
+            . '<tr><th>Assessment Pattern</th><td colspan="3">' . e($assessmentSummary) . '</td></tr>'
             . '</table>'
             . '<table>'
-            . '<thead><tr><th style="width:35%;">Subject</th><th style="width:10%;">CA</th><th style="width:10%;">Exam</th><th style="width:10%;">Total</th><th style="width:10%;">Grade</th><th style="width:25%;">Remark</th></tr></thead>'
+            . '<thead><tr><th style="width:25%;">Subject</th><th style="width:8%;">CA</th><th style="width:25%;">CA Details</th><th style="width:8%;">Exam</th><th style="width:8%;">Total</th><th style="width:8%;">Grade</th><th style="width:18%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'

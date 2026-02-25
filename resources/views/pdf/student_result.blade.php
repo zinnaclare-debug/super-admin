@@ -126,6 +126,14 @@
     $timesPresent = (int) ($attendance?->days_present ?? 0);
     $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
     $totalObtainable = max(1, count($rows)) * 100;
+    $assessmentSchema = \App\Support\AssessmentSchema::normalizeSchema($assessmentSchema ?? []);
+    $activeCaIndices = \App\Support\AssessmentSchema::activeCaIndices($assessmentSchema);
+    $assessmentParts = [];
+    foreach ($activeCaIndices as $index) {
+        $assessmentParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
+    }
+    $assessmentPattern = implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')';
+    $scoreColspan = 10 + count($activeCaIndices);
     $nextTermBeginLabel = '-';
     if (!empty($nextTermBeginDate)) {
         try {
@@ -162,6 +170,9 @@
 
         <div class="section-title">
             REPORT SHEET FOR {{ strtoupper($term?->name ?? '-') }} {{ strtoupper($session?->academic_year ?: $session?->session_name ?: '-') }} SESSION
+        </div>
+        <div class="grades-key" style="margin-top: 0; border-top: 0;">
+            <strong>ASSESSMENT PATTERN:</strong> {{ strtoupper($assessmentPattern) }}
         </div>
 
         <table class="meta">
@@ -200,22 +211,28 @@
         <table class="scores" style="margin-top: 8px;">
             <thead>
                 <tr>
-                    <th style="width: 22%;">SUBJECT</th>
-                    <th style="width: 7%;" class="center">CA</th>
-                    <th style="width: 7%;" class="center">EXAM</th>
-                    <th style="width: 7%;" class="center">TOTAL</th>
-                    <th style="width: 7%;" class="center">MIN</th>
-                    <th style="width: 7%;" class="center">MAX</th>
-                    <th style="width: 10%;" class="center">CLASS AVE</th>
-                    <th style="width: 8%;" class="center">POSITION</th>
-                    <th style="width: 8%;" class="center">GRADE</th>
-                    <th style="width: 17%;" class="center">REMARK</th>
+                    <th class="center">SUBJECT</th>
+                    @foreach($activeCaIndices as $index)
+                        <th class="center">CA{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
+                    @endforeach
+                    <th class="center">CA TOTAL</th>
+                    <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
+                    <th class="center">TOTAL</th>
+                    <th class="center">MIN</th>
+                    <th class="center">MAX</th>
+                    <th class="center">CLASS AVE</th>
+                    <th class="center">POSITION</th>
+                    <th class="center">GRADE</th>
+                    <th class="center">REMARK</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($rows as $row)
                     <tr>
                         <td>{{ strtoupper($row['subject_name']) }}</td>
+                        @foreach($activeCaIndices as $index)
+                            <td class="center">{{ (int) (($row['ca_breakdown'][$index] ?? 0)) }}</td>
+                        @endforeach
                         <td class="center">{{ $row['ca'] }}</td>
                         <td class="center">{{ $row['exam'] }}</td>
                         <td class="center">{{ $row['total'] }}</td>
@@ -228,7 +245,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="center">No result data found.</td>
+                        <td colspan="{{ $scoreColspan }}" class="center">No result data found.</td>
                     </tr>
                 @endforelse
             </tbody>

@@ -253,6 +253,78 @@
 
 .sd-actions {
   margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sd-actions__alt {
+  background: linear-gradient(125deg, #0f172a 0%, #1d4ed8 100%) !important;
+}
+
+.sd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 18px;
+}
+
+.sd-modal-card {
+  width: min(760px, 100%);
+  border-radius: 14px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  box-shadow: 0 24px 44px rgba(15, 23, 42, 0.24);
+  padding: 16px;
+}
+
+.sd-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sd-modal-head h3 {
+  margin: 0;
+  color: #0b3a63;
+}
+
+.sd-modal-close {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sd-modal-help {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.sd-exam-grid {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.sd-exam-meta {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {

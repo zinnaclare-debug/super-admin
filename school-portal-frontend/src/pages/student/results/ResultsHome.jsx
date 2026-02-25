@@ -1,5 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+
+const DEFAULT_SCHEMA = {
+  ca_maxes: [30, 0, 0, 0, 0],
+  exam_max: 70,
+  total_max: 100,
+};
+
+const normalizeSchema = (schema) => {
+  const raw = schema || {};
+  const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
+  const normalizedCa = Array.from({ length: 5 }, (_, idx) => {
+    const n = Number(caMaxes[idx] || 0);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+  });
+  const caTotal = normalizedCa.reduce((sum, value) => sum + value, 0);
+  const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
+  const examMax = Number.isFinite(requestedExam) ? Math.max(0, Math.min(100, Math.round(requestedExam))) : 0;
+
+  return {
+    ca_maxes: normalizedCa,
+    exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
+    total_max: 100,
+  };
+};
+
+const activeCaIndices = (schema) => {
+  const indices = [];
+  schema.ca_maxes.forEach((max, idx) => {
+    if (Number(max) > 0) indices.push(idx);
+  });
+  return indices.length ? indices : [0];
+};
 
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -27,10 +59,13 @@ export default function StudentResultsHome() {
   const [classes, setClasses] = useState([]);
   const [selected, setSelected] = useState(null);
   const [results, setResults] = useState([]);
+  const [assessmentSchema, setAssessmentSchema] = useState(DEFAULT_SCHEMA);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
+
+  const caIndices = useMemo(() => activeCaIndices(assessmentSchema), [assessmentSchema]);
 
   const loadClasses = async () => {
     setLoadingClasses(true);
@@ -39,11 +74,7 @@ export default function StudentResultsHome() {
       const res = await api.get("/api/student/results/classes");
       const items = res.data?.data || [];
       setClasses(items);
-      if (items.length > 0) {
-        setSelected(items[0]);
-      } else {
-        setSelected(null);
-      }
+      setSelected(items.length > 0 ? items[0] : null);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load assigned classes");
       setClasses([]);
@@ -56,6 +87,7 @@ export default function StudentResultsHome() {
   const loadResults = async (item) => {
     if (!item) {
       setResults([]);
+      setAssessmentSchema(DEFAULT_SCHEMA);
       return;
     }
 
@@ -69,9 +101,11 @@ export default function StudentResultsHome() {
         },
       });
       setResults(res.data?.data || []);
+      setAssessmentSchema(normalizeSchema(res.data?.assessment_schema));
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load results");
       setResults([]);
+      setAssessmentSchema(DEFAULT_SCHEMA);
     } finally {
       setLoadingResults(false);
     }
@@ -102,9 +136,8 @@ export default function StudentResultsHome() {
         throw new Error(message);
       }
 
-      const pdfBlob = res.data instanceof Blob
-        ? res.data
-        : new Blob([res.data], { type: "application/pdf" });
+      const pdfBlob =
+        res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
 
       const blobUrl = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
@@ -137,12 +170,13 @@ export default function StudentResultsHome() {
         <p>No class assignment found for the current session.</p>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
-          {classes.map((c) => {
-            const isActive = selected?.class_id === c.class_id && selected?.term_id === c.term_id;
+          {classes.map((item) => {
+            const isActive =
+              selected?.class_id === item.class_id && selected?.term_id === item.term_id;
             return (
               <button
-                key={`${c.class_id}-${c.term_id}`}
-                onClick={() => setSelected(c)}
+                key={`${item.class_id}-${item.term_id}`}
+                onClick={() => setSelected(item)}
                 style={{
                   padding: "10px 12px",
                   borderRadius: 8,
@@ -151,9 +185,9 @@ export default function StudentResultsHome() {
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontWeight: 700 }}>{c.class_name}</div>
+                <div style={{ fontWeight: 700 }}>{item.class_name}</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>
-                  {c.class_level} • {c.term_name}
+                  {item.class_level} | {item.term_name}
                 </div>
               </button>
             );
@@ -181,26 +215,38 @@ export default function StudentResultsHome() {
                 <tr>
                   <th style={{ width: 70 }}>S/N</th>
                   <th>Subject</th>
-                  <th style={{ width: 80 }}>CA</th>
-                  <th style={{ width: 80 }}>Exam</th>
+                  {caIndices.map((idx) => (
+                    <th key={`ca-head-${idx}`} style={{ width: 80 }}>
+                      CA{idx + 1}
+                    </th>
+                  ))}
+                  <th style={{ width: 80 }}>CA Total</th>
+                  <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
                   <th style={{ width: 80 }}>Total</th>
                   <th style={{ width: 80 }}>Grade</th>
                 </tr>
               </thead>
               <tbody>
-                {results.map((r, idx) => (
-                  <tr key={r.term_subject_id}>
+                {results.map((row, idx) => (
+                  <tr key={row.term_subject_id}>
                     <td>{idx + 1}</td>
-                    <td>{r.subject_name}</td>
-                    <td>{r.ca}</td>
-                    <td>{r.exam}</td>
-                    <td>{r.total}</td>
-                    <td>{r.grade}</td>
+                    <td>{row.subject_name}</td>
+                    {caIndices.map((caIdx) => (
+                      <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
+                        {Number(row.ca_breakdown?.[caIdx] || 0)}
+                      </td>
+                    ))}
+                    <td>{row.ca}</td>
+                    <td>{row.exam}</td>
+                    <td>{row.total}</td>
+                    <td>{row.grade}</td>
                   </tr>
                 ))}
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan="6">No result records for this class and term.</td>
+                    <td colSpan={6 + caIndices.length}>
+                      No result records for this class and term.
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -211,3 +257,4 @@ export default function StudentResultsHome() {
     </div>
   );
 }
+

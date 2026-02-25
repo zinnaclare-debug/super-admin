@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\Result;
+use App\Models\School;
 use App\Models\Term;
 use App\Models\TermSubject;
+use App\Support\AssessmentSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TeacherResultsController extends Controller
 {
@@ -58,6 +61,8 @@ class TeacherResultsController extends Controller
   {
     $user = $request->user();
     $schoolId = $user->school_id;
+    $school = School::find((int) $schoolId);
+    $assessmentSchema = AssessmentSchema::normalizeSchema($school?->assessment_schema);
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
@@ -82,17 +87,26 @@ class TeacherResultsController extends Controller
         'students.id as student_id',
         'users.name as student_name',
         DB::raw('COALESCE(results.ca, 0) as ca'),
+        'results.ca_breakdown',
         DB::raw('COALESCE(results.exam, 0) as exam'),
       ])
       ->orderBy('users.name')
       ->get()
-      ->map(function ($r) {
-        $total = (int)$r->ca + (int)$r->exam;
+      ->map(function ($r) use ($assessmentSchema) {
+        $caBreakdown = AssessmentSchema::normalizeBreakdown(
+          $r->ca_breakdown ?? null,
+          $assessmentSchema,
+          (int) ($r->ca ?? 0)
+        );
+        $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
+        $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
+        $total = $caTotal + $exam;
         return [
           'student_id' => $r->student_id,
           'student_name' => $r->student_name,
-          'ca' => (int)$r->ca,
-          'exam' => (int)$r->exam,
+          'ca' => $caTotal,
+          'ca_breakdown' => $caBreakdown,
+          'exam' => $exam,
           'total' => $total,
           'grade' => $this->gradeFromTotal($total),
         ];
@@ -101,6 +115,7 @@ class TeacherResultsController extends Controller
     return response()->json([
       'data' => [
         'term_subject_id' => $termSubject->id,
+        'assessment_schema' => $assessmentSchema,
         'students' => $rows,
       ]
     ]);
@@ -112,6 +127,11 @@ class TeacherResultsController extends Controller
   {
     $user = $request->user();
     $schoolId = $user->school_id;
+    $school = School::find((int) $schoolId);
+    $assessmentSchema = AssessmentSchema::normalizeSchema($school?->assessment_schema);
+    $caMaxes = $assessmentSchema['ca_maxes'];
+    $examMax = (int) $assessmentSchema['exam_max'];
+    $caTotalMax = array_sum($caMaxes);
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
@@ -125,21 +145,74 @@ class TeacherResultsController extends Controller
     $payload = $request->validate([
       'scores' => 'required|array|min:1',
       'scores.*.student_id' => 'required|integer',
-      'scores.*.ca' => 'required|integer|min:0|max:30',
-      'scores.*.exam' => 'required|integer|min:0|max:70',
+      'scores.*.ca' => 'nullable|integer|min:0|max:100',
+      'scores.*.ca_breakdown' => 'nullable|array|size:5',
+      'scores.*.ca_breakdown.*' => 'nullable|integer|min:0|max:100',
+      'scores.*.exam' => 'required|integer|min:0|max:100',
     ]);
 
-    DB::transaction(function () use ($payload, $termSubject, $schoolId) {
-      foreach ($payload['scores'] as $s) {
+    $preparedScores = [];
+    $errors = [];
+
+    foreach ($payload['scores'] as $idx => $score) {
+      $rawBreakdown = $score['ca_breakdown'] ?? null;
+      $legacyCa = (int) ($score['ca'] ?? 0);
+
+      if (is_array($rawBreakdown)) {
+        for ($i = 0; $i < 5; $i++) {
+          $inputVal = (int) ($rawBreakdown[$i] ?? 0);
+          if ($inputVal > (int) $caMaxes[$i]) {
+            $errors["scores.$idx.ca_breakdown.$i"] = [
+              'CA' . ($i + 1) . " score cannot be more than {$caMaxes[$i]}.",
+            ];
+          }
+        }
+      } elseif ($legacyCa > $caTotalMax) {
+        $errors["scores.$idx.ca"] = [
+          "CA score cannot be more than {$caTotalMax}.",
+        ];
+      }
+
+      $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $assessmentSchema, $legacyCa);
+      $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
+      $exam = (int) ($score['exam'] ?? 0);
+
+      if ($exam > $examMax) {
+        $errors["scores.$idx.exam"] = [
+          "Exam score cannot be more than {$examMax}.",
+        ];
+      }
+
+      if (($caTotal + $exam) > 100) {
+        $errors["scores.$idx.total"] = [
+          'CA total and exam score cannot be more than 100.',
+        ];
+      }
+
+      $preparedScores[] = [
+        'student_id' => (int) $score['student_id'],
+        'ca' => $caTotal,
+        'ca_breakdown' => $caBreakdown,
+        'exam' => $exam,
+      ];
+    }
+
+    if (!empty($errors)) {
+      throw ValidationException::withMessages($errors);
+    }
+
+    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId) {
+      foreach ($preparedScores as $score) {
         Result::updateOrCreate(
           [
             'school_id' => $schoolId,
             'term_subject_id' => $termSubject->id,
-            'student_id' => $s['student_id'],
+            'student_id' => $score['student_id'],
           ],
           [
-            'ca' => $s['ca'],
-            'exam' => $s['exam'],
+            'ca' => $score['ca'],
+            'ca_breakdown' => $score['ca_breakdown'],
+            'exam' => $score['exam'],
           ]
         );
       }

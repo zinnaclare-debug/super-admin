@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\SchoolFeature;
 use App\Models\User;
+use App\Support\AssessmentSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -46,6 +47,7 @@ class DashboardController extends Controller
             'school_logo_url' => $this->storageUrl($school?->logo_path),
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
+            'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
             'results_published' => (bool) ($school?->results_published),
             'students' => $students,
             'male_students' => $maleStudents,
@@ -147,6 +149,61 @@ class DashboardController extends Controller
                 'head_of_school_name' => $school->head_of_school_name,
                 'head_signature_url' => $this->storageUrl($school->head_signature_path),
             ],
+        ]);
+    }
+
+    public function examRecord(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        return response()->json([
+            'data' => AssessmentSchema::normalizeSchema($school->assessment_schema),
+        ]);
+    }
+
+    public function upsertExamRecord(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'ca_maxes' => 'required|array|size:5',
+            'ca_maxes.*' => 'required|integer|min:0|max:100',
+            'exam_max' => 'required|integer|min:0|max:100',
+        ]);
+
+        $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes']));
+        $caTotal = array_sum($caMaxes);
+        $examMax = (int) $payload['exam_max'];
+
+        if ($caTotal <= 0) {
+            return response()->json([
+                'message' => 'At least one CA score must be greater than zero.',
+            ], 422);
+        }
+
+        if (($caTotal + $examMax) !== 100) {
+            return response()->json([
+                'message' => 'Total of all CA maxima and exam maximum must be exactly 100.',
+            ], 422);
+        }
+
+        $schema = AssessmentSchema::normalizeSchema([
+            'ca_maxes' => $caMaxes,
+            'exam_max' => $examMax,
+        ]);
+
+        $school->assessment_schema = $schema;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Exam record updated successfully',
+            'data' => $schema,
         ]);
     }
 

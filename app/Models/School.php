@@ -15,11 +15,17 @@ class School extends Model
         'logo_path',
         'head_of_school_name',
         'head_signature_path',
+        'assessment_schema',
         'slug',
         'subdomain',
         'status',
         'paystack_subaccount_code',
         'results_published',
+    ];
+
+    protected $casts = [
+        'results_published' => 'boolean',
+        'assessment_schema' => 'array',
     ];
 
     public function features(): HasMany
