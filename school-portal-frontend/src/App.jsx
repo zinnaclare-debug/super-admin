@@ -16,6 +16,7 @@ import SchoolAcademicSessions from "./pages/super-admin/SchoolAcademicSessions";
 
 // School Admin
 import SchoolDashboard from "./pages/school/Dashboard";
+import ClassTemplates from "./pages/school/ClassTemplates";
 import SchoolFeatures from "./pages/school-admin/SchoolFeatures";
 import Register from "./pages/school-admin/Register";
 
@@ -129,6 +130,7 @@ function App() {
 
         <Route element={<SchoolAdminFeatureLayout />}>
         {/* Admin Features */}
+        <Route path="admin/class-templates" element={<ClassTemplates />} />
         <Route path="admin/register" element={<Register />} />
 
         {/* Users */}

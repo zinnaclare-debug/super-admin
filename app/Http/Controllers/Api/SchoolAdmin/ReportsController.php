@@ -116,7 +116,7 @@ class ReportsController extends Controller
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
-            'level' => 'nullable|in:nursery,primary,secondary',
+            'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
         ]);
 
@@ -172,7 +172,7 @@ class ReportsController extends Controller
     {
         $payload = $request->validate([
             'academic_session_id' => 'nullable|integer',
-            'level' => 'nullable|in:nursery,primary,secondary',
+            'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
         ]);
 
@@ -517,7 +517,7 @@ class ReportsController extends Controller
 
     private function sessionLevelOptions(int $schoolId, int $sessionId): array
     {
-        $levels = DB::table('classes')
+        return DB::table('classes')
             ->where('school_id', $schoolId)
             ->where('academic_session_id', $sessionId)
             ->select('level')
@@ -525,17 +525,9 @@ class ReportsController extends Controller
             ->pluck('level')
             ->map(fn ($value) => strtolower(trim((string) $value)))
             ->filter()
+            ->unique()
             ->values()
             ->all();
-
-        $allowed = ['nursery', 'primary', 'secondary'];
-        $levels = array_values(array_filter($levels, fn ($level) => in_array($level, $allowed, true)));
-
-        usort($levels, function (string $a, string $b) use ($allowed) {
-            return array_search($a, $allowed, true) <=> array_search($b, $allowed, true);
-        });
-
-        return $levels;
     }
 
     private function sessionDepartmentOptions(int $schoolId, int $sessionId, string $level): array

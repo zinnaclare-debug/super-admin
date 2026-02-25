@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 
-const LEVEL_OPTIONS = [
-  { value: "", label: "School-wide (all levels)" },
-  { value: "nursery", label: "Nursery only" },
-  { value: "primary", label: "Primary only" },
-  { value: "secondary", label: "Secondary only" },
-];
+const prettyLevel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 function formatDate(value) {
   if (!value) return "-";
@@ -23,6 +21,9 @@ export default function AnnouncementDesk() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [levelOptions, setLevelOptions] = useState([
+    { value: "", label: "School-wide (all levels)" },
+  ]);
   const [form, setForm] = useState({
     title: "",
     message: "",
@@ -50,6 +51,34 @@ export default function AnnouncementDesk() {
   useEffect(() => {
     load(statusFilter);
   }, [statusFilter]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadLevels = async () => {
+      try {
+        const res = await api.get("/api/school-admin/class-templates");
+        const templates = Array.isArray(res.data?.data) ? res.data.data : [];
+        const options = templates
+          .filter((section) => Boolean(section?.enabled))
+          .map((section) => String(section?.key || "").trim().toLowerCase())
+          .filter(Boolean)
+          .map((value) => ({ value, label: `${prettyLevel(value)} only` }));
+
+        if (mounted) {
+          setLevelOptions([{ value: "", label: "School-wide (all levels)" }, ...options]);
+        }
+      } catch {
+        if (mounted) {
+          setLevelOptions([{ value: "", label: "School-wide (all levels)" }]);
+        }
+      }
+    };
+
+    loadLevels();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -129,7 +158,7 @@ export default function AnnouncementDesk() {
           />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <select name="level" value={form.level} onChange={onChange} style={{ padding: 10 }}>
-              {LEVEL_OPTIONS.map((opt) => (
+              {levelOptions.map((opt) => (
                 <option key={opt.value || "all"} value={opt.value}>
                   {opt.label}
                 </option>
@@ -197,4 +226,3 @@ export default function AnnouncementDesk() {
     </div>
   );
 }
-

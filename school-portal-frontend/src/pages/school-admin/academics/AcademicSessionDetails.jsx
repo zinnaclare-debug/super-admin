@@ -3,6 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 import { getStoredUser } from "../../../utils/authStorage";
 
+const prettyLevel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 export default function AcademicSessionDetails() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -134,7 +139,7 @@ export default function AcademicSessionDetails() {
                 }}
               >
                 <div>
-                  <strong style={{ fontSize: 16 }}>{String(level.level).toUpperCase()}</strong>
+                  <strong style={{ fontSize: 16 }}>{prettyLevel(level.level)}</strong>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
                     Classes: {level.classes?.length || 0} | Departments: {level.departments?.length || 0}
                   </div>
@@ -174,4 +179,3 @@ export default function AcademicSessionDetails() {
     </div>
   );
 }
-

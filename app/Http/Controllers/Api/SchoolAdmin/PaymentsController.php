@@ -279,18 +279,16 @@ class PaymentsController extends Controller
 
     private function extractSessionLevels(int $schoolId, int $sessionId, mixed $rawLevels): array
     {
-        $allowed = ['nursery', 'primary', 'secondary'];
-
         $levels = collect(is_array($rawLevels) ? $rawLevels : [])
             ->map(function ($item) {
                 $name = is_array($item) ? ($item['level'] ?? null) : $item;
                 return strtolower(trim((string) $name));
             })
             ->filter()
+            ->unique()
             ->values()
             ->all();
 
-        $levels = array_values(array_unique(array_intersect($levels, $allowed)));
         if (!empty($levels)) {
             return $levels;
         }
@@ -300,11 +298,11 @@ class PaymentsController extends Controller
             ->where('academic_session_id', $sessionId)
             ->pluck('level')
             ->map(fn ($level) => strtolower(trim((string) $level)))
-            ->filter(fn ($level) => in_array($level, $allowed, true))
+            ->filter()
             ->unique()
             ->values()
             ->all();
 
-        return !empty($classLevels) ? $classLevels : ['primary', 'secondary'];
+        return $classLevels;
     }
 }

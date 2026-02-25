@@ -25,11 +25,9 @@ async function messageFromBlobError(blob, fallback) {
 }
 
 const levelLabel = (value) => {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized === "nursery") return "Nursery";
-  if (normalized === "primary") return "Primary";
-  if (normalized === "secondary") return "Secondary";
-  return value || "-";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "-";
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const formatNumber = (value) => {

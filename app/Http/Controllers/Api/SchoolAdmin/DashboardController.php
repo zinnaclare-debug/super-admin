@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
 use App\Models\LevelDepartment;
 use App\Models\School;
+use App\Models\SchoolClass;
 use App\Models\SchoolFeature;
 use App\Models\User;
 use App\Support\AssessmentSchema;
+use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +55,7 @@ class DashboardController extends Controller
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
             'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
             'department_templates' => $this->resolveDepartmentTemplates($school),
+            'class_templates' => ClassTemplateSchema::normalize($school?->class_templates),
             'results_published' => (bool) ($school?->results_published),
             'students' => $students,
             'male_students' => $maleStudents,
@@ -267,6 +271,66 @@ class DashboardController extends Controller
         });
     }
 
+    public function classTemplates(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        return response()->json([
+            'data' => ClassTemplateSchema::normalize($school->class_templates),
+        ]);
+    }
+
+    public function upsertClassTemplates(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'class_templates' => 'required|array|size:4',
+            'class_templates.*.key' => 'required|string|max:50',
+            'class_templates.*.label' => 'required|string|max:80',
+            'class_templates.*.enabled' => 'required|boolean',
+            'class_templates.*.classes' => 'required|array|min:1|max:20',
+            'class_templates.*.classes.*' => 'nullable|string|max:80',
+        ]);
+
+        $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
+        $active = ClassTemplateSchema::activeSections($normalized);
+
+        if (empty($active)) {
+            return response()->json([
+                'message' => 'Enable at least one class section.',
+            ], 422);
+        }
+
+        foreach ($active as $section) {
+            $classes = array_values(array_filter(
+                (array) ($section['classes'] ?? []),
+                fn ($value) => trim((string) $value) !== ''
+            ));
+            if (empty($classes)) {
+                return response()->json([
+                    'message' => 'Each enabled section must have at least one class name.',
+                ], 422);
+            }
+        }
+
+        $school->class_templates = $normalized;
+        $school->save();
+
+        $this->syncClassTemplatesToExistingSessions($school, $normalized);
+
+        return response()->json([
+            'message' => 'Class templates saved successfully.',
+            'data' => $normalized,
+        ]);
+    }
+
     private function resolveDepartmentTemplates(?School $school): array
     {
         if (!$school) {
@@ -307,5 +371,57 @@ class DashboardController extends Controller
             || str_starts_with($relativeOrAbsolute, 'https://')
             ? $relativeOrAbsolute
             : url($relativeOrAbsolute);
+    }
+
+    private function syncClassTemplatesToExistingSessions(School $school, array $templates): void
+    {
+        $schoolId = (int) $school->id;
+        $activeSections = ClassTemplateSchema::activeSections($templates);
+        $activeLevels = array_values(array_map(
+            fn (array $section) => strtolower(trim((string) ($section['key'] ?? ''))),
+            $activeSections
+        ));
+
+        $departmentTemplates = DepartmentTemplateSync::normalizeTemplateNames(
+            $school->department_templates ?? []
+        );
+
+        $sessions = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->get();
+
+        foreach ($sessions as $session) {
+            $session->levels = $activeLevels;
+            $session->save();
+
+            foreach ($activeSections as $section) {
+                $level = strtolower(trim((string) ($section['key'] ?? '')));
+                if ($level === '') {
+                    continue;
+                }
+
+                $classNames = collect((array) ($section['classes'] ?? []))
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter(fn ($name) => $name !== '')
+                    ->values()
+                    ->all();
+
+                foreach ($classNames as $className) {
+                    SchoolClass::firstOrCreate([
+                        'school_id' => $schoolId,
+                        'academic_session_id' => (int) $session->id,
+                        'level' => $level,
+                        'name' => $className,
+                    ]);
+                }
+            }
+
+            DepartmentTemplateSync::syncTemplatesToSession(
+                $schoolId,
+                (int) $session->id,
+                $activeLevels,
+                $departmentTemplates
+            );
+        }
     }
 }

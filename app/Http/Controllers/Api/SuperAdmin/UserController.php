@@ -107,7 +107,7 @@ class UserController extends Controller
     public function studentsByLevel(Request $request, School $school)
     {
         $payload = $request->validate([
-            'level' => 'nullable|in:nursery,primary,secondary',
+            'level' => 'nullable|string|max:60',
         ]);
 
         $schoolId = (int) $school->id;
@@ -137,22 +137,20 @@ class UserController extends Controller
             ->orderBy('users.name')
             ->get();
 
-        $counts = [
-            'nursery' => 0,
-            'primary' => 0,
-            'secondary' => 0,
-        ];
+        $counts = [];
         foreach ($allRows as $row) {
             $lvl = strtolower((string) ($row->class_level ?? ''));
-            if (isset($counts[$lvl])) {
-                $counts[$lvl]++;
+            if ($lvl !== '') {
+                $counts[$lvl] = (int) ($counts[$lvl] ?? 0) + 1;
             }
         }
 
         $filteredRows = $allRows;
         if (!empty($payload['level'])) {
+            $levelFilter = strtolower(trim((string) $payload['level']));
             $filteredRows = $allRows->filter(function ($row) use ($payload) {
-                return strtolower((string) ($row->class_level ?? '')) === $payload['level'];
+                $levelFilter = strtolower(trim((string) $payload['level']));
+                return strtolower((string) ($row->class_level ?? '')) === $levelFilter;
             })->values();
         }
 
@@ -164,17 +162,22 @@ class UserController extends Controller
             ];
         })->values();
 
+        $levels = collect($counts)
+            ->map(function ($count, $key) {
+                $label = ucwords(str_replace('_', ' ', (string) $key));
+                return ['key' => (string) $key, 'label' => $label, 'count' => (int) $count];
+            })
+            ->sortBy('label')
+            ->values()
+            ->all();
+
         return response()->json([
             'data' => [
                 'school' => [
                     'id' => $school->id,
                     'name' => $school->name,
                 ],
-                'levels' => [
-                    ['key' => 'nursery', 'label' => 'Nursery', 'count' => $counts['nursery']],
-                    ['key' => 'primary', 'label' => 'Primary', 'count' => $counts['primary']],
-                    ['key' => 'secondary', 'label' => 'Secondary', 'count' => $counts['secondary']],
-                ],
+                'levels' => $levels,
                 'students' => $students,
             ],
         ]);

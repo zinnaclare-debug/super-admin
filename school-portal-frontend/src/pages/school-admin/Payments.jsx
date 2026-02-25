@@ -3,11 +3,10 @@ import api from "../../services/api";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
-const LEVEL_LABELS = {
-  nursery: "Nursery",
-  primary: "Primary",
-  secondary: "Secondary",
-};
+const prettyLevel = (level) =>
+  String(level || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const buildInitialLevelFees = (levels = [], feesByLevel = {}) => {
   const next = {};
@@ -105,7 +104,7 @@ export default function SchoolAdminPayments() {
 
       const amount = Number(row.amount);
       if (!Number.isFinite(amount) || amount < 0) {
-        return alert(`Enter a valid fee amount for ${LEVEL_LABELS[level] || level}.`);
+        return alert(`Enter a valid fee amount for ${prettyLevel(level)}.`);
       }
 
       payloadFees[level] = amount;
@@ -191,13 +190,13 @@ export default function SchoolAdminPayments() {
                         checked={Boolean(levelFees[level]?.enabled)}
                         onChange={(e) => toggleLevel(level, e.target.checked)}
                       />
-                      <span>{LEVEL_LABELS[level] || level}</span>
+                      <span>{prettyLevel(level)}</span>
                     </label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      placeholder={`Enter ${LEVEL_LABELS[level] || level} fee`}
+                      placeholder={`Enter ${prettyLevel(level)} fee`}
                       value={levelFees[level]?.amount ?? ""}
                       disabled={!levelFees[level]?.enabled}
                       onChange={(e) => changeLevelAmount(level, e.target.value)}

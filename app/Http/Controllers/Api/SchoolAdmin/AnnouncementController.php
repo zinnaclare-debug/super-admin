@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Models\School;
+use App\Models\SchoolClass;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -15,14 +18,20 @@ class AnnouncementController extends Controller
         $schoolId = (int) $user->school_id;
 
         $request->validate([
-            'level' => ['nullable', Rule::in(['nursery', 'primary', 'secondary'])],
+            'level' => ['nullable', 'string', 'max:60'],
             'status' => ['nullable', Rule::in(['all', 'active', 'inactive'])],
         ]);
 
+        $allowedLevels = $this->resolveAllowedLevels($schoolId);
+        $requestedLevel = $this->normalizeLevel($request->input('level'));
+        if ($requestedLevel !== null && !in_array($requestedLevel, $allowedLevels, true)) {
+            return response()->json(['message' => 'Invalid level selected.'], 422);
+        }
+
         $query = Announcement::query()
             ->where('school_id', $schoolId)
-            ->when($request->filled('level'), function ($q) use ($request) {
-                $q->where('level', $request->string('level')->toString());
+            ->when($requestedLevel !== null, function ($q) use ($requestedLevel) {
+                $q->where('level', $requestedLevel);
             })
             ->when($request->string('status')->toString() === 'active', function ($q) {
                 $q->where('is_active', true);
@@ -47,16 +56,22 @@ class AnnouncementController extends Controller
         $payload = $request->validate([
             'title' => ['required', 'string', 'max:160'],
             'message' => ['required', 'string', 'max:5000'],
-            'level' => ['nullable', Rule::in(['nursery', 'primary', 'secondary'])],
+            'level' => ['nullable', 'string', 'max:60'],
             'expires_at' => ['nullable', 'date'],
         ]);
+
+        $allowedLevels = $this->resolveAllowedLevels($schoolId);
+        $level = $this->normalizeLevel($payload['level'] ?? null);
+        if ($level !== null && !in_array($level, $allowedLevels, true)) {
+            return response()->json(['message' => 'Invalid level selected.'], 422);
+        }
 
         $announcement = Announcement::create([
             'school_id' => $schoolId,
             'created_by_user_id' => $user->id,
             'title' => trim($payload['title']),
             'message' => trim($payload['message']),
-            'level' => $payload['level'] ?? null,
+            'level' => $level,
             'is_active' => true,
             'published_at' => now(),
             'expires_at' => $payload['expires_at'] ?? null,
@@ -82,10 +97,12 @@ class AnnouncementController extends Controller
         $payload = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:160'],
             'message' => ['sometimes', 'required', 'string', 'max:5000'],
-            'level' => ['sometimes', 'nullable', Rule::in(['nursery', 'primary', 'secondary'])],
+            'level' => ['sometimes', 'nullable', 'string', 'max:60'],
             'is_active' => ['sometimes', 'boolean'],
             'expires_at' => ['sometimes', 'nullable', 'date'],
         ]);
+
+        $allowedLevels = $this->resolveAllowedLevels($schoolId);
 
         if (array_key_exists('title', $payload)) {
             $announcement->title = trim((string) $payload['title']);
@@ -96,7 +113,11 @@ class AnnouncementController extends Controller
         }
 
         if (array_key_exists('level', $payload)) {
-            $announcement->level = $payload['level'];
+            $level = $this->normalizeLevel($payload['level']);
+            if ($level !== null && !in_array($level, $allowedLevels, true)) {
+                return response()->json(['message' => 'Invalid level selected.'], 422);
+            }
+            $announcement->level = $level;
         }
 
         if (array_key_exists('is_active', $payload)) {
@@ -132,12 +153,16 @@ class AnnouncementController extends Controller
 
     private function toPayload(Announcement $item): array
     {
+        $audience = $item->level
+            ? $this->prettyLevel($item->level) . ' only'
+            : 'School-wide';
+
         return [
             'id' => $item->id,
             'title' => $item->title,
             'message' => $item->message,
             'level' => $item->level,
-            'audience' => $item->level ? ucfirst($item->level) . ' only' : 'School-wide',
+            'audience' => $audience,
             'is_active' => (bool) $item->is_active,
             'published_at' => optional($item->published_at)->toIso8601String(),
             'expires_at' => optional($item->expires_at)->toIso8601String(),
@@ -149,5 +174,39 @@ class AnnouncementController extends Controller
             'updated_at' => optional($item->updated_at)->toIso8601String(),
         ];
     }
-}
 
+    private function normalizeLevel(mixed $value): ?string
+    {
+        $normalized = strtolower(trim((string) $value));
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function prettyLevel(string $value): string
+    {
+        return ucwords(str_replace('_', ' ', strtolower(trim($value))));
+    }
+
+    private function resolveAllowedLevels(int $schoolId): array
+    {
+        $fromClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->pluck('level')
+            ->map(fn ($value) => strtolower(trim((string) $value)))
+            ->filter(fn ($value) => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $school = School::query()->find($schoolId);
+        $fromTemplates = $school
+            ? ClassTemplateSchema::activeLevelKeys(ClassTemplateSchema::normalize($school->class_templates))
+            : [];
+
+        return collect(array_merge($fromClasses, $fromTemplates))
+            ->map(fn ($value) => strtolower(trim((string) $value)))
+            ->filter(fn ($value) => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+}

@@ -3,56 +3,52 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Guardian;
+use App\Models\School;
+use App\Models\SchoolClass;
+use App\Models\Staff;
+use App\Models\Student;
+use App\Models\User;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
-use App\Models\User;
-use App\Models\Student;
-use App\Models\Staff;
-use App\Models\Guardian;
-
 class RegistrationController extends Controller
 {
-    /**
-     * STEP 1 - Preview: Validate form and generate username
-     * Now supports multipart/form-data (photo can be sent too).
-     */
     public function preview(Request $request)
     {
         $school = $request->user()->school;
+        $schoolId = (int) $school->id;
 
         $request->validate([
             'role' => 'required|in:student,staff',
             'name' => 'required|string',
             'password' => 'required|min:6',
-
-            // important now that you select education_level in UI
-            'education_level' => 'nullable|in:nursery,primary,secondary',
+            'education_level' => 'nullable|string|max:60',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-
-            // photo can be validated early
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        $username = $this->generateUsername($school, $request->name);
+        $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
+        if ($educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
+            return response()->json(['message' => 'Invalid education level selected.'], 422);
+        }
+
+        $username = $this->generateUsername($school, (string) $request->name);
 
         return response()->json([
             'username' => $username,
-            'message' => 'Username generated successfully'
+            'message' => 'Username generated successfully',
         ]);
     }
 
-    /**
-     * STEP 2 - Confirm: Create user with form data
-     */
     public function confirm(Request $request)
     {
         $school = $request->user()->school;
-        $schoolId = $school->id;
+        $schoolId = (int) $school->id;
 
-        // email rules depend on role
         $emailRule = $request->input('role') === 'staff'
             ? 'required|string|email|unique:users,email'
             : 'nullable|string|email|unique:users,email';
@@ -63,15 +59,17 @@ class RegistrationController extends Controller
             'email' => $emailRule,
             'password' => 'required|min:6',
             'username' => 'required|string|unique:users,username',
-
-            'education_level' => 'nullable|in:nursery,primary,secondary',
+            'education_level' => 'nullable|string|max:60',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        // ✅ SAVE PHOTO (if any)
+        $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
+        if ($educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
+            return response()->json(['message' => 'Invalid education level selected.'], 422);
+        }
+
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $dir = "schools/{$schoolId}/profiles";
@@ -80,22 +78,16 @@ class RegistrationController extends Controller
             $photoPath = $request->file('photo')->storeAs($dir, $filename, 'public');
         }
 
-        // -------------------------
-        // CREATE USER
-        // -------------------------
         $user = User::create([
             'school_id' => $schoolId,
             'name' => $request->name,
             'username' => $request->username,
-            'email' => $request->email, // can be null for student
+            'email' => $request->email,
             'photo_path' => $photoPath,
             'password' => Hash::make($request->password),
             'role' => $request->role,
         ]);
 
-        // -------------------------
-        // STUDENT / STAFF PROFILE
-        // -------------------------
         if ($request->role === 'student') {
             Student::create([
                 'user_id' => $user->id,
@@ -114,14 +106,11 @@ class RegistrationController extends Controller
                 'dob' => $request->input('dob') ?? null,
                 'address' => $request->input('address') ?? null,
                 'position' => $request->input('staff_position') ?? null,
-                'education_level' => $request->input('education_level') ?? null,
+                'education_level' => $educationLevel,
                 'photo_path' => $photoPath,
             ]);
         }
 
-        // -------------------------
-        // GUARDIAN (OPTIONAL)
-        // -------------------------
         if ($request->input('guardian_name')) {
             Guardian::create([
                 'school_id' => $schoolId,
@@ -143,14 +132,10 @@ class RegistrationController extends Controller
         ], 201);
     }
 
-    /**
-     * OPTIONAL: SINGLE-STEP registration
-     * Keep it consistent (fix email assignment).
-     */
     public function register(Request $request)
     {
         $school = $request->user()->school;
-        $schoolId = $school->id;
+        $schoolId = (int) $school->id;
 
         $emailRule = $request->input('role') === 'staff'
             ? 'required|string|email|unique:users,email'
@@ -160,16 +145,19 @@ class RegistrationController extends Controller
             'role' => 'required|in:student,staff',
             'name' => 'required|string',
             'password' => 'required|min:6',
-
             'email' => $emailRule,
-            'education_level' => 'nullable|in:nursery,primary,secondary',
+            'education_level' => 'nullable|string|max:60',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        $username = $this->generateUsername($school, $request->name);
+        $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
+        if ($educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
+            return response()->json(['message' => 'Invalid education level selected.'], 422);
+        }
+
+        $username = $this->generateUsername($school, (string) $request->name);
 
         $photoPath = null;
         if ($request->hasFile('photo')) {
@@ -183,7 +171,7 @@ class RegistrationController extends Controller
             'school_id' => $schoolId,
             'name' => $request->name,
             'username' => $username,
-            'email' => $request->email, // ✅ fixed
+            'email' => $request->email,
             'photo_path' => $photoPath,
             'password' => Hash::make($request->password),
             'role' => $request->role,
@@ -207,7 +195,7 @@ class RegistrationController extends Controller
                 'dob' => $request->input('dob') ?? null,
                 'address' => $request->input('address') ?? null,
                 'position' => $request->input('staff_position') ?? null,
-                'education_level' => $request->input('education_level') ?? null,
+                'education_level' => $educationLevel,
                 'photo_path' => $photoPath,
             ]);
         }
@@ -233,24 +221,58 @@ class RegistrationController extends Controller
         ], 201);
     }
 
-    private function generateUsername($school, $fullName)
+    private function generateUsername($school, string $fullName): string
     {
-        $prefix = strtoupper($school->username_prefix);
+        $prefix = strtoupper((string) $school->username_prefix);
         $surname = strtolower(explode(' ', trim($fullName))[0]);
 
-        $lastUser = User::where('school_id', $school->id)
+        $lastUser = User::query()
+            ->where('school_id', $school->id)
             ->where('username', 'LIKE', "{$prefix}-{$surname}%")
-            ->orderBy('id', 'desc')
+            ->orderByDesc('id')
             ->first();
 
         if ($lastUser) {
-            preg_match('/(\d+)$/', $lastUser->username, $matches);
-            $number = isset($matches[1]) ? ((int)$matches[1] + 1) : 1;
+            preg_match('/(\d+)$/', (string) $lastUser->username, $matches);
+            $number = isset($matches[1]) ? ((int) $matches[1] + 1) : 1;
         } else {
             $number = 1;
         }
 
         return "{$prefix}-{$surname}{$number}";
+    }
+
+    private function normalizeEducationLevel(?string $value): ?string
+    {
+        $normalized = strtolower(trim((string) $value));
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function isValidEducationLevel(int $schoolId, string $level): bool
+    {
+        $normalizedLevel = strtolower(trim($level));
+        if ($normalizedLevel === '') {
+            return false;
+        }
+
+        $existsInClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->whereRaw('LOWER(level) = ?', [$normalizedLevel])
+            ->exists();
+        if ($existsInClasses) {
+            return true;
+        }
+
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return false;
+        }
+
+        $activeTemplateLevels = ClassTemplateSchema::activeLevelKeys(
+            ClassTemplateSchema::normalize($school->class_templates)
+        );
+
+        return in_array($normalizedLevel, $activeTemplateLevels, true);
     }
 
     private function storageUrl(?string $path): ?string

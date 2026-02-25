@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\ClassDepartment;
 use App\Models\LevelDepartment;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Term;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -375,6 +377,11 @@ class PromotionController extends Controller
             return null;
         }
 
+        $templateMapped = $this->resolveNextClassUsingTemplates($schoolId, $targetSessionId, $sourceClass, $classes);
+        if ($templateMapped) {
+            return $templateMapped;
+        }
+
         $sourceRank = $this->classProgressionRank((string) $sourceClass->name, (string) $sourceClass->level);
         $targetRank = $this->nextClassProgressionRank($sourceRank);
 
@@ -405,6 +412,107 @@ class PromotionController extends Controller
 
         return $classes
             ->where('level', $sourceClass->level)
+            ->sortBy('id')
+            ->first();
+    }
+
+    private function resolveNextClassUsingTemplates(
+        int $schoolId,
+        int $targetSessionId,
+        SchoolClass $sourceClass,
+        $targetClasses
+    ): ?SchoolClass {
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return null;
+        }
+
+        $sections = ClassTemplateSchema::activeSections(
+            ClassTemplateSchema::normalize($school->class_templates)
+        );
+        if (empty($sections)) {
+            return null;
+        }
+
+        $sequence = [];
+        foreach ($sections as $section) {
+            $level = strtolower(trim((string) ($section['key'] ?? '')));
+            if ($level === '') {
+                continue;
+            }
+
+            $classNames = collect((array) ($section['classes'] ?? []))
+                ->map(fn ($name) => trim((string) $name))
+                ->filter(fn ($name) => $name !== '')
+                ->values()
+                ->all();
+
+            foreach ($classNames as $className) {
+                $sequence[] = [
+                    'level' => $level,
+                    'name' => strtolower(trim($className)),
+                ];
+            }
+        }
+
+        if (count($sequence) < 2) {
+            return null;
+        }
+
+        $sourceLevel = strtolower(trim((string) $sourceClass->level));
+        $sourceName = strtolower(trim((string) $sourceClass->name));
+
+        $sourceIndex = collect($sequence)
+            ->search(fn ($item) => $item['level'] === $sourceLevel && $item['name'] === $sourceName);
+
+        if ($sourceIndex === false) {
+            $sourceSessionClasses = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $sourceClass->academic_session_id)
+                ->orderBy('id')
+                ->get(['id', 'name', 'level']);
+
+            $levelClasses = $sourceSessionClasses
+                ->filter(fn (SchoolClass $class) => strtolower(trim((string) $class->level)) === $sourceLevel)
+                ->values();
+
+            $sourceLevelIndex = $levelClasses->search(
+                fn (SchoolClass $class) => (int) $class->id === (int) $sourceClass->id
+            );
+
+            if ($sourceLevelIndex !== false) {
+                $sequenceIndexes = collect($sequence)
+                    ->map(fn ($item, $idx) => $item['level'] === $sourceLevel ? $idx : null)
+                    ->filter(fn ($idx) => $idx !== null)
+                    ->values();
+
+                if ($sequenceIndexes->has((int) $sourceLevelIndex)) {
+                    $sourceIndex = (int) $sequenceIndexes[(int) $sourceLevelIndex];
+                }
+            }
+        }
+
+        if ($sourceIndex === false || $sourceIndex === null) {
+            return null;
+        }
+
+        $nextIndex = (int) $sourceIndex + 1;
+        if (!isset($sequence[$nextIndex])) {
+            return null;
+        }
+
+        $nextSpec = $sequence[$nextIndex];
+
+        $exact = $targetClasses->first(function (SchoolClass $class) use ($nextSpec) {
+            return strtolower(trim((string) $class->level)) === $nextSpec['level']
+                && strtolower(trim((string) $class->name)) === $nextSpec['name'];
+        });
+        if ($exact) {
+            return $exact;
+        }
+
+        return $targetClasses
+            ->filter(fn (SchoolClass $class) => strtolower(trim((string) $class->level)) === $nextSpec['level'])
             ->sortBy('id')
             ->first();
     }

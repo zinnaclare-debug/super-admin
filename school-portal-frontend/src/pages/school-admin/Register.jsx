@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 
+const prettyLevel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 const toAbsoluteUrl = (url) => {
   if (!url) return "";
   if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
@@ -24,6 +29,7 @@ export default function Register() {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const [educationLevels, setEducationLevels] = useState([]);
 
   const [form, setForm] = useState({
     role: "",
@@ -50,6 +56,32 @@ export default function Register() {
 
   const isStudent = form.role === "student";
   const isStaff = form.role === "staff";
+
+  useEffect(() => {
+    let mounted = true;
+    const loadEducationLevels = async () => {
+      try {
+        const res = await api.get("/api/school-admin/class-templates");
+        const templates = Array.isArray(res.data?.data) ? res.data.data : [];
+        const levels = templates
+          .filter((section) => Boolean(section?.enabled))
+          .map((section) => String(section?.key || "").trim().toLowerCase())
+          .filter(Boolean);
+        if (mounted) {
+          setEducationLevels(Array.from(new Set(levels)));
+        }
+      } catch {
+        if (mounted) {
+          setEducationLevels([]);
+        }
+      }
+    };
+
+    loadEducationLevels();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isEditMode || !editUserId) return;
@@ -246,9 +278,14 @@ export default function Register() {
           </h3>
           <select name="education_level" value={form.education_level} onChange={handleChange}>
             <option value="">Select Level</option>
-            <option value="nursery">Nursery</option>
-            <option value="primary">Primary</option>
-            <option value="secondary">Secondary</option>
+            {educationLevels.map((level) => (
+              <option key={level} value={level}>
+                {prettyLevel(level)}
+              </option>
+            ))}
+            {form.education_level && !educationLevels.includes(form.education_level) && (
+              <option value={form.education_level}>{prettyLevel(form.education_level)}</option>
+            )}
           </select>
 
           <h3 style={{ marginTop: 14 }}>Basic Info</h3>

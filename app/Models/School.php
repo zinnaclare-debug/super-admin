@@ -17,6 +17,7 @@ class School extends Model
         'head_signature_path',
         'assessment_schema',
         'department_templates',
+        'class_templates',
         'slug',
         'subdomain',
         'status',
@@ -28,6 +29,7 @@ class School extends Model
         'results_published' => 'boolean',
         'assessment_schema' => 'array',
         'department_templates' => 'array',
+        'class_templates' => 'array',
     ];
 
     public function features(): HasMany

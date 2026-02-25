@@ -422,8 +422,6 @@ class SchoolFeesController extends Controller
         }
 
         $normalized = strtolower(trim((string) $level));
-        return in_array($normalized, ['nursery', 'primary', 'secondary'], true)
-            ? $normalized
-            : null;
+        return $normalized !== '' ? $normalized : null;
     }
 }

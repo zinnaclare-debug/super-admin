@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Guardian;
+use App\Models\School;
+use App\Models\SchoolClass;
 use App\Models\Staff;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -120,7 +123,7 @@ class UserManagementController extends Controller
             'email' => $emailRule,
             'password' => ['nullable', 'string', 'min:6'],
 
-            'education_level' => ['nullable', Rule::in(['nursery', 'primary', 'secondary'])],
+            'education_level' => ['nullable', 'string', 'max:60'],
             'sex' => ['nullable', 'string', 'max:10'],
             'religion' => ['nullable', 'string', 'max:255'],
             'dob' => ['nullable', 'date'],
@@ -140,6 +143,12 @@ class UserManagementController extends Controller
 
         $user->name = $validated['name'];
         $user->email = $validated['email'] ?? null;
+        $educationLevel = $this->normalizeEducationLevel($validated['education_level'] ?? null);
+        if ($educationLevel !== null && !$this->isValidEducationLevel((int) $user->school_id, $educationLevel)) {
+            return response()->json([
+                'message' => 'Invalid education level selected.',
+            ], 422);
+        }
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }
@@ -202,7 +211,7 @@ class UserManagementController extends Controller
             $staff->dob = $validated['dob'] ?? $staff->dob;
             $staff->address = $validated['address'] ?? $staff->address;
             $staff->position = $validated['staff_position'] ?? $staff->position;
-            $staff->education_level = $validated['education_level'] ?? $staff->education_level;
+            $staff->education_level = $educationLevel ?? $staff->education_level;
             if ($photoPath) {
                 $staff->photo_path = $photoPath;
             }
@@ -277,5 +286,38 @@ class UserManagementController extends Controller
             || str_starts_with($relativeOrAbsolute, 'https://')
             ? $relativeOrAbsolute
             : url($relativeOrAbsolute);
+    }
+
+    private function normalizeEducationLevel(?string $value): ?string
+    {
+        $normalized = strtolower(trim((string) $value));
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function isValidEducationLevel(int $schoolId, string $level): bool
+    {
+        $normalizedLevel = strtolower(trim($level));
+        if ($normalizedLevel === '') {
+            return false;
+        }
+
+        $existsInClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->whereRaw('LOWER(level) = ?', [$normalizedLevel])
+            ->exists();
+        if ($existsInClasses) {
+            return true;
+        }
+
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return false;
+        }
+
+        $activeTemplateLevels = ClassTemplateSchema::activeLevelKeys(
+            ClassTemplateSchema::normalize($school->class_templates)
+        );
+
+        return in_array($normalizedLevel, $activeTemplateLevels, true);
     }
 }

@@ -35,10 +35,7 @@ class AcademicsController extends Controller
             ], 200);
         }
 
-        $rawLevels = $session->levels ?? [];
-
-        // Normalize levels: accept either ["nursery","primary"] or [{"level":"nursery"}, ...]
-        $activeLevels = collect($rawLevels)
+        $activeLevels = collect((array) ($session->levels ?? []))
             ->map(function ($item) {
                 if (is_array($item)) {
                     return isset($item['level']) ? strtolower($item['level']) : null;
@@ -46,21 +43,32 @@ class AcademicsController extends Controller
                 return is_string($item) ? strtolower($item) : null;
             })
             ->filter()
+            ->unique()
             ->values()
             ->toArray();
 
-        $allowed = ['nursery', 'primary', 'secondary'];
-        $activeLevels = array_values(array_filter(
-            $activeLevels,
-            fn ($l) => in_array($l, $allowed, true)
-        ));
+        if (empty($activeLevels)) {
+            $activeLevels = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->pluck('level')
+                ->map(fn ($level) => strtolower(trim((string) $level)))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
 
-        $classes = SchoolClass::where('school_id', $schoolId)
+        $classesQuery = SchoolClass::where('school_id', $schoolId)
             ->where('academic_session_id', $session->id)
-            ->whereIn('level', $activeLevels)
             ->orderBy('level')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('id');
+
+        if (!empty($activeLevels)) {
+            $classesQuery->whereIn('level', $activeLevels);
+        }
+
+        $classes = $classesQuery->get();
 
         return response()->json([
             'data' => [

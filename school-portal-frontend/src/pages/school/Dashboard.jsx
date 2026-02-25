@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import "./Dashboard.css";
 
@@ -47,6 +48,7 @@ const normalizeExamRecord = (record) => {
 };
 
 function SchoolDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     school_name: "",
     school_location: "",
@@ -556,6 +558,13 @@ function SchoolDashboard() {
           <div className="sd-actions">
             <button onClick={saveBranding} disabled={savingBranding}>
               {savingBranding ? "Saving..." : "Save Branding"}
+            </button>
+            <button
+              type="button"
+              className="sd-actions__alt"
+              onClick={() => navigate("/school/admin/class-templates")}
+            >
+              Create Class
             </button>
             <button type="button" className="sd-actions__alt" onClick={openExamRecordModal}>
               Create Exam Record
