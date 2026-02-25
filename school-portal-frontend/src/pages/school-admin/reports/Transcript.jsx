@@ -42,7 +42,7 @@ function termSlot(termName) {
 }
 
 function groupTermEntries(entries) {
-  if ((entries || []).length > 0 && Array.isArray(entries[0]?.terms) && !entries[0]?.term) {
+  if ((entries || []).length > 0 && Array.isArray(entries[0]?.rows) && !entries[0]?.term && !entries[0]?.terms) {
     return entries;
   }
 
@@ -73,43 +73,32 @@ function groupTermEntries(entries) {
       if (!group.subjects.has(subjectKey)) {
         group.subjects.set(subjectKey, {
           subject_name: subjectName,
-          totals: { first: null, second: null, third: null },
+          first_total: null,
+          second_total: null,
+          third_total: null,
         });
       }
 
-      group.subjects.get(subjectKey).totals[slot] = Number(row?.total ?? 0);
+      group.subjects.get(subjectKey)[`${slot}_total`] = Number(row?.total ?? 0);
     });
   });
 
   return Array.from(map.values()).map((group) => {
-    const subjects = Array.from(group.subjects.values()).sort((a, b) =>
+    const rows = Array.from(group.subjects.values()).sort((a, b) =>
       String(a.subject_name || "").localeCompare(String(b.subject_name || ""), undefined, { sensitivity: "base" })
     );
 
-    const termRows = { first: [], second: [], third: [] };
-    subjects.forEach((subject) => {
-      const values = [subject.totals.first, subject.totals.second, subject.totals.third].filter((v) => v !== null);
+    rows.forEach((row) => {
+      const values = [row.first_total, row.second_total, row.third_total].filter((v) => v !== null);
       const annualAverage = values.length ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null;
-      const annualGrade = annualAverage === null ? "-" : gradeFromAverage(Math.round(annualAverage));
-
-      ["first", "second", "third"].forEach((slot) => {
-        termRows[slot].push({
-          subject_name: subject.subject_name,
-          total: subject.totals[slot],
-          annual_average: annualAverage,
-          grade: annualGrade,
-        });
-      });
+      row.annual_average = annualAverage;
+      row.annual_grade = annualAverage === null ? "-" : gradeFromAverage(Math.round(annualAverage));
     });
 
     return {
       session: group.session,
       class: group.class,
-      terms: [
-        { slot: "first", name: "First Term", rows: termRows.first },
-        { slot: "second", name: "Second Term", rows: termRows.second },
-        { slot: "third", name: "Third Term", rows: termRows.third },
-      ],
+      rows,
     };
   });
 }
@@ -232,50 +221,49 @@ export default function Transcript() {
         </div>
       ) : null}
 
-      {groupedEntries.map((group, groupIndex) => (
-        <div className="transcript-entry" key={`${group.session?.id || "s"}-${group.class?.id || "c"}-${groupIndex}`}>
-          <div className="transcript-entry-head">
-            <h3>
-              {group.session?.academic_year || group.session?.session_name || "-"} | {group.class?.name || "-"}
-            </h3>
-          </div>
+      <div className="transcript-session-grid">
+        {groupedEntries.map((group, groupIndex) => (
+          <div className="transcript-entry" key={`${group.session?.id || "s"}-${group.class?.id || "c"}-${groupIndex}`}>
+            <div className="transcript-entry-head">
+              <h3>
+                {group.session?.academic_year || group.session?.session_name || "-"} | {group.class?.name || "-"}
+              </h3>
+            </div>
 
-          <div className="transcript-terms-grid">
-            {(group.terms || []).map((term) => (
-              <div className="transcript-term-card" key={`${groupIndex}-${term.slot}`}>
-                <div className="transcript-term-title">{term.name}</div>
-                <div className="transcript-table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Subject</th>
-                        <th>Total</th>
-                        <th>Annual Average</th>
-                        <th>Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(term.rows || []).map((row, idx) => (
-                        <tr key={`${term.slot}-${idx}-${row.subject_name}`}>
-                          <td>{row.subject_name}</td>
-                          <td>{row.total === null ? "-" : row.total}</td>
-                          <td>{row.annual_average === null ? "-" : Number(row.annual_average).toFixed(2)}</td>
-                          <td>{row.grade}</td>
-                        </tr>
-                      ))}
-                      {(term.rows || []).length === 0 ? (
-                        <tr>
-                          <td colSpan="4">No graded records.</td>
-                        </tr>
-                      ) : null}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
+            <div className="transcript-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>First Term</th>
+                    <th>Second Term</th>
+                    <th>Third Term</th>
+                    <th>Annual Average</th>
+                    <th>Annual Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(group.rows || []).map((row, idx) => (
+                    <tr key={`${groupIndex}-${idx}-${row.subject_name}`}>
+                      <td>{row.subject_name}</td>
+                      <td>{row.first_total === null ? "-" : row.first_total}</td>
+                      <td>{row.second_total === null ? "-" : row.second_total}</td>
+                      <td>{row.third_total === null ? "-" : row.third_total}</td>
+                      <td>{row.annual_average === null ? "-" : Number(row.annual_average).toFixed(2)}</td>
+                      <td>{row.annual_grade || "-"}</td>
+                    </tr>
+                  ))}
+                  {(group.rows || []).length === 0 ? (
+                    <tr>
+                      <td colSpan="6">No graded records.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

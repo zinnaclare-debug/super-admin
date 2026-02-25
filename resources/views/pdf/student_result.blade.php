@@ -133,7 +133,7 @@
         $assessmentParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
     }
     $assessmentPattern = implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')';
-    $scoreColspan = 10 + count($activeCaIndices);
+    $scoreColspan = 5 + count($activeCaIndices);
     $nextTermBeginLabel = '-';
     if (!empty($nextTermBeginDate)) {
         try {
@@ -213,15 +213,10 @@
                 <tr>
                     <th class="center">SUBJECT</th>
                     @foreach($activeCaIndices as $index)
-                        <th class="center">CA{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
+                        <th class="center">C{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
                     @endforeach
-                    <th class="center">CA TOTAL</th>
                     <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
                     <th class="center">TOTAL</th>
-                    <th class="center">MIN</th>
-                    <th class="center">MAX</th>
-                    <th class="center">CLASS AVE</th>
-                    <th class="center">POSITION</th>
                     <th class="center">GRADE</th>
                     <th class="center">REMARK</th>
                 </tr>
@@ -233,13 +228,8 @@
                         @foreach($activeCaIndices as $index)
                             <td class="center">{{ (int) (($row['ca_breakdown'][$index] ?? 0)) }}</td>
                         @endforeach
-                        <td class="center">{{ $row['ca'] }}</td>
                         <td class="center">{{ $row['exam'] }}</td>
                         <td class="center">{{ $row['total'] }}</td>
-                        <td class="center">{{ $row['min_score'] ?? 0 }}</td>
-                        <td class="center">{{ $row['max_score'] ?? 0 }}</td>
-                        <td class="center">{{ number_format((float) ($row['class_average'] ?? 0), 2) }}</td>
-                        <td class="center">{{ $row['position_label'] ?? '-' }}</td>
                         <td class="center">{{ strtoupper($row['grade']) }}</td>
                         <td class="center">{{ strtoupper($row['remark'] ?? '-') }}</td>
                     </tr>

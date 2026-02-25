@@ -1159,25 +1159,32 @@ class ResultsController extends Controller
         $headName = strtoupper((string) data_get($viewData, 'school.head_of_school_name', '-'));
         $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
         $caSummaryParts = [];
-        foreach (AssessmentSchema::activeCaIndices($assessmentSchema) as $index) {
+        $activeCaIndices = AssessmentSchema::activeCaIndices($assessmentSchema);
+        foreach ($activeCaIndices as $index) {
             $caSummaryParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
         }
         $assessmentSummary = implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')';
 
+        $caHeaderHtml = '';
+        foreach ($activeCaIndices as $index) {
+            $caHeaderHtml .= '<th style="width:8%;">C' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
+        }
+
         $rowsHtml = '';
         foreach ((array) data_get($viewData, 'rows', []) as $row) {
             $subject = strtoupper((string) ($row['subject_name'] ?? '-'));
-            $ca = (int) ($row['ca'] ?? 0);
             $exam = (int) ($row['exam'] ?? 0);
             $score = (int) ($row['total'] ?? 0);
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
-            $caDetails = strtoupper((string) ($row['ca_breakdown_text'] ?? '-'));
+            $caCellsHtml = '';
+            foreach ($activeCaIndices as $index) {
+                $caCellsHtml .= '<td style="text-align:center;">' . (int) ($row['ca_breakdown'][$index] ?? 0) . '</td>';
+            }
 
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
-                . '<td style="text-align:center;">' . $ca . '</td>'
-                . '<td>' . e($caDetails) . '</td>'
+                . $caCellsHtml
                 . '<td style="text-align:center;">' . $exam . '</td>'
                 . '<td style="text-align:center;">' . $score . '</td>'
                 . '<td style="text-align:center;">' . e($grade) . '</td>'
@@ -1186,7 +1193,7 @@ class ResultsController extends Controller
         }
 
         if ($rowsHtml === '') {
-            $rowsHtml = '<tr><td colspan="7" style="text-align:center;">No result data found.</td></tr>';
+            $rowsHtml = '<tr><td colspan="' . (5 + count($activeCaIndices)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
         $behaviourHtml = '';
@@ -1241,7 +1248,9 @@ class ResultsController extends Controller
             . '<tr><th>Assessment Pattern</th><td colspan="3">' . e($assessmentSummary) . '</td></tr>'
             . '</table>'
             . '<table>'
-            . '<thead><tr><th style="width:25%;">Subject</th><th style="width:8%;">CA</th><th style="width:25%;">CA Details</th><th style="width:8%;">Exam</th><th style="width:8%;">Total</th><th style="width:8%;">Grade</th><th style="width:18%;">Remark</th></tr></thead>'
+            . '<thead><tr><th style="width:30%;">Subject</th>'
+            . $caHeaderHtml
+            . '<th style="width:8%;">Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th><th style="width:8%;">Total</th><th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
