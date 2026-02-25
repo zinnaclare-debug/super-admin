@@ -111,6 +111,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::put('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'upsertExamRecord']);
     Route::get('/school-admin/department-templates', [SchoolAdminDashboardController::class, 'departmentTemplates']);
     Route::post('/school-admin/department-templates', [SchoolAdminDashboardController::class, 'storeDepartmentTemplate']);
+    Route::patch('/school-admin/department-templates', [SchoolAdminDashboardController::class, 'updateDepartmentTemplate']);
+    Route::delete('/school-admin/department-templates', [SchoolAdminDashboardController::class, 'deleteDepartmentTemplate']);
     Route::get('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'classTemplates']);
     Route::put('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'upsertClassTemplates']);
 
@@ -185,6 +187,10 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:academic_session');
 
     Route::post('/school-admin/academic-sessions/{session}/level-departments', [AcademicStructureController::class, 'createLevelDepartment'])
+        ->middleware('feature:academic_session');
+    Route::patch('/school-admin/academic-sessions/{session}/level-departments/{department}', [AcademicStructureController::class, 'updateLevelDepartment'])
+        ->middleware('feature:academic_session');
+    Route::delete('/school-admin/academic-sessions/{session}/level-departments/{department}', [AcademicStructureController::class, 'deleteLevelDepartment'])
         ->middleware('feature:academic_session');
 
     // ✅ Class Terms page

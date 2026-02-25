@@ -73,6 +73,19 @@ class TeacherResultsController extends Controller
       : null;
     abort_unless($currentTerm && (int)$termSubject->term_id === (int)$currentTerm->id, 403);
 
+    $subjectSummary = TermSubject::query()
+      ->where('term_subjects.id', $termSubject->id)
+      ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+      ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+      ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+      ->select([
+        'subjects.name as subject_name',
+        'classes.name as class_name',
+        'classes.level as class_level',
+        'terms.name as term_name',
+      ])
+      ->first();
+
     // students enrolled in the same class + term
     $rows = Enrollment::query()
       ->where('enrollments.class_id', $termSubject->class_id)
@@ -115,6 +128,10 @@ class TeacherResultsController extends Controller
     return response()->json([
       'data' => [
         'term_subject_id' => $termSubject->id,
+        'subject_name' => (string) ($subjectSummary->subject_name ?? ''),
+        'class_name' => (string) ($subjectSummary->class_name ?? ''),
+        'class_level' => (string) ($subjectSummary->class_level ?? ''),
+        'term_name' => (string) ($subjectSummary->term_name ?? ''),
         'assessment_schema' => $assessmentSchema,
         'students' => $rows,
       ]

@@ -77,6 +77,8 @@ function SchoolDashboard() {
   const [departmentTemplates, setDepartmentTemplates] = useState([]);
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [savingDepartmentTemplate, setSavingDepartmentTemplate] = useState(false);
+  const [updatingDepartmentTemplate, setUpdatingDepartmentTemplate] = useState("");
+  const [deletingDepartmentTemplate, setDeletingDepartmentTemplate] = useState("");
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
 
@@ -317,6 +319,64 @@ function SchoolDashboard() {
     }
   };
 
+  const editDepartmentTemplate = async (currentName) => {
+    const nextName = window.prompt("Enter new department name", currentName);
+    if (nextName === null) return;
+
+    const trimmed = String(nextName || "").trim();
+    if (!trimmed) {
+      alert("Department name cannot be empty.");
+      return;
+    }
+    if (trimmed.toLowerCase() === String(currentName || "").trim().toLowerCase()) {
+      return;
+    }
+
+    setUpdatingDepartmentTemplate(currentName);
+    try {
+      const res = await api.patch("/api/school-admin/department-templates", {
+        old_name: currentName,
+        new_name: trimmed,
+      });
+      setDepartmentTemplates(Array.isArray(res.data?.data) ? res.data.data : departmentTemplates);
+      alert("Department updated.");
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to update department");
+    } finally {
+      setUpdatingDepartmentTemplate("");
+    }
+  };
+
+  const deleteDepartmentTemplate = async (name) => {
+    if (!window.confirm(`Delete "${name}" from branding templates?`)) return;
+
+    setDeletingDepartmentTemplate(name);
+    try {
+      const res = await api.delete("/api/school-admin/department-templates", {
+        data: { name },
+      });
+      setDepartmentTemplates(Array.isArray(res.data?.data) ? res.data.data : []);
+      const retained = Number(res.data?.meta?.retained_class_departments || 0);
+      if (retained > 0) {
+        alert(`Template deleted. ${retained} class department(s) still have enrolled students and were retained.`);
+      } else {
+        alert("Department deleted.");
+      }
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to delete department");
+    } finally {
+      setDeletingDepartmentTemplate("");
+    }
+  };
+
   const onPickLogo = (e) => {
     const file = e.target.files?.[0] || null;
     if (file && !ALLOWED_BRANDING_TYPES.includes(file.type)) {
@@ -547,7 +607,25 @@ function SchoolDashboard() {
                     <span className="sd-empty">No departments added yet.</span>
                   ) : (
                     departmentTemplates.map((name) => (
-                      <span key={name} className="sd-dept-tag">{name}</span>
+                      <span key={name} className="sd-dept-tag">
+                        <span>{name}</span>
+                        <button
+                          type="button"
+                          className="sd-dept-tag-btn"
+                          onClick={() => editDepartmentTemplate(name)}
+                          disabled={updatingDepartmentTemplate === name || deletingDepartmentTemplate === name}
+                        >
+                          {updatingDepartmentTemplate === name ? "..." : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          className="sd-dept-tag-btn sd-dept-tag-btn--danger"
+                          onClick={() => deleteDepartmentTemplate(name)}
+                          disabled={updatingDepartmentTemplate === name || deletingDepartmentTemplate === name}
+                        >
+                          {deletingDepartmentTemplate === name ? "..." : "Delete"}
+                        </button>
+                      </span>
                     ))
                   )}
                 </div>

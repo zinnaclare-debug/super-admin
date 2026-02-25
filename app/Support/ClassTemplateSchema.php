@@ -27,7 +27,7 @@ class ClassTemplateSchema
                 'key' => $key,
                 'label' => $label,
                 'enabled' => $key !== 'pre_nursery',
-                'classes' => self::defaultClassNames($label, $count),
+                'classes' => self::defaultClassRows($label, $count),
             ];
         }
 
@@ -67,26 +67,38 @@ class ClassTemplateSchema
 
             $classes = [];
             if (isset($item['classes']) && is_array($item['classes'])) {
-                foreach ($item['classes'] as $name) {
-                    $clean = trim((string) $name);
-                    if ($clean === '') {
+                foreach ($item['classes'] as $classRow) {
+                    $normalizedClassRow = self::normalizeClassRow($classRow);
+                    if ($normalizedClassRow === null) {
                         continue;
                     }
-                    $classes[] = $clean;
+                    $classes[] = $normalizedClassRow;
                 }
             }
-            $classes = array_values(array_unique($classes, SORT_STRING));
+
+            $classes = collect($classes)
+                ->unique(fn (array $row) => strtolower((string) ($row['name'] ?? '')))
+                ->values()
+                ->all();
+
             if (count($classes) > $size) {
                 $classes = array_slice($classes, 0, $size);
             }
             if (count($classes) < $size) {
-                $defaults = self::defaultClassNames($label, $size);
-                foreach ($defaults as $placeholder) {
+                $defaults = self::defaultClassRows($label, $size);
+                $existing = collect($classes)
+                    ->map(fn (array $row) => strtolower((string) ($row['name'] ?? '')))
+                    ->all();
+
+                foreach ($defaults as $defaultRow) {
                     if (count($classes) >= $size) {
                         break;
                     }
-                    if (!in_array($placeholder, $classes, true)) {
-                        $classes[] = $placeholder;
+
+                    $defaultName = strtolower((string) ($defaultRow['name'] ?? ''));
+                    if (!in_array($defaultName, $existing, true)) {
+                        $classes[] = $defaultRow;
+                        $existing[] = $defaultName;
                     }
                 }
             }
@@ -117,6 +129,36 @@ class ClassTemplateSchema
         ));
     }
 
+    public static function sectionClassNames(array $section, bool $enabledOnly = true): array
+    {
+        $classes = is_array($section['classes'] ?? null) ? $section['classes'] : [];
+
+        return collect($classes)
+            ->map(function ($classRow) {
+                $normalized = self::normalizeClassRow($classRow);
+                if ($normalized === null) {
+                    return null;
+                }
+
+                return [
+                    'name' => (string) $normalized['name'],
+                    'enabled' => (bool) ($normalized['enabled'] ?? true),
+                ];
+            })
+            ->filter()
+            ->filter(fn (array $row) => !$enabledOnly || (bool) $row['enabled'])
+            ->map(fn (array $row) => trim((string) $row['name']))
+            ->filter(fn (string $name) => $name !== '')
+            ->unique(fn (string $name) => strtolower($name))
+            ->values()
+            ->all();
+    }
+
+    public static function activeClassNames(array $section): array
+    {
+        return self::sectionClassNames($section, true);
+    }
+
     public static function sectionSize(string $key): int
     {
         return self::SECTION_SIZES[$key] ?? 0;
@@ -129,13 +171,44 @@ class ClassTemplateSchema
         return trim($value, '_');
     }
 
-    private static function defaultClassNames(string $label, int $count): array
+    private static function normalizeClassRow(mixed $value): ?array
     {
-        $names = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $names[] = trim($label) . ' ' . $i;
+        if (is_array($value)) {
+            $name = trim((string) ($value['name'] ?? ''));
+            if ($name === '') {
+                return null;
+            }
+
+            $enabled = array_key_exists('enabled', $value)
+                ? (bool) $value['enabled']
+                : true;
+
+            return [
+                'name' => $name,
+                'enabled' => $enabled,
+            ];
         }
-        return $names;
+
+        $name = trim((string) $value);
+        if ($name === '') {
+            return null;
+        }
+
+        return [
+            'name' => $name,
+            'enabled' => true,
+        ];
+    }
+
+    private static function defaultClassRows(string $label, int $count): array
+    {
+        $rows = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $rows[] = [
+                'name' => trim($label) . ' ' . $i,
+                'enabled' => true,
+            ];
+        }
+        return $rows;
     }
 }
-

@@ -1144,6 +1144,8 @@ class ResultsController extends Controller
         $schoolLocation = strtoupper((string) data_get($viewData, 'school.location', ''));
         $studentName = strtoupper((string) data_get($viewData, 'studentUser.name', '-'));
         $studentSerial = strtoupper((string) data_get($viewData, 'studentUser.username', '-'));
+        $studentSexRaw = trim((string) data_get($viewData, 'student.sex', ''));
+        $studentSex = $studentSexRaw !== '' ? strtoupper($studentSexRaw) : '-';
         $className = strtoupper((string) data_get($viewData, 'class.name', '-'));
         $termName = strtoupper((string) data_get($viewData, 'term.name', '-'));
         $sessionName = strtoupper((string) (data_get($viewData, 'session.academic_year') ?: data_get($viewData, 'session.session_name', '-')));
@@ -1157,6 +1159,20 @@ class ResultsController extends Controller
         $headSignatureDataUri = (string) data_get($viewData, 'headSignatureDataUri', '');
         $behaviourTraits = (array) data_get($viewData, 'behaviourTraits', []);
         $headName = strtoupper((string) data_get($viewData, 'school.head_of_school_name', '-'));
+        $timesPresent = (int) data_get($viewData, 'attendance.days_present', 0);
+        $timesSchoolOpened = (int) data_get($viewData, 'attendanceSetting.total_school_days', 0);
+        $attendanceSummary = $timesSchoolOpened > 0
+            ? ($timesPresent . '/' . $timesSchoolOpened)
+            : (string) $timesPresent;
+        $nextTermBeginLabel = '-';
+        $nextTermBeginDate = data_get($viewData, 'nextTermBeginDate');
+        if (!empty($nextTermBeginDate)) {
+            try {
+                $nextTermBeginLabel = \Carbon\Carbon::parse($nextTermBeginDate)->format('jS M, Y');
+            } catch (Throwable $e) {
+                $nextTermBeginLabel = '-';
+            }
+        }
         $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
         $caSummaryParts = [];
         $activeCaIndices = AssessmentSchema::activeCaIndices($assessmentSchema);
@@ -1244,6 +1260,8 @@ class ResultsController extends Controller
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
             . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
+            . '<tr><th>Gender</th><td>' . e($studentSex) . '</td><th>Next Term Begins</th><td>' . e($nextTermBeginLabel) . '</td></tr>'
+            . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Number of School Open</th><td>' . $timesSchoolOpened . '</td></tr>'
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
             . '<tr><th>Assessment Pattern</th><td colspan="3">' . e($assessmentSummary) . '</td></tr>'
             . '</table>'

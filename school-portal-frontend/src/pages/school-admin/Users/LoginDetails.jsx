@@ -8,23 +8,41 @@ const parseFileName = (headers, fallback = "user_login_details.csv") => {
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
 };
 
+const prettyLevel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 export default function LoginDetails() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [role, setRole] = useState("");
+  const [level, setLevel] = useState("");
+  const [department, setDepartment] = useState("");
+  const [levels, setLevels] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
 
   const load = async () => {
     setLoading(true);
     try {
+      const params = {};
+      if (role) params.role = role;
+      if (level) params.level = level;
+      if (department) params.department = department;
+
       const res = await api.get("/api/school-admin/users/login-details", {
-        params: role ? { role } : {},
+        params,
       });
       setRows(Array.isArray(res.data?.data) ? res.data.data : []);
+      setLevels(Array.isArray(res.data?.meta?.levels) ? res.data.meta.levels : []);
+      setDepartments(Array.isArray(res.data?.meta?.departments) ? res.data.meta.departments : []);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load login details.");
       setRows([]);
+      setLevels([]);
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
@@ -33,7 +51,7 @@ export default function LoginDetails() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [role, level, department]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -49,8 +67,13 @@ export default function LoginDetails() {
   const download = async () => {
     setDownloading(true);
     try {
+      const params = {};
+      if (role) params.role = role;
+      if (level) params.level = level;
+      if (department) params.department = department;
+
       const res = await api.get("/api/school-admin/users/login-details/download", {
-        params: role ? { role } : {},
+        params,
         responseType: "blob",
       });
 
@@ -79,6 +102,22 @@ export default function LoginDetails() {
           <option value="staff">Staff only</option>
           <option value="student">Students only</option>
         </select>
+        <select value={level} onChange={(e) => setLevel(e.target.value)} style={{ padding: 8 }}>
+          <option value="">All levels</option>
+          {levels.map((value) => (
+            <option key={value} value={value}>
+              {prettyLevel(value)}
+            </option>
+          ))}
+        </select>
+        <select value={department} onChange={(e) => setDepartment(e.target.value)} style={{ padding: 8 }}>
+          <option value="">All departments</option>
+          {departments.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -103,6 +142,8 @@ export default function LoginDetails() {
               <th>S/N</th>
               <th>Name</th>
               <th>Role</th>
+              <th>Education Level</th>
+              <th>Department</th>
               <th>Username</th>
               <th>Email</th>
               <th>Password</th>
@@ -115,6 +156,8 @@ export default function LoginDetails() {
                 <td>{idx + 1}</td>
                 <td>{row.name || "-"}</td>
                 <td>{row.role || "-"}</td>
+                <td>{prettyLevel(row.level || "") || "-"}</td>
+                <td>{row.department || "-"}</td>
                 <td>{row.username || "-"}</td>
                 <td>{row.email || "-"}</td>
                 <td>{row.password || "-"}</td>
@@ -123,7 +166,7 @@ export default function LoginDetails() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
+                <td colSpan="9" style={{ textAlign: "center", opacity: 0.7 }}>
                   No login details found.
                 </td>
               </tr>
@@ -134,4 +177,3 @@ export default function LoginDetails() {
     </div>
   );
 }
-

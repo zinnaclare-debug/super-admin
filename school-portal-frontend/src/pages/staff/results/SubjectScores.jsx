@@ -69,6 +69,7 @@ export default function SubjectScores() {
 
   const [schema, setSchema] = useState(DEFAULT_SCHEMA);
   const [rows, setRows] = useState([]);
+  const [subjectName, setSubjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -86,9 +87,11 @@ export default function SubjectScores() {
       const res = await api.get(`/api/staff/results/subjects/${termSubjectId}/students`);
       const normalizedSchema = normalizeSchema(res.data?.data?.assessment_schema);
       setSchema(normalizedSchema);
+      setSubjectName(String(res.data?.data?.subject_name || "").trim());
       setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema)));
     } catch (e) {
       alert("Failed to load students for this subject");
+      setSubjectName("");
     } finally {
       setLoading(false);
     }
@@ -145,7 +148,7 @@ export default function SubjectScores() {
   };
 
   return (
-    <StaffFeatureLayout title="Enter Results">
+    <StaffFeatureLayout title={subjectName ? `Enter Results - ${subjectName}` : "Enter Results"}>
       <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
         Assessment pattern: {caPattern}. Total max: 100.
       </div>
@@ -227,4 +230,3 @@ export default function SubjectScores() {
     </StaffFeatureLayout>
   );
 }
-

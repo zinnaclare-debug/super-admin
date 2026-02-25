@@ -47,10 +47,6 @@ export default function ClassPage() {
             Unassign Class Teacher
           </button>
         )}
-
-        <button onClick={() => navigate(`/school/admin/classes/${classId}/enroll-students`)}>
-          Enroll Students
-        </button>
       </div>
 
       <div style={{ marginTop: 10, opacity: 0.85 }}>

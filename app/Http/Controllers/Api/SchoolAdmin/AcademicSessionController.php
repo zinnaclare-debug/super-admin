@@ -77,12 +77,7 @@ class AcademicSessionController extends Controller
 
             foreach ($activeSections as $section) {
                 $level = strtolower(trim((string) ($section['key'] ?? '')));
-                $classNames = collect((array) ($section['classes'] ?? []))
-                    ->map(fn ($value) => trim((string) $value))
-                    ->filter(fn ($value) => $value !== '')
-                    ->unique()
-                    ->values()
-                    ->all();
+                $classNames = ClassTemplateSchema::activeClassNames($section);
 
                 foreach ($classNames as $className) {
                     SchoolClass::firstOrCreate([
@@ -427,4 +422,3 @@ class AcademicSessionController extends Controller
         }
     }
 }
-

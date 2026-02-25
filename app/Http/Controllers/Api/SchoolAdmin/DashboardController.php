@@ -271,6 +271,116 @@ class DashboardController extends Controller
         });
     }
 
+    public function updateDepartmentTemplate(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'old_name' => 'required|string|max:80',
+            'new_name' => 'required|string|max:80',
+        ]);
+
+        $oldName = trim((string) ($payload['old_name'] ?? ''));
+        $newName = trim((string) ($payload['new_name'] ?? ''));
+
+        if ($oldName === '' || $newName === '') {
+            return response()->json(['message' => 'Department names are required.'], 422);
+        }
+
+        return DB::transaction(function () use ($school, $oldName, $newName) {
+            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+                $school->department_templates ?? []
+            );
+
+            $oldIndex = collect($templates)->search(
+                fn ($item) => strcasecmp((string) $item, $oldName) === 0
+            );
+            if ($oldIndex === false) {
+                return response()->json([
+                    'message' => 'Department not found in branding templates.',
+                ], 404);
+            }
+
+            if (strcasecmp($oldName, $newName) !== 0) {
+                $newExists = collect($templates)->contains(
+                    fn ($item) => strcasecmp((string) $item, $newName) === 0
+                );
+                if ($newExists) {
+                    return response()->json([
+                        'message' => 'Another department with this name already exists.',
+                    ], 409);
+                }
+            }
+
+            $existingStoredName = (string) $templates[(int) $oldIndex];
+            $templates[(int) $oldIndex] = $newName;
+            $templates = DepartmentTemplateSync::normalizeTemplateNames($templates);
+
+            $school->department_templates = $templates;
+            $school->save();
+
+            if (strcasecmp($existingStoredName, $newName) !== 0) {
+                $this->renameDepartmentAcrossSchool((int) $school->id, $existingStoredName, $newName);
+            }
+
+            return response()->json([
+                'message' => 'Department template updated successfully.',
+                'data' => $templates,
+            ]);
+        });
+    }
+
+    public function deleteDepartmentTemplate(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'name' => 'required|string|max:80',
+        ]);
+
+        $name = trim((string) ($payload['name'] ?? ''));
+        if ($name === '') {
+            return response()->json(['message' => 'Department name is required.'], 422);
+        }
+
+        return DB::transaction(function () use ($school, $name) {
+            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+                $school->department_templates ?? []
+            );
+
+            $existingName = collect($templates)->first(
+                fn ($item) => strcasecmp((string) $item, $name) === 0
+            );
+            if ($existingName === null) {
+                return response()->json([
+                    'message' => 'Department not found in branding templates.',
+                ], 404);
+            }
+
+            $templates = collect($templates)
+                ->reject(fn ($item) => strcasecmp((string) $item, (string) $existingName) === 0)
+                ->values()
+                ->all();
+
+            $school->department_templates = $templates;
+            $school->save();
+
+            $cleanup = $this->removeDepartmentAcrossSchool((int) $school->id, (string) $existingName);
+
+            return response()->json([
+                'message' => 'Department template deleted.',
+                'data' => $templates,
+                'meta' => $cleanup,
+            ]);
+        });
+    }
+
     public function classTemplates(Request $request)
     {
         $school = School::find((int) $request->user()->school_id);
@@ -296,7 +406,7 @@ class DashboardController extends Controller
             'class_templates.*.label' => 'required|string|max:80',
             'class_templates.*.enabled' => 'required|boolean',
             'class_templates.*.classes' => 'required|array|min:1|max:20',
-            'class_templates.*.classes.*' => 'nullable|string|max:80',
+            'class_templates.*.classes.*' => 'nullable',
         ]);
 
         $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
@@ -309,13 +419,10 @@ class DashboardController extends Controller
         }
 
         foreach ($active as $section) {
-            $classes = array_values(array_filter(
-                (array) ($section['classes'] ?? []),
-                fn ($value) => trim((string) $value) !== ''
-            ));
+            $classes = ClassTemplateSchema::activeClassNames($section);
             if (empty($classes)) {
                 return response()->json([
-                    'message' => 'Each enabled section must have at least one class name.',
+                    'message' => 'Each enabled section must have at least one checked class.',
                 ], 422);
             }
         }
@@ -400,11 +507,7 @@ class DashboardController extends Controller
                     continue;
                 }
 
-                $classNames = collect((array) ($section['classes'] ?? []))
-                    ->map(fn ($name) => trim((string) $name))
-                    ->filter(fn ($name) => $name !== '')
-                    ->values()
-                    ->all();
+                $classNames = ClassTemplateSchema::activeClassNames($section);
 
                 foreach ($classNames as $className) {
                     SchoolClass::firstOrCreate([
@@ -423,5 +526,166 @@ class DashboardController extends Controller
                 $departmentTemplates
             );
         }
+    }
+
+    private function renameDepartmentAcrossSchool(int $schoolId, string $oldName, string $newName): void
+    {
+        $oldLower = strtolower(trim($oldName));
+        $newName = trim($newName);
+        if ($oldLower === '' || $newName === '') {
+            return;
+        }
+
+        $newLower = strtolower($newName);
+        if ($oldLower === $newLower) {
+            return;
+        }
+
+        $levelDepartments = Schema::hasTable('level_departments')
+            ? LevelDepartment::query()
+                ->where('school_id', $schoolId)
+                ->whereRaw('LOWER(name) = ?', [$oldLower])
+                ->get()
+            : collect();
+
+        foreach ($levelDepartments as $department) {
+            $duplicate = LevelDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $department->academic_session_id)
+                ->where('level', (string) $department->level)
+                ->whereRaw('LOWER(name) = ?', [$newLower])
+                ->where('id', '!=', (int) $department->id)
+                ->exists();
+
+            if ($duplicate) {
+                $department->delete();
+                continue;
+            }
+
+            $department->name = $newName;
+            $department->save();
+        }
+
+        if (!Schema::hasTable('class_departments')) {
+            return;
+        }
+
+        $classDepartments = DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->whereRaw('LOWER(name) = ?', [$oldLower])
+            ->select(['id', 'class_id'])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('class_id');
+
+        foreach ($classDepartments as $classId => $rows) {
+            $existingTargetId = DB::table('class_departments')
+                ->where('school_id', $schoolId)
+                ->where('class_id', (int) $classId)
+                ->whereRaw('LOWER(name) = ?', [$newLower])
+                ->orderBy('id')
+                ->value('id');
+
+            $oldIds = collect($rows)->pluck('id')->map(fn ($id) => (int) $id)->values();
+            if ($oldIds->isEmpty()) {
+                continue;
+            }
+
+            $targetId = $existingTargetId ? (int) $existingTargetId : (int) $oldIds->first();
+            if (!$existingTargetId) {
+                DB::table('class_departments')
+                    ->where('id', $targetId)
+                    ->update([
+                        'name' => $newName,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            $idsToDelete = $oldIds->filter(fn ($id) => $id !== $targetId)->values();
+            if ($idsToDelete->isEmpty()) {
+                continue;
+            }
+
+            if (Schema::hasTable('enrollments')) {
+                DB::table('enrollments')
+                    ->whereIn('department_id', $idsToDelete->all())
+                    ->update(['department_id' => $targetId]);
+            }
+
+            DB::table('class_departments')
+                ->whereIn('id', $idsToDelete->all())
+                ->delete();
+        }
+    }
+
+    private function removeDepartmentAcrossSchool(int $schoolId, string $name): array
+    {
+        $targetLower = strtolower(trim($name));
+        if ($targetLower === '') {
+            return [
+                'removed_level_departments' => 0,
+                'removed_class_departments' => 0,
+                'retained_class_departments' => 0,
+            ];
+        }
+
+        $removedLevelDepartments = Schema::hasTable('level_departments')
+            ? LevelDepartment::query()
+                ->where('school_id', $schoolId)
+                ->whereRaw('LOWER(name) = ?', [$targetLower])
+                ->delete()
+            : 0;
+
+        if (!Schema::hasTable('class_departments')) {
+            return [
+                'removed_level_departments' => (int) $removedLevelDepartments,
+                'removed_class_departments' => 0,
+                'retained_class_departments' => 0,
+            ];
+        }
+
+        $departmentQuery = DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->whereRaw('LOWER(name) = ?', [$targetLower]);
+
+        $departmentIds = $departmentQuery
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($departmentIds->isEmpty()) {
+            return [
+                'removed_level_departments' => (int) $removedLevelDepartments,
+                'removed_class_departments' => 0,
+                'retained_class_departments' => 0,
+            ];
+        }
+
+        $idsInUse = collect();
+        if (Schema::hasTable('enrollments')) {
+            $idsInUse = DB::table('enrollments')
+                ->whereIn('department_id', $departmentIds->all())
+                ->distinct()
+                ->pluck('department_id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+        }
+
+        $idsToDelete = $departmentIds
+            ->reject(fn ($id) => $idsInUse->contains($id))
+            ->values();
+
+        $removedClassDepartments = 0;
+        if ($idsToDelete->isNotEmpty()) {
+            $removedClassDepartments = DB::table('class_departments')
+                ->whereIn('id', $idsToDelete->all())
+                ->delete();
+        }
+
+        return [
+            'removed_level_departments' => (int) $removedLevelDepartments,
+            'removed_class_departments' => (int) $removedClassDepartments,
+            'retained_class_departments' => (int) $idsInUse->count(),
+        ];
     }
 }

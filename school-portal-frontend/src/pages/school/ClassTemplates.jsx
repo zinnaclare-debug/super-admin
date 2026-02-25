@@ -8,6 +8,28 @@ const pretty = (value) =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+const normalizeClassRow = (row) => {
+  if (row && typeof row === "object" && !Array.isArray(row)) {
+    return {
+      name: String(row.name || "").trim(),
+      enabled: row.enabled !== false,
+    };
+  }
+
+  return {
+    name: String(row || "").trim(),
+    enabled: true,
+  };
+};
+
+const normalizeTemplates = (items) =>
+  (Array.isArray(items) ? items : []).map((section) => ({
+    key: section?.key || "",
+    label: section?.label || "",
+    enabled: Boolean(section?.enabled),
+    classes: (Array.isArray(section?.classes) ? section.classes : []).map(normalizeClassRow),
+  }));
+
 export default function ClassTemplates() {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
@@ -18,7 +40,7 @@ export default function ClassTemplates() {
     setLoading(true);
     try {
       const res = await api.get("/api/school-admin/class-templates");
-      setTemplates(Array.isArray(res.data?.data) ? res.data.data : []);
+      setTemplates(normalizeTemplates(res.data?.data));
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load class templates.");
       setTemplates([]);
@@ -40,18 +62,43 @@ export default function ClassTemplates() {
       prev.map((section, idx) => {
         if (idx !== sectionIndex) return section;
         const classes = Array.isArray(section.classes) ? [...section.classes] : [];
-        classes[classIndex] = value;
+        const current = normalizeClassRow(classes[classIndex]);
+        classes[classIndex] = { ...current, name: value };
+        return { ...section, classes };
+      })
+    );
+  };
+
+  const updateClassEnabled = (sectionIndex, classIndex, enabled) => {
+    setTemplates((prev) =>
+      prev.map((section, idx) => {
+        if (idx !== sectionIndex) return section;
+        const classes = Array.isArray(section.classes) ? [...section.classes] : [];
+        const current = normalizeClassRow(classes[classIndex]);
+        classes[classIndex] = { ...current, enabled: Boolean(enabled) };
         return { ...section, classes };
       })
     );
   };
 
   const saveTemplates = async () => {
+    const enabledSectionWithoutClass = templates.find((section) => {
+      if (!section.enabled) return false;
+      const checked = (section.classes || []).filter((item) => item?.enabled && String(item?.name || "").trim() !== "");
+      return checked.length === 0;
+    });
+    if (enabledSectionWithoutClass) {
+      return alert(`Select at least one checked class in ${enabledSectionWithoutClass.label || pretty(enabledSectionWithoutClass.key)}.`);
+    }
+
     const payload = templates.map((section) => ({
       key: section.key,
       label: section.label,
       enabled: Boolean(section.enabled),
-      classes: Array.isArray(section.classes) ? section.classes : [],
+      classes: (Array.isArray(section.classes) ? section.classes : []).map((row) => ({
+        name: String(row?.name || ""),
+        enabled: Boolean(row?.enabled),
+      })),
     }));
 
     setSaving(true);
@@ -59,7 +106,7 @@ export default function ClassTemplates() {
       const res = await api.put("/api/school-admin/class-templates", {
         class_templates: payload,
       });
-      const normalized = Array.isArray(res.data?.data) ? res.data.data : payload;
+      const normalized = normalizeTemplates(Array.isArray(res.data?.data) ? res.data.data : payload);
       setTemplates(normalized);
       alert("Class templates saved.");
     } catch (err) {
@@ -108,17 +155,33 @@ export default function ClassTemplates() {
               </div>
 
               <div className="class-template-fields">
-                {(section.classes || []).map((name, classIndex) => (
-                  <input
-                    key={`${section.key}-${classIndex}`}
-                    type="text"
-                    value={name || ""}
-                    onChange={(e) => updateClassName(sectionIndex, classIndex, e.target.value)}
-                    placeholder={`${section.label || pretty(section.key)} ${classIndex + 1}`}
-                    disabled={!section.enabled}
-                  />
-                ))}
+                {(section.classes || []).map((row, classIndex) => {
+                  const classRow = normalizeClassRow(row);
+                  return (
+                    <div key={`${section.key}-${classIndex}`} className="class-template-row">
+                      <label className="class-template-check">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(classRow.enabled)}
+                          onChange={(e) => updateClassEnabled(sectionIndex, classIndex, e.target.checked)}
+                          disabled={!section.enabled}
+                        />
+                        <span>Show</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={classRow.name || ""}
+                        onChange={(e) => updateClassName(sectionIndex, classIndex, e.target.value)}
+                        placeholder={`${section.label || pretty(section.key)} ${classIndex + 1}`}
+                        disabled={!section.enabled}
+                      />
+                    </div>
+                  );
+                })}
               </div>
+              <p className="class-template-hint">
+                Checked classes are used for new academic sessions.
+              </p>
             </div>
           ))}
         </div>

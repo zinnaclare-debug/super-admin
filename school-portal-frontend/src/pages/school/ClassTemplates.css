@@ -73,6 +73,13 @@
   gap: 8px;
 }
 
+.class-template-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
 .class-template-fields input {
   width: 100%;
   box-sizing: border-box;
@@ -85,6 +92,12 @@
 .class-template-fields input:disabled {
   background: #f8fafc;
   color: #64748b;
+}
+
+.class-template-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #475569;
 }
 
 .class-template-actions {
@@ -106,4 +119,3 @@
   opacity: 0.75;
   cursor: not-allowed;
 }
-

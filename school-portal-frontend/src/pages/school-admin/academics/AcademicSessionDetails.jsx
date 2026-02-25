@@ -17,6 +17,10 @@ export default function AcademicSessionDetails() {
   const [terms, setTerms] = useState([]);
   const [currentTerm, setCurrentTerm] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [newDepartmentByLevel, setNewDepartmentByLevel] = useState({});
+  const [creatingDepartmentLevel, setCreatingDepartmentLevel] = useState("");
+  const [updatingDepartmentId, setUpdatingDepartmentId] = useState(0);
+  const [deletingDepartmentId, setDeletingDepartmentId] = useState(0);
 
   const schoolName = useMemo(() => {
     const user = getStoredUser();
@@ -54,6 +58,72 @@ export default function AcademicSessionDetails() {
       await load();
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to set current term");
+    }
+  };
+
+  const setDepartmentDraft = (levelKey, value) => {
+    setNewDepartmentByLevel((prev) => ({ ...prev, [levelKey]: value }));
+  };
+
+  const createDepartment = async (levelKey) => {
+    const name = String(newDepartmentByLevel[levelKey] || "").trim();
+    if (!name) return alert("Enter a department name.");
+
+    setCreatingDepartmentLevel(levelKey);
+    try {
+      await api.post(`/api/school-admin/academic-sessions/${sessionId}/level-departments`, {
+        level: levelKey,
+        name,
+      });
+      setDepartmentDraft(levelKey, "");
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to create department.");
+    } finally {
+      setCreatingDepartmentLevel("");
+    }
+  };
+
+  const editDepartment = async (department) => {
+    const currentName = String(department?.name || "").trim();
+    const nextName = window.prompt("Enter new department name", currentName);
+    if (nextName === null) return;
+
+    const trimmed = String(nextName || "").trim();
+    if (!trimmed) return alert("Department name cannot be empty.");
+    if (trimmed.toLowerCase() === currentName.toLowerCase()) return;
+
+    setUpdatingDepartmentId(Number(department?.id || 0));
+    try {
+      await api.patch(
+        `/api/school-admin/academic-sessions/${sessionId}/level-departments/${department.id}`,
+        { name: trimmed }
+      );
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to update department.");
+    } finally {
+      setUpdatingDepartmentId(0);
+    }
+  };
+
+  const deleteDepartment = async (department) => {
+    if (!window.confirm(`Delete department "${department?.name}" for this level?`)) return;
+
+    setDeletingDepartmentId(Number(department?.id || 0));
+    try {
+      const res = await api.delete(
+        `/api/school-admin/academic-sessions/${sessionId}/level-departments/${department.id}`
+      );
+      const retained = Number(res?.data?.meta?.retained_class_departments || 0);
+      if (retained > 0) {
+        alert(`Department deleted. ${retained} class department(s) still have enrollments and were retained.`);
+      }
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to delete department.");
+    } finally {
+      setDeletingDepartmentId(0);
     }
   };
 
@@ -166,13 +236,69 @@ export default function AcademicSessionDetails() {
                     <div style={{ fontSize: 13, opacity: 0.7 }}>No classes yet for this level.</div>
                   )}
                 </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <strong style={{ fontSize: 14 }}>Departments</strong>
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {(level.departments || []).map((department) => (
+                      <span
+                        key={department.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 999,
+                          padding: "4px 10px",
+                          background: "#f8fafc",
+                          fontSize: 12,
+                        }}
+                      >
+                        <span>{department.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => editDepartment(department)}
+                          disabled={updatingDepartmentId === Number(department.id) || deletingDepartmentId === Number(department.id)}
+                        >
+                          {updatingDepartmentId === Number(department.id) ? "..." : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteDepartment(department)}
+                          disabled={updatingDepartmentId === Number(department.id) || deletingDepartmentId === Number(department.id)}
+                        >
+                          {deletingDepartmentId === Number(department.id) ? "..." : "Delete"}
+                        </button>
+                      </span>
+                    ))}
+                    {(level.departments || []).length === 0 && (
+                      <span style={{ fontSize: 13, opacity: 0.7 }}>No department added yet.</span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      type="text"
+                      value={newDepartmentByLevel[level.level] || ""}
+                      onChange={(e) => setDepartmentDraft(level.level, e.target.value)}
+                      placeholder={`Add ${prettyLevel(level.level)} department`}
+                      style={{ minWidth: 220, padding: "8px 10px" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => createDepartment(level.level)}
+                      disabled={creatingDepartmentLevel === level.level}
+                    >
+                      {creatingDepartmentLevel === level.level ? "Adding..." : "Add Department"}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
           <div style={{ marginTop: 12, fontSize: 13, opacity: 0.85 }}>
-            Departments are now managed in <strong>School Dashboard - Branding - Department Templates</strong>.
-            Any new department there is auto-applied to all levels and terms in this session.
+            You can manage departments in both <strong>School Dashboard - Branding</strong> (global templates)
+            and here per level for this specific session.
           </div>
         </>
       )}

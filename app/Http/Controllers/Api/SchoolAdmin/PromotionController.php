@@ -441,11 +441,7 @@ class PromotionController extends Controller
                 continue;
             }
 
-            $classNames = collect((array) ($section['classes'] ?? []))
-                ->map(fn ($name) => trim((string) $name))
-                ->filter(fn ($name) => $name !== '')
-                ->values()
-                ->all();
+            $classNames = ClassTemplateSchema::activeClassNames($section);
 
             foreach ($classNames as $className) {
                 $sequence[] = [
