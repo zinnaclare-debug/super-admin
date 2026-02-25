@@ -72,6 +72,9 @@ function SchoolDashboard() {
   const [examDraft, setExamDraft] = useState(DEFAULT_EXAM_RECORD);
   const [showExamRecordModal, setShowExamRecordModal] = useState(false);
   const [savingExamRecord, setSavingExamRecord] = useState(false);
+  const [departmentTemplates, setDepartmentTemplates] = useState([]);
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [savingDepartmentTemplate, setSavingDepartmentTemplate] = useState(false);
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
 
@@ -79,9 +82,10 @@ function SchoolDashboard() {
     const load = async () => {
       setLoading(true);
       try {
-        const [statsRes, examRes] = await Promise.allSettled([
+        const [statsRes, examRes, departmentRes] = await Promise.allSettled([
           api.get("/api/school-admin/stats"),
           api.get("/api/school-admin/exam-record"),
+          api.get("/api/school-admin/department-templates"),
         ]);
 
         if (statsRes.status !== "fulfilled") {
@@ -111,6 +115,17 @@ function SchoolDashboard() {
         const normalizedExam = normalizeExamRecord(examFromEndpoint || examFromStats);
         setExamRecord(normalizedExam);
         setExamDraft(normalizedExam);
+
+        const departmentsFromStats = Array.isArray(res.data?.department_templates)
+          ? res.data.department_templates
+          : [];
+        const departmentsFromEndpoint =
+          departmentRes.status === "fulfilled" && Array.isArray(departmentRes.value?.data?.data)
+            ? departmentRes.value.data.data
+            : [];
+        setDepartmentTemplates(
+          Array.from(new Set([...departmentsFromStats, ...departmentsFromEndpoint].map((x) => String(x).trim()).filter(Boolean)))
+        );
       } catch {
         setStats((prev) => ({
           ...prev,
@@ -130,6 +145,7 @@ function SchoolDashboard() {
         setSchoolLocation("");
         setExamRecord(DEFAULT_EXAM_RECORD);
         setExamDraft(DEFAULT_EXAM_RECORD);
+        setDepartmentTemplates([]);
       } finally {
         setLoading(false);
       }
@@ -271,6 +287,31 @@ function SchoolDashboard() {
       alert(firstValidationError || apiMessage || "Failed to update branding");
     } finally {
       setSavingBranding(false);
+    }
+  };
+
+  const addDepartmentTemplate = async () => {
+    const name = (newDepartmentName || "").trim();
+    if (!name) {
+      alert("Enter a department name.");
+      return;
+    }
+
+    setSavingDepartmentTemplate(true);
+    try {
+      const res = await api.post("/api/school-admin/department-templates", { name });
+      const items = Array.isArray(res.data?.data) ? res.data.data : [];
+      setDepartmentTemplates(items);
+      setNewDepartmentName("");
+      alert("Department saved and applied to all sessions/classes.");
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to add department");
+    } finally {
+      setSavingDepartmentTemplate(false);
     }
   };
 
@@ -479,6 +520,35 @@ function SchoolDashboard() {
                 <button type="button" onClick={() => signatureInputRef.current?.click()}>
                   Select Signature
                 </button>
+              </div>
+            </div>
+
+            <div className="sd-field">
+              <label>Department Templates</label>
+              <div className="sd-dept-box">
+                <div className="sd-dept-add">
+                  <input
+                    type="text"
+                    value={newDepartmentName}
+                    onChange={(e) => setNewDepartmentName(e.target.value)}
+                    placeholder="e.g. Science, Arts, Commercial"
+                  />
+                  <button type="button" onClick={addDepartmentTemplate} disabled={savingDepartmentTemplate}>
+                    {savingDepartmentTemplate ? "Saving..." : "Add Department"}
+                  </button>
+                </div>
+                <p className="sd-note" style={{ marginTop: 8 }}>
+                  New department here is auto-applied to all levels and all class terms.
+                </p>
+                <div className="sd-dept-tags">
+                  {departmentTemplates.length === 0 ? (
+                    <span className="sd-empty">No departments added yet.</span>
+                  ) : (
+                    departmentTemplates.map((name) => (
+                      <span key={name} className="sd-dept-tag">{name}</span>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>

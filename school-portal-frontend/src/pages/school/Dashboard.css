@@ -327,6 +327,54 @@
   font-weight: 600;
 }
 
+.sd-dept-box {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.sd-dept-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-dept-add button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  background: linear-gradient(125deg, #0d6efd 0%, #0f766e 100%);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sd-dept-add button:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.sd-dept-tags {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sd-dept-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 @media (max-width: 1100px) {
   .sd-branding,
   .sd-hero {

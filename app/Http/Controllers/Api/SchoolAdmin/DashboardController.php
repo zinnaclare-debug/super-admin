@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\LevelDepartment;
 use App\Models\School;
 use App\Models\SchoolFeature;
 use App\Models\User;
 use App\Support\AssessmentSchema;
+use App\Support\DepartmentTemplateSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
@@ -48,6 +51,7 @@ class DashboardController extends Controller
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
             'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
+            'department_templates' => $this->resolveDepartmentTemplates($school),
             'results_published' => (bool) ($school?->results_published),
             'students' => $students,
             'male_students' => $maleStudents,
@@ -205,6 +209,91 @@ class DashboardController extends Controller
             'message' => 'Exam record updated successfully',
             'data' => $schema,
         ]);
+    }
+
+    public function departmentTemplates(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        return response()->json([
+            'data' => $this->resolveDepartmentTemplates($school),
+        ]);
+    }
+
+    public function storeDepartmentTemplate(Request $request)
+    {
+        $school = School::find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'name' => 'required|string|max:80',
+        ]);
+
+        $name = trim((string) ($payload['name'] ?? ''));
+        if ($name === '') {
+            return response()->json(['message' => 'Department name is required.'], 422);
+        }
+
+        return DB::transaction(function () use ($school, $name) {
+            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+                $school->department_templates ?? []
+            );
+
+            $exists = collect($templates)
+                ->contains(fn ($item) => strcasecmp((string) $item, $name) === 0);
+
+            if ($exists) {
+                return response()->json([
+                    'message' => 'Department already exists in branding templates.',
+                    'data' => $templates,
+                ], 409);
+            }
+
+            $templates[] = $name;
+            $school->department_templates = $templates;
+            $school->save();
+
+            DepartmentTemplateSync::syncTemplateToAllSessions((int) $school->id, $name);
+
+            return response()->json([
+                'message' => 'Department template saved and applied across all levels/classes.',
+                'data' => $templates,
+            ], 201);
+        });
+    }
+
+    private function resolveDepartmentTemplates(?School $school): array
+    {
+        if (!$school) {
+            return [];
+        }
+
+        $templates = DepartmentTemplateSync::normalizeTemplateNames(
+            $school->department_templates ?? []
+        );
+
+        if (!empty($templates)) {
+            return $templates;
+        }
+
+        if (!Schema::hasTable('level_departments')) {
+            return [];
+        }
+
+        return LevelDepartment::query()
+            ->where('school_id', (int) $school->id)
+            ->orderBy('name')
+            ->pluck('name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter(fn ($name) => $name !== '')
+            ->unique(fn ($name) => strtolower($name))
+            ->values()
+            ->all();
     }
 
     private function storageUrl(?string $path): ?string

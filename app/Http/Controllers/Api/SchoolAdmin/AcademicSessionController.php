@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Term;
 use App\Models\TermSubject;
 use App\Models\LevelDepartment;
+use App\Support\DepartmentTemplateSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -112,6 +114,16 @@ public function store(Request $request)
                 ]);
             }
         }
+
+        $templates = DepartmentTemplateSync::normalizeTemplateNames(
+            School::query()->where('id', $schoolId)->value('department_templates') ?? []
+        );
+        DepartmentTemplateSync::syncTemplatesToSession(
+            $schoolId,
+            (int) $session->id,
+            (array) ($data['levels'] ?? []),
+            $templates
+        );
 
         $this->copyPreviousSessionSubjectMappings($schoolId, (int) $session->id);
 

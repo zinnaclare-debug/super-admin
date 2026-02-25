@@ -16,6 +16,7 @@ class School extends Model
         'head_of_school_name',
         'head_signature_path',
         'assessment_schema',
+        'department_templates',
         'slug',
         'subdomain',
         'status',
@@ -26,6 +27,7 @@ class School extends Model
     protected $casts = [
         'results_published' => 'boolean',
         'assessment_schema' => 'array',
+        'department_templates' => 'array',
     ];
 
     public function features(): HasMany
