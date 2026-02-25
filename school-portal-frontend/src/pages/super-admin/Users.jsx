@@ -28,6 +28,11 @@ function Users() {
     <div>
       <h1>Platform Users</h1>
       <p>Select a school to view students by education level.</p>
+      <div style={{ marginTop: 8 }}>
+        <button onClick={() => navigate("/super-admin/users/login-details")}>
+          School Admin Login Details
+        </button>
+      </div>
 
       <div style={{ marginTop: 14 }}>
         <strong>Schools</strong>

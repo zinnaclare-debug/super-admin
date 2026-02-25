@@ -8,6 +8,7 @@ use App\Models\School;
 use App\Models\Student;
 use App\Models\Term;
 use App\Models\User;
+use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -64,6 +65,12 @@ class UserController extends Controller
             'school_id' => $validated['school_id'],
         ]);
 
+        UserCredentialStore::sync(
+            $user,
+            (string) $validated['password'],
+            (int) $request->user()->id
+        );
+
         return response()->json([
             'message' => 'School admin created successfully',
             'data' => $user,
@@ -88,6 +95,12 @@ class UserController extends Controller
 
         $user->password = Hash::make($payload['password']);
         $user->save();
+
+        UserCredentialStore::sync(
+            $user,
+            (string) $payload['password'],
+            (int) $request->user()->id
+        );
 
         return response()->json([
             'message' => 'School admin password reset successfully.',

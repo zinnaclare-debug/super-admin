@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\SuperAdmin\SchoolController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolFeatureController;
 use App\Http\Controllers\Api\SuperAdmin\DashboardController;
 use App\Http\Controllers\Api\SuperAdmin\UserController;
+use App\Http\Controllers\Api\SuperAdmin\LoginDetailsController as SuperAdminLoginDetailsController;
 use App\Http\Controllers\Api\SuperAdmin\PaymentsController as SuperAdminPaymentsController;
 
 use App\Http\Controllers\Api\SchoolAdmin\RegistrationController;
@@ -73,6 +74,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/users', [UserController::class, 'index']);
     Route::post('/super-admin/users', [UserController::class, 'store']);
     Route::post('/super-admin/users/{user}/reset-password', [UserController::class, 'resetSchoolAdminPassword']);
+    Route::get('/super-admin/users/login-details', [SuperAdminLoginDetailsController::class, 'index']);
+    Route::get('/super-admin/users/login-details/download', [SuperAdminLoginDetailsController::class, 'download']);
     Route::get('/super-admin/schools/{school}/students-by-level', [UserController::class, 'studentsByLevel']);
 
     Route::get('/super-admin/schools', [SchoolController::class, 'index']);

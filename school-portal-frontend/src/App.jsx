@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Overview from "./pages/super-admin/Overview";
 import Schools from "./pages/super-admin/Schools";
 import Users from "./pages/super-admin/Users";
+import SuperAdminLoginDetails from "./pages/super-admin/LoginDetails";
 import SchoolUsersByLevel from "./pages/super-admin/SchoolUsersByLevel";
 import SuperAdminPayments from "./pages/super-admin/Payments";
 import SchoolAcademicSessions from "./pages/super-admin/SchoolAcademicSessions";
@@ -112,6 +113,7 @@ function App() {
         <Route path="schools" element={<Schools />} />
         <Route path="schools/:schoolId/academic-sessions" element={<SchoolAcademicSessions />} />
         <Route path="users" element={<Users />} />
+        <Route path="users/login-details" element={<SuperAdminLoginDetails />} />
         <Route path="users/:schoolId" element={<SchoolUsersByLevel />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="payments" element={<SuperAdminPayments />} />

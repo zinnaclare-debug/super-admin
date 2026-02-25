@@ -14,6 +14,7 @@ use App\Models\School;
 use App\Models\SchoolFeature;
 use App\Models\AcademicSession;
 use App\Models\Term;
+use App\Support\UserCredentialStore;
 
 class SchoolController extends Controller
 {
@@ -86,6 +87,8 @@ class SchoolController extends Controller
      */
     public function createWithAdmin(Request $request)
     {
+        $actorUserId = (int) ($request->user()->id ?? 0);
+
         $request->merge([
             'subdomain' => $this->normalizeSubdomain($request->input('subdomain')),
         ]);
@@ -98,7 +101,7 @@ class SchoolController extends Controller
             'subdomain'    => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]+$/', 'unique:schools,subdomain'],
         ]);
 
-        return DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated, $actorUserId) {
 
             // 1️⃣ Create school (tenant)
             $school = School::create([
@@ -121,6 +124,12 @@ class SchoolController extends Controller
                 'role'      => 'school_admin',
                 'school_id' => $school->id,
             ]);
+
+            UserCredentialStore::sync(
+                $admin,
+                $plainPassword,
+                $actorUserId > 0 ? $actorUserId : null
+            );
 
             // 4️⃣ Seed features (use updateOrCreate to avoid duplicates if observer already created some)
 // 4️⃣ Seed features (GENERAL + ADMIN)
