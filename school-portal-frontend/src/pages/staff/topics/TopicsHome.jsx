@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import onlineTestArt from "../../../assets/topics/online-test.svg";
+import bloggingArt from "../../../assets/topics/blogging.svg";
+import "../../shared/TopicsShowcase.css";
 
 export default function TopicsHome() {
   const navigate = useNavigate();
@@ -20,33 +23,62 @@ export default function TopicsHome() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
     <StaffFeatureLayout title="Topics">
+      <div className="tps-page tps-page--staff">
+        <section className="tps-hero">
+          <div>
+            <span className="tps-pill">Staff Topics Desk</span>
+            <h2 className="tps-title">Organize topic materials by subject</h2>
+            <p className="tps-subtitle">
+              Open any assigned subject to upload and manage topic resources for your students.
+            </p>
+            <div className="tps-meta">
+              <span>{loading ? "Loading..." : `${items.length} assigned subject${items.length === 1 ? "" : "s"}`}</span>
+              <span>Topic resource management</span>
+            </div>
+          </div>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : items.length === 0 ? (
-        <p>No assigned subjects yet.</p>
-      ) : (
-        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-          {items.map((x) => (
-            <button
-              key={x.term_subject_id}
-              onClick={() => navigate(`/staff/topics/${x.term_subject_id}`, { state: x })}
-              style={{ padding: 12, textAlign: "left", border: "1px solid #ddd", borderRadius: 10 }}
-            >
-              <div style={{ fontWeight: 700 }}>
-                {x.subject_name} {x.subject_code ? `(${x.subject_code})` : ""}
-              </div>
-              <div style={{ opacity: 0.8, fontSize: 13 }}>
-                {x.class_level?.toUpperCase()} • {x.class_name} • {x.term_name}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+          <div className="tps-hero-art" aria-hidden="true">
+            <div className="tps-art tps-art--main">
+              <img src={onlineTestArt} alt="" />
+            </div>
+            <div className="tps-art tps-art--alt">
+              <img src={bloggingArt} alt="" />
+            </div>
+          </div>
+        </section>
+
+        <section className="tps-panel">
+          {loading ? <p className="tps-state tps-state--loading">Loading assigned subjects...</p> : null}
+          {!loading && items.length === 0 ? (
+            <p className="tps-state tps-state--empty">No assigned subjects yet.</p>
+          ) : null}
+
+          {!loading && items.length > 0 ? (
+            <div className="tps-subject-grid">
+              {items.map((x) => (
+                <button
+                  key={x.term_subject_id}
+                  className="tps-subject-btn"
+                  onClick={() => navigate(`/staff/topics/${x.term_subject_id}`, { state: x })}
+                >
+                  <h3 className="tps-subject-title">
+                    {x.subject_name} {x.subject_code ? `(${x.subject_code})` : ""}
+                  </h3>
+                  <p className="tps-subject-meta">
+                    {x.class_level?.toUpperCase()} | {x.class_name} | {x.term_name}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      </div>
     </StaffFeatureLayout>
   );
 }
