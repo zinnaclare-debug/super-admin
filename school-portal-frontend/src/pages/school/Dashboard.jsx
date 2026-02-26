@@ -52,6 +52,8 @@ function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
     school_location: "",
+    contact_email: "",
+    contact_phone: "",
     school_logo_url: null,
     head_of_school_name: "",
     head_signature_url: null,
@@ -69,6 +71,8 @@ function SchoolDashboard() {
   const [headSignaturePreview, setHeadSignaturePreview] = useState(null);
   const [headName, setHeadName] = useState("");
   const [schoolLocation, setSchoolLocation] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
   const [examDraft, setExamDraft] = useState(DEFAULT_EXAM_RECORD);
@@ -100,6 +104,8 @@ function SchoolDashboard() {
         setStats({
           school_name: res.data?.school_name ?? "",
           school_location: res.data?.school_location ?? "",
+          contact_email: res.data?.contact_email ?? "",
+          contact_phone: res.data?.contact_phone ?? "",
           school_logo_url: res.data?.school_logo_url ?? null,
           head_of_school_name: res.data?.head_of_school_name ?? "",
           head_signature_url: res.data?.head_signature_url ?? null,
@@ -112,6 +118,8 @@ function SchoolDashboard() {
         });
         setHeadName(res.data?.head_of_school_name ?? "");
         setSchoolLocation(res.data?.school_location ?? "");
+        setContactEmail(res.data?.contact_email ?? "");
+        setContactPhone(res.data?.contact_phone ?? "");
 
         const examFromStats = res.data?.assessment_schema || null;
         const examFromEndpoint =
@@ -135,6 +143,8 @@ function SchoolDashboard() {
           ...prev,
           school_name: "",
           school_location: "",
+          contact_email: "",
+          contact_phone: "",
           school_logo_url: null,
           head_of_school_name: "",
           head_signature_url: null,
@@ -147,6 +157,8 @@ function SchoolDashboard() {
         }));
         setHeadName("");
         setSchoolLocation("");
+        setContactEmail("");
+        setContactPhone("");
         setExamRecord(DEFAULT_EXAM_RECORD);
         setExamDraft(DEFAULT_EXAM_RECORD);
         setDepartmentTemplates([]);
@@ -244,14 +256,27 @@ function SchoolDashboard() {
   const saveBranding = async () => {
     const normalizedName = (headName || "").trim();
     const normalizedLocation = (schoolLocation || "").trim();
+    const normalizedContactEmail = (contactEmail || "").trim();
+    const normalizedContactPhone = (contactPhone || "").trim();
     const existingName = (stats.head_of_school_name || "").trim();
     const existingLocation = (stats.school_location || "").trim();
+    const existingContactEmail = (stats.contact_email || "").trim();
+    const existingContactPhone = (stats.contact_phone || "").trim();
     const hasNameChange = normalizedName !== existingName;
     const hasLocationChange = normalizedLocation !== existingLocation;
+    const hasContactEmailChange = normalizedContactEmail !== existingContactEmail;
+    const hasContactPhoneChange = normalizedContactPhone !== existingContactPhone;
     const hasLogo = !!logoFile;
     const hasSignature = !!headSignatureFile;
 
-    if (!hasNameChange && !hasLocationChange && !hasLogo && !hasSignature) {
+    if (
+      !hasNameChange &&
+      !hasLocationChange &&
+      !hasContactEmailChange &&
+      !hasContactPhoneChange &&
+      !hasLogo &&
+      !hasSignature
+    ) {
       return alert("No branding changes to save.");
     }
 
@@ -260,6 +285,8 @@ function SchoolDashboard() {
       const fd = new FormData();
       fd.append("head_of_school_name", normalizedName);
       fd.append("school_location", normalizedLocation);
+      fd.append("contact_email", normalizedContactEmail);
+      fd.append("contact_phone", normalizedContactPhone);
       if (logoFile) fd.append("logo", logoFile);
       if (headSignatureFile) fd.append("head_signature", headSignatureFile);
 
@@ -272,12 +299,28 @@ function SchoolDashboard() {
         ...prev,
         school_name: data.school_name ?? prev.school_name,
         school_location: data.school_location ?? prev.school_location,
+        contact_email: Object.prototype.hasOwnProperty.call(data, "contact_email")
+          ? (data.contact_email ?? "")
+          : prev.contact_email,
+        contact_phone: Object.prototype.hasOwnProperty.call(data, "contact_phone")
+          ? (data.contact_phone ?? "")
+          : prev.contact_phone,
         school_logo_url: data.school_logo_url ?? prev.school_logo_url,
         head_of_school_name: data.head_of_school_name ?? prev.head_of_school_name,
         head_signature_url: data.head_signature_url ?? prev.head_signature_url,
       }));
       setHeadName(data.head_of_school_name ?? normalizedName);
       setSchoolLocation(data.school_location ?? normalizedLocation);
+      setContactEmail(
+        Object.prototype.hasOwnProperty.call(data, "contact_email")
+          ? (data.contact_email ?? "")
+          : normalizedContactEmail
+      );
+      setContactPhone(
+        Object.prototype.hasOwnProperty.call(data, "contact_phone")
+          ? (data.contact_phone ?? "")
+          : normalizedContactPhone
+      );
       setLogoFile(null);
       setLogoPreview(null);
       setHeadSignatureFile(null);
@@ -511,7 +554,7 @@ function SchoolDashboard() {
         <div className="sd-branding__form">
           <div className="sd-section-head">
             <h2>School Branding</h2>
-            <p>Update logo, head name and signature for reports and official pages.</p>
+            <p>Update logo, head name, signature, and login contact details for this school.</p>
           </div>
 
           <div className="sd-field-grid">
@@ -557,6 +600,26 @@ function SchoolDashboard() {
                 value={schoolLocation}
                 onChange={(e) => setSchoolLocation(e.target.value)}
                 placeholder="Enter school address/location"
+              />
+            </div>
+
+            <div className="sd-field">
+              <label>Information Email</label>
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="contact@school.com"
+              />
+            </div>
+
+            <div className="sd-field">
+              <label>Mobile Number</label>
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+234 800 000 0000"
               />
             </div>
 

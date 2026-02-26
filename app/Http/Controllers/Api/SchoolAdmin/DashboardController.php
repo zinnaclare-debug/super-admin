@@ -50,6 +50,8 @@ class DashboardController extends Controller
         return response()->json([
             'school_name' => $school?->name,
             'school_location' => $school?->location,
+            'contact_email' => $school?->contact_email,
+            'contact_phone' => $school?->contact_phone,
             'school_logo_url' => $this->storageUrl($school?->logo_path),
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
@@ -105,18 +107,29 @@ class DashboardController extends Controller
         $payload = $request->validate([
             'head_of_school_name' => 'nullable|string|max:255',
             'school_location' => 'nullable|string|max:255',
+            'contact_email' => 'nullable|email|max:255',
+            'contact_phone' => 'nullable|string|max:30',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
         $hasNameField = $request->has('head_of_school_name');
         $hasLocationField = $request->has('school_location');
+        $hasContactEmailField = $request->has('contact_email');
+        $hasContactPhoneField = $request->has('contact_phone');
         $hasLogoFile = $request->hasFile('logo');
         $hasSignatureFile = $request->hasFile('head_signature');
 
-        if (!$hasNameField && !$hasLocationField && !$hasLogoFile && !$hasSignatureFile) {
+        if (
+            !$hasNameField
+            && !$hasLocationField
+            && !$hasContactEmailField
+            && !$hasContactPhoneField
+            && !$hasLogoFile
+            && !$hasSignatureFile
+        ) {
             return response()->json([
-                'message' => 'Provide head_of_school_name, school_location, logo, or head_signature.',
+                'message' => 'Provide head_of_school_name, school_location, contact_email, contact_phone, logo, or head_signature.',
             ], 422);
         }
 
@@ -128,6 +141,16 @@ class DashboardController extends Controller
         if ($hasLocationField) {
             $location = trim((string) ($payload['school_location'] ?? ''));
             $school->location = $location !== '' ? $location : null;
+        }
+
+        if ($hasContactEmailField) {
+            $contactEmail = trim((string) ($payload['contact_email'] ?? ''));
+            $school->contact_email = $contactEmail !== '' ? $contactEmail : null;
+        }
+
+        if ($hasContactPhoneField) {
+            $contactPhone = trim((string) ($payload['contact_phone'] ?? ''));
+            $school->contact_phone = $contactPhone !== '' ? $contactPhone : null;
         }
 
         if ($hasLogoFile) {
@@ -153,6 +176,8 @@ class DashboardController extends Controller
             'data' => [
                 'school_name' => $school->name,
                 'school_location' => $school->location,
+                'contact_email' => $school->contact_email,
+                'contact_phone' => $school->contact_phone,
                 'school_logo_url' => $this->storageUrl($school->logo_path),
                 'head_of_school_name' => $school->head_of_school_name,
                 'head_signature_url' => $this->storageUrl($school->head_signature_path),

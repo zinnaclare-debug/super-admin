@@ -415,6 +415,16 @@
   color: #64748b;
 }
 
+.login-help a {
+  color: #0369a1;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.login-help a:hover {
+  text-decoration: underline;
+}
+
 @keyframes slowSpin {
   0% {
     transform: rotate(0deg);

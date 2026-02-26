@@ -12,6 +12,8 @@ class School extends Model
         'location',
         'username_prefix',
         'email',
+        'contact_email',
+        'contact_phone',
         'logo_path',
         'head_of_school_name',
         'head_signature_path',

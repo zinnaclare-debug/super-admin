@@ -37,6 +37,9 @@ function Login() {
 
   const heroLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandBanner;
   const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
+  const tenantContactEmail = (tenantSchool?.contact_email || "").trim();
+  const tenantContactPhone = (tenantSchool?.contact_phone || "").trim();
+  const tenantDialPhone = tenantContactPhone.replace(/[^\d+]/g, "");
   const isLytCentralDomain = useMemo(() => {
     const host = window.location.hostname.toLowerCase();
     return host === "lyt.com.ng" || host === "www.lyt.com.ng";
@@ -215,7 +218,24 @@ function Login() {
           </form>
 
           <p className="login-help">
-            Protected access. Contact school admin if you cannot sign in.
+            {tenantContactEmail || tenantContactPhone ? (
+              <>
+                Protected access. Contact school admin:
+                {tenantContactEmail ? (
+                  <>
+                    {" "}
+                    <a href={`mailto:${tenantContactEmail}`}>{tenantContactEmail}</a>
+                  </>
+                ) : null}
+                {tenantContactEmail && tenantContactPhone ? " | " : " "}
+                {tenantContactPhone ? (
+                  <a href={`tel:${tenantDialPhone || tenantContactPhone}`}>{tenantContactPhone}</a>
+                ) : null}
+                .
+              </>
+            ) : (
+              "Protected access. Contact school admin if you cannot sign in."
+            )}
           </p>
         </section>
       </div>
