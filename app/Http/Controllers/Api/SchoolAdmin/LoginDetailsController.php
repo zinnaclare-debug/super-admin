@@ -295,16 +295,15 @@ class LoginDetailsController extends Controller
             $className = '';
             $department = '';
             if ((string) $user->role === 'staff') {
-                $level = (string) ($staffLevelByUserId[$userId] ?? '');
+                $level = $this->normalizeLevelValue((string) ($staffLevelByUserId[$userId] ?? ''));
             } elseif ((string) $user->role === 'student') {
                 $studentId = (int) ($studentIdByUserId[$userId] ?? 0);
                 $profile = $studentId ? ($studentProfileByStudentId[$studentId] ?? null) : null;
                 $classId = isset($profile['class_id']) ? (int) $profile['class_id'] : null;
                 $className = trim((string) ($profile['class_name'] ?? ''));
-                $studentEducationLevel = strtolower(trim((string) ($studentLevelByUserId[$userId] ?? '')));
-                $level = $studentEducationLevel !== ''
-                    ? $studentEducationLevel
-                    : strtolower(trim((string) ($profile['level'] ?? '')));
+                $studentEducationLevel = $this->normalizeLevelValue((string) ($studentLevelByUserId[$userId] ?? ''));
+                $profileLevel = $this->normalizeLevelValue((string) ($profile['level'] ?? ''));
+                $level = $studentEducationLevel !== '' ? $studentEducationLevel : $profileLevel;
                 $department = trim((string) ($profile['department'] ?? ''));
             }
 
@@ -323,7 +322,7 @@ class LoginDetailsController extends Controller
             ];
         });
 
-        $levelFilter = strtolower(trim((string) $level));
+        $levelFilter = $this->normalizeLevelValue((string) $level);
         $departmentFilter = strtolower(trim((string) $department));
         $classFilter = (int) ($classId ?? 0);
 
@@ -337,7 +336,7 @@ class LoginDetailsController extends Controller
             $classOptionsQuery->where('academic_session_id', (int) $currentSessionId);
         }
         if ($levelFilter !== '') {
-            $classOptionsQuery->where('level', $levelFilter);
+            $classOptionsQuery->whereRaw('LOWER(classes.level) LIKE ?', [$levelFilter . '%']);
         }
 
         $classOptions = $classOptionsQuery
@@ -346,7 +345,7 @@ class LoginDetailsController extends Controller
                 return [
                     'id' => (int) $row->id,
                     'name' => trim((string) ($row->name ?? '')),
-                    'level' => strtolower(trim((string) ($row->level ?? ''))),
+                    'level' => $this->normalizeLevelValue((string) ($row->level ?? '')),
                 ];
             })
             ->values()
@@ -364,7 +363,7 @@ class LoginDetailsController extends Controller
 
         $filteredRows = $rawRows
             ->filter(function (array $row) use ($levelFilter, $departmentFilter, $validClassId) {
-                if ($levelFilter !== '' && strtolower((string) ($row['level'] ?? '')) !== $levelFilter) {
+                if ($levelFilter !== '' && $this->normalizeLevelValue((string) ($row['level'] ?? '')) !== $levelFilter) {
                     return false;
                 }
 
@@ -405,6 +404,7 @@ class LoginDetailsController extends Controller
                     ->all()
             )
             ->map(fn ($value) => strtolower(trim((string) $value)))
+            ->map(fn ($value) => $this->normalizeLevelValue((string) $value))
             ->filter(fn ($value) => $value !== '')
             ->unique()
             ->sort()
@@ -444,5 +444,37 @@ class LoginDetailsController extends Controller
         }, $columns);
 
         return implode(',', $escaped);
+    }
+
+    private function normalizeLevelValue(string $value): string
+    {
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = str_replace(['-', ' '], '_', $normalized);
+        $normalized = preg_replace('/[^a-z0-9_]+/', '', $normalized) ?? '';
+        $normalized = preg_replace('/_+/', '_', $normalized) ?? '';
+        $normalized = trim($normalized, '_');
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (str_starts_with($normalized, 'pre_nursery') || str_starts_with($normalized, 'prenursery')) {
+            return 'pre_nursery';
+        }
+        if (str_starts_with($normalized, 'nursery')) {
+            return 'nursery';
+        }
+        if (str_starts_with($normalized, 'primary')) {
+            return 'primary';
+        }
+        if (str_starts_with($normalized, 'secondary')) {
+            return 'secondary';
+        }
+
+        return $normalized;
     }
 }

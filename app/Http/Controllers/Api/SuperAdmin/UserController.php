@@ -159,7 +159,7 @@ class UserController extends Controller
 
         $counts = [];
         foreach ($allRows as $row) {
-            $lvl = strtolower(trim((string) ($row->class_level ?? ($row->student_level ?? ''))));
+            $lvl = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
             if ($lvl !== '') {
                 $counts[$lvl] = (int) ($counts[$lvl] ?? 0) + 1;
             }
@@ -167,16 +167,17 @@ class UserController extends Controller
 
         $filteredRows = $allRows;
         if (!empty($payload['level'])) {
-            $levelFilter = strtolower(trim((string) $payload['level']));
+            $levelFilter = $this->normalizeLevelValue((string) $payload['level']);
             $filteredRows = $allRows->filter(function ($row) use ($payload) {
-                $levelFilter = strtolower(trim((string) $payload['level']));
-                $effectiveLevel = strtolower(trim((string) ($row->class_level ?? ($row->student_level ?? ''))));
+                $levelFilter = $this->normalizeLevelValue((string) $payload['level']);
+                $effectiveLevel = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
                 return $effectiveLevel === $levelFilter;
             })->values();
         }
 
         $students = $filteredRows->map(function ($row) {
-            $effectiveLevel = trim((string) ($row->class_level ?? ($row->student_level ?? '')));
+            $effectiveLevelRaw = trim((string) ($row->class_level ?? ($row->student_level ?? '')));
+            $effectiveLevel = $this->normalizeLevelValue($effectiveLevelRaw);
             return [
                 'student_id' => (int) $row->student_id,
                 'name' => $row->student_name,
@@ -212,5 +213,37 @@ class UserController extends Controller
                 'students' => $students,
             ],
         ]);
+    }
+
+    private function normalizeLevelValue(string $value): string
+    {
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = str_replace(['-', ' '], '_', $normalized);
+        $normalized = preg_replace('/[^a-z0-9_]+/', '', $normalized) ?? '';
+        $normalized = preg_replace('/_+/', '_', $normalized) ?? '';
+        $normalized = trim($normalized, '_');
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (str_starts_with($normalized, 'pre_nursery') || str_starts_with($normalized, 'prenursery')) {
+            return 'pre_nursery';
+        }
+        if (str_starts_with($normalized, 'nursery')) {
+            return 'nursery';
+        }
+        if (str_starts_with($normalized, 'primary')) {
+            return 'primary';
+        }
+        if (str_starts_with($normalized, 'secondary')) {
+            return 'secondary';
+        }
+
+        return $normalized;
     }
 }
