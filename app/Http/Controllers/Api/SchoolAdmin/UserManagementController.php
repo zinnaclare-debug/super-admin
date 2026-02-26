@@ -144,7 +144,12 @@ class UserManagementController extends Controller
         ]);
 
         $user->name = $validated['name'];
-        $user->email = $validated['email'] ?? null;
+        if ($user->role === 'staff') {
+            $user->email = $validated['email'];
+        } elseif (array_key_exists('email', $validated) && filled($validated['email'])) {
+            // For students, keep existing email unless a new non-empty value is provided.
+            $user->email = $validated['email'];
+        }
         $educationLevel = $this->normalizeEducationLevel($validated['education_level'] ?? null);
         if ($educationLevel !== null && !$this->isValidEducationLevel((int) $user->school_id, $educationLevel)) {
             return response()->json([
