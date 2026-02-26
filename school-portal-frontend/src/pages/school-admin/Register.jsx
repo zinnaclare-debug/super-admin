@@ -310,18 +310,20 @@ export default function Register() {
                   border: "1px solid #ddd",
                 }}
               />
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhoto(null);
-                    setPhotoPreview(null);
-                  }}
-                  style={{ marginTop: 8 }}
-                >
-                  Remove Photo
-                </button>
-              </div>
+              {!isEditMode ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto(null);
+                      setPhotoPreview(null);
+                    }}
+                    style={{ marginTop: 8 }}
+                  >
+                    Remove Photo
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
 

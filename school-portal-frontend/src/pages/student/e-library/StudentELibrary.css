@@ -112,6 +112,19 @@
   padding: 14px;
 }
 
+.sel-page--staff {
+  background:
+    radial-gradient(circle at 15% 9%, rgba(250, 204, 21, 0.3), transparent 44%),
+    radial-gradient(circle at 90% 84%, rgba(59, 130, 246, 0.24), transparent 50%),
+    linear-gradient(130deg, #0d3a4f, #145a74 56%, #0369a1);
+}
+
+.sel-panel h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: clamp(1.05rem, 1.7vw, 1.25rem);
+}
+
 .sel-state {
   margin: 0;
   border-radius: 10px;
@@ -127,6 +140,107 @@
 .sel-state--empty {
   color: #9a3412;
   background: #fff7ed;
+}
+
+.sel-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sel-field {
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.sel-field:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.sel-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+  cursor: pointer;
+}
+
+.sel-btn:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+.sel-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sel-btn--danger {
+  color: #7f1d1d;
+  background: linear-gradient(130deg, #fee2e2, #fecaca 95%);
+}
+
+.sel-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+}
+
+.sel-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 880px;
+  background: #ffffff;
+}
+
+.sel-table th,
+.sel-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.sel-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #334155;
+  background: #eff6ff;
+}
+
+.sel-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.sel-table tbody tr:hover {
+  background: #ecfeff;
+}
+
+.sel-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 9px 12px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #f0abfc 95%);
+}
+
+.sel-link-btn:hover {
+  filter: brightness(1.03);
 }
 
 .sel-grid {
@@ -238,5 +352,9 @@
 
   .sel-art--main {
     inset: 8px 44px 14px 0;
+  }
+
+  .sel-form {
+    grid-template-columns: 1fr;
   }
 }

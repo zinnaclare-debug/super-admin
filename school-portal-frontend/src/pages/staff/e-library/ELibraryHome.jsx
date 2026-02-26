@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import mobileDevicesArt from "../../../assets/e-library/mobile-devices.svg";
+import onlineReadingArt from "../../../assets/e-library/online-reading.svg";
+import audiobookArt from "../../../assets/e-library/audiobook.svg";
+import "../../student/e-library/StudentELibrary.css";
 
 export default function ELibraryHome() {
   const [books, setBooks] = useState([]);
@@ -14,6 +18,15 @@ export default function ELibraryHome() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  function formatDate(value) {
+    if (!value) return null;
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return null;
+    }
+  }
 
   const load = async () => {
     setLoading(true);
@@ -80,80 +93,123 @@ export default function ELibraryHome() {
 
   return (
     <StaffFeatureLayout title="E-Library (Teacher)">
+      <div className="sel-page sel-page--staff">
+        <section className="sel-hero">
+          <div>
+            <span className="sel-pill">Staff E-Library</span>
+            <h2>Upload and manage textbooks with a clean workspace</h2>
+            <p className="sel-subtitle">
+              Keep subject resources organized for students. Upload by assigned subject and manage materials from one place.
+            </p>
+            <div className="sel-metrics">
+              <span>{loading ? "Loading..." : `${subjects.length} subject${subjects.length === 1 ? "" : "s"} assigned`}</span>
+              <span>{loading ? "Syncing..." : `${books.length} book${books.length === 1 ? "" : "s"} uploaded`}</span>
+            </div>
+          </div>
 
-      <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
-        <h3 style={{ marginTop: 0 }}>Upload Textbook</h3>
-        <form onSubmit={upload} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <select value={termSubjectId} onChange={(e) => setTermSubjectId(e.target.value)} required>
-            <option value="">Select assigned subject</option>
-            {subjects.map((s) => (
-              <option key={s.term_subject_id} value={s.term_subject_id}>
-                {s.subject_name} - {s.class_name} ({s.term_name})
-              </option>
-            ))}
-          </select>
+          <div className="sel-hero-art" aria-hidden="true">
+            <div className="sel-art sel-art--main">
+              <img src={mobileDevicesArt} alt="" />
+            </div>
+            <div className="sel-art sel-art--reading">
+              <img src={onlineReadingArt} alt="" />
+            </div>
+            <div className="sel-art sel-art--audio">
+              <img src={audiobookArt} alt="" />
+            </div>
+          </div>
+        </section>
 
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
-          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author (optional)" />
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" />
-
-          <input
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-
-          <button type="submit" disabled={uploading}>
-            {uploading ? "Uploading..." : "Upload"}
-          </button>
-        </form>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table border="1" cellPadding="10" width="100%">
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>S/N</th>
-                <th>Title</th>
-                <th>Subject</th>
-                <th>Class</th>
-                <th>Term</th>
-                <th>Author</th>
-                <th style={{ width: 140 }}>File</th>
-                <th style={{ width: 120 }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {books.map((b, idx) => (
-                <tr key={b.id}>
-                  <td>{idx + 1}</td>
-                  <td>{b.title}</td>
-                  <td>{b.subject_name || "-"}</td>
-                  <td>{b.class_name || "-"}</td>
-                  <td>{b.term_name || "-"}</td>
-                  <td>{b.author || "-"}</td>
-                  <td>
-                    <a href={b.file_url} target="_blank" rel="noreferrer">View</a>
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => removeBook(b.id)}
-                      disabled={deletingId === b.id}
-                    >
-                      {deletingId === b.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </td>
-                </tr>
+        <section className="sel-panel">
+          <h3>Upload Textbook</h3>
+          <form onSubmit={upload} className="sel-form">
+            <select className="sel-field" value={termSubjectId} onChange={(e) => setTermSubjectId(e.target.value)} required>
+              <option value="">Select assigned subject</option>
+              {subjects.map((s) => (
+                <option key={s.term_subject_id} value={s.term_subject_id}>
+                  {s.subject_name} - {s.class_name} ({s.term_name})
+                </option>
               ))}
-              {books.length === 0 && (
-                <tr><td colSpan="8">No textbooks uploaded yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        )}
+            </select>
+
+            <input className="sel-field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
+            <input className="sel-field" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author (optional)" />
+            <input
+              className="sel-field"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description (optional)"
+            />
+
+            <input
+              className="sel-field"
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+
+            <button className="sel-btn" type="submit" disabled={uploading}>
+              {uploading ? "Uploading..." : "Upload"}
+            </button>
+          </form>
+        </section>
+
+        <section className="sel-panel">
+          {loading ? (
+            <p className="sel-state sel-state--loading">Loading e-library...</p>
+          ) : (
+            <div className="sel-table-wrap">
+              <table className="sel-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 70 }}>S/N</th>
+                    <th>Title</th>
+                    <th>Subject</th>
+                    <th>Class</th>
+                    <th>Term</th>
+                    <th>Author</th>
+                    <th>Posted</th>
+                    <th style={{ width: 120 }}>File</th>
+                    <th style={{ width: 120 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {books.map((b, idx) => (
+                    <tr key={b.id}>
+                      <td>{idx + 1}</td>
+                      <td>{b.title}</td>
+                      <td>{b.subject_name || "-"}</td>
+                      <td>{b.class_name || "-"}</td>
+                      <td>{b.term_name || "-"}</td>
+                      <td>{b.author || "-"}</td>
+                      <td>{formatDate(b.created_at || b.updated_at || b.published_at) || "-"}</td>
+                      <td>
+                        <a className="sel-link-btn" href={b.file_url} target="_blank" rel="noreferrer">
+                          View
+                        </a>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="sel-btn sel-btn--danger"
+                          onClick={() => removeBook(b.id)}
+                          disabled={deletingId === b.id}
+                        >
+                          {deletingId === b.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {books.length === 0 && (
+                    <tr>
+                      <td colSpan="9">No textbooks uploaded yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </StaffFeatureLayout>
   );
