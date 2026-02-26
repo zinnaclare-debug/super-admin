@@ -1,0 +1,242 @@
+.sel-page {
+  --sel-deep: #093047;
+  --sel-teal: #0ea5a6;
+  --sel-orange: #f59e0b;
+  --sel-ink: #0f172a;
+  border-radius: 24px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(245, 158, 11, 0.3), transparent 44%),
+    radial-gradient(circle at 88% 84%, rgba(14, 165, 166, 0.28), transparent 50%),
+    linear-gradient(130deg, #093047, #145a74 56%, #1f7a8c);
+  box-shadow: 0 24px 40px rgba(9, 48, 71, 0.28);
+}
+
+.sel-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.sel-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #0c4a6e;
+  background: linear-gradient(130deg, #fef3c7, #ffffff);
+}
+
+.sel-hero h2 {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  line-height: 1.06;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+}
+
+.sel-subtitle {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.55;
+  max-width: 56ch;
+}
+
+.sel-metrics {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sel-metrics span {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.sel-hero-art {
+  min-height: 230px;
+  position: relative;
+}
+
+.sel-art {
+  position: absolute;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.2);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sel-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sel-art--main {
+  inset: 12px 56px 20px 0;
+}
+
+.sel-art--reading {
+  width: 42%;
+  height: 40%;
+  right: 0;
+  top: 0;
+  background: linear-gradient(160deg, #fff7ed, #e0f2fe);
+}
+
+.sel-art--audio {
+  width: 40%;
+  height: 38%;
+  right: 14px;
+  bottom: 0;
+  background: linear-gradient(160deg, #f5f3ff, #dcfce7);
+}
+
+.sel-panel {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  padding: 14px;
+}
+
+.sel-state {
+  margin: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.sel-state--loading {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.sel-state--empty {
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.sel-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.sel-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.sel-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sel-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: linear-gradient(150deg, #fde68a, #f59e0b);
+}
+
+.sel-level {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #155e75;
+  background: #ecfeff;
+}
+
+.sel-card h3 {
+  margin: 0;
+  color: var(--sel-ink);
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.sel-author {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sel-description {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.sel-meta {
+  color: #475569;
+  font-size: 12px;
+}
+
+.sel-download {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  padding: 9px 12px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+}
+
+.sel-download:hover {
+  filter: brightness(1.03);
+}
+
+@media (max-width: 900px) {
+  .sel-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .sel-page {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .sel-panel {
+    padding: 10px;
+  }
+
+  .sel-hero-art {
+    min-height: 200px;
+  }
+
+  .sel-art--main {
+    inset: 8px 44px 14px 0;
+  }
+}
