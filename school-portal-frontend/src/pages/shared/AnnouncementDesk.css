@@ -1,0 +1,247 @@
+.announce-page {
+  --announce-ink: #05292f;
+  --announce-deep: #264c57;
+  --announce-mint: #3dbb9c;
+  --announce-gold: #f2b52a;
+  --announce-coral: #d53b32;
+  position: relative;
+  border-radius: 24px;
+  padding: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(242, 181, 42, 0.3), transparent 45%),
+    radial-gradient(circle at 90% 84%, rgba(61, 187, 156, 0.34), transparent 50%),
+    linear-gradient(135deg, var(--announce-ink), var(--announce-deep) 48%, #1e5f63 100%);
+  box-shadow: 0 22px 40px rgba(5, 41, 47, 0.26);
+}
+
+.announce-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 35%),
+    linear-gradient(290deg, rgba(213, 59, 50, 0.18), transparent 50%);
+  pointer-events: none;
+}
+
+.announce-hero {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+}
+
+.announce-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #083344;
+  background: linear-gradient(130deg, #f8fafc, #fef9c3);
+}
+
+.announce-hero h2 {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  line-height: 1.06;
+}
+
+.announce-subtitle {
+  margin: 0;
+  color: #dbeafe;
+  max-width: 56ch;
+  line-height: 1.55;
+}
+
+.announce-metrics {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.announce-metrics span {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #082f49;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.announce-hero-art {
+  position: relative;
+  min-height: 220px;
+}
+
+.announce-art-card {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 24px rgba(8, 47, 73, 0.2);
+  padding: 10px;
+}
+
+.announce-art-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.announce-art-card--main {
+  inset: 12px 64px 22px 0;
+}
+
+.announce-art-card--chat {
+  width: 46%;
+  height: 40%;
+  right: 0;
+  top: 0;
+  background: linear-gradient(160deg, #fff7ed, #ffe4e6);
+}
+
+.announce-art-card--info {
+  width: 40%;
+  height: 36%;
+  right: 16px;
+  bottom: 0;
+  background: linear-gradient(160deg, #eff6ff, #dcfce7);
+}
+
+.announce-panel {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(248, 250, 252, 0.95);
+  padding: 14px;
+}
+
+.announce-state {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.announce-state--loading {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.announce-state--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.announce-state--empty {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.announce-list {
+  display: grid;
+  gap: 12px;
+}
+
+.announce-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.announce-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.announce-card h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.announce-badge {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.announce-badge--all {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.announce-badge--staff {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.announce-badge--student {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.announce-badge--level {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.announce-message {
+  margin: 8px 0 10px;
+  color: #334155;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.announce-meta {
+  display: grid;
+  gap: 4px;
+  color: #475569;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .announce-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .announce-hero-art {
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 560px) {
+  .announce-page {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .announce-panel {
+    padding: 10px;
+  }
+
+  .announce-art-card--main {
+    inset: 8px 52px 14px 0;
+  }
+}
