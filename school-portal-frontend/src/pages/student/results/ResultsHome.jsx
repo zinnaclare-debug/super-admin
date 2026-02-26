@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import examPrepArt from "../../../assets/results/exam-prep.svg";
+import onlineSurveyArt from "../../../assets/results/online-survey.svg";
+import certificateArt from "../../../assets/results/certificate.svg";
+import "../../shared/ResultsShowcase.css";
 
 const DEFAULT_SCHEMA = {
   ca_maxes: [30, 0, 0, 0, 0],
@@ -163,98 +167,123 @@ export default function StudentResultsHome() {
   };
 
   return (
-    <div>
-      {loadingClasses ? (
-        <p>Loading assigned classes...</p>
-      ) : classes.length === 0 ? (
-        <p>No class assignment found for the current session.</p>
-      ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
-          {classes.map((item) => {
-            const isActive =
-              selected?.class_id === item.class_id && selected?.term_id === item.term_id;
-            return (
-              <button
-                key={`${item.class_id}-${item.term_id}`}
-                onClick={() => setSelected(item)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: isActive ? "1px solid #2563eb" : "1px solid #ddd",
-                  background: isActive ? "#eff6ff" : "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 700 }}>{item.class_name}</div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>
-                  {item.class_level} | {item.term_name}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {error ? <p style={{ color: "red", marginTop: 10 }}>{error}</p> : null}
-
-      {selected ? (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <h3 style={{ marginBottom: 8 }}>
-              {selected.class_name} - {selected.term_name}
-            </h3>
-            <button onClick={downloadResultPdf} disabled={loadingResults || downloading}>
-              {downloading ? "Downloading..." : "Download Result PDF"}
-            </button>
+    <div className="rs-page rs-page--student">
+      <section className="rs-hero">
+        <div>
+          <span className="rs-pill">Student Results</span>
+          <h2 className="rs-title">Track your performance by class and term</h2>
+          <p className="rs-subtitle">
+            Switch across assigned class records, review CA and exam scores, and download your result PDF instantly.
+          </p>
+          <div className="rs-meta">
+            <span>{loadingClasses ? "Loading..." : `${classes.length} class record${classes.length === 1 ? "" : "s"}`}</span>
+            <span>{selected?.term_name || "Term not selected"}</span>
           </div>
-          {loadingResults ? (
-            <p>Loading results...</p>
-          ) : (
-            <table border="1" cellPadding="10" width="100%">
-              <thead>
-                <tr>
-                  <th style={{ width: 70 }}>S/N</th>
-                  <th>Subject</th>
-                  {caIndices.map((idx) => (
-                    <th key={`ca-head-${idx}`} style={{ width: 80 }}>
-                      CA{idx + 1}
-                    </th>
-                  ))}
-                  <th style={{ width: 80 }}>CA Total</th>
-                  <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
-                  <th style={{ width: 80 }}>Total</th>
-                  <th style={{ width: 80 }}>Grade</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, idx) => (
-                  <tr key={row.term_subject_id}>
-                    <td>{idx + 1}</td>
-                    <td>{row.subject_name}</td>
-                    {caIndices.map((caIdx) => (
-                      <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
-                        {Number(row.ca_breakdown?.[caIdx] || 0)}
-                      </td>
-                    ))}
-                    <td>{row.ca}</td>
-                    <td>{row.exam}</td>
-                    <td>{row.total}</td>
-                    <td>{row.grade}</td>
-                  </tr>
-                ))}
-                {results.length === 0 ? (
-                  <tr>
-                    <td colSpan={6 + caIndices.length}>
-                      No result records for this class and term.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          )}
         </div>
-      ) : null}
+
+        <div className="rs-hero-art" aria-hidden="true">
+          <div className="rs-art rs-art--main">
+            <img src={examPrepArt} alt="" />
+          </div>
+          <div className="rs-art rs-art--survey">
+            <img src={onlineSurveyArt} alt="" />
+          </div>
+          <div className="rs-art rs-art--cert">
+            <img src={certificateArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="rs-panel">
+        {loadingClasses ? <p className="rs-state rs-state--loading">Loading assigned classes...</p> : null}
+        {!loadingClasses && classes.length === 0 ? (
+          <p className="rs-state rs-state--empty">No class assignment found for the current session.</p>
+        ) : null}
+
+        {!loadingClasses && classes.length > 0 ? (
+          <div className="rs-cards">
+            {classes.map((item) => {
+              const isActive =
+                selected?.class_id === item.class_id && selected?.term_id === item.term_id;
+              return (
+                <button
+                  key={`${item.class_id}-${item.term_id}`}
+                  className={`rs-card-btn${isActive ? " rs-card-btn--active" : ""}`}
+                  onClick={() => setSelected(item)}
+                >
+                  <h3 className="rs-card-title">{item.class_name}</h3>
+                  <p className="rs-card-meta">
+                    {item.class_level} | {item.term_name}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
+
+        {selected ? (
+          <>
+            <div className="rs-results-head">
+              <h3 className="rs-results-title">
+                {selected.class_name} - {selected.term_name}
+              </h3>
+              <button className="rs-btn" onClick={downloadResultPdf} disabled={loadingResults || downloading}>
+                {downloading ? "Downloading..." : "Download Result PDF"}
+              </button>
+            </div>
+
+            {loadingResults ? (
+              <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>
+            ) : (
+              <div className="rs-table-wrap">
+                <table className="rs-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 70 }}>S/N</th>
+                      <th>Subject</th>
+                      {caIndices.map((idx) => (
+                        <th key={`ca-head-${idx}`} style={{ width: 80 }}>
+                          CA{idx + 1}
+                        </th>
+                      ))}
+                      <th style={{ width: 80 }}>CA Total</th>
+                      <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
+                      <th style={{ width: 80 }}>Total</th>
+                      <th style={{ width: 80 }}>Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((row, idx) => (
+                      <tr key={row.term_subject_id}>
+                        <td>{idx + 1}</td>
+                        <td>{row.subject_name}</td>
+                        {caIndices.map((caIdx) => (
+                          <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
+                            {Number(row.ca_breakdown?.[caIdx] || 0)}
+                          </td>
+                        ))}
+                        <td>{row.ca}</td>
+                        <td>{row.exam}</td>
+                        <td>{row.total}</td>
+                        <td>{row.grade}</td>
+                      </tr>
+                    ))}
+                    {results.length === 0 ? (
+                      <tr>
+                        <td colSpan={6 + caIndices.length}>
+                          No result records for this class and term.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }
-
