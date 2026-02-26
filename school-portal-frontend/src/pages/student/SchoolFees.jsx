@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import payCardArt from "../../assets/payments/pay-with-credit-card.svg";
+import creditCardArt from "../../assets/payments/credit-card-payments.svg";
+import onlinePayArt from "../../assets/payments/online-payments.svg";
+import "../shared/PaymentsShowcase.css";
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
 
 export default function StudentSchoolFees() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -93,92 +101,137 @@ export default function StudentSchoolFees() {
   }, [isFullyPaid, outstanding]);
 
   return (
-    <div>
-      {loading ? (
-        <p>Loading school fees...</p>
-      ) : error ? (
-        <p style={{ color: "red" }}>{error}</p>
-      ) : (
-        <>
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Current Session / Term</h3>
-            <p style={{ margin: "4px 0" }}>
-              <strong>Session:</strong>{" "}
-              {summary?.current_session?.session_name || summary?.current_session?.academic_year || "-"}
-            </p>
-            <p style={{ margin: "4px 0" }}>
-              <strong>Term:</strong> {summary?.current_term?.name || "-"}
-            </p>
-            <p style={{ margin: "4px 0" }}>
-              <strong>Amount Payable:</strong> NGN {Number(fee?.amount_due || 0).toFixed(2)}
-            </p>
-            <p style={{ margin: "4px 0" }}>
-              <strong>Total Paid:</strong> NGN {Number(fee?.total_paid || 0).toFixed(2)}
-            </p>
-            <p style={{ margin: "4px 0", color: isFullyPaid ? "green" : "#b45309" }}>
-              <strong>Status:</strong> {statusLabel}
-            </p>
+    <div className="payx-page payx-page--student">
+      <section className="payx-hero">
+        <div>
+          <span className="payx-pill">Student School Fees</span>
+          <h2 className="payx-title">Pay securely and track your fee status</h2>
+          <p className="payx-subtitle">
+            Check outstanding balance, make partial or full payments, and monitor each transaction in your history.
+          </p>
+          <div className="payx-meta">
+            <span>{summary?.current_session?.session_name || summary?.current_session?.academic_year || "Session - "}</span>
+            <span>{summary?.current_term?.name || "Term -"}</span>
+            <span>{isFullyPaid ? "Fully Paid" : `Outstanding: NGN ${formatMoney(outstanding)}`}</span>
           </div>
+        </div>
 
-          {!isFullyPaid && (
-            <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 12 }}>
-              <h3 style={{ marginTop: 0 }}>Pay School Fees</h3>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input
-                  type="number"
-                  min="100"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  style={{ width: 220, padding: 10 }}
-                  disabled={paying || verifying}
-                />
-                <button onClick={payNow} disabled={paying || verifying}>
-                  {paying ? "Redirecting..." : "Pay with Paystack"}
-                </button>
-                {verifying && <span>Verifying payment...</span>}
-              </div>
-              <small style={{ opacity: 0.7 }}>
-                You can pay partially. Remaining balance will keep showing as outstanding.
-              </small>
-            </div>
-          )}
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main">
+            <img src={payCardArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card">
+            <img src={creditCardArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online">
+            <img src={onlinePayArt} alt="" />
+          </div>
+        </div>
+      </section>
 
-          <div style={{ marginTop: 14 }}>
-            <h3>Payment History</h3>
-            <table border="1" cellPadding="8" width="100%">
-              <thead>
-                <tr>
-                  <th>S/N</th>
-                  <th>Reference</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(summary?.payments || []).map((p, idx) => (
-                  <tr key={p.id}>
-                    <td>{idx + 1}</td>
-                    <td>{p.reference}</td>
-                    <td>
-                      {p.currency} {Number(p.amount_paid || 0).toFixed(2)}
-                    </td>
-                    <td>{p.status}</td>
-                    <td>{p.paid_at || p.created_at || "-"}</td>
-                  </tr>
-                ))}
-                {(summary?.payments || []).length === 0 && (
-                  <tr>
-                    <td colSpan="5">No payments yet.</td>
-                  </tr>
+      <section className="payx-panel">
+        {loading ? <p className="payx-state payx-state--loading">Loading school fees...</p> : null}
+        {!loading && error ? <p className="payx-state payx-state--error">{error}</p> : null}
+
+        {!loading && !error ? (
+          <>
+            <div className="payx-grid-2">
+              <article className="payx-card">
+                <h3>Current Session / Term</h3>
+                <div className="payx-kv">
+                  <div className="payx-row">
+                    <span className="payx-label">Session</span>
+                    <span className="payx-value">
+                      {summary?.current_session?.session_name || summary?.current_session?.academic_year || "-"}
+                    </span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Term</span>
+                    <span className="payx-value">{summary?.current_term?.name || "-"}</span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Amount Payable</span>
+                    <span className="payx-value">NGN {formatMoney(fee?.amount_due)}</span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Total Paid</span>
+                    <span className="payx-value">NGN {formatMoney(fee?.total_paid)}</span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Status</span>
+                    <span className="payx-value">{statusLabel}</span>
+                  </div>
+                </div>
+              </article>
+
+              <article className="payx-card">
+                <h3>Pay School Fees</h3>
+                {isFullyPaid ? (
+                  <p className="payx-state payx-state--ok">No outstanding fee for this term.</p>
+                ) : (
+                  <>
+                    <div className="payx-actions">
+                      <input
+                        className="payx-input"
+                        type="number"
+                        min="100"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="Enter amount"
+                        style={{ width: 220 }}
+                        disabled={paying || verifying}
+                      />
+                      <button className="payx-btn" onClick={payNow} disabled={paying || verifying}>
+                        {paying ? "Redirecting..." : "Pay with Paystack"}
+                      </button>
+                      {verifying ? <span className="payx-label">Verifying payment...</span> : null}
+                    </div>
+                    <small className="payx-small">
+                      You can pay partially. Remaining balance will keep showing as outstanding.
+                    </small>
+                  </>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              </article>
+            </div>
+
+            <div className="payx-card" style={{ marginTop: 12 }}>
+              <h3>Payment History</h3>
+              <div className="payx-table-wrap">
+                <table className="payx-table">
+                  <thead>
+                    <tr>
+                      <th>S/N</th>
+                      <th>Reference</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(summary?.payments || []).map((p, idx) => (
+                      <tr key={p.id}>
+                        <td>{idx + 1}</td>
+                        <td>{p.reference}</td>
+                        <td>
+                          {p.currency} {formatMoney(p.amount_paid)}
+                        </td>
+                        <td>{p.status}</td>
+                        <td>{p.paid_at || p.created_at || "-"}</td>
+                      </tr>
+                    ))}
+                    {(summary?.payments || []).length === 0 ? (
+                      <tr>
+                        <td colSpan="5">No payments yet.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }

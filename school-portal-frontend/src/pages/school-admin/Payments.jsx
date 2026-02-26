@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
+import payCardArt from "../../assets/payments/pay-with-credit-card.svg";
+import creditCardArt from "../../assets/payments/credit-card-payments.svg";
+import onlinePayArt from "../../assets/payments/online-payments.svg";
+import "../shared/PaymentsShowcase.css";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
@@ -147,163 +151,192 @@ export default function SchoolAdminPayments() {
   };
 
   return (
-    <div>
-      {sessionConfigError ? (
-        <p style={{ marginTop: 10, color: "#b45309" }}>{sessionConfigError}</p>
-      ) : null}
-
-      {configLoading ? (
-        <p>Loading fee setup...</p>
-      ) : (
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 12 }}>
-          <p style={{ margin: "4px 0" }}>
-            <strong>Current Session:</strong>{" "}
-            {context?.current_session?.session_name || context?.current_session?.academic_year || "-"}
+    <div className="payx-page payx-page--admin">
+      <section className="payx-hero">
+        <div>
+          <span className="payx-pill">School Admin Payments</span>
+          <h2 className="payx-title">Configure fees and manage payment flow</h2>
+          <p className="payx-subtitle">
+            Set fee amount per education level, configure subaccount routing, and monitor student fee payments.
           </p>
-          <p style={{ margin: "4px 0" }}>
-            <strong>Current Term:</strong> {context?.current_term?.name || "-"}
-          </p>
-          <div style={{ marginTop: 12 }}>
-            <strong>School Fee By Education Level (NGN):</strong>
-            {!activeLevels.length ? (
-              <p style={{ margin: "8px 0 0", opacity: 0.8 }}>
-                No active levels found in this session.
-              </p>
-            ) : (
-              <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-                {activeLevels.map((level) => (
-                  <div
-                    key={level}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      padding: "8px 10px",
-                    }}
-                  >
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 130 }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(levelFees[level]?.enabled)}
-                        onChange={(e) => toggleLevel(level, e.target.checked)}
-                      />
-                      <span>{prettyLevel(level)}</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder={`Enter ${prettyLevel(level)} fee`}
-                      value={levelFees[level]?.amount ?? ""}
-                      disabled={!levelFees[level]?.enabled}
-                      onChange={(e) => changeLevelAmount(level, e.target.value)}
-                      style={{ width: 220, padding: 8 }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="payx-meta">
+            <span>{context?.current_session?.session_name || context?.current_session?.academic_year || "Session -"}</span>
+            <span>{context?.current_term?.name || "Term -"}</span>
+            <span>{activeLevels.length} active level{activeLevels.length === 1 ? "" : "s"}</span>
           </div>
-          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <label htmlFor="paystack_subaccount_code"><strong>Paystack Subaccount Code:</strong></label>
+        </div>
+
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main">
+            <img src={payCardArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card">
+            <img src={creditCardArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online">
+            <img src={onlinePayArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="payx-panel">
+        {sessionConfigError ? <p className="payx-state payx-state--warn">{sessionConfigError}</p> : null}
+
+        {configLoading ? (
+          <p className="payx-state payx-state--loading">Loading fee setup...</p>
+        ) : (
+          <div className="payx-card">
+            <h3>Fee Configuration</h3>
+            <div className="payx-kv">
+              <div className="payx-row">
+                <span className="payx-label">Current Session</span>
+                <span className="payx-value">
+                  {context?.current_session?.session_name || context?.current_session?.academic_year || "-"}
+                </span>
+              </div>
+              <div className="payx-row">
+                <span className="payx-label">Current Term</span>
+                <span className="payx-value">{context?.current_term?.name || "-"}</span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <strong>School Fee By Education Level (NGN)</strong>
+              {!activeLevels.length ? (
+                <p className="payx-small">No active levels found in this session.</p>
+              ) : (
+                <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                  {activeLevels.map((level) => (
+                    <div key={level} className="payx-fee-row">
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 130 }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(levelFees[level]?.enabled)}
+                          onChange={(e) => toggleLevel(level, e.target.checked)}
+                        />
+                        <span>{prettyLevel(level)}</span>
+                      </label>
+                      <input
+                        className="payx-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={`Enter ${prettyLevel(level)} fee`}
+                        value={levelFees[level]?.amount ?? ""}
+                        disabled={!levelFees[level]?.enabled}
+                        onChange={(e) => changeLevelAmount(level, e.target.value)}
+                        style={{ width: 220 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="payx-actions">
+              <label htmlFor="paystack_subaccount_code"><strong>Paystack Subaccount Code:</strong></label>
+              <input
+                className="payx-input"
+                id="paystack_subaccount_code"
+                type="text"
+                value={paystackSubaccountCode}
+                onChange={(e) => setPaystackSubaccountCode(e.target.value)}
+                placeholder="e.g. ACCT_xxxxxxxxx"
+                style={{ width: 280 }}
+              />
+              <button className="payx-btn" onClick={saveConfig} disabled={saving}>
+                {saving ? "Saving..." : "Save Settings"}
+              </button>
+            </div>
+            <small className="payx-small">
+              Set this to route fees to your school subaccount. Leave blank to use main Paystack account.
+            </small>
+          </div>
+        )}
+
+        <div className="payx-card" style={{ marginTop: 12 }}>
+          <h3>Payment Records</h3>
+          <div className="payx-actions">
             <input
-              id="paystack_subaccount_code"
-              type="text"
-              value={paystackSubaccountCode}
-              onChange={(e) => setPaystackSubaccountCode(e.target.value)}
-              placeholder="e.g. ACCT_xxxxxxxxx"
-              style={{ width: 280, padding: 10 }}
+              className="payx-input"
+              placeholder="Search by name/email/username/reference"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              style={{ width: 360 }}
             />
-            <button onClick={saveConfig} disabled={saving}>
-              {saving ? "Saving..." : "Save Settings"}
+            <button
+              className="payx-btn payx-btn--soft"
+              onClick={() => {
+                setSearch("");
+                setPage(1);
+              }}
+            >
+              Clear
             </button>
           </div>
-          <small style={{ display: "block", marginTop: 8, opacity: 0.7 }}>
-            Set this to route fees to your school subaccount. Leave blank to use main Paystack account.
-          </small>
-        </div>
-      )}
 
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            placeholder="Search by name/email/username/reference"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            style={{ width: 360, padding: 10 }}
-          />
-          <button
-            onClick={() => {
-              setSearch("");
-              setPage(1);
-            }}
-          >
-            Clear
-          </button>
-        </div>
-
-        {tableLoading ? (
-          <p>Loading payments...</p>
-        ) : (
-          <>
-            <table border="1" cellPadding="8" width="100%" style={{ marginTop: 12 }}>
-              <thead>
-                <tr>
-                  <th>S/N</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Username</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Reference</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, idx) => (
-                  <tr key={r.id}>
-                    <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || rows.length || 0) + idx + 1}</td>
-                    <td>{r.student?.name || "-"}</td>
-                    <td>{r.student?.email || "-"}</td>
-                    <td>{r.student?.username || "-"}</td>
-                    <td>
-                      {r.currency} {Number(r.amount_paid || 0).toFixed(2)}
-                    </td>
-                    <td>{r.status}</td>
-                    <td>{r.reference}</td>
-                    <td>{r.paid_at || r.created_at || "-"}</td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan="8">No payments found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-
-            {meta && (
-              <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-                <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                  Prev
-                </button>
-                <div>
-                  Page {meta.current_page} / {meta.last_page}
-                </div>
-                <button disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>
-                  Next
-                </button>
+          {tableLoading ? (
+            <p className="payx-state payx-state--loading" style={{ marginTop: 10 }}>Loading payments...</p>
+          ) : (
+            <>
+              <div className="payx-table-wrap">
+                <table className="payx-table">
+                  <thead>
+                    <tr>
+                      <th>S/N</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Username</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Reference</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, idx) => (
+                      <tr key={r.id}>
+                        <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || rows.length || 0) + idx + 1}</td>
+                        <td>{r.student?.name || "-"}</td>
+                        <td>{r.student?.email || "-"}</td>
+                        <td>{r.student?.username || "-"}</td>
+                        <td>
+                          {r.currency} {Number(r.amount_paid || 0).toFixed(2)}
+                        </td>
+                        <td>{r.status}</td>
+                        <td>{r.reference}</td>
+                        <td>{r.paid_at || r.created_at || "-"}</td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan="8">No payments found.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {meta ? (
+                <div className="payx-actions" style={{ marginTop: 12 }}>
+                  <button className="payx-btn payx-btn--soft" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                    Prev
+                  </button>
+                  <div className="payx-label">
+                    Page {meta.current_page} / {meta.last_page}
+                  </div>
+                  <button className="payx-btn payx-btn--soft" disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>
+                    Next
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

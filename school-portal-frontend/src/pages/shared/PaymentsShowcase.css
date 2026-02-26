@@ -1,0 +1,329 @@
+.payx-page {
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 24px 42px rgba(15, 23, 42, 0.22);
+}
+
+.payx-page--student {
+  background:
+    radial-gradient(circle at 14% 10%, rgba(245, 158, 11, 0.28), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(16, 185, 129, 0.24), transparent 50%),
+    linear-gradient(135deg, #0f3d59, #155e75 52%, #0f766e);
+}
+
+.payx-page--admin {
+  background:
+    radial-gradient(circle at 14% 10%, rgba(244, 114, 182, 0.26), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(59, 130, 246, 0.24), transparent 50%),
+    linear-gradient(135deg, #312e81, #1d4ed8 52%, #0f172a);
+}
+
+.payx-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.payx-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #1e293b;
+  background: linear-gradient(130deg, #fde68a, #ffffff);
+}
+
+.payx-title {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  line-height: 1.06;
+  font-size: clamp(1.35rem, 2.1vw, 2rem);
+}
+
+.payx-subtitle {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.5;
+  max-width: 58ch;
+}
+
+.payx-meta {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.payx-meta span {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.payx-hero-art {
+  position: relative;
+  min-height: 220px;
+}
+
+.payx-art {
+  position: absolute;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.2);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payx-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.payx-art--main {
+  inset: 12px 60px 20px 0;
+}
+
+.payx-art--card {
+  width: 44%;
+  height: 40%;
+  right: 0;
+  top: 6px;
+  background: linear-gradient(160deg, #fff7ed, #e0f2fe);
+}
+
+.payx-art--online {
+  width: 40%;
+  height: 38%;
+  right: 14px;
+  bottom: 0;
+  background: linear-gradient(160deg, #f0f9ff, #fce7f3);
+}
+
+.payx-panel {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  padding: 14px;
+}
+
+.payx-state {
+  margin: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.payx-state--loading {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.payx-state--error {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.payx-state--warn {
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.payx-state--ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.payx-grid-2 {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payx-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.payx-card h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.payx-kv {
+  display: grid;
+  gap: 8px;
+}
+
+.payx-row {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 10px;
+}
+
+.payx-label {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payx-value {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.payx-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.payx-input,
+.payx-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.payx-input:focus,
+.payx-select:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.payx-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+  width: fit-content;
+  cursor: pointer;
+}
+
+.payx-btn:hover {
+  filter: brightness(1.03);
+}
+
+.payx-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.payx-btn--soft {
+  color: #1e293b;
+  background: linear-gradient(130deg, #e2e8f0, #f8fafc);
+}
+
+.payx-fee-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.payx-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.payx-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.payx-table thead th {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 13px;
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.payx-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #edf2f7;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.payx-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.payx-table tbody tr:nth-child(odd) {
+  background: #f8fafc;
+}
+
+.payx-small {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .payx-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .payx-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .payx-page {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .payx-panel {
+    padding: 10px;
+  }
+
+  .payx-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .payx-hero-art {
+    min-height: 200px;
+  }
+
+  .payx-art--main {
+    inset: 8px 46px 14px 0;
+  }
+}
