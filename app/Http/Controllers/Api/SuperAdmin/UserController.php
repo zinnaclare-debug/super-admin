@@ -8,6 +8,7 @@ use App\Models\School;
 use App\Models\Student;
 use App\Models\Term;
 use App\Models\User;
+use App\Support\ClassTemplateSchema;
 use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -141,18 +142,24 @@ class UserController extends Controller
             ->where('students.school_id', $schoolId)
             ->where('users.role', 'student');
 
+        $selectColumns = [
+            'students.id as student_id',
+            'users.name as student_name',
+            'classes.level as class_level',
+        ];
+        $hasStudentEducationLevel = Schema::hasColumn('students', 'education_level');
+        if ($hasStudentEducationLevel) {
+            $selectColumns[] = 'students.education_level as student_level';
+        }
+
         $allRows = (clone $baseQuery)
-            ->select([
-                'students.id as student_id',
-                'users.name as student_name',
-                'classes.level as class_level',
-            ])
+            ->select($selectColumns)
             ->orderBy('users.name')
             ->get();
 
         $counts = [];
         foreach ($allRows as $row) {
-            $lvl = strtolower((string) ($row->class_level ?? ''));
+            $lvl = strtolower(trim((string) ($row->class_level ?? ($row->student_level ?? ''))));
             if ($lvl !== '') {
                 $counts[$lvl] = (int) ($counts[$lvl] ?? 0) + 1;
             }
@@ -163,19 +170,30 @@ class UserController extends Controller
             $levelFilter = strtolower(trim((string) $payload['level']));
             $filteredRows = $allRows->filter(function ($row) use ($payload) {
                 $levelFilter = strtolower(trim((string) $payload['level']));
-                return strtolower((string) ($row->class_level ?? '')) === $levelFilter;
+                $effectiveLevel = strtolower(trim((string) ($row->class_level ?? ($row->student_level ?? ''))));
+                return $effectiveLevel === $levelFilter;
             })->values();
         }
 
         $students = $filteredRows->map(function ($row) {
+            $effectiveLevel = trim((string) ($row->class_level ?? ($row->student_level ?? '')));
             return [
                 'student_id' => (int) $row->student_id,
                 'name' => $row->student_name,
-                'level' => $row->class_level ?: 'unassigned',
+                'level' => $effectiveLevel !== '' ? $effectiveLevel : 'unassigned',
             ];
         })->values();
 
-        $levels = collect($counts)
+        $templateLevelMap = collect(
+            ClassTemplateSchema::activeLevelKeys(
+                ClassTemplateSchema::normalize($school->class_templates)
+            )
+        )
+            ->mapWithKeys(fn ($key) => [$key => 0])
+            ->all();
+        $mergedCounts = array_merge($templateLevelMap, $counts);
+
+        $levels = collect($mergedCounts)
             ->map(function ($count, $key) {
                 $label = ucwords(str_replace('_', ' ', (string) $key));
                 return ['key' => (string) $key, 'label' => $label, 'count' => (int) $count];

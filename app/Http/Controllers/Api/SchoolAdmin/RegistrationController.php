@@ -13,6 +13,7 @@ use App\Support\ClassTemplateSchema;
 use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class RegistrationController extends Controller
@@ -96,7 +97,7 @@ class RegistrationController extends Controller
         );
 
         if ($request->role === 'student') {
-            Student::create([
+            $studentPayload = [
                 'user_id' => $user->id,
                 'school_id' => $schoolId,
                 'sex' => $request->input('sex'),
@@ -104,7 +105,11 @@ class RegistrationController extends Controller
                 'dob' => $request->input('dob'),
                 'address' => $request->input('address'),
                 'photo_path' => $photoPath,
-            ]);
+            ];
+            if (Schema::hasColumn('students', 'education_level')) {
+                $studentPayload['education_level'] = $educationLevel;
+            }
+            Student::create($studentPayload);
         } else {
             Staff::create([
                 'user_id' => $user->id,
@@ -191,7 +196,7 @@ class RegistrationController extends Controller
         );
 
         if ($request->role === 'student') {
-            Student::create([
+            $studentPayload = [
                 'user_id' => $user->id,
                 'school_id' => $schoolId,
                 'sex' => $request->input('sex'),
@@ -199,7 +204,11 @@ class RegistrationController extends Controller
                 'dob' => $request->input('dob'),
                 'address' => $request->input('address'),
                 'photo_path' => $photoPath,
-            ]);
+            ];
+            if (Schema::hasColumn('students', 'education_level')) {
+                $studentPayload['education_level'] = $educationLevel;
+            }
+            Student::create($studentPayload);
         } else {
             Staff::create([
                 'user_id' => $user->id,

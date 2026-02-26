@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\User;
+use App\Support\ClassTemplateSchema;
 use App\Support\UserCredentialStore;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -182,13 +183,30 @@ class LoginDetailsController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values();
         $studentIdByUserId = [];
+        $studentLevelByUserId = [];
         if ($studentUserIds->isNotEmpty() && Schema::hasTable('students')) {
-            $studentIdByUserId = DB::table('students')
+            $hasStudentEducationLevel = Schema::hasColumn('students', 'education_level');
+
+            $studentQuery = DB::table('students')
                 ->where('school_id', $schoolId)
                 ->whereIn('user_id', $studentUserIds->all())
-                ->pluck('id', 'user_id')
-                ->mapWithKeys(fn ($studentId, $userId) => [(int) $userId => (int) $studentId])
+                ->select(['id', 'user_id']);
+            if ($hasStudentEducationLevel) {
+                $studentQuery->addSelect('education_level');
+            }
+            $studentRows = $studentQuery->get();
+
+            $studentIdByUserId = $studentRows
+                ->mapWithKeys(fn ($row) => [(int) $row->user_id => (int) $row->id])
                 ->all();
+
+            if ($hasStudentEducationLevel) {
+                $studentLevelByUserId = $studentRows
+                    ->mapWithKeys(function ($row) {
+                        return [(int) $row->user_id => strtolower(trim((string) ($row->education_level ?? '')))];
+                    })
+                    ->all();
+            }
         }
 
         $staffLevelByUserId = [];
@@ -264,6 +282,7 @@ class LoginDetailsController extends Controller
         $rawRows = $users->values()->map(function (User $user) use (
             $hasCredentialTable,
             $studentIdByUserId,
+            $studentLevelByUserId,
             $staffLevelByUserId,
             $studentProfileByStudentId
         ) {
@@ -282,7 +301,10 @@ class LoginDetailsController extends Controller
                 $profile = $studentId ? ($studentProfileByStudentId[$studentId] ?? null) : null;
                 $classId = isset($profile['class_id']) ? (int) $profile['class_id'] : null;
                 $className = trim((string) ($profile['class_name'] ?? ''));
-                $level = strtolower(trim((string) ($profile['level'] ?? '')));
+                $studentEducationLevel = strtolower(trim((string) ($studentLevelByUserId[$userId] ?? '')));
+                $level = $studentEducationLevel !== ''
+                    ? $studentEducationLevel
+                    : strtolower(trim((string) ($profile['level'] ?? '')));
                 $department = trim((string) ($profile['department'] ?? ''));
             }
 
@@ -363,11 +385,29 @@ class LoginDetailsController extends Controller
             })
             ->all();
 
-        $levels = $rawRows
-            ->pluck('level')
+        $templateLevels = [];
+        $school = School::query()->find($schoolId);
+        if ($school) {
+            $templateLevels = ClassTemplateSchema::activeLevelKeys(
+                ClassTemplateSchema::normalize($school->class_templates)
+            );
+        }
+
+        $levels = collect($templateLevels)
+            ->merge(
+                collect($classOptions)
+                    ->pluck('level')
+                    ->all()
+            )
+            ->merge(
+                collect($rawRows)
+                    ->pluck('level')
+                    ->all()
+            )
             ->map(fn ($value) => strtolower(trim((string) $value)))
             ->filter(fn ($value) => $value !== '')
             ->unique()
+            ->sort()
             ->values()
             ->all();
 

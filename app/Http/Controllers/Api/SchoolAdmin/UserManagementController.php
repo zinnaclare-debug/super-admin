@@ -14,6 +14,7 @@ use App\Support\UserCredentialStore;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -87,7 +88,7 @@ class UserManagementController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'username' => $user->username,
-                'education_level' => $staff?->education_level,
+                'education_level' => $student?->education_level ?? $staff?->education_level,
                 'sex' => $student?->sex ?? $staff?->sex,
                 'religion' => $student?->religion,
                 'dob' => $student?->dob ?? $staff?->dob,
@@ -187,6 +188,9 @@ class UserManagementController extends Controller
             $student->religion = $validated['religion'] ?? $student->religion;
             $student->dob = $validated['dob'] ?? $student->dob;
             $student->address = $validated['address'] ?? $student->address;
+            if (Schema::hasColumn('students', 'education_level')) {
+                $student->education_level = $educationLevel ?? $student->education_level;
+            }
             if ($photoPath) {
                 $student->photo_path = $photoPath;
             }
