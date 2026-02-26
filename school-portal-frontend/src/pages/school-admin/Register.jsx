@@ -27,6 +27,7 @@ export default function Register() {
 
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [educationLevels, setEducationLevels] = useState([]);
@@ -117,6 +118,8 @@ export default function Register() {
         if (data.photo_url) {
           setPhotoPreview(data.photo_url);
         }
+        setPhoto(null);
+        setRemovePhoto(false);
       } catch (err) {
         alert(err?.response?.data?.message || "Failed to load user for editing");
       } finally {
@@ -137,6 +140,7 @@ export default function Register() {
 
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
+    setRemovePhoto(false);
   };
 
   const buildFormData = (extra = {}) => {
@@ -145,6 +149,10 @@ export default function Register() {
     Object.entries({ ...form, ...extra }).forEach(([k, v]) => {
       if (v !== null && v !== undefined && v !== "") fd.append(k, v);
     });
+
+    if (isEditMode && removePhoto) {
+      fd.append("remove_photo", "1");
+    }
 
     if (photo) fd.append("photo", photo);
 
@@ -310,20 +318,19 @@ export default function Register() {
                   border: "1px solid #ddd",
                 }}
               />
-              {!isEditMode ? (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhoto(null);
-                      setPhotoPreview(null);
-                    }}
-                    style={{ marginTop: 8 }}
-                  >
-                    Remove Photo
-                  </button>
-                </div>
-              ) : null}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoto(null);
+                    setPhotoPreview(null);
+                    if (isEditMode) setRemovePhoto(true);
+                  }}
+                  style={{ marginTop: 8 }}
+                >
+                  Remove Photo
+                </button>
+              </div>
             </div>
           )}
 

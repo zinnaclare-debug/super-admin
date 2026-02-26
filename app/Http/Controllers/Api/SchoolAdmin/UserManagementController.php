@@ -141,6 +141,7 @@ class UserManagementController extends Controller
             'guardian_occupation' => ['nullable', 'string', 'max:255'],
             'guardian_relationship' => ['nullable', 'string', 'max:255'],
 
+            'remove_photo' => ['nullable', 'boolean'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -163,11 +164,21 @@ class UserManagementController extends Controller
         }
         $user->save();
 
-        $existingPhotoPath = $user->role === 'student'
-            ? Student::where('school_id', $user->school_id)->where('user_id', $user->id)->value('photo_path')
-            : Staff::where('school_id', $user->school_id)->where('user_id', $user->id)->value('photo_path');
+        $existingStudentPhotoPath = Student::where('school_id', $user->school_id)
+            ->where('user_id', $user->id)
+            ->value('photo_path');
+        $existingStaffPhotoPath = Staff::where('school_id', $user->school_id)
+            ->where('user_id', $user->id)
+            ->value('photo_path');
+
+        $currentPhotoPaths = collect([
+            $user->photo_path,
+            $existingStudentPhotoPath,
+            $existingStaffPhotoPath,
+        ])->filter(fn ($path) => filled($path))->unique()->values();
 
         $photoPath = null;
+        $removePhoto = filter_var($validated['remove_photo'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($request->hasFile('photo')) {
             $dir = "schools/{$user->school_id}/profiles";
             $ext = $request->file('photo')->getClientOriginalExtension();
@@ -175,6 +186,9 @@ class UserManagementController extends Controller
             $filename = $user->username . '-' . now()->timestamp . '.' . $ext;
             $photoPath = $request->file('photo')->storeAs($dir, $filename, 'public');
             $user->photo_path = $photoPath;
+            $user->save();
+        } elseif ($removePhoto) {
+            $user->photo_path = null;
             $user->save();
         }
 
@@ -193,6 +207,8 @@ class UserManagementController extends Controller
             }
             if ($photoPath) {
                 $student->photo_path = $photoPath;
+            } elseif ($removePhoto) {
+                $student->photo_path = null;
             }
             $student->save();
 
@@ -227,12 +243,30 @@ class UserManagementController extends Controller
             $staff->education_level = $educationLevel ?? $staff->education_level;
             if ($photoPath) {
                 $staff->photo_path = $photoPath;
+            } elseif ($removePhoto) {
+                $staff->photo_path = null;
             }
             $staff->save();
         }
 
-        if ($photoPath && $existingPhotoPath && $existingPhotoPath !== $photoPath && Storage::disk('public')->exists($existingPhotoPath)) {
-            Storage::disk('public')->delete($existingPhotoPath);
+        $updatedStudentPhotoPath = Student::where('school_id', $user->school_id)
+            ->where('user_id', $user->id)
+            ->value('photo_path');
+        $updatedStaffPhotoPath = Staff::where('school_id', $user->school_id)
+            ->where('user_id', $user->id)
+            ->value('photo_path');
+
+        $activePhotoPaths = collect([
+            $user->photo_path,
+            $updatedStudentPhotoPath,
+            $updatedStaffPhotoPath,
+        ])->filter(fn ($path) => filled($path))->unique()->values();
+
+        $pathsToDelete = $currentPhotoPaths->diff($activePhotoPaths)->values();
+        foreach ($pathsToDelete as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
         }
 
         UserCredentialStore::sync(
