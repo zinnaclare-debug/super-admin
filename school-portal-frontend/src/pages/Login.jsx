@@ -35,7 +35,6 @@ function Login() {
     return "";
   }, [tenantSchool]);
 
-  const heroLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandBanner;
   const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
   const tenantContactEmail = (tenantSchool?.contact_email || "").trim();
   const tenantContactPhone = (tenantSchool?.contact_phone || "").trim();
@@ -117,14 +116,6 @@ function Login() {
           <div className="hero-meta">
             <span className="hero-pill">Smart School Portal</span>
             <span className="hero-domain">{window.location.hostname}</span>
-            <img
-              className="hero-school-logo"
-              src={heroLogoUrl}
-              alt={`${tenantSchool?.name || "Lytebridge"} logo`}
-              onError={() => {
-                if (tenantLogoUrl) setLogoLoadError(true);
-              }}
-            />
           </div>
 
           <h1>

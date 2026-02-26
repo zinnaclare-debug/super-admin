@@ -146,16 +146,6 @@
   text-overflow: ellipsis;
 }
 
-.hero-school-logo {
-  width: 138px;
-  height: 69px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.94);
-  object-fit: cover;
-  box-shadow: 0 6px 16px rgba(3, 38, 63, 0.28);
-}
-
 .login-hero h1 {
   margin: 8px 0 0;
   font-size: clamp(1.28rem, 2.1vw, 1.9rem);
@@ -304,7 +294,7 @@
 
 .login-mark {
   width: 100%;
-  min-height: 129px;
+  min-height: 194px;
   border-radius: 12px;
   background: #ffffff;
   display: flex;
@@ -319,7 +309,7 @@
   width: 100%;
   height: auto;
   max-width: 100%;
-  max-height: 108px;
+  max-height: 162px;
   object-fit: contain;
   background: #ffffff;
   padding: 0;
@@ -483,11 +473,6 @@
     max-width: 100%;
   }
 
-  .hero-school-logo {
-    width: 126px;
-    height: 63px;
-  }
-
   .login-card {
     padding: 18px 14px 14px;
   }
@@ -515,11 +500,11 @@
 }
 
 .login-page--compact .login-mark {
-  min-height: 111px;
+  min-height: 167px;
 }
 
 .login-page--compact .login-mark img {
-  max-height: 93px;
+  max-height: 140px;
 }
 
 .login-page--compact .login-subtitle {
