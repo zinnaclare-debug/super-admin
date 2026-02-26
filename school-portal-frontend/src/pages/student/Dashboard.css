@@ -263,6 +263,8 @@
 }
 
 .sdx-quick-btn--subject {
+  min-height: 128px;
+  padding-bottom: 64px;
   border-color: #6366f1;
   background:
     radial-gradient(circle at 92% 10%, rgba(253, 224, 71, 0.38), transparent 38%),
@@ -276,6 +278,15 @@
 
 .sdx-quick-btn--subject .sdx-quick-btn__hint {
   color: #3730a3;
+}
+
+.sdx-quick-btn__visual--subject {
+  width: 104px;
+  height: 58px;
+}
+
+.sdx-quick-btn__visual-float--subject {
+  box-shadow: 0 6px 12px rgba(79, 70, 229, 0.2);
 }
 
 .sdx-quick-btn--cbt {
