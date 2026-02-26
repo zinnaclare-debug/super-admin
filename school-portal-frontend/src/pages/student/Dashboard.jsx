@@ -187,11 +187,12 @@ export default function StudentDashboard() {
                 {quickActions.map((item) => (
                   <button
                     key={item.path}
-                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}`}
+                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}${item.label === "Subjects" ? " sdx-quick-btn--subject" : ""}`}
                     onClick={() => navigate(item.path)}
                   >
                     <span className="sdx-quick-btn__title">{item.label}</span>
                     <span className="sdx-quick-btn__hint">{item.hint}</span>
+                    {item.label === "Subjects" ? <span className="sdx-quick-btn__badge">Featured</span> : null}
                   </button>
                 ))}
               </div>

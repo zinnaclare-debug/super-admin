@@ -230,6 +230,19 @@
   color: #475569;
 }
 
+.sdx-quick-btn__badge {
+  margin-top: 2px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #172554;
+  background: rgba(255, 255, 255, 0.9);
+}
+
 .sdx-quick-btn--calm {
   background: linear-gradient(130deg, #ffffff, #ecfeff);
 }
@@ -240,6 +253,22 @@
 
 .sdx-quick-btn--bright {
   background: linear-gradient(130deg, #ffffff, #eef2ff);
+}
+
+.sdx-quick-btn--subject {
+  border-color: #6366f1;
+  background:
+    radial-gradient(circle at 92% 10%, rgba(253, 224, 71, 0.38), transparent 38%),
+    linear-gradient(140deg, #eef2ff, #e0e7ff 54%, #dbeafe);
+  box-shadow: 0 12px 22px rgba(79, 70, 229, 0.18);
+}
+
+.sdx-quick-btn--subject .sdx-quick-btn__title {
+  color: #312e81;
+}
+
+.sdx-quick-btn--subject .sdx-quick-btn__hint {
+  color: #3730a3;
 }
 
 .sdx-grid {
