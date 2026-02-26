@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import standOutArt from "../../../assets/behaviour-rating/stand-out.svg";
+import splitTestingArt from "../../../assets/behaviour-rating/split-testing.svg";
+import customerSurveyArt from "../../../assets/behaviour-rating/customer-survey.svg";
+import "./BehaviourRatingHome.css";
 
 const cols = [
   ["handwriting", "Handwriting"],
@@ -87,114 +91,153 @@ export default function BehaviourRatingHome() {
 
   return (
     <StaffFeatureLayout title="Behaviour Rating (Class Teacher)">
+      <div className="bvr-page">
+        <section className="bvr-hero">
+          <div>
+            <span className="bvr-pill">Staff Behaviour Rating</span>
+            <h2>Rate classroom behaviour with structure and speed</h2>
+            <p className="bvr-subtitle">
+              Select class and term, score behaviour criteria on a 0-5 scale, and save comments for each student in one page.
+            </p>
+            <div className="bvr-metrics">
+              <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
+              <span>{cols.length} behaviour criteria</span>
+            </div>
+          </div>
 
-      {message ? (
-        <div style={{ marginTop: 12, padding: 10, border: "1px solid #f3c06b", borderRadius: 8 }}>{message}</div>
-      ) : null}
+          <div className="bvr-hero-art" aria-hidden="true">
+            <div className="bvr-art bvr-art--main">
+              <img src={standOutArt} alt="" />
+            </div>
+            <div className="bvr-art bvr-art--split">
+              <img src={splitTestingArt} alt="" />
+            </div>
+            <div className="bvr-art bvr-art--survey">
+              <img src={customerSurveyArt} alt="" />
+            </div>
+          </div>
+        </section>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-        <select
-          value={classId}
-          onChange={async (e) => {
-            const v = e.target.value;
-            setClassId(v);
-            await load(v, termId);
-          }}
-          disabled={loading || !classes.length}
-        >
-          <option value="">Select class</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.level})
-            </option>
-          ))}
-        </select>
+        <section className="bvr-panel">
+          {message ? <p className="bvr-state bvr-state--warn">{message}</p> : null}
 
-        <select
-          value={termId}
-          onChange={async (e) => {
-            const v = e.target.value;
-            setTermId(v);
-            await load(classId, v);
-          }}
-          disabled={loading || !terms.length}
-        >
-          <option value="">Select term</option>
-          {terms.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div style={{ marginTop: 14 }}>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table border="1" cellPadding="8" width="100%">
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>S/N</th>
-                <th>Student Name</th>
-                {cols.map(([, label]) => (
-                  <th key={label}>{label}</th>
+          <div className="bvr-filter-row">
+            <div className="bvr-filter">
+              <label htmlFor="bvr-class">Class</label>
+              <select
+                id="bvr-class"
+                className="bvr-field"
+                value={classId}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  setClassId(v);
+                  await load(v, termId);
+                }}
+                disabled={loading || !classes.length}
+              >
+                <option value="">Select class</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.level})
+                  </option>
                 ))}
-                <th style={{ width: 260 }}>Teacher Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s, idx) => (
-                <tr key={s.student_id}>
-                  <td>{idx + 1}</td>
-                  <td>{s.student_name}</td>
-                  {cols.map(([key]) => (
-                    <td key={key}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="5"
-                        value={s[key] ?? 0}
-                        onChange={(e) => {
-                          const v = Number(e.target.value || 0);
-                          setStudents((prev) =>
-                            prev.map((x) => (x.student_id === s.student_id ? { ...x, [key]: v } : x))
-                          );
-                        }}
-                        style={{ width: 65 }}
-                      />
-                    </td>
-                  ))}
-                  <td>
-                    <input
-                      type="text"
-                      value={s.teacher_comment || ""}
-                      placeholder="Teacher comment"
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setStudents((prev) =>
-                          prev.map((x) => (x.student_id === s.student_id ? { ...x, teacher_comment: v } : x))
-                        );
-                      }}
-                      style={{ width: "100%" }}
-                    />
-                  </td>
-                </tr>
-              ))}
-              {!students.length && (
-                <tr>
-                  <td colSpan={3 + cols.length}>No enrolled students found for this class and term.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </select>
+            </div>
 
-      <div style={{ marginTop: 14 }}>
-        <button onClick={save} disabled={saving || loading || !classId || !termId}>
-          {saving ? "Saving..." : "Save"}
-        </button>
+            <div className="bvr-filter">
+              <label htmlFor="bvr-term">Term</label>
+              <select
+                id="bvr-term"
+                className="bvr-field"
+                value={termId}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  setTermId(v);
+                  await load(classId, v);
+                }}
+                disabled={loading || !terms.length}
+              >
+                <option value="">Select term</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="bvr-panel">
+          {loading ? (
+            <p className="bvr-state bvr-state--loading">Loading behaviour rating...</p>
+          ) : (
+            <div className="bvr-table-wrap">
+              <table className="bvr-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 70 }}>S/N</th>
+                    <th style={{ minWidth: 190 }}>Student Name</th>
+                    {cols.map(([, label]) => (
+                      <th key={label}>{label}</th>
+                    ))}
+                    <th style={{ minWidth: 260 }}>Teacher Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s, idx) => (
+                    <tr key={s.student_id}>
+                      <td>{idx + 1}</td>
+                      <td>{s.student_name}</td>
+                      {cols.map(([key]) => (
+                        <td key={key}>
+                          <input
+                            className="bvr-field bvr-field--score"
+                            type="number"
+                            min="0"
+                            max="5"
+                            value={s[key] ?? 0}
+                            onChange={(e) => {
+                              const v = Number(e.target.value || 0);
+                              setStudents((prev) =>
+                                prev.map((x) => (x.student_id === s.student_id ? { ...x, [key]: v } : x))
+                              );
+                            }}
+                          />
+                        </td>
+                      ))}
+                      <td>
+                        <input
+                          className="bvr-field"
+                          type="text"
+                          value={s.teacher_comment || ""}
+                          placeholder="Teacher comment"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setStudents((prev) =>
+                              prev.map((x) => (x.student_id === s.student_id ? { ...x, teacher_comment: v } : x))
+                            );
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {!students.length && (
+                    <tr>
+                      <td colSpan={3 + cols.length}>No enrolled students found for this class and term.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="bvr-panel">
+          <button className="bvr-btn" onClick={save} disabled={saving || loading || !classId || !termId}>
+            {saving ? "Saving..." : "Save Behaviour Ratings"}
+          </button>
+        </section>
       </div>
     </StaffFeatureLayout>
   );

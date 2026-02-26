@@ -1,0 +1,250 @@
+.bvr-page {
+  border-radius: 24px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(251, 191, 36, 0.3), transparent 44%),
+    radial-gradient(circle at 88% 84%, rgba(244, 114, 182, 0.24), transparent 48%),
+    linear-gradient(130deg, #0f3d56, #1e3a8a 56%, #6d28d9);
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.3);
+}
+
+.bvr-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.bvr-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #1e293b;
+  background: linear-gradient(130deg, #fef3c7, #ffffff);
+}
+
+.bvr-hero h2 {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  line-height: 1.06;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+}
+
+.bvr-subtitle {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.55;
+  max-width: 58ch;
+}
+
+.bvr-metrics {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bvr-metrics span {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.bvr-hero-art {
+  min-height: 232px;
+  position: relative;
+}
+
+.bvr-art {
+  position: absolute;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.2);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bvr-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bvr-art--main {
+  inset: 12px 56px 20px 0;
+}
+
+.bvr-art--split {
+  width: 42%;
+  height: 40%;
+  right: 0;
+  top: 0;
+  background: linear-gradient(160deg, #fff7ed, #e0f2fe);
+}
+
+.bvr-art--survey {
+  width: 40%;
+  height: 38%;
+  right: 14px;
+  bottom: 0;
+  background: linear-gradient(160deg, #fdf4ff, #dcfce7);
+}
+
+.bvr-panel {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  padding: 14px;
+}
+
+.bvr-state {
+  margin: 0 0 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.bvr-state--loading {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.bvr-state--warn {
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.bvr-filter-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bvr-filter {
+  display: grid;
+  gap: 6px;
+}
+
+.bvr-filter label {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bvr-field {
+  width: 100%;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.bvr-field:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.bvr-field--score {
+  width: 74px;
+}
+
+.bvr-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+}
+
+.bvr-table {
+  width: 100%;
+  min-width: 1160px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.bvr-table th,
+.bvr-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.bvr-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #334155;
+  background: #eff6ff;
+}
+
+.bvr-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.bvr-table tbody tr:hover {
+  background: #ecfeff;
+}
+
+.bvr-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+  cursor: pointer;
+}
+
+.bvr-btn:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+.bvr-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .bvr-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .bvr-page {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .bvr-panel {
+    padding: 10px;
+  }
+
+  .bvr-hero-art {
+    min-height: 200px;
+  }
+
+  .bvr-art--main {
+    inset: 8px 44px 14px 0;
+  }
+
+  .bvr-filter-row {
+    grid-template-columns: 1fr;
+  }
+}
