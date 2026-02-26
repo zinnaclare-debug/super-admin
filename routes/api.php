@@ -168,6 +168,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     Route::patch('/school-admin/users/{user}/toggle', [UserManagementController::class, 'toggle'])
         ->middleware('feature:users');
+    Route::delete('/school-admin/users/{user}', [UserManagementController::class, 'destroy'])
+        ->middleware('feature:users');
     Route::post('/school-admin/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])
         ->middleware('feature:users');
 

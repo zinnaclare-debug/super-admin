@@ -10,6 +10,7 @@ export default function ActiveUsers() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -31,6 +32,25 @@ export default function ActiveUsers() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  const removeUser = async (u) => {
+    if (!u?.id) return;
+    if (!window.confirm(`Delete ${u.name || "this user"} permanently? This cannot be undone.`)) return;
+
+    setDeletingId(u.id);
+    try {
+      await api.delete(`/api/school-admin/users/${u.id}`);
+      if (selectedUserId === u.id) {
+        setSelectedUserId(null);
+      }
+      await load();
+      alert("User deleted successfully");
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -94,6 +114,18 @@ export default function ActiveUsers() {
                       }
                     >
                       Edit
+                    </button>
+                    <button
+                      style={{
+                        marginLeft: 8,
+                        background: "#dc2626",
+                        border: "1px solid #b91c1c",
+                        color: "#fff",
+                      }}
+                      onClick={() => removeUser(u)}
+                      disabled={deletingId === u.id}
+                    >
+                      {deletingId === u.id ? "Deleting..." : "Delete"}
                     </button>
                   </td>
                 </tr>

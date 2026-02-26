@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\UserCredentialStore;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -286,6 +287,56 @@ class UserManagementController extends Controller
         return response()->json([
             'message' => 'User status updated',
             'data' => $user->only(['id', 'is_active'])
+        ]);
+    }
+
+    // DELETE /api/school-admin/users/{user}
+    public function destroy(Request $request, User $user)
+    {
+        $schoolId = (int) $request->user()->school_id;
+
+        if ((int) $user->school_id !== $schoolId) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if (!in_array($user->role, ['student', 'staff'], true)) {
+            return response()->json(['message' => 'Only student/staff can be deleted here'], 422);
+        }
+
+        $photoPaths = collect([
+            $user->photo_path,
+            Student::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', $user->id)
+                ->value('photo_path'),
+            Staff::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', $user->id)
+                ->value('photo_path'),
+        ])
+            ->filter(fn ($path) => filled($path))
+            ->unique()
+            ->values();
+
+        $userName = $user->name;
+
+        try {
+            $user->delete();
+        } catch (QueryException $e) {
+            return response()->json([
+                'message' => 'Unable to delete this user because related records are protected.',
+            ], 409);
+        }
+
+        foreach ($photoPaths as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
+
+        return response()->json([
+            'message' => "User {$userName} deleted successfully",
+            'data' => ['id' => $user->id],
         ]);
     }
 
