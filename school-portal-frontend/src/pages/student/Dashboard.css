@@ -1,0 +1,278 @@
+.sdx-page {
+  border-radius: 24px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(245, 158, 11, 0.28), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(16, 185, 129, 0.24), transparent 50%),
+    linear-gradient(135deg, #0f3d59, #155e75 52%, #1d4ed8);
+  box-shadow: 0 24px 42px rgba(15, 23, 42, 0.22);
+}
+
+.sdx-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.sdx-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #1e293b;
+  background: linear-gradient(130deg, #fde68a, #ffffff);
+}
+
+.sdx-hero h2 {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  line-height: 1.06;
+  font-size: clamp(1.35rem, 2.1vw, 2rem);
+}
+
+.sdx-hero p {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.5;
+  max-width: 58ch;
+}
+
+.sdx-meta {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sdx-meta span {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.sdx-hero-art {
+  position: relative;
+  min-height: 220px;
+}
+
+.sdx-art {
+  position: absolute;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.2);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sdx-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sdx-art--main {
+  inset: 12px 58px 18px 0;
+}
+
+.sdx-art--trend {
+  width: 42%;
+  height: 40%;
+  right: 0;
+  top: 8px;
+  background: linear-gradient(160deg, #fff7ed, #e0f2fe);
+}
+
+.sdx-art--article {
+  width: 40%;
+  height: 38%;
+  right: 14px;
+  bottom: 0;
+  background: linear-gradient(160deg, #f5f3ff, #dcfce7);
+}
+
+.sdx-panel {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  padding: 14px;
+}
+
+.sdx-state {
+  margin: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.sdx-state--loading {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.sdx-state--error {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.sdx-alert {
+  border: 1px solid #facc15;
+  background: #fef9c3;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sdx-alert p {
+  margin: 0 0 6px;
+}
+
+.sdx-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+  cursor: pointer;
+}
+
+.sdx-btn:hover {
+  filter: brightness(1.03);
+}
+
+.sdx-quick h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.sdx-quick-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  margin-bottom: 12px;
+}
+
+.sdx-quick-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 11px 10px;
+  font-weight: 700;
+  color: #0f172a;
+  background: linear-gradient(130deg, #ffffff, #eff6ff);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.sdx-quick-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+  border-color: #60a5fa;
+}
+
+.sdx-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.sdx-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.sdx-card h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.sdx-kv {
+  display: grid;
+  gap: 8px;
+}
+
+.sdx-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 10px;
+}
+
+.sdx-row span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sdx-row strong {
+  color: #0f172a;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.sdx-photo-box {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.sdx-photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 980px) {
+  .sdx-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .sdx-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .sdx-page {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .sdx-panel {
+    padding: 10px;
+  }
+
+  .sdx-hero-art {
+    min-height: 200px;
+  }
+
+  .sdx-art--main {
+    inset: 8px 44px 12px 0;
+  }
+
+  .sdx-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

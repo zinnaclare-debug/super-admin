@@ -8,6 +8,10 @@ import {
   unreadAnnouncementCount,
 } from "../../utils/announcementNotifier";
 import { getStoredUser } from "../../utils/authStorage";
+import teachingArt from "../../assets/student-dashboard/teaching.svg";
+import trendsArt from "../../assets/student-dashboard/trends.svg";
+import articlesArt from "../../assets/student-dashboard/online-articles.svg";
+import "./Dashboard.css";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -106,95 +110,122 @@ export default function StudentDashboard() {
     navigate("/student/announcements");
   };
 
+  const quickActions = [
+    { label: "Profile", path: "/student/profile" },
+    { label: "Subjects", path: "/student/subjects" },
+    { label: "Results", path: "/student/results" },
+    { label: "Topics", path: "/student/topics" },
+    { label: "E-Library", path: "/student/e-library" },
+    { label: "Class Activities", path: "/student/class-activities" },
+    { label: "Virtual Class", path: "/student/virtual-class" },
+    { label: "CBT", path: "/student/cbt" },
+    { label: "School Fees", path: "/student/school-fees" },
+    { label: "Announcements", path: "/student/announcements" },
+  ];
+
   return (
-    <div>
-      {loading ? (
-        <p>Loading profile...</p>
-      ) : error ? (
-        <p style={{ color: "red" }}>{error}</p>
-      ) : (
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 10 }}>
-          {announcementUnreadCount > 0 && latestAnnouncement ? (
-            <div
-              style={{
-                marginBottom: 12,
-                border: "1px solid #facc15",
-                background: "#fef9c3",
-                borderRadius: 10,
-                padding: 12,
-              }}
-            >
-              <p style={{ margin: 0, fontWeight: 700 }}>
-                🔔 {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
-              </p>
-              <p style={{ margin: "6px 0 8px" }}>
-                Latest: <strong>{latestAnnouncement.title}</strong>
-              </p>
-              <button onClick={openAnnouncements}>Open Announcement Desk</button>
-            </div>
-          ) : null}
-
-          <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ marginTop: 0 }}>Student Details</h3>
-              <table cellPadding="8" style={{ width: "100%" }}>
-                <tbody>
-                  <tr><td style={{ width: 180, opacity: 0.75 }}>Name</td><td><strong>{user.name || "-"}</strong></td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Sex</td><td>{student.sex || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>DOB</td><td>{student.dob || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Address</td><td>{student.address || "-"}</td></tr>
-                </tbody>
-              </table>
-            </div>
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt="Student profile"
-                style={{ width: 130, height: 130, borderRadius: 8, objectFit: "cover", border: "1px solid #ddd", flexShrink: 0 }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 130,
-                  height: 130,
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: 0.7,
-                  flexShrink: 0,
-                }}
-              >
-                No Photo
-              </div>
-            )}
+    <div className="sdx-page">
+      <section className="sdx-hero">
+        <div>
+          <span className="sdx-pill">Student Dashboard</span>
+          <h2>All your academic tools in one colorful workspace</h2>
+          <p>
+            Access learning tools quickly, track your profile details, and stay up to date with school announcements.
+          </p>
+          <div className="sdx-meta">
+            <span>{currentClass ? `${currentClass.name} (${currentClass.level})` : "Class pending"}</span>
+            <span>{currentTerm?.name || "Term pending"}</span>
+            <span>{currentSession?.session_name || currentSession?.academic_year || "Session pending"}</span>
           </div>
-
-          <h3 style={{ marginTop: 18 }}>Current Academic Info</h3>
-          <table cellPadding="8" style={{ width: "100%" }}>
-            <tbody>
-              <tr>
-                <td style={{ width: 180, opacity: 0.75 }}>Current Session</td>
-                <td>{currentSession?.session_name || currentSession?.academic_year || "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Current Term</td>
-                <td>{currentTerm?.name || "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Current Class</td>
-                <td>{currentClass ? `${currentClass.name} (${currentClass.level})` : "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Department</td>
-                <td>{currentDepartment?.name || "-"}</td>
-              </tr>
-            </tbody>
-          </table>
-
         </div>
-      )}
+
+        <div className="sdx-hero-art" aria-hidden="true">
+          <div className="sdx-art sdx-art--main">
+            <img src={teachingArt} alt="" />
+          </div>
+          <div className="sdx-art sdx-art--trend">
+            <img src={trendsArt} alt="" />
+          </div>
+          <div className="sdx-art sdx-art--article">
+            <img src={articlesArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="sdx-panel">
+        {loading ? <p className="sdx-state sdx-state--loading">Loading profile...</p> : null}
+        {!loading && error ? <p className="sdx-state sdx-state--error">{error}</p> : null}
+
+        {!loading && !error ? (
+          <>
+            {announcementUnreadCount > 0 && latestAnnouncement ? (
+              <div className="sdx-alert">
+                <p>
+                  {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
+                </p>
+                <p>
+                  Latest: <strong>{latestAnnouncement.title}</strong>
+                </p>
+                <button className="sdx-btn" onClick={openAnnouncements}>
+                  Open Announcement Desk
+                </button>
+              </div>
+            ) : null}
+
+            <div className="sdx-quick">
+              <h3>Quick Actions</h3>
+              <div className="sdx-quick-grid">
+                {quickActions.map((item) => (
+                  <button key={item.path} className="sdx-quick-btn" onClick={() => navigate(item.path)}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sdx-grid">
+              <article className="sdx-card">
+                <h3>Student Details</h3>
+                <div className="sdx-kv">
+                  <div className="sdx-row"><span>Name</span><strong>{user.name || "-"}</strong></div>
+                  <div className="sdx-row"><span>Sex</span><strong>{student.sex || "-"}</strong></div>
+                  <div className="sdx-row"><span>DOB</span><strong>{student.dob || "-"}</strong></div>
+                  <div className="sdx-row"><span>Address</span><strong>{student.address || "-"}</strong></div>
+                </div>
+              </article>
+
+              <article className="sdx-card">
+                <h3>Photo</h3>
+                <div className="sdx-photo-box">
+                  {photoUrl ? <img src={photoUrl} alt="Student profile" /> : <span>No Photo</span>}
+                </div>
+              </article>
+            </div>
+
+            <div className="sdx-card" style={{ marginTop: 12 }}>
+              <h3>Current Academic Info</h3>
+              <div className="sdx-kv">
+                <div className="sdx-row">
+                  <span>Current Session</span>
+                  <strong>{currentSession?.session_name || currentSession?.academic_year || "-"}</strong>
+                </div>
+                <div className="sdx-row">
+                  <span>Current Term</span>
+                  <strong>{currentTerm?.name || "-"}</strong>
+                </div>
+                <div className="sdx-row">
+                  <span>Current Class</span>
+                  <strong>{currentClass ? `${currentClass.name} (${currentClass.level})` : "-"}</strong>
+                </div>
+                <div className="sdx-row">
+                  <span>Department</span>
+                  <strong>{currentDepartment?.name || "-"}</strong>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }
