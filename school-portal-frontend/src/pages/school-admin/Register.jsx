@@ -175,9 +175,7 @@ export default function Register() {
       // IMPORTANT: preview should also accept FormData (so photo can be validated early)
       const fd = buildFormData();
 
-      const res = await api.post("/api/school-admin/register/preview", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post("/api/school-admin/register/preview", fd);
 
       setUsername(res.data.username || "");
       setStep(2);
@@ -196,9 +194,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       const fd = buildFormData();
-      await api.post(`/api/school-admin/users/${editUserId}/update`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post(`/api/school-admin/users/${editUserId}/update`, fd);
 
       alert("User Updated");
       navigate(returnTo);
@@ -217,9 +213,7 @@ export default function Register() {
       // IMPORTANT: confirm MUST be FormData (so photo gets uploaded)
       const fd = buildFormData({ username });
 
-      await api.post("/api/school-admin/register/confirm", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post("/api/school-admin/register/confirm", fd);
 
       alert("User Created");
 

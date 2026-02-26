@@ -170,7 +170,8 @@ class UserManagementController extends Controller
         if ($request->hasFile('photo')) {
             $dir = "schools/{$user->school_id}/profiles";
             $ext = $request->file('photo')->getClientOriginalExtension();
-            $filename = $user->username . '.' . $ext;
+            // Use a versioned filename to avoid stale browser-cached images after edit.
+            $filename = $user->username . '-' . now()->timestamp . '.' . $ext;
             $photoPath = $request->file('photo')->storeAs($dir, $filename, 'public');
             $user->photo_path = $photoPath;
             $user->save();
@@ -352,6 +353,11 @@ class UserManagementController extends Controller
         }
 
         $relativeOrAbsolute = Storage::disk('public')->url($path);
+        if (Storage::disk('public')->exists($path)) {
+            $version = Storage::disk('public')->lastModified($path);
+            $relativeOrAbsolute .= (str_contains($relativeOrAbsolute, '?') ? '&' : '?') . 'v=' . $version;
+        }
+
         return str_starts_with($relativeOrAbsolute, 'http://')
             || str_starts_with($relativeOrAbsolute, 'https://')
             ? $relativeOrAbsolute

@@ -160,6 +160,10 @@ $path = $request->file('photo')->store(
     private function publicUrl(Request $request, string $path): string
     {
         $relativeOrAbsolute = Storage::disk('public')->url($path);
+        if (Storage::disk('public')->exists($path)) {
+            $version = Storage::disk('public')->lastModified($path);
+            $relativeOrAbsolute .= (str_contains($relativeOrAbsolute, '?') ? '&' : '?') . 'v=' . $version;
+        }
 
         if (str_starts_with($relativeOrAbsolute, 'http://') || str_starts_with($relativeOrAbsolute, 'https://')) {
             return $relativeOrAbsolute;

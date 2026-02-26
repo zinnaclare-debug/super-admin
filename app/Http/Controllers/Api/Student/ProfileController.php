@@ -90,6 +90,8 @@ class ProfileController extends Controller
         $photoUrl = null;
         if ($photoPath && Storage::disk('public')->exists($photoPath)) {
             $relativeOrAbsolute = Storage::disk('public')->url($photoPath);
+            $version = Storage::disk('public')->lastModified($photoPath);
+            $relativeOrAbsolute .= (str_contains($relativeOrAbsolute, '?') ? '&' : '?') . 'v=' . $version;
             $photoUrl = str_starts_with($relativeOrAbsolute, 'http://')
                 || str_starts_with($relativeOrAbsolute, 'https://')
                 ? $relativeOrAbsolute
