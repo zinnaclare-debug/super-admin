@@ -11,6 +11,7 @@ import { getStoredUser } from "../../utils/authStorage";
 import teachingArt from "../../assets/student-dashboard/teaching.svg";
 import trendsArt from "../../assets/student-dashboard/trends.svg";
 import articlesArt from "../../assets/student-dashboard/online-articles.svg";
+import swipeProfilesArt from "../../assets/student-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
 export default function StudentDashboard() {
@@ -111,16 +112,16 @@ export default function StudentDashboard() {
   };
 
   const quickActions = [
-    { label: "Profile", path: "/student/profile" },
-    { label: "Subjects", path: "/student/subjects" },
-    { label: "Results", path: "/student/results" },
-    { label: "Topics", path: "/student/topics" },
-    { label: "E-Library", path: "/student/e-library" },
-    { label: "Class Activities", path: "/student/class-activities" },
-    { label: "Virtual Class", path: "/student/virtual-class" },
-    { label: "CBT", path: "/student/cbt" },
-    { label: "School Fees", path: "/student/school-fees" },
-    { label: "Announcements", path: "/student/announcements" },
+    { label: "Profile", hint: "Personal details", path: "/student/profile", tone: "calm" },
+    { label: "Subjects", hint: "Subject list", path: "/student/subjects", tone: "warm" },
+    { label: "Results", hint: "Scores and grades", path: "/student/results", tone: "bright" },
+    { label: "Topics", hint: "Topic resources", path: "/student/topics", tone: "calm" },
+    { label: "E-Library", hint: "Digital textbooks", path: "/student/e-library", tone: "warm" },
+    { label: "Class Activities", hint: "Assignments", path: "/student/class-activities", tone: "bright" },
+    { label: "Virtual Class", hint: "Join meetings", path: "/student/virtual-class", tone: "calm" },
+    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright" },
+    { label: "School Fees", hint: "Payments", path: "/student/school-fees", tone: "warm" },
+    { label: "Announcements", hint: "School updates", path: "/student/announcements", tone: "calm" },
   ];
 
   return (
@@ -173,11 +174,24 @@ export default function StudentDashboard() {
             ) : null}
 
             <div className="sdx-quick">
-              <h3>Quick Actions</h3>
+              <div className="sdx-quick-head">
+                <div>
+                  <h3>Quick Actions</h3>
+                  <p>Open any student tool in one click.</p>
+                </div>
+                <div className="sdx-quick-art" aria-hidden="true">
+                  <img src={swipeProfilesArt} alt="" />
+                </div>
+              </div>
               <div className="sdx-quick-grid">
                 {quickActions.map((item) => (
-                  <button key={item.path} className="sdx-quick-btn" onClick={() => navigate(item.path)}>
-                    {item.label}
+                  <button
+                    key={item.path}
+                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <span className="sdx-quick-btn__title">{item.label}</span>
+                    <span className="sdx-quick-btn__hint">{item.hint}</span>
                   </button>
                 ))}
               </div>
