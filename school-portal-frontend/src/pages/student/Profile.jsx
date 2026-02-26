@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
+import profileArt from "../../assets/profile/profile-card.svg";
+import proudArt from "../../assets/profile/proud-self.svg";
+import "../shared/ProfileShowcase.css";
 
 export default function StudentProfile() {
   const [profile, setProfile] = useState(null);
@@ -58,94 +61,120 @@ export default function StudentProfile() {
     (student?.photo_path ? `/storage/${student.photo_path}` : "");
   const photoUrl = toAbsoluteUrl(rawPhotoUrl);
 
+  const studentRows = [
+    ["Name", user.name || "-"],
+    ["Email", user.email || "-"],
+    ["Username", user.username || "-"],
+    ["Sex", student.sex || "-"],
+    ["Religion", student.religion || "-"],
+    ["Date of Birth", student.dob || "-"],
+    ["Address", student.address || "-"],
+  ];
+
+  const academicRows = [
+    ["Current Session", currentSession?.session_name || currentSession?.academic_year || "-"],
+    ["Current Term", currentTerm?.name || "-"],
+    ["Current Class", currentClass ? `${currentClass.name} (${currentClass.level})` : "-"],
+    ["Department", currentDepartment?.name || "-"],
+  ];
+
+  const guardianRows = guardian
+    ? [
+        ["Name", guardian.name || "-"],
+        ["Relationship", guardian.relationship || "-"],
+        ["Email", guardian.email || "-"],
+        ["Mobile", guardian.mobile || "-"],
+        ["Occupation", guardian.occupation || "-"],
+        ["Location", guardian.location || "-"],
+        ["State of Origin", guardian.state_of_origin || "-"],
+      ]
+    : [];
+
   return (
-    <div>
-      {loading ? (
-        <p>Loading profile...</p>
-      ) : error ? (
-        <p style={{ color: "red" }}>{error}</p>
-      ) : (
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 10 }}>
-          <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ marginTop: 0 }}>Student Details</h3>
-              <table cellPadding="8" style={{ width: "100%" }}>
-                <tbody>
-                  <tr><td style={{ width: 180, opacity: 0.75 }}>Name</td><td><strong>{user.name || "-"}</strong></td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Email</td><td>{user.email || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Username</td><td>{user.username || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Sex</td><td>{student.sex || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Religion</td><td>{student.religion || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>DOB</td><td>{student.dob || "-"}</td></tr>
-                  <tr><td style={{ opacity: 0.75 }}>Address</td><td>{student.address || "-"}</td></tr>
-                </tbody>
-              </table>
-            </div>
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt="Student profile"
-                style={{ width: 130, height: 130, borderRadius: 8, objectFit: "cover", border: "1px solid #ddd", flexShrink: 0 }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 130,
-                  height: 130,
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: 0.7,
-                  flexShrink: 0,
-                }}
-              >
-                No Photo
-              </div>
-            )}
+    <div className="pf-page pf-page--student">
+      <section className="pf-hero">
+        <div>
+          <span className="pf-pill">Student Profile</span>
+          <h2 className="pf-title">Your learning identity at a glance</h2>
+          <p className="pf-subtitle">
+            Track your personal details, current academic placement, and guardian contact information in one place.
+          </p>
+          <div className="pf-meta">
+            <span>{user.name || "Student"}</span>
+            <span>{currentClass ? `${currentClass.name} (${currentClass.level})` : "Class pending"}</span>
+            <span>{currentTerm?.name || "No active term"}</span>
           </div>
-
-          <h3 style={{ marginTop: 18 }}>Current Academic Info</h3>
-          <table cellPadding="8" style={{ width: "100%" }}>
-            <tbody>
-              <tr>
-                <td style={{ width: 180, opacity: 0.75 }}>Current Session</td>
-                <td>{currentSession?.session_name || currentSession?.academic_year || "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Current Term</td>
-                <td>{currentTerm?.name || "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Current Class</td>
-                <td>{currentClass ? `${currentClass.name} (${currentClass.level})` : "-"}</td>
-              </tr>
-              <tr>
-                <td style={{ opacity: 0.75 }}>Department</td>
-                <td>{currentDepartment?.name || "-"}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <h3 style={{ marginTop: 18 }}>Guardian Details</h3>
-          {guardian ? (
-            <table cellPadding="8" style={{ width: "100%" }}>
-              <tbody>
-                <tr><td style={{ width: 180, opacity: 0.75 }}>Name</td><td><strong>{guardian.name || "-"}</strong></td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Relationship</td><td>{guardian.relationship || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Email</td><td>{guardian.email || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Mobile</td><td>{guardian.mobile || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Occupation</td><td>{guardian.occupation || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Location</td><td>{guardian.location || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>State of Origin</td><td>{guardian.state_of_origin || "-"}</td></tr>
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ opacity: 0.8 }}>No guardian details found.</p>
-          )}
         </div>
-      )}
+
+        <div className="pf-hero-art" aria-hidden="true">
+          <div className="pf-art pf-art--main">
+            <img src={profileArt} alt="" />
+          </div>
+          <div className="pf-art pf-art--alt">
+            <img src={proudArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="pf-panel">
+        {loading ? <p className="pf-state pf-state--loading">Loading profile...</p> : null}
+        {!loading && error ? <p className="pf-state pf-state--error">{error}</p> : null}
+
+        {!loading && !error ? (
+          <>
+            <div className="pf-grid pf-grid--top">
+              <article className="pf-card">
+                <h3>Student Details</h3>
+                <div className="pf-kv">
+                  {studentRows.map(([label, value]) => (
+                    <div className="pf-row" key={label}>
+                      <span className="pf-row-label">{label}</span>
+                      <span className="pf-row-value">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="pf-card">
+                <h3>Profile Photo</h3>
+                <div className="pf-photo-box">
+                  {photoUrl ? <img src={photoUrl} alt="Student profile" /> : <span className="pf-photo-empty">No Photo</span>}
+                </div>
+              </article>
+            </div>
+
+            <div className="pf-grid pf-grid--double">
+              <article className="pf-card">
+                <h3>Current Academic Info</h3>
+                <div className="pf-kv">
+                  {academicRows.map(([label, value]) => (
+                    <div className="pf-row" key={label}>
+                      <span className="pf-row-label">{label}</span>
+                      <span className="pf-row-value">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="pf-card">
+                <h3>Guardian Details</h3>
+                {guardianRows.length > 0 ? (
+                  <div className="pf-kv">
+                    {guardianRows.map(([label, value]) => (
+                      <div className="pf-row" key={label}>
+                        <span className="pf-row-label">{label}</span>
+                        <span className="pf-row-value">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="pf-state pf-state--empty">No guardian details found.</p>
+                )}
+              </article>
+            </div>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }
