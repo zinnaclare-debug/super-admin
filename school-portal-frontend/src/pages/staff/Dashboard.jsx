@@ -8,6 +8,10 @@ import {
   unreadAnnouncementCount,
 } from "../../utils/announcementNotifier";
 import { getStoredUser } from "../../utils/authStorage";
+import cbtMeetingsArt from "../../assets/cbt-dashboard/online-meetings.svg";
+import cbtResumeArt from "../../assets/cbt-dashboard/online-resume.svg";
+import cbtProfilesArt from "../../assets/cbt-dashboard/swipe-profiles.svg";
+import "./Dashboard.css";
 
 export default function StaffDashboard() {
   const navigate = useNavigate();
@@ -103,6 +107,20 @@ export default function StaffDashboard() {
     navigate("/staff/announcements");
   };
 
+  const quickActions = [
+    {
+      label: "View My Results/Courses",
+      hint: "Scores and assigned courses",
+      path: "/staff/results",
+    },
+    {
+      label: "CBT Console",
+      hint: "Create and manage CBT exams",
+      path: "/staff/cbt",
+      featured: true,
+    },
+  ];
+
   return (
     <div>
       <h1>Staff Dashboard</h1>
@@ -128,15 +146,28 @@ export default function StaffDashboard() {
         </div>
       ) : null}
 
-      {/* Quick Access Buttons */}
-      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button 
-          onClick={() => navigate("/staff/results")}
-          style={{ padding: "10px 16px", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", border: "none" }}
-        >
-          View My Results/Courses
-        </button>
-      </div>
+      <section className="stf-quick">
+        <div className="stf-quick-grid">
+          {quickActions.map((item) => (
+            <button
+              key={item.path}
+              className={`stf-quick-btn${item.featured ? " stf-quick-btn--cbt" : ""}`}
+              onClick={() => navigate(item.path)}
+            >
+              <span className="stf-quick-btn__title">{item.label}</span>
+              <span className="stf-quick-btn__hint">{item.hint}</span>
+              {item.featured ? <span className="stf-quick-btn__badge">Featured</span> : null}
+              {item.featured ? (
+                <span className="stf-quick-btn__visual" aria-hidden="true">
+                  <img className="stf-quick-btn__visual-main" src={cbtMeetingsArt} alt="" />
+                  <img className="stf-quick-btn__visual-float stf-quick-btn__visual-float--one" src={cbtResumeArt} alt="" />
+                  <img className="stf-quick-btn__visual-float stf-quick-btn__visual-float--two" src={cbtProfilesArt} alt="" />
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section style={{ marginTop: 24 }}>
         <h2>Profile Details</h2>

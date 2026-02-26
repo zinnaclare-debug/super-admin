@@ -12,6 +12,9 @@ import teachingArt from "../../assets/student-dashboard/teaching.svg";
 import trendsArt from "../../assets/student-dashboard/trends.svg";
 import articlesArt from "../../assets/student-dashboard/online-articles.svg";
 import swipeProfilesArt from "../../assets/student-dashboard/swipe-profiles.svg";
+import cbtMeetingsArt from "../../assets/cbt-dashboard/online-meetings.svg";
+import cbtResumeArt from "../../assets/cbt-dashboard/online-resume.svg";
+import cbtProfilesArt from "../../assets/cbt-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
 export default function StudentDashboard() {
@@ -119,7 +122,7 @@ export default function StudentDashboard() {
     { label: "E-Library", hint: "Digital textbooks", path: "/student/e-library", tone: "warm" },
     { label: "Class Activities", hint: "Assignments", path: "/student/class-activities", tone: "bright" },
     { label: "Virtual Class", hint: "Join meetings", path: "/student/virtual-class", tone: "calm" },
-    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright" },
+    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright", variant: "cbt" },
     { label: "School Fees", hint: "Payments", path: "/student/school-fees", tone: "warm" },
     { label: "Announcements", hint: "School updates", path: "/student/announcements", tone: "calm" },
   ];
@@ -187,12 +190,24 @@ export default function StudentDashboard() {
                 {quickActions.map((item) => (
                   <button
                     key={item.path}
-                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}${item.label === "Subjects" ? " sdx-quick-btn--subject" : ""}`}
+                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}${item.label === "Subjects" ? " sdx-quick-btn--subject" : ""}${
+                      item.variant === "cbt" ? " sdx-quick-btn--cbt" : ""
+                    }`}
                     onClick={() => navigate(item.path)}
                   >
                     <span className="sdx-quick-btn__title">{item.label}</span>
                     <span className="sdx-quick-btn__hint">{item.hint}</span>
                     {item.label === "Subjects" ? <span className="sdx-quick-btn__badge">Featured</span> : null}
+                    {item.variant === "cbt" ? (
+                      <>
+                        <span className="sdx-quick-btn__badge sdx-quick-btn__badge--cbt">Exam Zone</span>
+                        <span className="sdx-quick-btn__visual" aria-hidden="true">
+                          <img className="sdx-quick-btn__visual-main" src={cbtMeetingsArt} alt="" />
+                          <img className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--one" src={cbtResumeArt} alt="" />
+                          <img className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--two" src={cbtProfilesArt} alt="" />
+                        </span>
+                      </>
+                    ) : null}
                   </button>
                 ))}
               </div>

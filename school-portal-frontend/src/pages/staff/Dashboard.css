@@ -1,0 +1,113 @@
+.stf-quick {
+  margin-top: 16px;
+}
+
+.stf-quick-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.stf-quick-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 96px;
+  background: linear-gradient(140deg, #ffffff, #eff6ff);
+  color: #0f172a;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.stf-quick-btn:hover {
+  transform: translateY(-1px);
+  border-color: #60a5fa;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+}
+
+.stf-quick-btn__title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.stf-quick-btn__hint {
+  font-size: 12px;
+  color: #475569;
+}
+
+.stf-quick-btn--cbt {
+  min-height: 130px;
+  padding-bottom: 66px;
+  border-color: #0891b2;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.4), transparent 34%),
+    radial-gradient(circle at 12% 88%, rgba(34, 197, 94, 0.2), transparent 40%),
+    linear-gradient(150deg, #ecfeff, #dbeafe 56%, #f0f9ff);
+  box-shadow: 0 12px 22px rgba(14, 116, 144, 0.18);
+}
+
+.stf-quick-btn--cbt .stf-quick-btn__title {
+  color: #0c4a6e;
+}
+
+.stf-quick-btn--cbt .stf-quick-btn__hint {
+  color: #155e75;
+}
+
+.stf-quick-btn__badge {
+  margin-top: 2px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #0c4a6e;
+  background: rgba(240, 249, 255, 0.96);
+}
+
+.stf-quick-btn__visual {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 102px;
+  height: 58px;
+}
+
+.stf-quick-btn__visual-main {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 70%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.16));
+}
+
+.stf-quick-btn__visual-float {
+  position: absolute;
+  width: 44%;
+  height: 62%;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: 0 6px 12px rgba(14, 116, 144, 0.2);
+}
+
+.stf-quick-btn__visual-float--one {
+  left: 0;
+  top: 6px;
+}
+
+.stf-quick-btn__visual-float--two {
+  left: 20px;
+  bottom: -2px;
+}
+
