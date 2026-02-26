@@ -8,6 +8,10 @@ import {
   unreadAnnouncementCount,
 } from "../../utils/announcementNotifier";
 import { getStoredUser } from "../../utils/authStorage";
+import teachingArt from "../../assets/student-dashboard/teaching.svg";
+import trendsArt from "../../assets/student-dashboard/trends.svg";
+import articlesArt from "../../assets/student-dashboard/online-articles.svg";
+import swipeProfilesArt from "../../assets/student-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
 export default function StaffDashboard() {
@@ -105,116 +109,142 @@ export default function StaffDashboard() {
   };
 
   const quickActions = [
-    {
-      label: "View My Results/Courses",
-      hint: "Scores and assigned courses",
-      path: "/staff/results",
-    },
-    {
-      label: "CBT Console",
-      hint: "Create and manage CBT exams",
-      path: "/staff/cbt",
-    },
+    { label: "Profile", hint: "Personal details", path: "/staff/profile", tone: "calm" },
+    { label: "Results", hint: "Scores and courses", path: "/staff/results", tone: "bright" },
+    { label: "Topics", hint: "Manage topics", path: "/staff/topics", tone: "warm" },
+    { label: "E-Library", hint: "Learning resources", path: "/staff/e-library", tone: "calm" },
+    { label: "Class Activities", hint: "Assignments and files", path: "/staff/class-activities", tone: "warm" },
+    { label: "Virtual Class", hint: "Live sessions", path: "/staff/virtual-class", tone: "bright" },
+    { label: "CBT Console", hint: "Create and manage CBT exams", path: "/staff/cbt", tone: "bright" },
+    { label: "Announcements", hint: "School updates", path: "/staff/announcements", tone: "calm" },
   ];
 
   return (
-    <div>
-      <h1>Staff Dashboard</h1>
-
-      {announcementUnreadCount > 0 && latestAnnouncement ? (
-        <div
-          style={{
-            marginTop: 12,
-            marginBottom: 10,
-            border: "1px solid #facc15",
-            background: "#fef9c3",
-            borderRadius: 10,
-            padding: 12,
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: 700 }}>
-            🔔 {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
+    <div className="stx-page">
+      <section className="stx-hero">
+        <div>
+          <span className="stx-pill">Staff Dashboard</span>
+          <h2>Manage teaching tools from one colorful workspace</h2>
+          <p>
+            Open your teaching modules faster, stay updated with announcements, and review your profile in one place.
           </p>
-          <p style={{ margin: "6px 0 8px" }}>
-            Latest: <strong>{latestAnnouncement.title}</strong>
-          </p>
-          <button onClick={openAnnouncements}>Open Announcement Desk</button>
+          <div className="stx-meta">
+            <span>{staff.education_level || "Education level pending"}</span>
+            <span>{staff.position || "Position pending"}</span>
+            <span>{classes.length} class teacher assignment{classes.length === 1 ? "" : "s"}</span>
+          </div>
         </div>
-      ) : null}
 
-      <section className="stf-quick">
-        <div className="stf-quick-grid">
-          {quickActions.map((item) => (
-            <button
-              key={item.path}
-              className="stf-quick-btn"
-              onClick={() => navigate(item.path)}
-            >
-              <span className="stf-quick-btn__title">{item.label}</span>
-              <span className="stf-quick-btn__hint">{item.hint}</span>
-            </button>
-          ))}
+        <div className="stx-hero-art" aria-hidden="true">
+          <div className="stx-art stx-art--main">
+            <img src={teachingArt} alt="" />
+          </div>
+          <div className="stx-art stx-art--trend">
+            <img src={trendsArt} alt="" />
+          </div>
+          <div className="stx-art stx-art--article">
+            <img src={articlesArt} alt="" />
+          </div>
         </div>
       </section>
 
-      <section style={{ marginTop: 24 }}>
-        <h2>Profile Details</h2>
+      <section className="stx-panel">
+        {loading ? <p className="stx-state stx-state--loading">Loading profile...</p> : null}
+        {!loading && error ? <p className="stx-state stx-state--error">{error}</p> : null}
 
-        {loading ? (
-          <p>Loading profile...</p>
-        ) : error ? (
-          <p style={{ color: "red" }}>{error}</p>
-        ) : (
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-            {staffPhotoUrl ? (
-              <div style={{ marginBottom: 16 }}>
-                <img
-                  src={staffPhotoUrl}
-                  alt="Staff profile"
-                  style={{ width: 110, height: 110, borderRadius: 8, objectFit: "cover", border: "1px solid #ddd" }}
-                />
+        {!loading && !error ? (
+          <>
+            {announcementUnreadCount > 0 && latestAnnouncement ? (
+              <div className="stx-alert">
+                <p>
+                  {announcementUnreadCount} new announcement{announcementUnreadCount > 1 ? "s" : ""}
+                </p>
+                <p>
+                  Latest: <strong>{latestAnnouncement.title}</strong>
+                </p>
+                <button className="stx-btn" onClick={openAnnouncements}>
+                  Open Announcement Desk
+                </button>
               </div>
             ) : null}
-            <table cellPadding="8" style={{ width: "100%" }}>
-              <tbody>
-                <tr><td style={{ width: 180, opacity: 0.75 }}>Name</td><td><strong>{user.name || "-"}</strong></td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Email</td><td>{user.email || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Username</td><td>{user.username || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Education Level</td><td>{staff.education_level || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Position</td><td>{staff.position || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Sex</td><td>{staff.sex || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>DOB</td><td>{staff.dob || "-"}</td></tr>
-                <tr><td style={{ opacity: 0.75 }}>Address</td><td>{staff.address || "-"}</td></tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
 
-      {isClassTeacher ? (
-        <section style={{ marginTop: 24 }}>
-          <h2>Class Teacher</h2>
-          <p style={{ marginTop: 0, opacity: 0.8 }}>You are assigned as class teacher to the class(es) below.</p>
-          <table border="1" cellPadding="8" width="100%">
-            <thead>
-              <tr>
-                <th>S/N</th>
-                <th>Class</th>
-                <th>Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {classes.map((c, idx) => (
-                <tr key={c.id}>
-                  <td>{idx + 1}</td>
-                  <td>{c.name}</td>
-                  <td>{c.level}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
+            <div className="stx-quick">
+              <div className="stx-quick-head">
+                <div>
+                  <h3>Quick Actions</h3>
+                  <p>Open your staff tools in one click.</p>
+                </div>
+                <div className="stx-quick-art" aria-hidden="true">
+                  <img src={swipeProfilesArt} alt="" />
+                </div>
+              </div>
+
+              <div className="stx-quick-grid">
+                {quickActions.map((item) => (
+                  <button
+                    key={item.path}
+                    className={`stx-quick-btn stx-quick-btn--${item.tone}`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <span className="stx-quick-btn__title">{item.label}</span>
+                    <span className="stx-quick-btn__hint">{item.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="stx-grid">
+              <article className="stx-card">
+                <h3>Staff Details</h3>
+                <div className="stx-kv">
+                  <div className="stx-row"><span>Name</span><strong>{user.name || "-"}</strong></div>
+                  <div className="stx-row"><span>Email</span><strong>{user.email || "-"}</strong></div>
+                  <div className="stx-row"><span>Username</span><strong>{user.username || "-"}</strong></div>
+                  <div className="stx-row"><span>Education Level</span><strong>{staff.education_level || "-"}</strong></div>
+                  <div className="stx-row"><span>Position</span><strong>{staff.position || "-"}</strong></div>
+                  <div className="stx-row"><span>Sex</span><strong>{staff.sex || "-"}</strong></div>
+                  <div className="stx-row"><span>DOB</span><strong>{staff.dob || "-"}</strong></div>
+                  <div className="stx-row"><span>Address</span><strong>{staff.address || "-"}</strong></div>
+                </div>
+              </article>
+
+              <article className="stx-card">
+                <h3>Photo</h3>
+                <div className="stx-photo-box">
+                  {staffPhotoUrl ? <img src={staffPhotoUrl} alt="Staff profile" /> : <span>No Photo</span>}
+                </div>
+              </article>
+            </div>
+
+            {isClassTeacher ? (
+              <article className="stx-card stx-card--class">
+                <h3>Class Teacher Assignments</h3>
+                <p className="stx-class-subtext">You are assigned as class teacher to the class(es) below.</p>
+                <div className="stx-table-wrap">
+                  <table className="stx-table">
+                    <thead>
+                      <tr>
+                        <th>S/N</th>
+                        <th>Class</th>
+                        <th>Level</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classes.map((c, idx) => (
+                        <tr key={c.id}>
+                          <td>{idx + 1}</td>
+                          <td>{c.name}</td>
+                          <td>{c.level}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            ) : null}
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }
