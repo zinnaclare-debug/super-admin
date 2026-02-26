@@ -1,12 +1,25 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import workingTogetherArt from "../../../assets/class-activities/working-together.svg";
+import gradingPapersArt from "../../../assets/class-activities/grading-papers.svg";
+import learningSketchArt from "../../../assets/class-activities/learning-to-sketch.svg";
+import "../../student/class-activities/ClassActivitiesHome.css";
 
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
   if (!match?.[1]) return fallback || "download";
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
+}
+
+function formatDate(value) {
+  if (!value) return null;
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return null;
+  }
 }
 
 export default function ClassActivitiesHome() {
@@ -111,81 +124,115 @@ export default function ClassActivitiesHome() {
 
   return (
     <StaffFeatureLayout title="Class Activities (Staff)">
+      <div className="sca-page sca-page--staff">
+        <section className="sca-hero">
+          <div>
+            <span className="sca-pill">Staff Class Activities</span>
+            <h2>Create and manage class activities with confidence</h2>
+            <p className="sca-subtitle">
+              Upload assignments by subject, keep files organized, and manage activity downloads from one clean workspace.
+            </p>
 
-      <div style={{ marginTop: 14, border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
-        <h3 style={{ marginTop: 0 }}>Upload Activity</h3>
-        <form onSubmit={upload} style={{ display: "grid", gap: 10, maxWidth: 580 }}>
-          <select value={termSubjectId} onChange={(e) => setTermSubjectId(e.target.value)} required>
-            <option value="">Select assigned subject</option>
-            {subjects.map((s) => (
-              <option key={s.term_subject_id} value={s.term_subject_id}>
-                {s.subject_name} - {s.class_name} ({s.term_name})
-              </option>
-            ))}
-          </select>
+            <div className="sca-metrics">
+              <span>{loading ? "Loading..." : `${subjects.length} subject${subjects.length === 1 ? "" : "s"} assigned`}</span>
+              <span>{loading ? "Syncing..." : `${activities.length} activit${activities.length === 1 ? "y" : "ies"} uploaded`}</span>
+            </div>
+          </div>
 
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description (optional)"
-          />
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
+          <div className="sca-hero-art" aria-hidden="true">
+            <div className="sca-art sca-art--main">
+              <img src={workingTogetherArt} alt="" />
+            </div>
+            <div className="sca-art sca-art--grading">
+              <img src={gradingPapersArt} alt="" />
+            </div>
+            <div className="sca-art sca-art--sketch">
+              <img src={learningSketchArt} alt="" />
+            </div>
+          </div>
+        </section>
 
-          <button type="submit" disabled={uploading}>
-            {uploading ? "Uploading..." : "Upload"}
-          </button>
-        </form>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table border="1" cellPadding="10" width="100%">
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>S/N</th>
-                <th>Title</th>
-                <th>Subject</th>
-                <th>Class</th>
-                <th>Term</th>
-                <th style={{ width: 150 }}>File</th>
-                <th style={{ width: 120 }}>Delete</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activities.map((a, idx) => (
-                <tr key={a.id}>
-                  <td>{idx + 1}</td>
-                  <td>{a.title}</td>
-                  <td>{a.subject_name || "-"}</td>
-                  <td>{a.class_name || "-"}</td>
-                  <td>{a.term_name || "-"}</td>
-                  <td>
-                    <button onClick={() => download(a)} disabled={downloadingId === a.id}>
-                      {downloadingId === a.id ? "Downloading..." : "Download"}
-                    </button>
-                  </td>
-                  <td>
-                    <button onClick={() => remove(a.id)} disabled={deletingId === a.id}>
-                      {deletingId === a.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </td>
-                </tr>
+        <section className="sca-panel">
+          <h3>Upload Activity</h3>
+          <form onSubmit={upload} className="sca-form">
+            <select className="sca-field" value={termSubjectId} onChange={(e) => setTermSubjectId(e.target.value)} required>
+              <option value="">Select assigned subject</option>
+              {subjects.map((s) => (
+                <option key={s.term_subject_id} value={s.term_subject_id}>
+                  {s.subject_name} - {s.class_name} ({s.term_name})
+                </option>
               ))}
-              {activities.length === 0 && (
-                <tr>
-                  <td colSpan="7">No class activities uploaded yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+            </select>
+
+            <input className="sca-field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
+            <input
+              className="sca-field"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description (optional)"
+            />
+            <input
+              className="sca-field"
+              type="file"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+
+            <button className="sca-btn" type="submit" disabled={uploading}>
+              {uploading ? "Uploading..." : "Upload Activity"}
+            </button>
+          </form>
+        </section>
+
+        <section className="sca-panel">
+          {loading ? (
+            <p className="sca-state sca-state--loading">Loading class activities...</p>
+          ) : (
+            <div className="sca-table-wrap">
+              <table className="sca-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 70 }}>S/N</th>
+                    <th>Title</th>
+                    <th>Subject</th>
+                    <th>Class</th>
+                    <th>Term</th>
+                    <th>Posted</th>
+                    <th style={{ width: 150 }}>File</th>
+                    <th style={{ width: 120 }}>Delete</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activities.map((a, idx) => (
+                    <tr key={a.id}>
+                      <td>{idx + 1}</td>
+                      <td>{a.title}</td>
+                      <td>{a.subject_name || "-"}</td>
+                      <td>{a.class_name || "-"}</td>
+                      <td>{a.term_name || "-"}</td>
+                      <td>{formatDate(a.created_at || a.updated_at) || "-"}</td>
+                      <td>
+                        <button type="button" className="sca-btn sca-btn--soft" onClick={() => download(a)} disabled={downloadingId === a.id}>
+                          {downloadingId === a.id ? "Downloading..." : "Download"}
+                        </button>
+                      </td>
+                      <td>
+                        <button type="button" className="sca-btn sca-btn--danger" onClick={() => remove(a.id)} disabled={deletingId === a.id}>
+                          {deletingId === a.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {activities.length === 0 && (
+                    <tr>
+                      <td colSpan="8">No class activities uploaded yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </StaffFeatureLayout>
   );

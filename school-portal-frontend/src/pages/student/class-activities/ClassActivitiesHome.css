@@ -113,6 +113,19 @@
   padding: 14px;
 }
 
+.sca-page--staff {
+  background:
+    radial-gradient(circle at 14% 10%, rgba(252, 211, 77, 0.3), transparent 42%),
+    radial-gradient(circle at 88% 88%, rgba(45, 212, 191, 0.28), transparent 48%),
+    linear-gradient(135deg, #0f3d56, #0f766e 48%, #115e59);
+}
+
+.sca-panel h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: clamp(1.05rem, 1.7vw, 1.25rem);
+}
+
 .sca-filter {
   display: grid;
   gap: 6px;
@@ -156,6 +169,95 @@
 .sca-state--empty {
   color: #9a3412;
   background: #fff7ed;
+}
+
+.sca-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sca-field {
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.sca-field:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.sca-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #c4b5fd 95%);
+  cursor: pointer;
+}
+
+.sca-btn:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+.sca-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sca-btn--soft {
+  color: #155e75;
+  background: linear-gradient(130deg, #cffafe, #e0e7ff 95%);
+}
+
+.sca-btn--danger {
+  color: #7f1d1d;
+  background: linear-gradient(130deg, #fee2e2, #fecaca 95%);
+}
+
+.sca-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+}
+
+.sca-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+  background: #ffffff;
+}
+
+.sca-table th,
+.sca-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.sca-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #334155;
+  background: #eff6ff;
+}
+
+.sca-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.sca-table tbody tr:hover {
+  background: #ecfeff;
 }
 
 .sca-grid {
@@ -260,5 +362,9 @@
 
   .sca-art--main {
     inset: 8px 46px 14px 0;
+  }
+
+  .sca-form {
+    grid-template-columns: 1fr;
   }
 }
