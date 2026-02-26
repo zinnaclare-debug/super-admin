@@ -8,9 +8,6 @@ import {
   unreadAnnouncementCount,
 } from "../../utils/announcementNotifier";
 import { getStoredUser } from "../../utils/authStorage";
-import cbtMeetingsArt from "../../assets/cbt-dashboard/online-meetings.svg";
-import cbtResumeArt from "../../assets/cbt-dashboard/online-resume.svg";
-import cbtProfilesArt from "../../assets/cbt-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
 export default function StaffDashboard() {
@@ -117,7 +114,6 @@ export default function StaffDashboard() {
       label: "CBT Console",
       hint: "Create and manage CBT exams",
       path: "/staff/cbt",
-      featured: true,
     },
   ];
 
@@ -151,19 +147,11 @@ export default function StaffDashboard() {
           {quickActions.map((item) => (
             <button
               key={item.path}
-              className={`stf-quick-btn${item.featured ? " stf-quick-btn--cbt" : ""}`}
+              className="stf-quick-btn"
               onClick={() => navigate(item.path)}
             >
               <span className="stf-quick-btn__title">{item.label}</span>
               <span className="stf-quick-btn__hint">{item.hint}</span>
-              {item.featured ? <span className="stf-quick-btn__badge">Featured</span> : null}
-              {item.featured ? (
-                <span className="stf-quick-btn__visual" aria-hidden="true">
-                  <img className="stf-quick-btn__visual-main" src={cbtMeetingsArt} alt="" />
-                  <img className="stf-quick-btn__visual-float stf-quick-btn__visual-float--one" src={cbtResumeArt} alt="" />
-                  <img className="stf-quick-btn__visual-float stf-quick-btn__visual-float--two" src={cbtProfilesArt} alt="" />
-                </span>
-              ) : null}
             </button>
           ))}
         </div>

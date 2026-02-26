@@ -12,12 +12,6 @@ import teachingArt from "../../assets/student-dashboard/teaching.svg";
 import trendsArt from "../../assets/student-dashboard/trends.svg";
 import articlesArt from "../../assets/student-dashboard/online-articles.svg";
 import swipeProfilesArt from "../../assets/student-dashboard/swipe-profiles.svg";
-import subjectMainArt from "../../assets/subject-dashboard/multitasking.svg";
-import subjectExamArt from "../../assets/subject-dashboard/exam-prep.svg";
-import subjectReadArt from "../../assets/subject-dashboard/relaxed-reading.svg";
-import cbtMeetingsArt from "../../assets/cbt-dashboard/online-meetings.svg";
-import cbtResumeArt from "../../assets/cbt-dashboard/online-resume.svg";
-import cbtProfilesArt from "../../assets/cbt-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
 export default function StudentDashboard() {
@@ -119,13 +113,13 @@ export default function StudentDashboard() {
 
   const quickActions = [
     { label: "Profile", hint: "Personal details", path: "/student/profile", tone: "calm" },
-    { label: "Subjects", hint: "Subject list", path: "/student/subjects", tone: "warm", variant: "subject" },
+    { label: "Subjects", hint: "Subject list", path: "/student/subjects", tone: "warm" },
     { label: "Results", hint: "Scores and grades", path: "/student/results", tone: "bright" },
     { label: "Topics", hint: "Topic resources", path: "/student/topics", tone: "calm" },
     { label: "E-Library", hint: "Digital textbooks", path: "/student/e-library", tone: "warm" },
     { label: "Class Activities", hint: "Assignments", path: "/student/class-activities", tone: "bright" },
     { label: "Virtual Class", hint: "Join meetings", path: "/student/virtual-class", tone: "calm" },
-    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright", variant: "cbt" },
+    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright" },
     { label: "School Fees", hint: "Payments", path: "/student/school-fees", tone: "warm" },
     { label: "Announcements", hint: "School updates", path: "/student/announcements", tone: "calm" },
   ];
@@ -193,39 +187,11 @@ export default function StudentDashboard() {
                 {quickActions.map((item) => (
                   <button
                     key={item.path}
-                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}${item.label === "Subjects" ? " sdx-quick-btn--subject" : ""}${
-                      item.variant === "cbt" ? " sdx-quick-btn--cbt" : ""
-                    }`}
+                    className={`sdx-quick-btn sdx-quick-btn--${item.tone}`}
                     onClick={() => navigate(item.path)}
                   >
                     <span className="sdx-quick-btn__title">{item.label}</span>
                     <span className="sdx-quick-btn__hint">{item.hint}</span>
-                    {item.variant === "subject" ? <span className="sdx-quick-btn__badge">Featured</span> : null}
-                    {item.variant === "subject" ? (
-                      <span className="sdx-quick-btn__visual sdx-quick-btn__visual--subject" aria-hidden="true">
-                        <img className="sdx-quick-btn__visual-main" src={subjectMainArt} alt="" />
-                        <img
-                          className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--one sdx-quick-btn__visual-float--subject"
-                          src={subjectExamArt}
-                          alt=""
-                        />
-                        <img
-                          className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--two sdx-quick-btn__visual-float--subject"
-                          src={subjectReadArt}
-                          alt=""
-                        />
-                      </span>
-                    ) : null}
-                    {item.variant === "cbt" ? (
-                      <>
-                        <span className="sdx-quick-btn__badge sdx-quick-btn__badge--cbt">Exam Zone</span>
-                        <span className="sdx-quick-btn__visual" aria-hidden="true">
-                          <img className="sdx-quick-btn__visual-main" src={cbtMeetingsArt} alt="" />
-                          <img className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--one" src={cbtResumeArt} alt="" />
-                          <img className="sdx-quick-btn__visual-float sdx-quick-btn__visual-float--two" src={cbtProfilesArt} alt="" />
-                        </span>
-                      </>
-                    ) : null}
                   </button>
                 ))}
               </div>

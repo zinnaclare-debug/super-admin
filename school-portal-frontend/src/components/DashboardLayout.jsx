@@ -7,8 +7,6 @@ import {
   getStoredUser,
   setStoredFeatures,
 } from "../utils/authStorage";
-import subjectNavArt from "../assets/subject-dashboard/multitasking.svg";
-import cbtNavArt from "../assets/cbt-dashboard/online-meetings.svg";
 import {
   getLatestAnnouncement,
   getSeenAnnouncementRank,
@@ -188,62 +186,6 @@ function DashboardLayout() {
     wordBreak: isMobile || isCompactSidebar ? "break-word" : "normal",
   });
 
-  const featuredLinkStyle = ({ isActive }, featureKey) => {
-    const base = linkStyle({ isActive });
-    const key = String(featureKey || "").toLowerCase();
-    const withArt = !isMobile && !isCompactSidebar;
-
-    if (key === "subjects") {
-      return {
-        ...base,
-        opacity: 1,
-        fontWeight: 800,
-        border: "1px solid #818cf8",
-        color: "#ffffff",
-        boxShadow: isActive
-          ? "0 10px 18px rgba(67, 56, 202, 0.45)"
-          : "0 6px 12px rgba(67, 56, 202, 0.3)",
-        padding: withArt ? "10px 54px 10px 12px" : base.padding,
-        backgroundImage: withArt
-          ? `${isActive
-              ? "linear-gradient(140deg, #4f46e5, #4338ca 52%, #1d4ed8)"
-              : "linear-gradient(140deg, #6366f1, #4f46e5 54%, #2563eb)"}, url(${subjectNavArt})`
-          : isActive
-            ? "linear-gradient(140deg, #4f46e5, #4338ca 52%, #1d4ed8)"
-            : "linear-gradient(140deg, #6366f1, #4f46e5 54%, #2563eb)",
-        backgroundRepeat: withArt ? "no-repeat, no-repeat" : "no-repeat",
-        backgroundSize: withArt ? "auto, 34px 34px" : "auto",
-        backgroundPosition: withArt ? "center, right 9px center" : "center",
-      };
-    }
-
-    if (key === "cbt") {
-      return {
-        ...base,
-        opacity: 1,
-        fontWeight: 800,
-        border: "1px solid #22d3ee",
-        color: "#ffffff",
-        boxShadow: isActive
-          ? "0 10px 18px rgba(8, 145, 178, 0.45)"
-          : "0 6px 12px rgba(8, 145, 178, 0.3)",
-        padding: withArt ? "10px 54px 10px 12px" : base.padding,
-        backgroundImage: withArt
-          ? `${isActive
-              ? "linear-gradient(140deg, #0e7490, #0891b2 52%, #0284c7)"
-              : "linear-gradient(140deg, #0891b2, #0ea5e9 54%, #0284c7)"}, url(${cbtNavArt})`
-          : isActive
-            ? "linear-gradient(140deg, #0e7490, #0891b2 52%, #0284c7)"
-            : "linear-gradient(140deg, #0891b2, #0ea5e9 54%, #0284c7)",
-        backgroundRepeat: withArt ? "no-repeat, no-repeat" : "no-repeat",
-        backgroundSize: withArt ? "auto, 34px 34px" : "auto",
-        backgroundPosition: withArt ? "center, right 9px center" : "center",
-      };
-    }
-
-    return base;
-  };
-
   const roleFeaturePath = (role, featureKey) => {
     const map = {
       "class activities": "class-activities",
@@ -407,7 +349,7 @@ function DashboardLayout() {
               </NavLink>
 
               {user?.role === "student" && (
-                <NavLink to="/student/subjects" title="Subjects" style={(state) => featuredLinkStyle(state, "subjects")}>
+                <NavLink to="/student/subjects" title="Subjects" style={linkStyle}>
                   {isCompactSidebar ? "SUBJECTS" : "Subjects"}
                 </NavLink>
               )}
@@ -416,13 +358,7 @@ function DashboardLayout() {
                 {!isCompactSidebar && <strong style={{ fontSize: 13 }}>Features</strong>}
                 <ul style={{ marginTop: 10, paddingLeft: isCompactSidebar ? 0 : 16 }}>
                   {sidebarFeatures.map((f) => (
-                    <li
-                      key={f}
-                      style={{
-                        fontSize: 13,
-                        opacity: ["subjects", "cbt"].includes(String(f || "").toLowerCase()) ? 1 : 0.85,
-                      }}
-                    >
+                    <li key={f} style={{ fontSize: 13, opacity: 0.85 }}>
                       {user?.role === "staff" &&
                       (f === "attendance" || f === "behaviour rating") &&
                       !canAccessClassTeacherFeatures ? (
@@ -445,7 +381,7 @@ function DashboardLayout() {
                         <NavLink
                           title={featureLabel(f)}
                           to={roleFeaturePath(user.role, f)}
-                          style={(state) => featuredLinkStyle(state, f)}
+                          style={linkStyle}
                           onClick={isAnnouncementFeature(f) ? handleOpenAnnouncements : undefined}
                         >
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
