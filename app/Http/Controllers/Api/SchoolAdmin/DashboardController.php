@@ -104,38 +104,34 @@ class DashboardController extends Controller
             return response()->json(['message' => 'School not found'], 404);
         }
 
+        if (
+            $request->has('head_of_school_name')
+            || $request->hasFile('logo')
+            || $request->hasFile('head_signature')
+        ) {
+            return response()->json([
+                'message' => 'Head of school name, logo, and signature are managed by Super Admin (School Information).',
+            ], 403);
+        }
+
         $payload = $request->validate([
-            'head_of_school_name' => 'nullable|string|max:255',
             'school_location' => 'nullable|string|max:255',
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:30',
-            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        $hasNameField = $request->has('head_of_school_name');
         $hasLocationField = $request->has('school_location');
         $hasContactEmailField = $request->has('contact_email');
         $hasContactPhoneField = $request->has('contact_phone');
-        $hasLogoFile = $request->hasFile('logo');
-        $hasSignatureFile = $request->hasFile('head_signature');
 
         if (
-            !$hasNameField
-            && !$hasLocationField
+            ! $hasLocationField
             && !$hasContactEmailField
             && !$hasContactPhoneField
-            && !$hasLogoFile
-            && !$hasSignatureFile
         ) {
             return response()->json([
-                'message' => 'Provide head_of_school_name, school_location, contact_email, contact_phone, logo, or head_signature.',
+                'message' => 'Provide school_location, contact_email, or contact_phone.',
             ], 422);
-        }
-
-        if ($hasNameField) {
-            $name = trim((string) ($payload['head_of_school_name'] ?? ''));
-            $school->head_of_school_name = $name !== '' ? $name : null;
         }
 
         if ($hasLocationField) {
@@ -153,26 +149,10 @@ class DashboardController extends Controller
             $school->contact_phone = $contactPhone !== '' ? $contactPhone : null;
         }
 
-        if ($hasLogoFile) {
-            $logo = $request->file('logo');
-            $logoExt = $logo->getClientOriginalExtension();
-            $school->logo_path = $logo->storeAs("schools/{$schoolId}/branding", "logo.{$logoExt}", 'public');
-        }
-
-        if ($hasSignatureFile) {
-            $signature = $request->file('head_signature');
-            $signatureExt = $signature->getClientOriginalExtension();
-            $school->head_signature_path = $signature->storeAs(
-                "schools/{$schoolId}/branding",
-                "head_signature.{$signatureExt}",
-                'public'
-            );
-        }
-
         $school->save();
 
         return response()->json([
-            'message' => 'School branding updated successfully',
+            'message' => 'School contact information updated successfully',
             'data' => [
                 'school_name' => $school->name,
                 'school_location' => $school->location,
@@ -199,45 +179,9 @@ class DashboardController extends Controller
 
     public function upsertExamRecord(Request $request)
     {
-        $school = School::find((int) $request->user()->school_id);
-        if (!$school) {
-            return response()->json(['message' => 'School not found'], 404);
-        }
-
-        $payload = $request->validate([
-            'ca_maxes' => 'required|array|size:5',
-            'ca_maxes.*' => 'required|integer|min:0|max:100',
-            'exam_max' => 'required|integer|min:0|max:100',
-        ]);
-
-        $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes']));
-        $caTotal = array_sum($caMaxes);
-        $examMax = (int) $payload['exam_max'];
-
-        if ($caTotal <= 0) {
-            return response()->json([
-                'message' => 'At least one CA score must be greater than zero.',
-            ], 422);
-        }
-
-        if (($caTotal + $examMax) !== 100) {
-            return response()->json([
-                'message' => 'Total of all CA maxima and exam maximum must be exactly 100.',
-            ], 422);
-        }
-
-        $schema = AssessmentSchema::normalizeSchema([
-            'ca_maxes' => $caMaxes,
-            'exam_max' => $examMax,
-        ]);
-
-        $school->assessment_schema = $schema;
-        $school->save();
-
         return response()->json([
-            'message' => 'Exam record updated successfully',
-            'data' => $schema,
-        ]);
+            'message' => 'Exam record is managed by Super Admin (School Information).',
+        ], 403);
     }
 
     public function departmentTemplates(Request $request)
@@ -420,47 +364,9 @@ class DashboardController extends Controller
 
     public function upsertClassTemplates(Request $request)
     {
-        $school = School::find((int) $request->user()->school_id);
-        if (!$school) {
-            return response()->json(['message' => 'School not found'], 404);
-        }
-
-        $payload = $request->validate([
-            'class_templates' => 'required|array|size:4',
-            'class_templates.*.key' => 'required|string|max:50',
-            'class_templates.*.label' => 'required|string|max:80',
-            'class_templates.*.enabled' => 'required|boolean',
-            'class_templates.*.classes' => 'required|array|min:1|max:20',
-            'class_templates.*.classes.*' => 'nullable',
-        ]);
-
-        $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
-        $active = ClassTemplateSchema::activeSections($normalized);
-
-        if (empty($active)) {
-            return response()->json([
-                'message' => 'Enable at least one class section.',
-            ], 422);
-        }
-
-        foreach ($active as $section) {
-            $classes = ClassTemplateSchema::activeClassNames($section);
-            if (empty($classes)) {
-                return response()->json([
-                    'message' => 'Each enabled section must have at least one checked class.',
-                ], 422);
-            }
-        }
-
-        $school->class_templates = $normalized;
-        $school->save();
-
-        $this->syncClassTemplatesToExistingSessions($school, $normalized);
-
         return response()->json([
-            'message' => 'Class templates saved successfully.',
-            'data' => $normalized,
-        ]);
+            'message' => 'Class templates are managed by Super Admin (School Information).',
+        ], 403);
     }
 
     private function resolveDepartmentTemplates(?School $school): array

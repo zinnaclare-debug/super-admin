@@ -83,7 +83,12 @@ export default function SchoolAcademicSessions() {
             {school?.name ? `School: ${school.name}` : "School sessions"}
           </p>
         </div>
-        <button onClick={() => navigate(-1)}>Back</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => navigate(`/super-admin/schools/${schoolId}/information`)}>
+            Information
+          </button>
+          <button onClick={() => navigate(-1)}>Back</button>
+        </div>
       </div>
 
       {loading ? (

@@ -8,12 +8,17 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\School;
 use App\Models\SchoolFeature;
 use App\Models\AcademicSession;
+use App\Models\SchoolClass;
 use App\Models\Term;
+use App\Support\AssessmentSchema;
+use App\Support\ClassTemplateSchema;
+use App\Support\DepartmentTemplateSync;
 use App\Support\UserCredentialStore;
 
 class SchoolController extends Controller
@@ -192,6 +197,191 @@ foreach ($defs as $def) {
         ]);
     }
 
+    public function information(School $school)
+    {
+        return response()->json([
+            'school' => [
+                'id' => $school->id,
+                'name' => $school->name,
+                'subdomain' => $school->subdomain,
+                'email' => $school->email,
+            ],
+            'branding' => [
+                'school_location' => $school->location,
+                'contact_email' => $school->contact_email,
+                'contact_phone' => $school->contact_phone,
+                'school_logo_url' => $this->storageUrl($school->logo_path),
+                'head_of_school_name' => $school->head_of_school_name,
+                'head_signature_url' => $this->storageUrl($school->head_signature_path),
+            ],
+            'exam_record' => AssessmentSchema::normalizeSchema($school->assessment_schema),
+            'class_templates' => ClassTemplateSchema::normalize($school->class_templates),
+        ]);
+    }
+
+    public function upsertInformationBranding(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'head_of_school_name' => 'nullable|string|max:255',
+            'school_location' => 'nullable|string|max:255',
+            'contact_email' => 'nullable|email|max:255',
+            'contact_phone' => 'nullable|string|max:30',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        $hasNameField = $request->has('head_of_school_name');
+        $hasLocationField = $request->has('school_location');
+        $hasContactEmailField = $request->has('contact_email');
+        $hasContactPhoneField = $request->has('contact_phone');
+        $hasLogoFile = $request->hasFile('logo');
+        $hasSignatureFile = $request->hasFile('head_signature');
+
+        if (
+            ! $hasNameField
+            && ! $hasLocationField
+            && ! $hasContactEmailField
+            && ! $hasContactPhoneField
+            && ! $hasLogoFile
+            && ! $hasSignatureFile
+        ) {
+            return response()->json([
+                'message' => 'Provide head_of_school_name, school_location, contact_email, contact_phone, logo, or head_signature.',
+            ], 422);
+        }
+
+        $schoolId = (int) $school->id;
+
+        if ($hasNameField) {
+            $name = trim((string) ($payload['head_of_school_name'] ?? ''));
+            $school->head_of_school_name = $name !== '' ? $name : null;
+        }
+
+        if ($hasLocationField) {
+            $location = trim((string) ($payload['school_location'] ?? ''));
+            $school->location = $location !== '' ? $location : null;
+        }
+
+        if ($hasContactEmailField) {
+            $contactEmail = trim((string) ($payload['contact_email'] ?? ''));
+            $school->contact_email = $contactEmail !== '' ? $contactEmail : null;
+        }
+
+        if ($hasContactPhoneField) {
+            $contactPhone = trim((string) ($payload['contact_phone'] ?? ''));
+            $school->contact_phone = $contactPhone !== '' ? $contactPhone : null;
+        }
+
+        if ($hasLogoFile) {
+            $logo = $request->file('logo');
+            $logoExt = $logo->getClientOriginalExtension();
+            $school->logo_path = $logo->storeAs("schools/{$schoolId}/branding", "logo.{$logoExt}", 'public');
+        }
+
+        if ($hasSignatureFile) {
+            $signature = $request->file('head_signature');
+            $signatureExt = $signature->getClientOriginalExtension();
+            $school->head_signature_path = $signature->storeAs(
+                "schools/{$schoolId}/branding",
+                "head_signature.{$signatureExt}",
+                'public'
+            );
+        }
+
+        $school->save();
+
+        return response()->json([
+            'message' => 'School information updated successfully',
+            'data' => [
+                'school_name' => $school->name,
+                'school_location' => $school->location,
+                'contact_email' => $school->contact_email,
+                'contact_phone' => $school->contact_phone,
+                'school_logo_url' => $this->storageUrl($school->logo_path),
+                'head_of_school_name' => $school->head_of_school_name,
+                'head_signature_url' => $this->storageUrl($school->head_signature_path),
+            ],
+        ]);
+    }
+
+    public function updateInformationExamRecord(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'ca_maxes' => 'required|array|size:5',
+            'ca_maxes.*' => 'required|integer|min:0|max:100',
+            'exam_max' => 'required|integer|min:0|max:100',
+        ]);
+
+        $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes']));
+        $caTotal = array_sum($caMaxes);
+        $examMax = (int) $payload['exam_max'];
+
+        if ($caTotal <= 0) {
+            return response()->json([
+                'message' => 'At least one CA score must be greater than zero.',
+            ], 422);
+        }
+
+        if (($caTotal + $examMax) !== 100) {
+            return response()->json([
+                'message' => 'Total of all CA maxima and exam maximum must be exactly 100.',
+            ], 422);
+        }
+
+        $schema = AssessmentSchema::normalizeSchema([
+            'ca_maxes' => $caMaxes,
+            'exam_max' => $examMax,
+        ]);
+
+        $school->assessment_schema = $schema;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Exam record updated successfully',
+            'data' => $schema,
+        ]);
+    }
+
+    public function updateInformationClassTemplates(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'class_templates' => 'required|array|size:4',
+            'class_templates.*.key' => 'required|string|max:50',
+            'class_templates.*.label' => 'required|string|max:80',
+            'class_templates.*.enabled' => 'required|boolean',
+            'class_templates.*.classes' => 'required|array|min:1|max:20',
+            'class_templates.*.classes.*' => 'nullable',
+        ]);
+
+        $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
+        $active = ClassTemplateSchema::activeSections($normalized);
+
+        if (empty($active)) {
+            return response()->json([
+                'message' => 'Enable at least one class section.',
+            ], 422);
+        }
+
+        foreach ($active as $section) {
+            $classes = ClassTemplateSchema::activeClassNames($section);
+            if (empty($classes)) {
+                return response()->json([
+                    'message' => 'Each enabled section must have at least one checked class.',
+                ], 422);
+            }
+        }
+
+        $school->class_templates = $normalized;
+        $school->save();
+
+        $this->syncClassTemplatesToExistingSessions($school, $normalized);
+
+        return response()->json([
+            'message' => 'Class templates saved successfully.',
+            'data' => $normalized,
+        ]);
+    }
+
     /**
      * List academic sessions for one school.
      */
@@ -290,6 +480,68 @@ foreach ($defs as $def) {
     private function normalizeSubdomain(?string $subdomain): string
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $subdomain))) ?? '';
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+
+        return str_starts_with($relativeOrAbsolute, 'http://')
+            || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
+    }
+
+    private function syncClassTemplatesToExistingSessions(School $school, array $templates): void
+    {
+        $schoolId = (int) $school->id;
+        $activeSections = ClassTemplateSchema::activeSections($templates);
+        $activeLevels = array_values(array_map(
+            fn (array $section) => strtolower(trim((string) ($section['key'] ?? ''))),
+            $activeSections
+        ));
+
+        $departmentTemplates = DepartmentTemplateSync::normalizeTemplateNames(
+            $school->department_templates ?? []
+        );
+
+        $sessions = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->get();
+
+        foreach ($sessions as $session) {
+            $session->levels = $activeLevels;
+            $session->save();
+
+            foreach ($activeSections as $section) {
+                $level = strtolower(trim((string) ($section['key'] ?? '')));
+                if ($level === '') {
+                    continue;
+                }
+
+                $classNames = ClassTemplateSchema::activeClassNames($section);
+
+                foreach ($classNames as $className) {
+                    SchoolClass::firstOrCreate([
+                        'school_id' => $schoolId,
+                        'academic_session_id' => (int) $session->id,
+                        'level' => $level,
+                        'name' => $className,
+                    ]);
+                }
+            }
+
+            DepartmentTemplateSync::syncTemplatesToSession(
+                $schoolId,
+                (int) $session->id,
+                $activeLevels,
+                $departmentTemplates
+            );
+        }
     }
 
     private function clearApplicationCache(): void

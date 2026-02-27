@@ -14,10 +14,10 @@ import SuperAdminLoginDetails from "./pages/super-admin/LoginDetails";
 import SchoolUsersByLevel from "./pages/super-admin/SchoolUsersByLevel";
 import SuperAdminPayments from "./pages/super-admin/Payments";
 import SchoolAcademicSessions from "./pages/super-admin/SchoolAcademicSessions";
+import SchoolInformation from "./pages/super-admin/SchoolInformation";
 
 // School Admin
 import SchoolDashboard from "./pages/school/Dashboard";
-import ClassTemplates from "./pages/school/ClassTemplates";
 import SchoolFeatures from "./pages/school-admin/SchoolFeatures";
 import Register from "./pages/school-admin/Register";
 
@@ -112,6 +112,7 @@ function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="schools" element={<Schools />} />
         <Route path="schools/:schoolId/academic-sessions" element={<SchoolAcademicSessions />} />
+        <Route path="schools/:schoolId/information" element={<SchoolInformation />} />
         <Route path="users" element={<Users />} />
         <Route path="users/login-details" element={<SuperAdminLoginDetails />} />
         <Route path="users/:schoolId" element={<SchoolUsersByLevel />} />
@@ -133,7 +134,6 @@ function App() {
 
         <Route element={<SchoolAdminFeatureLayout />}>
         {/* Admin Features */}
-        <Route path="admin/class-templates" element={<ClassTemplates />} />
         <Route path="admin/register" element={<Register />} />
 
         {/* Users */}

@@ -87,6 +87,10 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/academic-sessions', [SchoolController::class, 'academicSessions']);
     Route::patch('/super-admin/schools/{school}/academic-sessions/{session}/status', [SchoolController::class, 'updateAcademicSessionStatus']);
     Route::delete('/super-admin/schools/{school}/academic-sessions/{session}', [SchoolController::class, 'destroyAcademicSession']);
+    Route::get('/super-admin/schools/{school}/information', [SchoolController::class, 'information']);
+    Route::post('/super-admin/schools/{school}/information/branding', [SchoolController::class, 'upsertInformationBranding']);
+    Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
+    Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
 
     Route::post('/super-admin/schools/create-with-admin', [SchoolController::class, 'createWithAdmin']);
     Route::post('/super-admin/schools/{school}/assign-admin', [SchoolController::class, 'assignAdmin']);

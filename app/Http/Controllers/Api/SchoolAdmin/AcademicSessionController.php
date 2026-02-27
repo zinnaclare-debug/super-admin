@@ -48,7 +48,7 @@ class AcademicSessionController extends Controller
             $activeSections = ClassTemplateSchema::activeSections($classTemplates);
             if (empty($activeSections)) {
                 return response()->json([
-                    'message' => 'No class template configured. Open Branding and create classes first.',
+                    'message' => 'No class template configured. Ask Super Admin to set class templates in School Information first.',
                 ], 422);
             }
 
