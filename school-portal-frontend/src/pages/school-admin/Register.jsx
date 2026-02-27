@@ -36,7 +36,13 @@ export default function Register() {
     current_term: null,
     classes: [],
   });
-  const [loadingEnrollmentContext, setLoadingEnrollmentContext] = useState(false);
+  const [loadingEnrollmentContext, setLoadingEnrollmentContext] = useState(true);
+  const [editPlacement, setEditPlacement] = useState({
+    class_id: "",
+    class_name: "",
+    department_id: "",
+    department_name: "",
+  });
 
   const [form, setForm] = useState({
     role: "",
@@ -124,9 +130,15 @@ export default function Register() {
           guardian_occupation: data.guardian_occupation || "",
           guardian_relationship: data.guardian_relationship || "",
           staff_position: data.staff_position || "",
-          class_id: "",
-          department_id: "",
+          class_id: data.class_id ? String(data.class_id) : "",
+          department_id: data.department_id ? String(data.department_id) : "",
         }));
+        setEditPlacement({
+          class_id: data.class_id ? String(data.class_id) : "",
+          class_name: data.class_name || "",
+          department_id: data.department_id ? String(data.department_id) : "",
+          department_name: data.department_name || "",
+        });
 
         if (data.photo_url) {
           setPhotoPreview(data.photo_url);
@@ -144,12 +156,13 @@ export default function Register() {
   }, [editRole, editUserId, isEditMode]);
 
   useEffect(() => {
-    if (!isStudent || isEditMode) {
+    if (!isStudent) {
       setEnrollmentContext({
         current_session: null,
         current_term: null,
         classes: [],
       });
+      setLoadingEnrollmentContext(false);
       return;
     }
 
@@ -191,6 +204,7 @@ export default function Register() {
   useEffect(() => {
     if (!isStudent) return;
     if (!form.class_id) return;
+    if (loadingEnrollmentContext) return;
 
     const classExists = studentClasses.some((c) => String(c.id) === String(form.class_id));
     if (!classExists) {
@@ -200,11 +214,12 @@ export default function Register() {
         department_id: "",
       }));
     }
-  }, [form.class_id, isStudent, studentClasses]);
+  }, [form.class_id, isStudent, loadingEnrollmentContext, studentClasses]);
 
   useEffect(() => {
     if (!isStudent) return;
     if (!form.department_id) return;
+    if (loadingEnrollmentContext) return;
 
     const departmentExists = selectedDepartments.some(
       (department) => String(department.id) === String(form.department_id)
@@ -215,7 +230,7 @@ export default function Register() {
         department_id: "",
       }));
     }
-  }, [form.department_id, isStudent, selectedDepartments]);
+  }, [form.department_id, isStudent, loadingEnrollmentContext, selectedDepartments]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -304,6 +319,10 @@ export default function Register() {
     if (!isEditMode || !editUserId) return;
     if (!form.name) return alert("Enter full name");
     if (form.password && form.password.length < 6) return alert("Password must be at least 6 characters");
+    if (isStudent && !form.class_id) return alert("Select student class");
+    if (isStudent && selectedDepartments.length > 0 && !form.department_id) {
+      return alert("Select student department");
+    }
 
     setSubmitting(true);
     try {
@@ -449,6 +468,13 @@ export default function Register() {
                 <option value="">
                   {loadingEnrollmentContext ? "Loading classes..." : "Select Class"}
                 </option>
+                {isEditMode &&
+                  form.class_id &&
+                  !studentClasses.some((schoolClass) => String(schoolClass.id) === String(form.class_id)) && (
+                    <option value={form.class_id}>
+                      {editPlacement.class_name || "Current Class"}
+                    </option>
+                  )}
                 {studentClasses.map((schoolClass) => (
                   <option key={schoolClass.id} value={schoolClass.id}>
                     {schoolClass.name} ({prettyLevel(schoolClass.level)})
@@ -469,6 +495,15 @@ export default function Register() {
                       ? "No department configured"
                       : "Select Department"}
                 </option>
+                {isEditMode &&
+                  form.department_id &&
+                  !selectedDepartments.some(
+                    (department) => String(department.id) === String(form.department_id)
+                  ) && (
+                    <option value={form.department_id}>
+                      {editPlacement.department_name || "Current Department"}
+                    </option>
+                  )}
                 {selectedDepartments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.name}

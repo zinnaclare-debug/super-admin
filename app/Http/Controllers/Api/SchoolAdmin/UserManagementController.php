@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
+use App\Models\ClassDepartment;
+use App\Models\Enrollment;
 use App\Models\Guardian;
+use App\Models\LevelDepartment;
 use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\Term;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\UserCredentialStore;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserManagementController extends Controller
 {
@@ -79,6 +86,11 @@ class UserManagementController extends Controller
             $staff = Staff::where('school_id', $user->school_id)->where('user_id', $user->id)->first();
         }
 
+        $placement = ['class_id' => null, 'department_id' => null, 'class_name' => null, 'department_name' => null];
+        if ($user->role === 'student' && $student) {
+            $placement = $this->resolveStudentCurrentPlacement((int) $user->school_id, (int) $student->id);
+        }
+
         $photoPath = $student?->photo_path ?? $staff?->photo_path ?? $user->photo_path;
 
         return response()->json([
@@ -102,6 +114,10 @@ class UserManagementController extends Controller
                 'guardian_state_of_origin' => $guardian?->state_of_origin,
                 'guardian_occupation' => $guardian?->occupation,
                 'guardian_relationship' => $guardian?->relationship,
+                'class_id' => $placement['class_id'],
+                'department_id' => $placement['department_id'],
+                'class_name' => $placement['class_name'],
+                'department_name' => $placement['department_name'],
             ],
         ]);
     }
@@ -121,7 +137,7 @@ class UserManagementController extends Controller
             ? ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)]
             : ['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id)];
 
-        $validated = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => $emailRule,
             'password' => ['nullable', 'string', 'min:6'],
@@ -143,7 +159,17 @@ class UserManagementController extends Controller
 
             'remove_photo' => ['nullable', 'boolean'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-        ]);
+        ];
+
+        if ($user->role === 'student') {
+            $rules['class_id'] = ['required', 'integer', 'exists:classes,id'];
+            $rules['department_id'] = ['nullable', 'integer', 'exists:class_departments,id'];
+        } else {
+            $rules['class_id'] = ['nullable', 'integer'];
+            $rules['department_id'] = ['nullable', 'integer'];
+        }
+
+        $validated = $request->validate($rules);
 
         $user->name = $validated['name'];
         if ($user->role === 'staff') {
@@ -198,12 +224,25 @@ class UserManagementController extends Controller
                 ['school_id' => $user->school_id, 'user_id' => $user->id]
             );
 
+            $requestedClassId = (int) ($validated['class_id'] ?? 0);
+            $requestedDepartmentId = $request->filled('department_id')
+                ? (int) $validated['department_id']
+                : null;
+
+            $placement = $this->resolveStudentPlacementForUpdate(
+                (int) $user->school_id,
+                $requestedClassId,
+                $requestedDepartmentId,
+                $educationLevel
+            );
+            $classLevel = strtolower(trim((string) $placement['class']->level));
+
             $student->sex = $validated['sex'] ?? $student->sex;
             $student->religion = $validated['religion'] ?? $student->religion;
             $student->dob = $validated['dob'] ?? $student->dob;
             $student->address = $validated['address'] ?? $student->address;
             if (Schema::hasColumn('students', 'education_level')) {
-                $student->education_level = $educationLevel ?? $student->education_level;
+                $student->education_level = $educationLevel ?? $classLevel;
             }
             if ($photoPath) {
                 $student->photo_path = $photoPath;
@@ -211,6 +250,14 @@ class UserManagementController extends Controller
                 $student->photo_path = null;
             }
             $student->save();
+
+            $this->reassignStudentInClassSession(
+                (int) $user->school_id,
+                $student,
+                $placement['class'],
+                $placement['session_term_ids'],
+                $placement['department_id']
+            );
 
             $guardianPayload = [
                 'name' => $validated['guardian_name'] ?? null,
@@ -382,6 +429,278 @@ class UserManagementController extends Controller
             'message' => "User {$userName} deleted successfully",
             'data' => ['id' => $user->id],
         ]);
+    }
+
+    private function resolveStudentCurrentPlacement(int $schoolId, int $studentId): array
+    {
+        $placement = [
+            'class_id' => null,
+            'department_id' => null,
+            'class_name' => null,
+            'department_name' => null,
+        ];
+
+        $currentSession = $this->resolveCurrentSession($schoolId);
+        $classId = null;
+        $departmentId = null;
+
+        if ($currentSession) {
+            $termId = $this->resolveCurrentSessionTermId($schoolId, (int) $currentSession->id);
+            if ($termId) {
+                $enrollmentQuery = Enrollment::query()
+                    ->where('student_id', $studentId)
+                    ->where('term_id', $termId)
+                    ->orderByDesc('id');
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $enrollmentQuery->where('school_id', $schoolId);
+                }
+                $enrollment = $enrollmentQuery->first(['class_id', 'department_id']);
+                if ($enrollment) {
+                    $classId = (int) $enrollment->class_id;
+                    $departmentId = $enrollment->department_id ? (int) $enrollment->department_id : null;
+                }
+            }
+
+            if (!$classId) {
+                $classId = DB::table('class_students')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $studentId)
+                    ->where('academic_session_id', (int) $currentSession->id)
+                    ->orderByDesc('id')
+                    ->value('class_id');
+                $classId = $classId ? (int) $classId : null;
+            }
+        }
+
+        if (!$classId) {
+            $enrollmentQuery = Enrollment::query()
+                ->where('student_id', $studentId)
+                ->orderByDesc('id');
+            if (Schema::hasColumn('enrollments', 'school_id')) {
+                $enrollmentQuery->where('school_id', $schoolId);
+            }
+            $enrollment = $enrollmentQuery->first(['class_id', 'department_id']);
+            if ($enrollment) {
+                $classId = (int) $enrollment->class_id;
+                $departmentId = $enrollment->department_id ? (int) $enrollment->department_id : null;
+            }
+        }
+
+        if (!$classId) {
+            return $placement;
+        }
+
+        $class = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $classId)
+            ->first(['id', 'name']);
+
+        if (!$class) {
+            return $placement;
+        }
+
+        $placement['class_id'] = (int) $class->id;
+        $placement['class_name'] = (string) $class->name;
+        $placement['department_id'] = $departmentId;
+
+        if ($departmentId) {
+            $department = ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('id', $departmentId)
+                ->first(['name']);
+            $placement['department_name'] = $department?->name;
+        }
+
+        return $placement;
+    }
+
+    private function resolveStudentPlacementForUpdate(
+        int $schoolId,
+        int $classId,
+        ?int $departmentId,
+        ?string $educationLevel
+    ): array {
+        $class = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $classId)
+            ->first();
+
+        if (!$class) {
+            throw ValidationException::withMessages([
+                'class_id' => ['Invalid class selected.'],
+            ]);
+        }
+
+        $currentSession = $this->resolveCurrentSession($schoolId);
+        if ($currentSession && (int) $class->academic_session_id !== (int) $currentSession->id) {
+            throw ValidationException::withMessages([
+                'class_id' => ['Selected class must belong to current academic session.'],
+            ]);
+        }
+
+        $classLevel = strtolower(trim((string) $class->level));
+        if ($educationLevel !== null && $educationLevel !== $classLevel) {
+            throw ValidationException::withMessages([
+                'class_id' => ['Selected class does not match the chosen education level.'],
+            ]);
+        }
+
+        $sessionTermIds = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($sessionTermIds)) {
+            throw ValidationException::withMessages([
+                'class_id' => ['No terms found for selected class session.'],
+            ]);
+        }
+
+        $this->syncClassDepartmentsFromLevel($schoolId, $class);
+
+        $classDepartments = ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name')
+            ->get(['id']);
+
+        $resolvedDepartmentId = null;
+        if ($classDepartments->isNotEmpty()) {
+            if (!$departmentId) {
+                throw ValidationException::withMessages([
+                    'department_id' => ['Select department for the selected class.'],
+                ]);
+            }
+
+            $departmentExists = $classDepartments
+                ->pluck('id')
+                ->contains((int) $departmentId);
+
+            if (!$departmentExists) {
+                throw ValidationException::withMessages([
+                    'department_id' => ['Invalid department selected for this class.'],
+                ]);
+            }
+
+            $resolvedDepartmentId = (int) $departmentId;
+        } elseif ($departmentId) {
+            throw ValidationException::withMessages([
+                'department_id' => ['Selected class has no departments configured.'],
+            ]);
+        }
+
+        return [
+            'class' => $class,
+            'department_id' => $resolvedDepartmentId,
+            'session_term_ids' => $sessionTermIds,
+        ];
+    }
+
+    private function reassignStudentInClassSession(
+        int $schoolId,
+        Student $student,
+        SchoolClass $class,
+        array $sessionTermIds,
+        ?int $departmentId
+    ): void {
+        DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('student_id', $student->id)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->where('class_id', '!=', $class->id)
+            ->delete();
+
+        DB::table('class_students')->updateOrInsert([
+            'school_id' => $schoolId,
+            'academic_session_id' => $class->academic_session_id,
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+        ], [
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        foreach ($sessionTermIds as $termId) {
+            $termEnrollments = Enrollment::query()
+                ->where('student_id', $student->id)
+                ->where('term_id', (int) $termId)
+                ->orderByDesc('id');
+
+            if (Schema::hasColumn('enrollments', 'school_id')) {
+                $termEnrollments->where('school_id', $schoolId);
+            }
+
+            $rows = $termEnrollments->get();
+            if ($rows->isEmpty()) {
+                $payload = [
+                    'student_id' => $student->id,
+                    'class_id' => $class->id,
+                    'term_id' => (int) $termId,
+                    'department_id' => $departmentId,
+                ];
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $payload['school_id'] = $schoolId;
+                }
+                Enrollment::create($payload);
+                continue;
+            }
+
+            $keeper = $rows->first();
+            $keeper->class_id = $class->id;
+            $keeper->department_id = $departmentId;
+            $keeper->save();
+
+            $duplicateIds = $rows->skip(1)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if (!empty($duplicateIds)) {
+                Enrollment::query()->whereIn('id', $duplicateIds)->delete();
+            }
+        }
+    }
+
+    private function resolveCurrentSession(int $schoolId): ?AcademicSession
+    {
+        return AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('status', 'current')
+            ->first();
+    }
+
+    private function resolveCurrentSessionTermId(int $schoolId, int $academicSessionId): ?int
+    {
+        $termQuery = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $academicSessionId);
+
+        if (Schema::hasColumn('terms', 'is_current')) {
+            $current = (clone $termQuery)->where('is_current', true)->value('id');
+            if ($current) {
+                return (int) $current;
+            }
+        }
+
+        $fallback = (clone $termQuery)->orderBy('id')->value('id');
+        return $fallback ? (int) $fallback : null;
+    }
+
+    private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
+    {
+        $levelDepartments = LevelDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->where('level', $class->level)
+            ->get(['name']);
+
+        foreach ($levelDepartments as $department) {
+            ClassDepartment::firstOrCreate([
+                'school_id' => $schoolId,
+                'class_id' => $class->id,
+                'name' => $department->name,
+            ]);
+        }
     }
 
     private function storageUrl(?string $path): ?string
