@@ -259,30 +259,45 @@ export default function ClassSubjects() {
       </div>
 
       {editingSubject && (
-        <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 14, borderRadius: 10 }}>
-          <h4 style={{ marginTop: 0 }}>Edit Subject</h4>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <input
-              value={editSubjectName}
-              onChange={(e) => setEditSubjectName(e.target.value)}
-              placeholder="Subject name"
-              style={{ padding: 10, width: 280 }}
-            />
-            <input
-              value={editSubjectCode}
-              onChange={(e) => setEditSubjectCode(e.target.value)}
-              placeholder="Code (optional)"
-              style={{ padding: 10, width: 180 }}
-            />
-          </div>
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: 12,
+          }}
+        >
+          <div style={{ width: "min(560px, 100%)", background: "#fff", borderRadius: 10, padding: 16 }}>
+            <h4 style={{ marginTop: 0 }}>Edit Subject</h4>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <input
+                value={editSubjectName}
+                onChange={(e) => setEditSubjectName(e.target.value)}
+                placeholder="Subject name"
+                style={{ padding: 10, width: 280 }}
+              />
+              <input
+                value={editSubjectCode}
+                onChange={(e) => setEditSubjectCode(e.target.value)}
+                placeholder="Code (optional)"
+                style={{ padding: 10, width: 180 }}
+              />
+            </div>
 
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <button onClick={saveEditedSubject} disabled={savingEdit}>
-              {savingEdit ? "Saving..." : "Save Changes"}
-            </button>
-            <button onClick={cancelEditSubject} disabled={savingEdit}>
-              Cancel
-            </button>
+            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+              <button onClick={saveEditedSubject} disabled={savingEdit}>
+                {savingEdit ? "Saving..." : "Save Changes"}
+              </button>
+              <button onClick={cancelEditSubject} disabled={savingEdit}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

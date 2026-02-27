@@ -10,6 +10,7 @@ use App\Models\SchoolClass;
 use App\Models\Term;
 use App\Models\Subject;
 use App\Models\TermSubject;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -243,7 +244,14 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
 
         $subject->name = $name;
         $subject->code = filled($payload['code'] ?? null) ? trim((string) $payload['code']) : null;
-        $subject->save();
+
+        try {
+            $subject->save();
+        } catch (QueryException $e) {
+            return response()->json([
+                'message' => 'Subject code is already used. Use another code or leave it empty.',
+            ], 422);
+        }
 
         return response()->json([
             'message' => 'Subject updated successfully',
