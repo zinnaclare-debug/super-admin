@@ -31,6 +31,12 @@ export default function Register() {
 
   const [submitting, setSubmitting] = useState(false);
   const [educationLevels, setEducationLevels] = useState([]);
+  const [enrollmentContext, setEnrollmentContext] = useState({
+    current_session: null,
+    current_term: null,
+    classes: [],
+  });
+  const [loadingEnrollmentContext, setLoadingEnrollmentContext] = useState(false);
 
   const [form, setForm] = useState({
     role: "",
@@ -53,10 +59,15 @@ export default function Register() {
     guardian_relationship: "",
 
     staff_position: "",
+    class_id: "",
+    department_id: "",
   });
 
   const isStudent = form.role === "student";
   const isStaff = form.role === "staff";
+  const studentClasses = enrollmentContext?.classes || [];
+  const selectedClass = studentClasses.find((c) => String(c.id) === String(form.class_id));
+  const selectedDepartments = selectedClass?.departments || [];
 
   useEffect(() => {
     let mounted = true;
@@ -113,6 +124,8 @@ export default function Register() {
           guardian_occupation: data.guardian_occupation || "",
           guardian_relationship: data.guardian_relationship || "",
           staff_position: data.staff_position || "",
+          class_id: "",
+          department_id: "",
         }));
 
         if (data.photo_url) {
@@ -130,8 +143,97 @@ export default function Register() {
     loadEditData();
   }, [editRole, editUserId, isEditMode]);
 
+  useEffect(() => {
+    if (!isStudent || isEditMode) {
+      setEnrollmentContext({
+        current_session: null,
+        current_term: null,
+        classes: [],
+      });
+      return;
+    }
+
+    let active = true;
+
+    const loadEnrollmentContext = async () => {
+      setLoadingEnrollmentContext(true);
+      try {
+        const params = {};
+        if (form.education_level) params.education_level = form.education_level;
+        const res = await api.get("/api/school-admin/register/enrollment-options", { params });
+        if (!active) return;
+        setEnrollmentContext(
+          res?.data?.data || {
+            current_session: null,
+            current_term: null,
+            classes: [],
+          }
+        );
+      } catch {
+        if (!active) return;
+        setEnrollmentContext({
+          current_session: null,
+          current_term: null,
+          classes: [],
+        });
+      } finally {
+        if (active) setLoadingEnrollmentContext(false);
+      }
+    };
+
+    loadEnrollmentContext();
+
+    return () => {
+      active = false;
+    };
+  }, [form.education_level, isEditMode, isStudent]);
+
+  useEffect(() => {
+    if (!isStudent) return;
+    if (!form.class_id) return;
+
+    const classExists = studentClasses.some((c) => String(c.id) === String(form.class_id));
+    if (!classExists) {
+      setForm((prev) => ({
+        ...prev,
+        class_id: "",
+        department_id: "",
+      }));
+    }
+  }, [form.class_id, isStudent, studentClasses]);
+
+  useEffect(() => {
+    if (!isStudent) return;
+    if (!form.department_id) return;
+
+    const departmentExists = selectedDepartments.some(
+      (department) => String(department.id) === String(form.department_id)
+    );
+    if (!departmentExists) {
+      setForm((prev) => ({
+        ...prev,
+        department_id: "",
+      }));
+    }
+  }, [form.department_id, isStudent, selectedDepartments]);
+
   const handleChange = (e) => {
-    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "education_level") {
+        next.class_id = "";
+        next.department_id = "";
+      }
+      if (name === "class_id") {
+        next.department_id = "";
+      }
+      if (name === "role" && value !== "student") {
+        next.class_id = "";
+        next.department_id = "";
+      }
+      return next;
+    });
   };
 
   const onPickPhoto = (e) => {
@@ -177,6 +279,10 @@ export default function Register() {
 
     // for students you can keep it optional, but if you want it required uncomment below:
     // if (isStudent && !form.education_level) return alert("Select student education level");
+    if (isStudent && !form.class_id) return alert("Select student class");
+    if (isStudent && selectedDepartments.length > 0 && !form.department_id) {
+      return alert("Select student department");
+    }
 
     setSubmitting(true);
     try {
@@ -249,6 +355,8 @@ export default function Register() {
         guardian_occupation: "",
         guardian_relationship: "",
         staff_position: "",
+        class_id: "",
+        department_id: "",
       });
     } catch (err) {
       alert(err?.response?.data?.error || err?.response?.data?.message || err.message || "Confirm failed");
@@ -336,6 +444,48 @@ export default function Register() {
 
           {isStudent && (
             <>
+              <h3 style={{ marginTop: 14 }}>Enrollment During Registration</h3>
+              <select name="class_id" value={form.class_id} onChange={handleChange}>
+                <option value="">
+                  {loadingEnrollmentContext ? "Loading classes..." : "Select Class"}
+                </option>
+                {studentClasses.map((schoolClass) => (
+                  <option key={schoolClass.id} value={schoolClass.id}>
+                    {schoolClass.name} ({prettyLevel(schoolClass.level)})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                name="department_id"
+                value={form.department_id}
+                onChange={handleChange}
+                disabled={!form.class_id || selectedDepartments.length === 0}
+              >
+                <option value="">
+                  {!form.class_id
+                    ? "Select class first"
+                    : selectedDepartments.length === 0
+                      ? "No department configured"
+                      : "Select Department"}
+                </option>
+                {selectedDepartments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+
+              {enrollmentContext?.current_term ? (
+                <p style={{ marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
+                  Enrollment will be applied across all terms in{" "}
+                  {enrollmentContext?.current_session?.session_name ||
+                    enrollmentContext?.current_session?.academic_year ||
+                    "current session"}
+                  . Current term: {enrollmentContext.current_term.name}
+                </p>
+              ) : null}
+
               <h3 style={{ marginTop: 14 }}>Student Details</h3>
 
               <select name="sex" value={form.sex} onChange={handleChange}>

@@ -137,6 +137,9 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:announcements');
 
     // ✅ Registration
+    Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
+        ->middleware('feature:register');
+
     Route::post('/school-admin/register/preview', [RegistrationController::class, 'preview'])
         ->middleware('feature:register');
 
