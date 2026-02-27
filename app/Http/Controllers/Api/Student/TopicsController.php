@@ -64,27 +64,50 @@ class TopicsController extends Controller
             ->first();
         if (!$student) return response()->json(['data' => []]);
 
-        $classIds = DB::table('class_students')
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->where('student_id', $student->id)
-            ->pluck('class_id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        $enrollQuery = Enrollment::query()
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->where('classes.school_id', $schoolId)
+            ->where('classes.academic_session_id', $session->id)
+            ->where('enrollments.student_id', $student->id)
+            ->where('enrollments.term_id', $currentTermId)
+            ->orderByDesc('enrollments.id');
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $activeClassId = $enrollQuery->value('enrollments.class_id');
+        $classIds = $activeClassId ? [(int) $activeClassId] : [];
 
         if (empty($classIds)) {
-            $enrollQuery = Enrollment::query()->where('student_id', $student->id);
-            if (Schema::hasColumn('enrollments', 'school_id')) {
-                $enrollQuery->where('school_id', $schoolId);
-            }
-
-            $classIds = $enrollQuery
-                ->where('term_id', $currentTermId)
+            $classIds = DB::table('class_students')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('student_id', $student->id)
                 ->pluck('class_id')
                 ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
                 ->values()
                 ->all();
+
+            if (!empty($classIds)) {
+                $classIds = [(int) $classIds[0]];
+            }
+        }
+
+        if (empty($classIds)) {
+            $legacyQuery = Enrollment::query()
+                ->where('student_id', $student->id)
+                ->where('term_id', $currentTermId)
+                ->orderByDesc('id');
+            if (Schema::hasColumn('enrollments', 'school_id')) {
+                $legacyQuery->where('school_id', $schoolId);
+            }
+
+            $legacyClassId = $legacyQuery->value('class_id');
+            if ($legacyClassId) {
+                $classIds = [(int) $legacyClassId];
+            }
         }
 
         if (empty($classIds)) return response()->json(['data' => []]);

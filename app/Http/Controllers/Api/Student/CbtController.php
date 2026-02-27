@@ -19,31 +19,47 @@ class CbtController extends Controller
 {
     private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId, int $currentTermId): array
     {
+        $enrollQuery = Enrollment::query()
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->where('classes.school_id', $schoolId)
+            ->where('classes.academic_session_id', $sessionId)
+            ->where('enrollments.student_id', $studentId)
+            ->where('enrollments.term_id', $currentTermId)
+            ->orderByDesc('enrollments.id');
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $activeClassId = $enrollQuery->value('enrollments.class_id');
+        if ($activeClassId) {
+            return [(int) $activeClassId];
+        }
+
         $classIds = DB::table('class_students')
             ->where('school_id', $schoolId)
             ->where('academic_session_id', $sessionId)
             ->where('student_id', $studentId)
             ->pluck('class_id')
             ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
             ->values()
             ->all();
 
         if (!empty($classIds)) {
-            return $classIds;
+            return [(int) $classIds[0]];
         }
 
-        $enrollQuery = Enrollment::query()
+        $legacyQuery = Enrollment::query()
             ->where('student_id', $studentId)
-            ->where('term_id', $currentTermId);
+            ->where('term_id', $currentTermId)
+            ->orderByDesc('id');
         if (Schema::hasColumn('enrollments', 'school_id')) {
-            $enrollQuery->where('school_id', $schoolId);
+            $legacyQuery->where('school_id', $schoolId);
         }
 
-        return $enrollQuery
-            ->pluck('class_id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        $legacyClassId = $legacyQuery->value('class_id');
+        return $legacyClassId ? [(int) $legacyClassId] : [];
     }
 
     private function resolveCurrentTermId(int $schoolId, int $sessionId): ?int

@@ -98,7 +98,9 @@ class EnrollmentController extends Controller
             return response()->json(['message' => 'No terms found for this class session'], 422);
         }
 
-        return DB::transaction(function () use ($rows, $class, $schoolId, $sessionTermIds) {
+        $currentSessionTermId = $this->resolveCurrentSessionTermId($schoolId, (int) $class->academic_session_id);
+
+        return DB::transaction(function () use ($rows, $class, $schoolId, $sessionTermIds, $currentSessionTermId) {
 
             $inserted = [];
             $skippedDuplicates = [];
@@ -117,6 +119,24 @@ class EnrollmentController extends Controller
                 $studentUser = User::where('id', $student->user_id)->first(['id', 'name', 'email']);
                 if (!$studentUser) {
                     continue;
+                }
+
+                if ($currentSessionTermId) {
+                    $existingClassId = $this->resolveCurrentTermEnrollmentClassId(
+                        $schoolId,
+                        (int) $student->id,
+                        (int) $currentSessionTermId
+                    );
+
+                    if ($existingClassId && (int) $existingClassId !== (int) $class->id) {
+                        $skippedDuplicates[] = [
+                            'student_id' => (int) $student->id,
+                            'name' => $studentUser->name,
+                            'email' => $studentUser->email,
+                            'reason' => 'Student already has a class in the current term/session',
+                        ];
+                        continue;
+                    }
                 }
 
                 if ($this->hasDuplicateNameOrEmailEnrollment(
@@ -349,5 +369,47 @@ class EnrollmentController extends Controller
         }
 
         return $query->exists();
+    }
+
+    private function resolveCurrentSessionTermId(int $schoolId, int $academicSessionId): ?int
+    {
+        $isCurrentSession = DB::table('academic_sessions')
+            ->where('school_id', $schoolId)
+            ->where('id', $academicSessionId)
+            ->where('status', 'current')
+            ->exists();
+
+        if (!$isCurrentSession) {
+            return null;
+        }
+
+        $termQuery = DB::table('terms')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $academicSessionId);
+
+        if (Schema::hasColumn('terms', 'is_current')) {
+            $current = (clone $termQuery)->where('is_current', true)->value('id');
+            if ($current) {
+                return (int) $current;
+            }
+        }
+
+        $fallback = (clone $termQuery)->orderBy('id')->value('id');
+        return $fallback ? (int) $fallback : null;
+    }
+
+    private function resolveCurrentTermEnrollmentClassId(int $schoolId, int $studentId, int $termId): ?int
+    {
+        $query = Enrollment::query()
+            ->where('student_id', $studentId)
+            ->where('term_id', $termId)
+            ->orderByDesc('id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $classId = $query->value('class_id');
+        return $classId ? (int) $classId : null;
     }
 }

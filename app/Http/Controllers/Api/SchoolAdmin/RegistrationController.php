@@ -439,6 +439,21 @@ class RegistrationController extends Controller
         array $sessionTermIds,
         ?int $departmentId
     ): void {
+        $currentSessionTermId = $this->resolveCurrentSessionTermId($schoolId, (int) $class->academic_session_id);
+        if ($currentSessionTermId) {
+            $existingClassId = $this->resolveCurrentTermEnrollmentClassId(
+                $schoolId,
+                (int) $student->id,
+                (int) $currentSessionTermId
+            );
+
+            if ($existingClassId && (int) $existingClassId !== (int) $class->id) {
+                throw ValidationException::withMessages([
+                    'class_id' => ['Student already has a class in the current term/session.'],
+                ]);
+            }
+        }
+
         DB::table('class_students')->updateOrInsert([
             'school_id' => $schoolId,
             'academic_session_id' => $class->academic_session_id,
@@ -474,6 +489,48 @@ class RegistrationController extends Controller
                 'department_id' => $departmentId,
             ]);
         }
+    }
+
+    private function resolveCurrentSessionTermId(int $schoolId, int $academicSessionId): ?int
+    {
+        $isCurrentSession = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $academicSessionId)
+            ->where('status', 'current')
+            ->exists();
+
+        if (!$isCurrentSession) {
+            return null;
+        }
+
+        $termQuery = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $academicSessionId);
+
+        if (Schema::hasColumn('terms', 'is_current')) {
+            $current = (clone $termQuery)->where('is_current', true)->value('id');
+            if ($current) {
+                return (int) $current;
+            }
+        }
+
+        $fallback = (clone $termQuery)->orderBy('id')->value('id');
+        return $fallback ? (int) $fallback : null;
+    }
+
+    private function resolveCurrentTermEnrollmentClassId(int $schoolId, int $studentId, int $termId): ?int
+    {
+        $query = Enrollment::query()
+            ->where('student_id', $studentId)
+            ->where('term_id', $termId)
+            ->orderByDesc('id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $classId = $query->value('class_id');
+        return $classId ? (int) $classId : null;
     }
 
     private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void

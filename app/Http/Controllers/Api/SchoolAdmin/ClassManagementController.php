@@ -166,7 +166,19 @@ class ClassManagementController extends Controller
             ->values()
             ->all();
 
-        DB::transaction(function () use ($schoolId, $class, $payload, $sessionTermIds) {
+        $currentSessionTermId = $this->resolveCurrentSessionTermId($schoolId, (int) $class->academic_session_id);
+        $skipped = [];
+        $insertedCount = 0;
+
+        DB::transaction(function () use (
+            $schoolId,
+            $class,
+            $payload,
+            $sessionTermIds,
+            $currentSessionTermId,
+            &$skipped,
+            &$insertedCount
+        ) {
             foreach ($payload['student_user_ids'] as $studentUserId) {
                 // resolve student record for this user
                 $student = \App\Models\Student::where('user_id', $studentUserId)
@@ -174,6 +186,23 @@ class ClassManagementController extends Controller
                     ->first();
 
                 if (!$student) continue;
+
+                if ($currentSessionTermId) {
+                    $existingClassId = $this->resolveCurrentTermEnrollmentClassId(
+                        $schoolId,
+                        (int) $student->id,
+                        (int) $currentSessionTermId
+                    );
+
+                    if ($existingClassId && (int) $existingClassId !== (int) $class->id) {
+                        $skipped[] = [
+                            'student_id' => (int) $student->id,
+                            'user_id' => (int) $studentUserId,
+                            'reason' => 'Student already has a class in the current term/session',
+                        ];
+                        continue;
+                    }
+                }
 
                 // insert into class_students (class-level enrollment)
                 DB::table('class_students')->updateOrInsert([
@@ -205,12 +234,17 @@ class ClassManagementController extends Controller
                             'created_at' => now(),
                             'updated_at' => now(),
                         ]);
+                        $insertedCount++;
                     }
                 }
             }
         });
 
-        return response()->json(['message' => 'Students enrolled for all terms in this session']);
+        return response()->json([
+            'message' => 'Students enrolled for all terms in this session',
+            'count' => $insertedCount,
+            'skipped' => $skipped,
+        ]);
     }
 
     // GET /api/school-admin/classes/{class}/terms/{term}/courses  (placeholder)
@@ -221,5 +255,47 @@ class ClassManagementController extends Controller
 
         // TODO: replace with real courses table later
         return response()->json(['data' => []]);
+    }
+
+    private function resolveCurrentSessionTermId(int $schoolId, int $academicSessionId): ?int
+    {
+        $isCurrentSession = DB::table('academic_sessions')
+            ->where('school_id', $schoolId)
+            ->where('id', $academicSessionId)
+            ->where('status', 'current')
+            ->exists();
+
+        if (!$isCurrentSession) {
+            return null;
+        }
+
+        $termQuery = DB::table('terms')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $academicSessionId);
+
+        if (Schema::hasColumn('terms', 'is_current')) {
+            $current = (clone $termQuery)->where('is_current', true)->value('id');
+            if ($current) {
+                return (int) $current;
+            }
+        }
+
+        $fallback = (clone $termQuery)->orderBy('id')->value('id');
+        return $fallback ? (int) $fallback : null;
+    }
+
+    private function resolveCurrentTermEnrollmentClassId(int $schoolId, int $studentId, int $termId): ?int
+    {
+        $query = DB::table('enrollments')
+            ->where('student_id', $studentId)
+            ->where('term_id', $termId)
+            ->orderByDesc('id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $classId = $query->value('class_id');
+        return $classId ? (int) $classId : null;
     }
 }
