@@ -361,18 +361,33 @@ class LoginDetailsController extends Controller
             }
         }
 
+        $studentScopedFiltersActive = $validClassId !== null || $departmentFilter !== '';
+
         $filteredRows = $rawRows
-            ->filter(function (array $row) use ($levelFilter, $departmentFilter, $validClassId) {
+            ->filter(function (array $row) use (
+                $levelFilter,
+                $departmentFilter,
+                $validClassId,
+                $role,
+                $studentScopedFiltersActive
+            ) {
                 if ($levelFilter !== '' && $this->normalizeLevelValue((string) ($row['level'] ?? '')) !== $levelFilter) {
                     return false;
                 }
 
-                if ($validClassId !== null && (int) ($row['class_id'] ?? 0) !== $validClassId) {
+                $isStudent = (string) ($row['role'] ?? '') === 'student';
+                if ($studentScopedFiltersActive && $role !== 'staff' && !$isStudent) {
                     return false;
                 }
 
-                if ($departmentFilter !== '' && strtolower((string) ($row['department'] ?? '')) !== $departmentFilter) {
-                    return false;
+                if ($isStudent) {
+                    if ($validClassId !== null && (int) ($row['class_id'] ?? 0) !== $validClassId) {
+                        return false;
+                    }
+
+                    if ($departmentFilter !== '' && strtolower((string) ($row['department'] ?? '')) !== $departmentFilter) {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -411,13 +426,32 @@ class LoginDetailsController extends Controller
             ->values()
             ->all();
 
-        $departments = $rawRows
+        $departmentRows = collect($rawRows)
+            ->filter(fn ($row) => (string) ($row['role'] ?? '') === 'student');
+
+        if ($levelFilter !== '') {
+            $departmentRows = $departmentRows
+                ->filter(fn ($row) => $this->normalizeLevelValue((string) ($row['level'] ?? '')) === $levelFilter);
+        }
+        if ($validClassId !== null) {
+            $departmentRows = $departmentRows
+                ->filter(fn ($row) => (int) ($row['class_id'] ?? 0) === $validClassId);
+        }
+
+        $departments = $departmentRows
             ->pluck('department')
             ->map(fn ($value) => trim((string) $value))
             ->filter(fn ($value) => $value !== '')
             ->unique(fn ($value) => strtolower($value))
             ->values()
             ->all();
+
+        if ($role === 'staff') {
+            $classOptions = [];
+            $departments = [];
+            $validClassId = null;
+            $departmentFilter = '';
+        }
 
         return [
             'rows' => $filteredRows,

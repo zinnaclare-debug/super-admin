@@ -60,6 +60,13 @@ export default function LoginDetails() {
   }, [role, level, classId, department]);
 
   useEffect(() => {
+    if (role === "staff") {
+      if (classId) setClassId("");
+      if (department) setDepartment("");
+    }
+  }, [classId, department, role]);
+
+  useEffect(() => {
     if (!classId) return;
     const exists = classes.some((item) => String(item?.id) === String(classId));
     if (!exists) {
@@ -155,7 +162,7 @@ export default function LoginDetails() {
             </option>
           ))}
         </select>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ padding: 8 }}>
+        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ padding: 8 }} disabled={role === "staff"}>
           <option value="">All classes</option>
           {classes.map((item) => (
             <option key={item.id} value={item.id}>
@@ -163,7 +170,7 @@ export default function LoginDetails() {
             </option>
           ))}
         </select>
-        <select value={department} onChange={(e) => setDepartment(e.target.value)} style={{ padding: 8 }}>
+        <select value={department} onChange={(e) => setDepartment(e.target.value)} style={{ padding: 8 }} disabled={role === "staff"}>
           <option value="">All departments</option>
           {departments.map((value) => (
             <option key={value} value={value}>
