@@ -256,6 +256,75 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
     }
 
     /**
+     * DELETE /api/school-admin/classes/{class}/subjects/{subject}
+     * Remove subject mapping for the whole class session (all terms in that session).
+     * If subject is no longer mapped anywhere in this school, delete the subject row too.
+     */
+    public function deleteSubjectFromClassSession(Request $request, SchoolClass $class, Subject $subject)
+    {
+        $schoolId = (int) $request->user()->school_id;
+
+        abort_unless((int) $class->school_id === $schoolId, 403);
+        abort_unless((int) $subject->school_id === $schoolId, 403);
+
+        return DB::transaction(function () use ($schoolId, $class, $subject) {
+            $sessionTermIds = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $class->academic_session_id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (empty($sessionTermIds)) {
+                return response()->json([
+                    'message' => 'No terms found for this class session.',
+                ], 422);
+            }
+
+            $termSubjectQuery = TermSubject::query()
+                ->where('class_id', (int) $class->id)
+                ->where('subject_id', (int) $subject->id)
+                ->whereIn('term_id', $sessionTermIds);
+
+            if (Schema::hasColumn('term_subjects', 'school_id')) {
+                $termSubjectQuery->where('school_id', $schoolId);
+            }
+
+            $removedCount = $termSubjectQuery->count();
+            if ($removedCount === 0) {
+                return response()->json([
+                    'message' => 'Subject is not mapped to this class session.',
+                ], 404);
+            }
+
+            // Cascades to dependent rows (results, CBT, materials, etc.) via FK cascade.
+            $termSubjectQuery->delete();
+
+            $subjectStillUsedQuery = TermSubject::query()
+                ->where('subject_id', (int) $subject->id);
+
+            if (Schema::hasColumn('term_subjects', 'school_id')) {
+                $subjectStillUsedQuery->where('school_id', $schoolId);
+            } else {
+                $subjectStillUsedQuery->whereIn('class_id', function ($q) use ($schoolId) {
+                    $q->from('classes')->select('id')->where('school_id', $schoolId);
+                });
+            }
+
+            if (! $subjectStillUsedQuery->exists()) {
+                $subject->delete();
+            }
+
+            return response()->json([
+                'message' => 'Subject deleted from class session successfully.',
+                'meta' => [
+                    'removed_term_subjects' => (int) $removedCount,
+                ],
+            ]);
+        });
+    }
+
+    /**
      * PATCH /api/school-admin/classes/{class}/terms/{term}/subjects/{subject}/assign-teacher
      * Assign a teacher to a subject for a specific class+term
      */

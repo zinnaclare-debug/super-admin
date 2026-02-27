@@ -23,6 +23,7 @@ export default function ClassSubjects() {
   const [editSubjectName, setEditSubjectName] = useState("");
   const [editSubjectCode, setEditSubjectCode] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingSubjectId, setDeletingSubjectId] = useState(null);
 
   const loadTerms = async () => {
     const res = await api.get(`/api/school-admin/classes/${classId}/terms`);
@@ -130,6 +131,25 @@ export default function ClassSubjects() {
     }
   };
 
+  const deleteSubject = async (subject) => {
+    if (!subject?.id) return;
+    const ok = window.confirm(
+      `Delete "${subject.name}" for this class session?\nThis removes it from all terms in this session.`
+    );
+    if (!ok) return;
+
+    setDeletingSubjectId(subject.id);
+    try {
+      const res = await api.delete(`/api/school-admin/classes/${classId}/subjects/${subject.id}`);
+      alert(res.data?.message || "Subject deleted");
+      await loadSubjects(selectedTermId);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to delete subject");
+    } finally {
+      setDeletingSubjectId(null);
+    }
+  };
+
   if (loading) return <p>Loading...</p>;
 
   return (
@@ -184,6 +204,13 @@ export default function ClassSubjects() {
                   CBT
                 </button>
                 <button onClick={() => startEditSubject(s)}>Edit</button>
+                <button
+                  onClick={() => deleteSubject(s)}
+                  disabled={deletingSubjectId === s.id}
+                  style={{ background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
+                >
+                  {deletingSubjectId === s.id ? "Deleting..." : "Delete"}
+                </button>
               </td>
             </tr>
           ))}
