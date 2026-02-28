@@ -14,6 +14,14 @@ const toAbsoluteUrl = (url) => {
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 };
 
+const parseFileName = (headers, fallback = "student_bulk_template.csv") => {
+  const disposition = headers?.["content-disposition"] || headers?.["Content-Disposition"] || "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1]);
+  const plainMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return plainMatch?.[1] || fallback;
+};
+
 export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -43,6 +51,11 @@ export default function Register() {
     department_id: "",
     department_name: "",
   });
+  const [bulkCsv, setBulkCsv] = useState(null);
+  const [bulkPreviewData, setBulkPreviewData] = useState(null);
+  const [bulkPreviewing, setBulkPreviewing] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   const [form, setForm] = useState({
     role: "",
@@ -384,6 +397,76 @@ export default function Register() {
     }
   };
 
+  const downloadBulkTemplate = async () => {
+    try {
+      const res = await api.get("/api/school-admin/register/bulk/template", {
+        responseType: "blob",
+      });
+      const fileName = parseFileName(res.headers, "student_bulk_template.csv");
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err.message ||
+          "Failed to download template"
+      );
+    }
+  };
+
+  const previewBulkCsv = async () => {
+    if (!bulkCsv) return alert("Choose a CSV file first");
+
+    const fd = new FormData();
+    fd.append("csv", bulkCsv);
+
+    setBulkPreviewing(true);
+    setBulkResult(null);
+    try {
+      const res = await api.post("/api/school-admin/register/bulk/preview", fd);
+      setBulkPreviewData(res.data?.data || null);
+    } catch (err) {
+      const responseData = err?.response?.data?.data;
+      if (responseData) {
+        setBulkPreviewData(responseData);
+      }
+      alert(err?.response?.data?.message || err.message || "Bulk preview failed");
+    } finally {
+      setBulkPreviewing(false);
+    }
+  };
+
+  const confirmBulkCsv = async () => {
+    if (!bulkCsv) return alert("Choose a CSV file first");
+
+    const fd = new FormData();
+    fd.append("csv", bulkCsv);
+
+    setBulkImporting(true);
+    try {
+      const res = await api.post("/api/school-admin/register/bulk/confirm", fd);
+      setBulkResult(res.data?.data || null);
+      setBulkPreviewData(null);
+      setBulkCsv(null);
+      alert(res.data?.message || "Bulk student registration completed");
+    } catch (err) {
+      const responseData = err?.response?.data?.data;
+      if (responseData) {
+        setBulkPreviewData(responseData);
+      }
+      alert(err?.response?.data?.message || err.message || "Bulk import failed");
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 720 }}>
       {isEditMode && username && (
@@ -604,6 +687,131 @@ export default function Register() {
               Back
             </button>
           </div>
+        </div>
+      )}
+
+      {!isEditMode && (
+        <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid #e5e7eb" }}>
+          <h3>Bulk Student CSV Upload</h3>
+          <p style={{ marginTop: 4, opacity: 0.8 }}>
+            Use the template. Include password and optional username per row.
+          </p>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button type="button" onClick={downloadBulkTemplate}>
+              Download CSV Template
+            </button>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => {
+                setBulkCsv(e.target.files?.[0] || null);
+                setBulkPreviewData(null);
+                setBulkResult(null);
+              }}
+            />
+            <button type="button" onClick={previewBulkCsv} disabled={!bulkCsv || bulkPreviewing || bulkImporting}>
+              {bulkPreviewing ? "Previewing..." : "Preview CSV"}
+            </button>
+            <button
+              type="button"
+              onClick={confirmBulkCsv}
+              disabled={
+                !bulkCsv ||
+                bulkPreviewing ||
+                bulkImporting ||
+                (bulkPreviewData?.summary?.invalid_rows || 0) > 0 ||
+                (bulkPreviewData?.summary?.valid_rows || 0) === 0
+              }
+            >
+              {bulkImporting ? "Importing..." : "Confirm Import"}
+            </button>
+          </div>
+
+          {bulkPreviewData?.summary && (
+            <p style={{ marginTop: 10 }}>
+              Rows: {bulkPreviewData.summary.total_rows || 0} | Valid:{" "}
+              {bulkPreviewData.summary.valid_rows || 0} | Invalid:{" "}
+              {bulkPreviewData.summary.invalid_rows || 0}
+            </p>
+          )}
+
+          {Array.isArray(bulkPreviewData?.rows) && bulkPreviewData.rows.length > 0 && (
+            <div style={{ marginTop: 8, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Row</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Status</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Name</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Username</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Class</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Errors</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkPreviewData.rows.slice(0, 30).map((row) => (
+                    <tr key={`${row.row_number}-${row.data?.username || row.data?.name || "row"}`}>
+                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.row_number}</td>
+                      <td
+                        style={{
+                          borderBottom: "1px solid #f1f1f1",
+                          padding: "6px",
+                          color: row.status === "valid" ? "#0f766e" : "#b91c1c",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {row.status}
+                      </td>
+                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.data?.name || "-"}</td>
+                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                        {row.data?.username || "-"}
+                      </td>
+                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                        {row.data?.class_name || "-"}
+                      </td>
+                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                        {Array.isArray(row.errors) && row.errors.length > 0 ? row.errors.join(", ") : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {bulkPreviewData.rows.length > 30 && (
+                <p style={{ marginTop: 6, opacity: 0.7 }}>
+                  Showing first 30 rows. Fix errors and re-preview before confirm.
+                </p>
+              )}
+            </div>
+          )}
+
+          {Array.isArray(bulkResult?.credentials) && bulkResult.credentials.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <h4>Imported Login Credentials</h4>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Row</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Name</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Username</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkResult.credentials.map((item) => (
+                      <tr key={`${item.row_number}-${item.username}`}>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{item.row_number}</td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{item.name}</td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{item.username}</td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{item.password}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

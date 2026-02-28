@@ -152,6 +152,12 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     Route::post('/school-admin/register', [RegistrationController::class, 'register'])
         ->middleware('feature:register');
+    Route::get('/school-admin/register/bulk/template', [RegistrationController::class, 'bulkTemplate'])
+        ->middleware('feature:register');
+    Route::post('/school-admin/register/bulk/preview', [RegistrationController::class, 'bulkPreview'])
+        ->middleware('feature:register');
+    Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
+        ->middleware('feature:register');
 
     // ✅ Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
