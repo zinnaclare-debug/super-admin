@@ -466,7 +466,7 @@ class DepartmentTemplateSync
 
     private static function isListOfLevelRows(array $rawTemplates): bool
     {
-        if (array_is_list($rawTemplates) === false) {
+        if (self::isArrayList($rawTemplates) === false) {
             return false;
         }
 
@@ -484,7 +484,7 @@ class DepartmentTemplateSync
 
     private static function isListOfClassRows(array $rawTemplates): bool
     {
-        if (array_is_list($rawTemplates) === false) {
+        if (self::isArrayList($rawTemplates) === false) {
             return false;
         }
 
@@ -502,7 +502,7 @@ class DepartmentTemplateSync
 
     private static function isAssociativeLevelMap(array $rawTemplates): bool
     {
-        if (array_is_list($rawTemplates)) {
+        if (self::isArrayList($rawTemplates)) {
             return false;
         }
 
@@ -518,7 +518,7 @@ class DepartmentTemplateSync
 
     private static function isTemplateNameList(array $rawTemplates): bool
     {
-        if (array_is_list($rawTemplates) === false) {
+        if (self::isArrayList($rawTemplates) === false) {
             return false;
         }
 
@@ -643,5 +643,22 @@ class DepartmentTemplateSync
             ->unique(fn ($name) => strtolower($name))
             ->values()
             ->all();
+    }
+
+    private static function isArrayList(array $value): bool
+    {
+        if (function_exists('array_is_list')) {
+            return array_is_list($value);
+        }
+
+        $expectedKey = 0;
+        foreach ($value as $key => $_) {
+            if ($key !== $expectedKey) {
+                return false;
+            }
+            $expectedKey++;
+        }
+
+        return true;
     }
 }
