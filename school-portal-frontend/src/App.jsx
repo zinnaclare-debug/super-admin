@@ -42,6 +42,7 @@ import ClassTermEnroll from "./pages/school-admin/academics/ClassTermEnroll";
 import AcademicsHome from "./pages/school-admin/academics/AcademicsHome";
 import ClassSubjects from "./pages/school-admin/academics/ClassSubjects";
 import SubjectCbtPublish from "./pages/school-admin/academics/SubjectCbtPublish";
+import SubjectStudents from "./pages/school-admin/academics/SubjectStudents";
 import SchoolAdminPayments from "./pages/school-admin/Payments";
 import Promotion from "./pages/school-admin/Promotion";
 import TeacherReport from "./pages/school-admin/reports/TeacherReport";
@@ -167,6 +168,14 @@ function App() {
 
         <Route path="admin/academics" element={<AcademicsHome />} />
         <Route path="admin/academics/classes/:classId/subjects" element={<ClassSubjects />} />
+        <Route
+          path="admin/academics/classes/:classId/terms/:termId/subjects/:subjectId/students"
+          element={<SubjectStudents />}
+        />
+        <Route
+          path="admin/classes/:classId/terms/:termId/subjects/:subjectId/students"
+          element={<SubjectStudents />}
+        />
         <Route
           path="admin/academics/classes/:classId/terms/:termId/subjects/:subjectId/cbt"
           element={<SubjectCbtPublish />}
