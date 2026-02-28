@@ -1226,8 +1226,8 @@ class ResultsController extends Controller
             $behaviourRowsHtml .= '<tr>';
             for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
                 $trait = $chunk->get($i);
-                $label = strtoupper((string) ($trait['label'] ?? '-'));
-                $value = $trait ? (string) ((int) ($trait['value'] ?? 0)) : '-';
+                $label = strtoupper((string) ($trait['label'] ?? ''));
+                $value = $trait ? (string) ((int) ($trait['value'] ?? 0)) : '';
                 $behaviourRowsHtml .= '<td>' . e($label) . '</td><td style="text-align:center;">' . e($value) . '</td>';
             }
             $behaviourRowsHtml .= '</tr>';
@@ -1262,6 +1262,12 @@ class ResultsController extends Controller
             . '.grid{width:100%;margin-top:8px;}'
             . '.grid td{vertical-align:top;border:0;padding:0;}'
             . '.section-title{font-weight:bold;margin-top:8px;}'
+            . '.footer-container{margin-top:8px;border:1px solid #222;padding:6px;}'
+            . '.info-box{width:100%;border-collapse:collapse;margin-top:4px;}'
+            . '.info-box:first-child{margin-top:0;}'
+            . '.info-box th,.info-box td{border:1px solid #222;padding:5px 6px;}'
+            . '.info-box th{background:#f3f4f6;text-align:left;width:28%;}'
+            . '.signature-only{border:1px solid #222;min-height:126px;display:flex;align-items:center;justify-content:center;padding:6px;text-align:center;}'
             . '</style></head><body><div class="sheet">' . $watermarkBlock . '<div class="content">'
             . '<table class="grid"><tr><td style="width:80px;">' . $studentPhotoBlock . '</td><td>'
             . '<h1>' . e($schoolName) . '</h1>'
@@ -1289,19 +1295,16 @@ class ResultsController extends Controller
             . '</tbody></table>'
             . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
             . '<td style="width:82%;">5 - EXCELLENT | 4 - VERY GOOD | 3 - SATISFACTORY | 2 - POOR | 1 - VERY POOR</td></tr></table>'
-            . '<table class="grid"><tr><td style="width:74%;">'
-            . '<table class="meta" style="margin-top:0;">'
-            . '<tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
-            . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
-            . '<tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr>'
-            . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
-            . '</table>'
+            . '<div class="footer-container">'
+            . '<table class="grid" style="margin-top:0;"><tr><td style="width:74%;">'
+            . '<table class="info-box"><tr><th>School Head Name</th><td>' . e($headName) . '</td></tr></table>'
+            . '<table class="info-box"><tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr></table>'
+            . '<table class="info-box"><tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr></table>'
+            . '<table class="info-box"><tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr></table>'
             . '</td><td style="width:2%;"></td><td style="width:24%;">'
-            . '<table class="meta" style="margin-top:0;">'
-            . '<tr><th>School Head Signature</th></tr>'
-            . '<tr><td style="text-align:center;">' . $signatureBlock . '</td></tr>'
-            . '</table>'
+            . '<div class="signature-only">' . $signatureBlock . '</div>'
             . '</td></tr></table>'
+            . '</div>'
             . '</div></div></body></html>';
 
         return $this->renderPdfFromHtml($html);

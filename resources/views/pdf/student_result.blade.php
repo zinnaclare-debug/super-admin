@@ -133,6 +133,11 @@
             font-size: 10px;
             letter-spacing: 0.2px;
         }
+        .footer-container {
+            margin-top: 8px;
+            border: 1px solid #111;
+            padding: 6px;
+        }
         .comment-layout {
             margin-top: 8px;
             width: 100%;
@@ -156,6 +161,33 @@
             text-align: left;
         }
         .signature-panel td {
+            text-align: center;
+        }
+        .info-box {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+        }
+        .info-box:first-child {
+            margin-top: 0;
+        }
+        .info-box th,
+        .info-box td {
+            border: 1px solid #111;
+            padding: 5px 6px;
+        }
+        .info-box th {
+            background: #f3f4f6;
+            text-align: left;
+            width: 28%;
+        }
+        .signature-only {
+            border: 1px solid #111;
+            min-height: 126px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
             text-align: center;
         }
     </style>
@@ -313,8 +345,8 @@
                     <tr>
                         @for($i = 0; $i < $traitPerRow; $i++)
                             @php($trait = $rowTraits->get($i))
-                            <td>{{ strtoupper((string)($trait['label'] ?? '-')) }}</td>
-                            <td class="rate">{{ $trait['value'] ?? '-' }}</td>
+                            <td>{{ strtoupper((string)($trait['label'] ?? '')) }}</td>
+                            <td class="rate">{{ $trait['value'] ?? '' }}</td>
                         @endfor
                     </tr>
                 @endforeach
@@ -329,47 +361,48 @@
             &nbsp;&nbsp;&nbsp; 1 - VERY POOR
         </div>
 
-        <table class="comment-layout">
-            <tr>
-                <td style="width: 74%;">
-                    <table class="comment">
-                        <tr>
-                            <th style="width: 28%;">School Head Name</th>
-                            <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
-                        </tr>
-                        <tr>
-                            <th>School Head Comment</th>
-                            <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Class Teacher Name</th>
-                            <td>{{ strtoupper($classTeacher?->name ?? '-') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Class Teacher Comment</th>
-                            <td>{{ strtoupper($teacherComment ?? '-') }}</td>
-                        </tr>
-                    </table>
-                </td>
-                <td style="width: 2%;"></td>
-                <td style="width: 24%;">
-                    <table class="signature-panel">
-                        <tr>
-                            <th>School Head Signature</th>
-                        </tr>
-                        <tr>
-                            <td>
-                                @if($headSignatureDataUri)
-                                    <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
-                                @else
-                                    <div class="signature-placeholder"></div>
-                                @endif
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
+        <div class="footer-container">
+            <table class="comment-layout" style="margin-top: 0;">
+                <tr>
+                    <td style="width: 74%;">
+                        <table class="info-box">
+                            <tr>
+                                <th>School Head Name</th>
+                                <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
+                            </tr>
+                        </table>
+                        <table class="info-box">
+                            <tr>
+                                <th>School Head Comment</th>
+                                <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
+                            </tr>
+                        </table>
+                        <table class="info-box">
+                            <tr>
+                                <th>Class Teacher Name</th>
+                                <td>{{ strtoupper($classTeacher?->name ?? '-') }}</td>
+                            </tr>
+                        </table>
+                        <table class="info-box">
+                            <tr>
+                                <th>Class Teacher Comment</th>
+                                <td>{{ strtoupper($teacherComment ?? '-') }}</td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td style="width: 2%;"></td>
+                    <td style="width: 24%;">
+                        <div class="signature-only">
+                            @if($headSignatureDataUri)
+                                <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
+                            @else
+                                <div class="signature-placeholder"></div>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
     </div>
 </div>
 @if(!$embedded)
