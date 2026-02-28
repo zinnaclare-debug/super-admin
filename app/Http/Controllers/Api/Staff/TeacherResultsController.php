@@ -12,6 +12,7 @@ use App\Models\TermSubject;
 use App\Support\AssessmentSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class TeacherResultsController extends Controller
@@ -87,7 +88,7 @@ class TeacherResultsController extends Controller
       ->first();
 
     // students enrolled in the same class + term
-    $rows = Enrollment::query()
+    $rowsQuery = Enrollment::query()
       ->where('enrollments.class_id', $termSubject->class_id)
       ->where('enrollments.term_id', $termSubject->term_id)
       ->join('students', 'students.id', '=', 'enrollments.student_id')
@@ -96,6 +97,16 @@ class TeacherResultsController extends Controller
         $join->on('results.student_id', '=', 'students.id')
           ->where('results.term_subject_id', '=', $termSubject->id);
       })
+      ->when(Schema::hasTable('student_subject_exclusions'), function ($query) use ($schoolId, $termSubject, $session) {
+        $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
+          $join->on('student_subject_exclusions.student_id', '=', 'students.id')
+            ->where('student_subject_exclusions.school_id', '=', $schoolId)
+            ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+            ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
+            ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
+        })
+        ->whereNull('student_subject_exclusions.id');
+      })
       ->select([
         'students.id as student_id',
         'users.name as student_name',
@@ -103,7 +114,13 @@ class TeacherResultsController extends Controller
         'results.ca_breakdown',
         DB::raw('COALESCE(results.exam, 0) as exam'),
       ])
-      ->orderBy('users.name')
+      ->orderBy('users.name');
+
+    if (Schema::hasColumn('enrollments', 'school_id')) {
+      $rowsQuery->where('enrollments.school_id', $schoolId);
+    }
+
+    $rows = $rowsQuery
       ->get()
       ->map(function ($r) use ($assessmentSchema) {
         $caBreakdown = AssessmentSchema::normalizeBreakdown(
@@ -168,6 +185,29 @@ class TeacherResultsController extends Controller
       'scores.*.exam' => 'required|integer|min:0|max:100',
     ]);
 
+    $eligibleStudentIdsQuery = Enrollment::query()
+      ->where('class_id', $termSubject->class_id)
+      ->where('term_id', $termSubject->term_id)
+      ->select('student_id');
+    if (Schema::hasColumn('enrollments', 'school_id')) {
+      $eligibleStudentIdsQuery->where('school_id', $schoolId);
+    }
+    if (Schema::hasTable('student_subject_exclusions')) {
+      $eligibleStudentIdsQuery->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
+        $join->on('student_subject_exclusions.student_id', '=', 'enrollments.student_id')
+          ->where('student_subject_exclusions.school_id', '=', $schoolId)
+          ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+          ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
+          ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
+      })
+      ->whereNull('student_subject_exclusions.id');
+    }
+    $eligibleStudentIds = $eligibleStudentIdsQuery
+      ->distinct()
+      ->pluck('student_id')
+      ->map(fn ($id) => (int) $id)
+      ->all();
+
     $preparedScores = [];
     $errors = [];
 
@@ -193,6 +233,13 @@ class TeacherResultsController extends Controller
       $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $assessmentSchema, $legacyCa);
       $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
       $exam = (int) ($score['exam'] ?? 0);
+      $studentId = (int) $score['student_id'];
+
+      if (!in_array($studentId, $eligibleStudentIds, true)) {
+        $errors["scores.$idx.student_id"] = [
+          'Student is not eligible for this subject in the current term.',
+        ];
+      }
 
       if ($exam > $examMax) {
         $errors["scores.$idx.exam"] = [
@@ -207,7 +254,7 @@ class TeacherResultsController extends Controller
       }
 
       $preparedScores[] = [
-        'student_id' => (int) $score['student_id'],
+        'student_id' => $studentId,
         'ca' => $caTotal,
         'ca_breakdown' => $caBreakdown,
         'exam' => $exam,

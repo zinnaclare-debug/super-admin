@@ -264,7 +264,11 @@ export default function StudentResult() {
           <div className="student-result-entry-head">
             <h3>{entry.term?.name || "Term Result"}</h3>
             <p>
-              {entry.class?.name || "-"} | Average: {Number(entry.summary?.average_score || 0).toFixed(2)} | Grade:{" "}
+              {entry.class?.name || "-"} | Average:{" "}
+              {entry.summary?.average_score === null || entry.summary?.average_score === undefined
+                ? "-"
+                : Number(entry.summary?.average_score || 0).toFixed(2)}{" "}
+              | Grade:{" "}
               {entry.summary?.overall_grade || "-"}
             </p>
           </div>

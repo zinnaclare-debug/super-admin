@@ -265,7 +265,7 @@
                 <th>GENDER</th>
                 <td>{{ strtoupper((string)($student?->sex ?? '-')) }}</td>
                 <th>AVERAGE</th>
-                <td>{{ number_format((float) $averageScore, 2) }}</td>
+                <td>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</td>
             </tr>
             <tr>
                 <th>TIMES PRESENT</th>
@@ -299,7 +299,8 @@
                     <tr>
                         <td>{{ strtoupper($row['subject_name']) }}</td>
                         @foreach($activeCaIndices as $index)
-                            <td class="center">{{ (int) (($row['ca_breakdown'][$index] ?? 0)) }}</td>
+                            @php($caValue = $row['ca_breakdown'][$index] ?? null)
+                            <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : (int) $caValue }}</td>
                         @endforeach
                         <td class="center">{{ $row['exam'] }}</td>
                         <td class="center">{{ $row['total'] }}</td>

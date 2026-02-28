@@ -285,19 +285,24 @@ class ResultsController extends Controller
             $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
 
             $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $totalScore = (int) collect($rows)->sum('total');
-            $subjectCount = max(1, count($rows));
-            $averageScore = (float) round($totalScore / $subjectCount, 2);
-            $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+            $summary = $this->summarizeRows($rows);
+            $totalScore = $summary['total_score'];
+            $averageScore = $summary['average_score'];
+            $overallGrade = $summary['overall_grade'];
+            $averageDisplay = $summary['average_display'];
 
             $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             if ($teacherComment === '') {
                 $teacherComment = (string) ($attendance?->comment ?? '');
             }
             if ($teacherComment === '') {
-                $teacherComment = $this->defaultTeacherComment($overallGrade);
+                $teacherComment = $overallGrade !== '-'
+                    ? $this->defaultTeacherComment($overallGrade)
+                    : 'No graded subject available yet.';
             }
-            $schoolHeadComment = $this->defaultHeadComment($overallGrade);
+            $schoolHeadComment = $overallGrade !== '-'
+                ? $this->defaultHeadComment($overallGrade)
+                : 'No graded subject available yet.';
 
             $behaviourTraits = [
                 ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
@@ -319,6 +324,7 @@ class ResultsController extends Controller
                 'rows' => $rows,
                 'totalScore' => $totalScore,
                 'averageScore' => $averageScore,
+                'averageDisplay' => $averageDisplay,
                 'overallGrade' => $overallGrade,
                 'attendance' => $attendance,
                 'attendanceSetting' => $attendanceSetting,
@@ -563,10 +569,10 @@ class ResultsController extends Controller
 
         $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
         $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-        $totalScore = (int) collect($rows)->sum('total');
-        $subjectCount = max(1, count($rows));
-        $averageScore = (float) round($totalScore / $subjectCount, 2);
-        $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+        $summary = $this->summarizeRows($rows);
+        $totalScore = $summary['total_score'];
+        $averageScore = $summary['average_score'];
+        $overallGrade = $summary['overall_grade'];
 
         return response()->json([
             'data' => [[
@@ -587,8 +593,9 @@ class ResultsController extends Controller
                 ],
                 'summary' => [
                     'subjects_count' => count($rows),
+                    'graded_subjects_count' => $summary['graded_subjects_count'],
                     'total_score' => $totalScore,
-                    'average_score' => $averageScore,
+                    'average_score' => $summary['graded_subjects_count'] > 0 ? $averageScore : null,
                     'overall_grade' => $overallGrade,
                 ],
                 'rows' => $rows,
@@ -761,19 +768,24 @@ class ResultsController extends Controller
             $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
             $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $totalScore = (int) collect($rows)->sum('total');
-            $subjectCount = max(1, count($rows));
-            $averageScore = (float) round($totalScore / $subjectCount, 2);
-            $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+            $summary = $this->summarizeRows($rows);
+            $totalScore = $summary['total_score'];
+            $averageScore = $summary['average_score'];
+            $overallGrade = $summary['overall_grade'];
+            $averageDisplay = $summary['average_display'];
 
             $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             if ($teacherComment === '') {
                 $teacherComment = (string) ($attendance?->comment ?? '');
             }
             if ($teacherComment === '') {
-                $teacherComment = $this->defaultTeacherComment($overallGrade);
+                $teacherComment = $overallGrade !== '-'
+                    ? $this->defaultTeacherComment($overallGrade)
+                    : 'No graded subject available yet.';
             }
-            $schoolHeadComment = $this->defaultHeadComment($overallGrade);
+            $schoolHeadComment = $overallGrade !== '-'
+                ? $this->defaultHeadComment($overallGrade)
+                : 'No graded subject available yet.';
 
             $behaviourTraits = [
                 ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
@@ -795,6 +807,7 @@ class ResultsController extends Controller
                 'rows' => $rows,
                 'totalScore' => $totalScore,
                 'averageScore' => $averageScore,
+                'averageDisplay' => $averageDisplay,
                 'overallGrade' => $overallGrade,
                 'attendance' => $attendance,
                 'attendanceSetting' => $attendanceSetting,
@@ -888,12 +901,27 @@ class ResultsController extends Controller
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
         $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+        $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $subjects = TermSubject::query()
             ->where('term_subjects.school_id', $schoolId)
             ->where('term_subjects.class_id', $classId)
             ->where('term_subjects.term_id', $termId)
             ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->when(
+                $termSessionId > 0 && Schema::hasTable('student_subject_exclusions'),
+                function ($query) use ($schoolId, $classId, $studentId, $termSessionId) {
+                    $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $classId, $studentId, $termSessionId) {
+                        $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                            ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                            ->where('student_subject_exclusions.school_id', '=', $schoolId)
+                            ->where('student_subject_exclusions.academic_session_id', '=', $termSessionId)
+                            ->where('student_subject_exclusions.class_id', '=', $classId)
+                            ->where('student_subject_exclusions.student_id', '=', $studentId);
+                    })
+                    ->whereNull('student_subject_exclusions.id');
+                }
+            )
             ->leftJoin('results', function ($join) use ($studentId) {
                 $join->on('results.term_subject_id', '=', 'term_subjects.id')
                     ->where('results.student_id', '=', $studentId);
@@ -902,6 +930,7 @@ class ResultsController extends Controller
                 'term_subjects.id as term_subject_id',
                 'subjects.name as subject_name',
                 'subjects.code as subject_code',
+                'results.id as result_id',
                 'results.student_id as result_student_id',
                 'results.ca',
                 'results.ca_breakdown',
@@ -915,25 +944,41 @@ class ResultsController extends Controller
 
         return $subjects
             ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema) {
-                $caBreakdown = AssessmentSchema::normalizeBreakdown(
-                    $r->ca_breakdown ?? null,
-                    $assessmentSchema,
-                    (int) ($r->ca ?? 0)
-                );
-                $ca = AssessmentSchema::breakdownTotal($caBreakdown);
-                $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
-                $total = $ca + $exam;
+                $isGraded = !is_null($r->result_id) && !is_null($r->result_student_id);
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
-                $position = $stats['positions'][$studentId] ?? null;
+                $position = $isGraded ? ($stats['positions'][$studentId] ?? null) : null;
+
+                if ($isGraded) {
+                    $caBreakdown = AssessmentSchema::normalizeBreakdown(
+                        $r->ca_breakdown ?? null,
+                        $assessmentSchema,
+                        (int) ($r->ca ?? 0)
+                    );
+                    $ca = AssessmentSchema::breakdownTotal($caBreakdown);
+                    $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
+                    $total = $ca + $exam;
+                    $grade = $this->gradeFromTotal($total);
+                    $remark = $this->remarkFromTotal($total);
+                    $caBreakdownText = AssessmentSchema::formatBreakdown($caBreakdown, $assessmentSchema);
+                } else {
+                    $caBreakdown = array_fill(0, 5, null);
+                    $ca = '-';
+                    $exam = '-';
+                    $total = '-';
+                    $grade = '-';
+                    $remark = '-';
+                    $caBreakdownText = '-';
+                }
 
                 return [
                     'term_subject_id' => $termSubjectId,
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
+                    'is_graded' => $isGraded,
                     'ca' => $ca,
                     'ca_breakdown' => $caBreakdown,
-                    'ca_breakdown_text' => AssessmentSchema::formatBreakdown($caBreakdown, $assessmentSchema),
+                    'ca_breakdown_text' => $caBreakdownText,
                     'exam' => $exam,
                     'total' => $total,
                     'min_score' => $stats['min_score'] ?? 0,
@@ -941,8 +986,8 @@ class ResultsController extends Controller
                     'class_average' => $stats['class_average'] ?? 0,
                     'position' => $position,
                     'position_label' => $position ? $this->ordinalPosition($position) : '-',
-                    'grade' => $this->gradeFromTotal($total),
-                    'remark' => $this->remarkFromTotal($total),
+                    'grade' => $grade,
+                    'remark' => $remark,
                 ];
             })
             ->values()
@@ -955,10 +1000,26 @@ class ResultsController extends Controller
             return [];
         }
 
-        $rows = DB::table('results')
-            ->where('school_id', $schoolId)
-            ->whereIn('term_subject_id', $termSubjectIds)
-            ->select(['term_subject_id', 'student_id', 'ca', 'exam'])
+        $rowsQuery = DB::table('results')
+            ->where('results.school_id', $schoolId)
+            ->whereIn('results.term_subject_id', $termSubjectIds);
+
+        if (Schema::hasTable('student_subject_exclusions')) {
+            $rowsQuery
+                ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+                ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+                ->leftJoin('student_subject_exclusions', function ($join) use ($schoolId) {
+                    $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                        ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                        ->on('student_subject_exclusions.student_id', '=', 'results.student_id')
+                        ->on('student_subject_exclusions.academic_session_id', '=', 'terms.academic_session_id')
+                        ->where('student_subject_exclusions.school_id', '=', $schoolId);
+                })
+                ->whereNull('student_subject_exclusions.id');
+        }
+
+        $rows = $rowsQuery
+            ->select(['results.term_subject_id', 'results.student_id', 'results.ca', 'results.exam'])
             ->get();
 
         $grouped = $rows->groupBy(fn ($r) => (int) $r->term_subject_id);
@@ -1010,6 +1071,29 @@ class ResultsController extends Controller
         }
 
         return $stats;
+    }
+
+    private function summarizeRows(array $rows): array
+    {
+        $gradedRows = collect($rows)
+            ->filter(fn ($row) => (bool) ($row['is_graded'] ?? false))
+            ->values();
+
+        $gradedCount = $gradedRows->count();
+        $totalScore = (int) $gradedRows->sum(fn ($row) => (int) ($row['total'] ?? 0));
+        $averageScore = $gradedCount > 0
+            ? (float) round($totalScore / $gradedCount, 2)
+            : 0.0;
+
+        return [
+            'graded_subjects_count' => $gradedCount,
+            'total_score' => $totalScore,
+            'average_score' => $averageScore,
+            'average_display' => $gradedCount > 0 ? number_format($averageScore, 2) : '-',
+            'overall_grade' => $gradedCount > 0
+                ? $this->gradeFromTotal((int) round($averageScore))
+                : '-',
+        ];
     }
 
     private function assessmentSchemaForSchool(int $schoolId): array
@@ -1152,7 +1236,11 @@ class ResultsController extends Controller
         $teacherComment = strtoupper((string) data_get($viewData, 'teacherComment', '-'));
         $headComment = strtoupper((string) data_get($viewData, 'schoolHeadComment', '-'));
         $classTeacherName = strtoupper((string) data_get($viewData, 'classTeacher.name', '-'));
-        $average = number_format((float) data_get($viewData, 'averageScore', 0), 2);
+        $average = (string) data_get(
+            $viewData,
+            'averageDisplay',
+            number_format((float) data_get($viewData, 'averageScore', 0), 2)
+        );
         $total = (int) data_get($viewData, 'totalScore', 0);
         $schoolLogoDataUri = (string) data_get($viewData, 'schoolLogoDataUri', '');
         $studentPhotoDataUri = (string) data_get($viewData, 'studentPhotoDataUri', '');
@@ -1189,13 +1277,16 @@ class ResultsController extends Controller
         $rowsHtml = '';
         foreach ((array) data_get($viewData, 'rows', []) as $row) {
             $subject = strtoupper((string) ($row['subject_name'] ?? '-'));
-            $exam = (int) ($row['exam'] ?? 0);
-            $score = (int) ($row['total'] ?? 0);
+            $exam = $row['exam'] ?? '-';
+            $score = $row['total'] ?? '-';
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
             $caCellsHtml = '';
             foreach ($activeCaIndices as $index) {
-                $caCellsHtml .= '<td style="text-align:center;">' . (int) ($row['ca_breakdown'][$index] ?? 0) . '</td>';
+                $caValue = $row['ca_breakdown'][$index] ?? null;
+                $caCellsHtml .= '<td style="text-align:center;">'
+                    . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
+                    . '</td>';
             }
 
             $rowsHtml .= '<tr>'

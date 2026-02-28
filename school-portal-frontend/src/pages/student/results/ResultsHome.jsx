@@ -37,6 +37,13 @@ const activeCaIndices = (schema) => {
   return indices.length ? indices : [0];
 };
 
+const displayScore = (value) => {
+  if (value === null || value === undefined || value === "") return "-";
+  if (value === "-") return "-";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : "-";
+};
+
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
@@ -261,12 +268,12 @@ export default function StudentResultsHome() {
                         <td>{row.subject_name}</td>
                         {caIndices.map((caIdx) => (
                           <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
-                            {Number(row.ca_breakdown?.[caIdx] || 0)}
+                            {displayScore(row.ca_breakdown?.[caIdx])}
                           </td>
                         ))}
-                        <td>{row.ca}</td>
-                        <td>{row.exam}</td>
-                        <td>{row.total}</td>
+                        <td>{displayScore(row.ca)}</td>
+                        <td>{displayScore(row.exam)}</td>
+                        <td>{displayScore(row.total)}</td>
                         <td>{row.grade}</td>
                       </tr>
                     ))}

@@ -112,6 +112,16 @@ class ELibraryController extends Controller
             ->where('term_subjects.term_id', $currentTermId)
             ->whereIn('term_subjects.class_id', $classIds)
             ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->when(Schema::hasTable('student_subject_exclusions'), function ($query) use ($schoolId, $session, $student) {
+                $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $session, $student) {
+                    $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                        ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                        ->where('student_subject_exclusions.school_id', '=', $schoolId)
+                        ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+                        ->where('student_subject_exclusions.student_id', '=', (int) $student->id);
+                })
+                ->whereNull('student_subject_exclusions.id');
+            })
             ->orderBy('subjects.name')
             ->get([
                 'term_subjects.id as term_subject_id',
@@ -156,6 +166,16 @@ class ELibraryController extends Controller
             ->where('school_id', $schoolId)
             ->where('term_id', $currentTermId)
             ->whereIn('class_id', $classIds)
+            ->when(Schema::hasTable('student_subject_exclusions'), function ($query) use ($schoolId, $session, $student) {
+                $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $session, $student) {
+                    $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                        ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                        ->where('student_subject_exclusions.school_id', '=', $schoolId)
+                        ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+                        ->where('student_subject_exclusions.student_id', '=', (int) $student->id);
+                })
+                ->whereNull('student_subject_exclusions.id');
+            })
             ->pluck('id')
             ->toArray();
 

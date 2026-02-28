@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\CbtExam;
 use App\Models\CbtExamQuestion;
+use App\Models\Enrollment;
 use App\Models\SchoolClass;
+use App\Models\Student;
+use App\Models\StudentSubjectExclusion;
 use App\Models\Term;
 use App\Models\Subject;
 use App\Models\TermSubject;
@@ -390,6 +393,231 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
 
     return response()->json(['message' => 'Teacher unassigned for all terms in this session']);
 }
+
+    /**
+     * GET /api/school-admin/classes/{class}/terms/{term}/subjects/{subject}/students
+     * List students in class+term and whether they currently offer this subject.
+     */
+    public function subjectStudents(Request $request, SchoolClass $class, Term $term, Subject $subject)
+    {
+        $schoolId = (int) $request->user()->school_id;
+
+        abort_unless((int) $class->school_id === $schoolId, 403);
+        abort_unless((int) $term->school_id === $schoolId, 403);
+        abort_unless((int) $subject->school_id === $schoolId, 403);
+        abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
+
+        if (!Schema::hasTable('student_subject_exclusions')) {
+            return response()->json([
+                'message' => 'Student subject exclusions table is missing. Run migrations first.',
+            ], 422);
+        }
+
+        $termSubject = TermSubject::query()
+            ->where('class_id', (int) $class->id)
+            ->where('term_id', (int) $term->id)
+            ->where('subject_id', (int) $subject->id)
+            ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
+                $query->where('school_id', $schoolId);
+            })
+            ->first();
+
+        if (!$termSubject) {
+            return response()->json([
+                'message' => 'Subject is not mapped to the selected class and term.',
+            ], 404);
+        }
+
+        $studentQuery = Enrollment::query()
+            ->join('students', 'students.id', '=', 'enrollments.student_id')
+            ->join('users', 'users.id', '=', 'students.user_id')
+            ->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id')
+            ->where('enrollments.class_id', (int) $class->id)
+            ->where('enrollments.term_id', (int) $term->id)
+            ->where('students.school_id', $schoolId)
+            ->select([
+                'students.id as student_id',
+                'users.name as student_name',
+                'users.username as student_username',
+                'class_departments.name as department_name',
+            ])
+            ->distinct()
+            ->orderBy('users.name');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $studentQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $students = $studentQuery->get();
+        $studentIds = $students->pluck('student_id')->map(fn ($id) => (int) $id)->all();
+
+        $excludedStudentIds = [];
+        if (!empty($studentIds)) {
+            $excludedStudentIds = StudentSubjectExclusion::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $class->academic_session_id)
+                ->where('class_id', (int) $class->id)
+                ->where('subject_id', (int) $subject->id)
+                ->whereIn('student_id', $studentIds)
+                ->pluck('student_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        return response()->json([
+            'data' => $students->map(function ($student) use ($excludedStudentIds) {
+                $studentId = (int) $student->student_id;
+                $offering = !in_array($studentId, $excludedStudentIds, true);
+
+                return [
+                    'student_id' => $studentId,
+                    'student_name' => (string) $student->student_name,
+                    'student_username' => (string) $student->student_username,
+                    'department_name' => $student->department_name,
+                    'offering' => $offering,
+                ];
+            })->values()->all(),
+            'meta' => [
+                'class_id' => (int) $class->id,
+                'class_name' => (string) $class->name,
+                'term_id' => (int) $term->id,
+                'term_name' => (string) $term->name,
+                'subject_id' => (int) $subject->id,
+                'subject_name' => (string) $subject->name,
+            ],
+        ]);
+    }
+
+    /**
+     * PATCH /api/school-admin/classes/{class}/terms/{term}/subjects/{subject}/students/{student}/offering
+     * Toggle if a student offers this subject for the whole class session.
+     */
+    public function setStudentSubjectOffering(
+        Request $request,
+        SchoolClass $class,
+        Term $term,
+        Subject $subject,
+        Student $student
+    ) {
+        $schoolId = (int) $request->user()->school_id;
+
+        abort_unless((int) $class->school_id === $schoolId, 403);
+        abort_unless((int) $term->school_id === $schoolId, 403);
+        abort_unless((int) $subject->school_id === $schoolId, 403);
+        abort_unless((int) $student->school_id === $schoolId, 403);
+        abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
+
+        if (!Schema::hasTable('student_subject_exclusions')) {
+            return response()->json([
+                'message' => 'Student subject exclusions table is missing. Run migrations first.',
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'offering' => 'required|boolean',
+        ]);
+        $offering = (bool) $payload['offering'];
+
+        $isEnrolledQuery = Enrollment::query()
+            ->where('class_id', (int) $class->id)
+            ->where('term_id', (int) $term->id)
+            ->where('student_id', (int) $student->id);
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $isEnrolledQuery->where('school_id', $schoolId);
+        }
+
+        $isEnrolled = $isEnrolledQuery->exists();
+        $isInClassSession = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $class->academic_session_id)
+            ->where('class_id', (int) $class->id)
+            ->where('student_id', (int) $student->id)
+            ->exists();
+
+        if (!$isEnrolled && !$isInClassSession) {
+            return response()->json([
+                'message' => 'Student is not assigned to the selected class/session.',
+            ], 422);
+        }
+
+        $termSubjectIds = $this->sessionTermSubjectIds($schoolId, $class, $subject);
+        if (empty($termSubjectIds)) {
+            return response()->json([
+                'message' => 'Subject is not mapped for this class session.',
+            ], 404);
+        }
+
+        $deletedResults = 0;
+        DB::transaction(function () use (
+            $offering,
+            $schoolId,
+            $class,
+            $subject,
+            $student,
+            $termSubjectIds,
+            &$deletedResults
+        ) {
+            if ($offering) {
+                StudentSubjectExclusion::query()
+                    ->where('school_id', $schoolId)
+                    ->where('academic_session_id', (int) $class->academic_session_id)
+                    ->where('class_id', (int) $class->id)
+                    ->where('subject_id', (int) $subject->id)
+                    ->where('student_id', (int) $student->id)
+                    ->delete();
+                return;
+            }
+
+            StudentSubjectExclusion::query()->updateOrCreate([
+                'school_id' => $schoolId,
+                'academic_session_id' => (int) $class->academic_session_id,
+                'class_id' => (int) $class->id,
+                'subject_id' => (int) $subject->id,
+                'student_id' => (int) $student->id,
+            ], []);
+
+            $deletedResults = DB::table('results')
+                ->where('school_id', $schoolId)
+                ->where('student_id', (int) $student->id)
+                ->whereIn('term_subject_id', $termSubjectIds)
+                ->delete();
+        });
+
+        return response()->json([
+            'message' => $offering
+                ? 'Student restored to this subject for the class session.'
+                : 'Student removed from this subject for the class session.',
+            'meta' => [
+                'offering' => $offering,
+                'deleted_results' => (int) $deletedResults,
+            ],
+        ]);
+    }
+
+    private function sessionTermSubjectIds(int $schoolId, SchoolClass $class, Subject $subject): array
+    {
+        $sessionTermIds = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $class->academic_session_id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($sessionTermIds)) {
+            return [];
+        }
+
+        return TermSubject::query()
+            ->where('class_id', (int) $class->id)
+            ->where('subject_id', (int) $subject->id)
+            ->whereIn('term_id', $sessionTermIds)
+            ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
+                $query->where('school_id', $schoolId);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
 
     /**
      * GET /api/school-admin/classes/{class}/terms/{term}/subjects/{subject}/cbt-exams

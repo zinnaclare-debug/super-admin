@@ -297,6 +297,10 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     Route::get('/school-admin/classes/{class}/terms/{term}/subjects', [AcademicsController::class, 'termSubjects'])
         ->middleware('feature:academics');
+    Route::get('/school-admin/classes/{class}/terms/{term}/subjects/{subject}/students', [AcademicsController::class, 'subjectStudents'])
+        ->middleware('feature:academics');
+    Route::patch('/school-admin/classes/{class}/terms/{term}/subjects/{subject}/students/{student}/offering', [AcademicsController::class, 'setStudentSubjectOffering'])
+        ->middleware('feature:academics');
 
     Route::post('/school-admin/classes/{class}/subjects', [AcademicsController::class, 'createSubjects'])
         ->middleware('feature:academics');
