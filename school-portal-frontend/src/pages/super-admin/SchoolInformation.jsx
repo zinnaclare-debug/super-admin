@@ -356,7 +356,11 @@ export default function SchoolInformation() {
         if (idx !== sectionIndex) return section;
         const classes = Array.isArray(section.classes) ? [...section.classes] : [];
         const current = normalizeClassRow(classes[classIndex]);
-        classes[classIndex] = { ...current, department_input: value };
+        classes[classIndex] = {
+          ...current,
+          department_input: value,
+          department_enabled: String(value || "").trim() !== "" ? true : current.department_enabled,
+        };
         return { ...section, classes };
       })
     );
@@ -652,7 +656,7 @@ export default function SchoolInformation() {
                           value={classRow.department_input}
                           onChange={(e) => updateClassDepartmentInput(sectionIndex, classIndex, e.target.value)}
                           placeholder="Gold, Diamond, Silver"
-                          disabled={!section.enabled || !classRow.enabled || !classRow.department_enabled}
+                          disabled={!section.enabled || !classRow.enabled}
                         />
                       </div>
                     );
