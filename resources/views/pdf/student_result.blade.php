@@ -9,7 +9,7 @@
     <style>
         @page { margin: 18px; }
         body {
-            font-family: DejaVu Sans, Arial, sans-serif;
+            font-family: Arial, Helvetica, DejaVu Sans, sans-serif;
             font-size: 7px;
             color: #111827;
         }
@@ -116,6 +116,47 @@
             width: 130px;
             height: 48px;
             border-bottom: 1px dashed #6b7280;
+        }
+        .psycho-horizontal th,
+        .psycho-horizontal td {
+            text-align: left;
+        }
+        .psycho-horizontal th.rate,
+        .psycho-horizontal td.rate {
+            text-align: center;
+        }
+        .key-rating-line {
+            margin-top: 0;
+            border: 1px solid #111;
+            border-top: 0;
+            padding: 4px 6px;
+            font-size: 10px;
+            letter-spacing: 0.2px;
+        }
+        .comment-layout {
+            margin-top: 8px;
+            width: 100%;
+        }
+        .comment-layout td {
+            border: 0;
+            padding: 0;
+            vertical-align: top;
+        }
+        .signature-panel {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .signature-panel th,
+        .signature-panel td {
+            border: 1px solid #111;
+            padding: 4px 6px;
+        }
+        .signature-panel th {
+            background: #f3f4f6;
+            text-align: left;
+        }
+        .signature-panel td {
+            text-align: center;
         }
     </style>
 @if(!$embedded)
@@ -251,74 +292,84 @@
             F [0-29]
         </div>
 
-        <table class="psycho-grid">
+        @php
+            $traitPerRow = 5;
+            $traitRows = collect($behaviourTraits ?? [])->values()->chunk($traitPerRow);
+            if ($traitRows->isEmpty()) {
+                $traitRows = collect([collect()]);
+            }
+        @endphp
+        <table class="psycho psycho-horizontal" style="margin-top: 8px;">
+            <thead>
+                <tr>
+                    @for($i = 0; $i < $traitPerRow; $i++)
+                        <th style="width: 16%;">PSYCHOMOTOR</th>
+                        <th class="rate" style="width: 4%;">RATE</th>
+                    @endfor
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($traitRows as $rowTraits)
+                    <tr>
+                        @for($i = 0; $i < $traitPerRow; $i++)
+                            @php($trait = $rowTraits->get($i))
+                            <td>{{ strtoupper((string)($trait['label'] ?? '-')) }}</td>
+                            <td class="rate">{{ $trait['value'] ?? '-' }}</td>
+                        @endfor
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+        <div class="key-rating-line">
+            <strong>KEY RATING:</strong>
+            5 - EXCELLENT
+            &nbsp;&nbsp;&nbsp; 4 - VERY GOOD
+            &nbsp;&nbsp;&nbsp; 3 - SATISFACTORY
+            &nbsp;&nbsp;&nbsp; 2 - POOR
+            &nbsp;&nbsp;&nbsp; 1 - VERY POOR
+        </div>
+
+        <table class="comment-layout">
             <tr>
                 <td style="width: 74%;">
-                    <table class="psycho">
-                        <thead>
-                            <tr>
-                                <th style="width: 75%;">PSYCHOMOTOR</th>
-                                <th style="width: 25%;">RATE</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($behaviourTraits as $trait)
-                                <tr>
-                                    <td>{{ strtoupper($trait['label']) }}</td>
-                                    <td class="center">{{ $trait['value'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
+                    <table class="comment">
+                        <tr>
+                            <th style="width: 28%;">School Head Name</th>
+                            <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
+                        </tr>
+                        <tr>
+                            <th>School Head Comment</th>
+                            <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Class Teacher Name</th>
+                            <td>{{ strtoupper($classTeacher?->name ?? '-') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Class Teacher Comment</th>
+                            <td>{{ strtoupper($teacherComment ?? '-') }}</td>
+                        </tr>
                     </table>
                 </td>
                 <td style="width: 2%;"></td>
                 <td style="width: 24%;">
-                    <table class="key-rate small">
-                        <thead>
-                            <tr>
-                                <th>KEY RATE</th>
-                                <th>SET</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>EXCELLENT</td><td class="center">5</td></tr>
-                            <tr><td>VERY GOOD</td><td class="center">4</td></tr>
-                            <tr><td>SATISFACTORY</td><td class="center">3</td></tr>
-                            <tr><td>POOR</td><td class="center">2</td></tr>
-                            <tr><td>VERY POOR</td><td class="center">1</td></tr>
-                        </tbody>
+                    <table class="signature-panel">
+                        <tr>
+                            <th>School Head Signature</th>
+                        </tr>
+                        <tr>
+                            <td>
+                                @if($headSignatureDataUri)
+                                    <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
+                                @else
+                                    <div class="signature-placeholder"></div>
+                                @endif
+                            </td>
+                        </tr>
                     </table>
                 </td>
             </tr>
         </table>
-
-        <table class="comment" style="margin-top: 8px;">
-            <tr>
-                <th style="width: 22%;">School Head Name</th>
-                <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
-            </tr>
-            <tr>
-                <th>School Head Comment</th>
-                <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
-            </tr>
-            <tr>
-                <th>Class Teacher Name</th>
-                <td>{{ strtoupper($classTeacher?->name ?? '-') }}</td>
-            </tr>
-            <tr>
-                <th>Class Teacher Comment</th>
-                <td>{{ strtoupper($teacherComment ?? '-') }}</td>
-            </tr>
-        </table>
-
-        <div class="signature-box">
-            <strong>School Head Signature:</strong><br>
-            @if($headSignatureDataUri)
-                <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
-            @else
-                <div class="signature-placeholder"></div>
-            @endif
-        </div>
     </div>
 </div>
 @if(!$embedded)

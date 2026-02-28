@@ -1212,14 +1212,25 @@ class ResultsController extends Controller
             $rowsHtml = '<tr><td colspan="' . (5 + count($activeCaIndices)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
-        $behaviourHtml = '';
-        foreach ($behaviourTraits as $trait) {
-            $label = strtoupper((string) ($trait['label'] ?? '-'));
-            $value = (int) ($trait['value'] ?? 0);
-            $behaviourHtml .= '<tr><td>' . e($label) . '</td><td style="text-align:center;">' . $value . '</td></tr>';
+        $behaviourCellsPerRow = 5;
+        $behaviourHeaderHtml = '';
+        for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
+            $behaviourHeaderHtml .= '<th style="width:16%;">PSYCHOMOTOR</th><th style="width:4%;text-align:center;">RATE</th>';
         }
-        if ($behaviourHtml === '') {
-            $behaviourHtml = '<tr><td colspan="2" style="text-align:center;">No behaviour data</td></tr>';
+        $behaviourRowsHtml = '';
+        $behaviourChunks = collect($behaviourTraits)->values()->chunk($behaviourCellsPerRow);
+        if ($behaviourChunks->isEmpty()) {
+            $behaviourChunks = collect([collect()]);
+        }
+        foreach ($behaviourChunks as $chunk) {
+            $behaviourRowsHtml .= '<tr>';
+            for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
+                $trait = $chunk->get($i);
+                $label = strtoupper((string) ($trait['label'] ?? '-'));
+                $value = $trait ? (string) ((int) ($trait['value'] ?? 0)) : '-';
+                $behaviourRowsHtml .= '<td>' . e($label) . '</td><td style="text-align:center;">' . e($value) . '</td>';
+            }
+            $behaviourRowsHtml .= '</tr>';
         }
 
         $studentPhotoBlock = $studentPhotoDataUri !== ''
@@ -1238,7 +1249,7 @@ class ResultsController extends Controller
 
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
-            . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:9px;color:#111;}'
+            . 'body{font-family:Arial,Helvetica,DejaVu Sans,sans-serif;font-size:9px;color:#111;}'
             . '.sheet{position:relative;border:1px solid #d1d5db;padding:10px;overflow:hidden;}'
             . '.wm{position:absolute;top:28%;left:50%;width:300px;height:300px;margin-left:-150px;opacity:.07;object-fit:contain;z-index:0;}'
             . '.content{position:relative;z-index:1;}'
@@ -1273,26 +1284,24 @@ class ResultsController extends Controller
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
             . '<td style="width:82%;">A [70-100] | B [60-69] | C [50-59] | D [40-49] | E [30-39] | F [0-29]</td></tr></table>'
+            . '<table><thead><tr>' . $behaviourHeaderHtml . '</tr></thead><tbody>'
+            . $behaviourRowsHtml
+            . '</tbody></table>'
+            . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
+            . '<td style="width:82%;">5 - EXCELLENT | 4 - VERY GOOD | 3 - SATISFACTORY | 2 - POOR | 1 - VERY POOR</td></tr></table>'
             . '<table class="grid"><tr><td style="width:74%;">'
-            . '<table><thead><tr><th style="width:80%;">PSYCHOMOTOR</th><th style="width:20%;">RATE</th></tr></thead><tbody>'
-            . $behaviourHtml
-            . '</tbody></table>'
-            . '</td><td style="width:2%;"></td><td style="width:24%;">'
-            . '<table><thead><tr><th>KEY RATE</th><th>SET</th></tr></thead><tbody>'
-            . '<tr><td>EXCELLENT</td><td style="text-align:center;">5</td></tr>'
-            . '<tr><td>VERY GOOD</td><td style="text-align:center;">4</td></tr>'
-            . '<tr><td>SATISFACTORY</td><td style="text-align:center;">3</td></tr>'
-            . '<tr><td>POOR</td><td style="text-align:center;">2</td></tr>'
-            . '<tr><td>VERY POOR</td><td style="text-align:center;">1</td></tr>'
-            . '</tbody></table>'
-            . '</td></tr></table>'
-            . '<table class="meta">'
+            . '<table class="meta" style="margin-top:0;">'
             . '<tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
             . '<tr><th>School Head Comment</th><td>' . e($headComment) . '</td></tr>'
             . '<tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr>'
             . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
             . '</table>'
-            . '<table class="meta"><tr><th style="width:24%;">School Head Signature</th><td>' . $signatureBlock . '</td></tr></table>'
+            . '</td><td style="width:2%;"></td><td style="width:24%;">'
+            . '<table class="meta" style="margin-top:0;">'
+            . '<tr><th>School Head Signature</th></tr>'
+            . '<tr><td style="text-align:center;">' . $signatureBlock . '</td></tr>'
+            . '</table>'
+            . '</td></tr></table>'
             . '</div></div></body></html>';
 
         return $this->renderPdfFromHtml($html);
