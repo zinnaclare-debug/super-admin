@@ -7,7 +7,6 @@ use App\Models\AcademicSession;
 use App\Models\ClassDepartment;
 use App\Models\Enrollment;
 use App\Models\Guardian;
-use App\Models\LevelDepartment;
 use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Staff;
@@ -15,6 +14,7 @@ use App\Models\Student;
 use App\Models\Term;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
+use App\Support\DepartmentTemplateSync;
 use App\Support\UserCredentialStore;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -616,13 +616,7 @@ class UserManagementController extends Controller
             ]);
         }
 
-        $this->syncClassDepartmentsFromLevel($schoolId, $class);
-
-        $classDepartments = ClassDepartment::query()
-            ->where('school_id', $schoolId)
-            ->where('class_id', $class->id)
-            ->orderBy('name')
-            ->get(['id']);
+        $classDepartments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
         $resolvedDepartmentId = null;
         if ($classDepartments->isNotEmpty()) {
@@ -742,21 +736,63 @@ class UserManagementController extends Controller
         return $fallback ? (int) $fallback : null;
     }
 
-    private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
+    private function loadTemplateScopedClassDepartments(int $schoolId, SchoolClass $class)
     {
-        $levelDepartments = LevelDepartment::query()
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $class->academic_session_id)
-            ->where('level', $class->level)
-            ->get(['name']);
+        $templateNames = $this->syncClassDepartmentsFromTemplates($schoolId, $class);
+        $allowedNames = collect($templateNames)
+            ->map(fn ($name) => strtolower(trim((string) $name)))
+            ->filter(fn ($name) => $name !== '')
+            ->unique()
+            ->values()
+            ->all();
 
-        foreach ($levelDepartments as $department) {
+        if (empty($allowedNames)) {
+            return collect();
+        }
+
+        return ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->filter(fn ($department) => in_array(
+                strtolower(trim((string) $department->name)),
+                $allowedNames,
+                true
+            ))
+            ->values();
+    }
+
+    private function syncClassDepartmentsFromTemplates(int $schoolId, SchoolClass $class): array
+    {
+        $school = School::query()
+            ->where('id', $schoolId)
+            ->first(['id', 'class_templates', 'department_templates']);
+
+        if (!$school) {
+            return [];
+        }
+
+        $templateNames = DepartmentTemplateSync::classTemplateNamesForClass(
+            $school->department_templates ?? [],
+            ClassTemplateSchema::normalize($school->class_templates),
+            (string) $class->level,
+            (string) $class->name
+        );
+
+        foreach ($templateNames as $name) {
+            $departmentName = trim((string) $name);
+            if ($departmentName === '') {
+                continue;
+            }
             ClassDepartment::firstOrCreate([
                 'school_id' => $schoolId,
                 'class_id' => $class->id,
-                'name' => $department->name,
+                'name' => $departmentName,
             ]);
         }
+
+        return $templateNames;
     }
 
     private function storageUrl(?string $path): ?string

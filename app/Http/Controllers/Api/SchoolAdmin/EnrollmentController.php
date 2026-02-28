@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\SchoolClass;
+use App\Models\School;
 use App\Models\Term;
 use App\Models\ClassDepartment;
-use App\Models\LevelDepartment;
 use App\Models\User;
+use App\Support\ClassTemplateSchema;
+use App\Support\DepartmentTemplateSync;
 
 class EnrollmentController extends Controller
 {
@@ -67,10 +69,8 @@ class EnrollmentController extends Controller
             return response()->json(['message' => 'Provide enrollments or student_ids'], 422);
         }
 
-        $this->syncClassDepartmentsFromLevel($schoolId, $class);
-
-        $classDepartmentIds = ClassDepartment::where('school_id', $schoolId)
-            ->where('class_id', $class->id)
+        $classDepartments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
+        $classDepartmentIds = $classDepartments
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values()
@@ -259,9 +259,7 @@ class EnrollmentController extends Controller
             ? (int) $request->query('department_id')
             : null;
 
-        $this->syncClassDepartmentsFromLevel($schoolId, $class);
-        $departments = ClassDepartment::where('school_id', $schoolId)
-            ->where('class_id', $class->id)
+        $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values()
@@ -330,12 +328,7 @@ class EnrollmentController extends Controller
         abort_unless($term->school_id === $schoolId, 403);
         abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
 
-        $this->syncClassDepartmentsFromLevel($schoolId, $class);
-
-        $departments = ClassDepartment::where('school_id', $schoolId)
-            ->where('class_id', $class->id)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
         return response()->json(['data' => $departments]);
     }
@@ -394,20 +387,63 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
+    private function loadTemplateScopedClassDepartments(int $schoolId, SchoolClass $class)
     {
-        $levelDepartments = LevelDepartment::where('school_id', $schoolId)
-            ->where('academic_session_id', $class->academic_session_id)
-            ->where('level', $class->level)
-            ->get(['name']);
+        $templateNames = $this->syncClassDepartmentsFromTemplates($schoolId, $class);
+        $allowedNames = collect($templateNames)
+            ->map(fn ($name) => strtolower(trim((string) $name)))
+            ->filter(fn ($name) => $name !== '')
+            ->unique()
+            ->values()
+            ->all();
 
-        foreach ($levelDepartments as $dept) {
+        if (empty($allowedNames)) {
+            return collect();
+        }
+
+        return ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->filter(fn ($department) => in_array(
+                strtolower(trim((string) $department->name)),
+                $allowedNames,
+                true
+            ))
+            ->values();
+    }
+
+    private function syncClassDepartmentsFromTemplates(int $schoolId, SchoolClass $class): array
+    {
+        $school = School::query()
+            ->where('id', $schoolId)
+            ->first(['id', 'class_templates', 'department_templates']);
+
+        if (!$school) {
+            return [];
+        }
+
+        $templateNames = DepartmentTemplateSync::classTemplateNamesForClass(
+            $school->department_templates ?? [],
+            ClassTemplateSchema::normalize($school->class_templates),
+            (string) $class->level,
+            (string) $class->name
+        );
+
+        foreach ($templateNames as $name) {
+            $departmentName = trim((string) $name);
+            if ($departmentName === '') {
+                continue;
+            }
             ClassDepartment::firstOrCreate([
                 'school_id' => $schoolId,
                 'class_id' => $class->id,
-                'name' => $dept->name,
+                'name' => $departmentName,
             ]);
         }
+
+        return $templateNames;
     }
 
     private function hasDuplicateNameOrEmailEnrollment(

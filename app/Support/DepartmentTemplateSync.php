@@ -293,6 +293,33 @@ class DepartmentTemplateSync
             ->all();
     }
 
+    public static function classTemplateNamesForClass(
+        mixed $rawTemplates,
+        array $classTemplates,
+        string $level,
+        string $className
+    ): array {
+        $normalizedTemplates = ClassTemplateSchema::normalize($classTemplates);
+        $classMap = self::normalizeClassTemplateMap($rawTemplates, $normalizedTemplates);
+
+        $normalizedLevel = strtolower(trim($level));
+        $normalizedClassName = trim($className);
+        if ($normalizedLevel === '' || $normalizedClassName === '') {
+            return [];
+        }
+
+        $row = self::findClassRow(
+            is_array($classMap[$normalizedLevel] ?? null) ? $classMap[$normalizedLevel] : [],
+            $normalizedClassName
+        );
+
+        if (!is_array($row) || !($row['enabled'] ?? false)) {
+            return [];
+        }
+
+        return self::normalizeNameList($row['names'] ?? []);
+    }
+
     public static function flattenLevelTemplateNames(array $map): array
     {
         return collect($map)

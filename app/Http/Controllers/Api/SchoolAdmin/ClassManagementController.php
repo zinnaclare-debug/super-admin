@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassDepartment;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Staff;
 use App\Models\Term;
 use App\Models\User;
+use App\Support\ClassTemplateSchema;
+use App\Support\DepartmentTemplateSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -20,7 +23,7 @@ class ClassManagementController extends Controller
         $schoolId = $request->user()->school_id;
         abort_unless($class->school_id === $schoolId, 403);
 
-        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
+        $this->syncClassDepartmentsFromTemplates((int) $schoolId, $class);
 
         $level = $class->level; // nursery|primary|secondary
 
@@ -34,16 +37,7 @@ class ClassManagementController extends Controller
             ->orderBy('name')
             ->get();
 
-        $departmentsQuery = ClassDepartment::query()
-            ->where('school_id', $schoolId)
-            ->where('class_id', $class->id)
-            ->orderBy('name');
-        if (Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
-            $departmentsQuery->addSelect(['id', 'name', 'class_teacher_user_id']);
-        } else {
-            $departmentsQuery->addSelect(['id', 'name']);
-        }
-        $departments = $departmentsQuery->get();
+        $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
         $selectedDepartmentId = null;
         $selectedDepartment = null;
@@ -142,12 +136,7 @@ class ClassManagementController extends Controller
             return response()->json(['message' => 'Teacher level does not match this class'], 422);
         }
 
-        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
-        $departments = ClassDepartment::query()
-            ->where('school_id', $schoolId)
-            ->where('class_id', $class->id)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
         if ($departments->isNotEmpty()) {
             if (!Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
@@ -211,12 +200,7 @@ class ClassManagementController extends Controller
             'department_id' => 'nullable|integer|exists:class_departments,id',
         ]);
 
-        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
-        $departments = ClassDepartment::query()
-            ->where('school_id', $schoolId)
-            ->where('class_id', $class->id)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
         if ($departments->isNotEmpty()) {
             if (!Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
@@ -449,24 +433,69 @@ class ClassManagementController extends Controller
         return $classId ? (int) $classId : null;
     }
 
-    private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
+    private function loadTemplateScopedClassDepartments(int $schoolId, SchoolClass $class)
     {
-        if (!Schema::hasTable('level_departments') || !Schema::hasTable('class_departments')) {
-            return;
+        $templateNames = $this->syncClassDepartmentsFromTemplates($schoolId, $class);
+        $allowedNames = collect($templateNames)
+            ->map(fn ($name) => strtolower(trim((string) $name)))
+            ->filter(fn ($name) => $name !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($allowedNames)) {
+            return collect();
         }
 
-        $levelDepartments = DB::table('level_departments')
+        $departmentsQuery = ClassDepartment::query()
             ->where('school_id', $schoolId)
-            ->where('academic_session_id', $class->academic_session_id)
-            ->where('level', $class->level)
-            ->pluck('name');
+            ->where('class_id', $class->id)
+            ->orderBy('name');
+        if (Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+            $departmentsQuery->addSelect(['id', 'name', 'class_teacher_user_id']);
+        } else {
+            $departmentsQuery->addSelect(['id', 'name']);
+        }
 
-        foreach ($levelDepartments as $name) {
+        return $departmentsQuery->get()
+            ->filter(fn ($department) => in_array(
+                strtolower(trim((string) $department->name)),
+                $allowedNames,
+                true
+            ))
+            ->values();
+    }
+
+    private function syncClassDepartmentsFromTemplates(int $schoolId, SchoolClass $class): array
+    {
+        $school = School::query()
+            ->where('id', $schoolId)
+            ->first(['id', 'class_templates', 'department_templates']);
+
+        if (!$school) {
+            return [];
+        }
+
+        $templateNames = DepartmentTemplateSync::classTemplateNamesForClass(
+            $school->department_templates ?? [],
+            ClassTemplateSchema::normalize($school->class_templates),
+            (string) $class->level,
+            (string) $class->name
+        );
+
+        foreach ($templateNames as $name) {
+            $departmentName = trim((string) $name);
+            if ($departmentName === '') {
+                continue;
+            }
+
             ClassDepartment::firstOrCreate([
                 'school_id' => $schoolId,
                 'class_id' => $class->id,
-                'name' => $name,
+                'name' => $departmentName,
             ]);
         }
+
+        return $templateNames;
     }
 }
