@@ -198,15 +198,17 @@ class DepartmentTemplateSync
             $globalNames = self::normalizeNameList($rawTemplates['global']);
         }
 
+        $rawIsClassRowList = self::isListOfClassRows($rawTemplates);
+
         if (array_key_exists('by_level', $rawTemplates) && is_array($rawTemplates['by_level'])) {
             $levelMap = self::normalizeLevelTemplateMap(['by_level' => $rawTemplates['by_level']]);
-        } elseif (self::isAssociativeLevelMap($rawTemplates) || self::isListOfLevelRows($rawTemplates)) {
+        } elseif (!$rawIsClassRowList && (self::isAssociativeLevelMap($rawTemplates) || self::isListOfLevelRows($rawTemplates))) {
             $levelMap = self::normalizeLevelTemplateMap($rawTemplates);
         }
 
         if (array_key_exists('by_class', $rawTemplates)) {
             $rawByClass = self::extractClassRows($rawTemplates['by_class']);
-        } elseif (self::isListOfClassRows($rawTemplates)) {
+        } elseif ($rawIsClassRowList) {
             $rawByClass = self::extractClassRows($rawTemplates);
         } elseif (empty($globalNames) && self::isTemplateNameList($rawTemplates)) {
             // Legacy format: ['Gold', 'Diamond'] applies to all classes.
@@ -475,6 +477,9 @@ class DepartmentTemplateSync
                 return false;
             }
             if (!array_key_exists('level', $row)) {
+                return false;
+            }
+            if (array_key_exists('class_name', $row)) {
                 return false;
             }
         }
