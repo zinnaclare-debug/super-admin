@@ -846,27 +846,14 @@ class RegistrationController extends Controller
         return null;
     }
 
-    private function generateBulkUsername(School $school, string $name, array $usedUsernames): string
+    private function generateBulkUsername(School $_school, string $name, array $usedUsernames): string
     {
-        $candidate = $this->generateUsername($school, $name);
-        if (!$this->bulkUsernameTaken($candidate, $usedUsernames)) {
-            return $candidate;
-        }
+        $base = $this->usernameBaseFromName($name);
 
-        if (preg_match('/^(.*?)(\d+)$/', $candidate, $matches)) {
-            $stem = (string) $matches[1];
-            $number = (int) $matches[2];
-        } else {
-            $stem = $candidate;
-            $number = 1;
-        }
-
-        do {
-            $number++;
-            $candidate = "{$stem}{$number}";
-        } while ($this->bulkUsernameTaken($candidate, $usedUsernames));
-
-        return $candidate;
+        return $this->generateUniqueUsernameCandidate(
+            $base,
+            fn (string $candidate) => $this->bulkUsernameTaken($candidate, $usedUsernames)
+        );
     }
 
     private function bulkUsernameTaken(string $username, array $usedUsernames): bool
@@ -1237,25 +1224,66 @@ class RegistrationController extends Controller
         return $templateNames;
     }
 
-    private function generateUsername($school, string $fullName): string
+    private function generateUsername(School $_school, string $fullName): string
     {
-        $prefix = strtoupper((string) $school->username_prefix);
-        $surname = strtolower(explode(' ', trim($fullName))[0]);
+        $base = $this->usernameBaseFromName($fullName);
 
-        $lastUser = User::query()
-            ->where('school_id', $school->id)
-            ->where('username', 'LIKE', "{$prefix}-{$surname}%")
-            ->orderByDesc('id')
-            ->first();
+        return $this->generateUniqueUsernameCandidate(
+            $base,
+            fn (string $candidate) => User::query()
+                ->whereRaw('LOWER(username) = ?', [strtolower($candidate)])
+                ->exists()
+        );
+    }
 
-        if ($lastUser) {
-            preg_match('/(\d+)$/', (string) $lastUser->username, $matches);
-            $number = isset($matches[1]) ? ((int) $matches[1] + 1) : 1;
-        } else {
-            $number = 1;
+    private function usernameBaseFromName(string $fullName): string
+    {
+        $parts = preg_split('/\s+/', trim($fullName)) ?: [];
+        $surname = '';
+        if (!empty($parts)) {
+            $lastPart = end($parts);
+            $surname = is_string($lastPart) ? $lastPart : '';
         }
 
-        return "{$prefix}-{$surname}{$number}";
+        $base = strtolower(preg_replace('/[^a-z0-9]+/i', '', $surname) ?? '');
+        if ($base === '') {
+            $base = 'user';
+        }
+
+        return substr($base, 0, 20);
+    }
+
+    private function generateUniqueUsernameCandidate(string $base, callable $isTaken): string
+    {
+        $base = trim(strtolower($base));
+        if ($base === '') {
+            $base = 'user';
+        }
+
+        foreach ([2, 3, 4, 5] as $digits) {
+            for ($attempt = 0; $attempt < 240; $attempt++) {
+                $candidate = $base . $this->randomDigits($digits);
+                if (!$isTaken($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        $counter = 1;
+        do {
+            $candidate = $base . str_pad((string) $counter, 6, '0', STR_PAD_LEFT);
+            $counter++;
+        } while ($isTaken($candidate));
+
+        return $candidate;
+    }
+
+    private function randomDigits(int $digits): string
+    {
+        $digits = max(1, $digits);
+        $max = (10 ** $digits) - 1;
+
+        return str_pad((string) random_int(0, $max), $digits, '0', STR_PAD_LEFT);
     }
 
     private function normalizeEducationLevel(?string $value): ?string

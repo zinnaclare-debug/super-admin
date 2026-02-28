@@ -218,6 +218,12 @@ class LoginDetailsController extends Controller
                 ->mapWithKeys(fn ($value, $userId) => [(int) $userId => strtolower(trim((string) $value))])
                 ->all();
         }
+        $staffUserIds = $users
+            ->where('role', 'staff')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
 
         $currentSessionId = DB::table('academic_sessions')
             ->where('school_id', $schoolId)
@@ -230,6 +236,12 @@ class LoginDetailsController extends Controller
                 ->where('is_current', true)
                 ->value('id')
             : null;
+        [$staffTeachingClassesByUserId, $staffDepartmentAssignmentsByUserId] = $this->resolveStaffAssignments(
+            $schoolId,
+            $staffUserIds,
+            $currentSessionId ? (int) $currentSessionId : null,
+            $currentTermId ? (int) $currentTermId : null
+        );
 
         $studentProfileByStudentId = [];
         $studentIds = collect(array_values($studentIdByUserId))->filter()->values();
@@ -284,7 +296,9 @@ class LoginDetailsController extends Controller
             $studentIdByUserId,
             $studentLevelByUserId,
             $staffLevelByUserId,
-            $studentProfileByStudentId
+            $studentProfileByStudentId,
+            $staffTeachingClassesByUserId,
+            $staffDepartmentAssignmentsByUserId
         ) {
             $credential = $hasCredentialTable ? $user->loginCredential : null;
             $password = UserCredentialStore::reveal($credential?->password_encrypted);
@@ -296,6 +310,8 @@ class LoginDetailsController extends Controller
             $department = '';
             if ((string) $user->role === 'staff') {
                 $level = $this->normalizeLevelValue((string) ($staffLevelByUserId[$userId] ?? ''));
+                $className = (string) ($staffTeachingClassesByUserId[$userId] ?? '');
+                $department = (string) ($staffDepartmentAssignmentsByUserId[$userId] ?? '');
             } elseif ((string) $user->role === 'student') {
                 $studentId = (int) ($studentIdByUserId[$userId] ?? 0);
                 $profile = $studentId ? ($studentProfileByStudentId[$studentId] ?? null) : null;
@@ -478,6 +494,141 @@ class LoginDetailsController extends Controller
         }, $columns);
 
         return implode(',', $escaped);
+    }
+
+    private function resolveStaffAssignments(
+        int $schoolId,
+        array $staffUserIds,
+        ?int $currentSessionId,
+        ?int $currentTermId
+    ): array {
+        if (empty($staffUserIds) || !Schema::hasTable('classes')) {
+            return [[], []];
+        }
+
+        $classSetsByUserId = [];
+        $departmentSetsByUserId = [];
+
+        if (Schema::hasTable('term_subjects') && Schema::hasColumn('term_subjects', 'teacher_user_id')) {
+            $teachingClassesQuery = DB::table('term_subjects')
+                ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+                ->whereNotNull('term_subjects.teacher_user_id')
+                ->whereIn('term_subjects.teacher_user_id', $staffUserIds)
+                ->select([
+                    'term_subjects.teacher_user_id',
+                    'classes.name as class_name',
+                ]);
+
+            if (Schema::hasColumn('term_subjects', 'school_id')) {
+                $teachingClassesQuery->where('term_subjects.school_id', $schoolId);
+            } else {
+                $teachingClassesQuery->where('classes.school_id', $schoolId);
+            }
+            if ($currentSessionId) {
+                $teachingClassesQuery->where('classes.academic_session_id', $currentSessionId);
+            }
+            if ($currentTermId) {
+                $teachingClassesQuery->where('term_subjects.term_id', $currentTermId);
+            }
+
+            foreach ($teachingClassesQuery->get() as $row) {
+                $this->addStaffAssignmentValue(
+                    $classSetsByUserId,
+                    (int) ($row->teacher_user_id ?? 0),
+                    (string) ($row->class_name ?? '')
+                );
+            }
+        }
+
+        if (Schema::hasColumn('classes', 'class_teacher_user_id')) {
+            $classTeacherQuery = DB::table('classes')
+                ->where('classes.school_id', $schoolId)
+                ->whereNotNull('classes.class_teacher_user_id')
+                ->whereIn('classes.class_teacher_user_id', $staffUserIds)
+                ->select([
+                    'classes.class_teacher_user_id',
+                    'classes.name as class_name',
+                ]);
+
+            if ($currentSessionId) {
+                $classTeacherQuery->where('classes.academic_session_id', $currentSessionId);
+            }
+
+            foreach ($classTeacherQuery->get() as $row) {
+                $this->addStaffAssignmentValue(
+                    $classSetsByUserId,
+                    (int) ($row->class_teacher_user_id ?? 0),
+                    (string) ($row->class_name ?? '')
+                );
+            }
+        }
+
+        if (Schema::hasTable('class_departments') && Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+            $departmentQuery = DB::table('class_departments')
+                ->join('classes', 'classes.id', '=', 'class_departments.class_id')
+                ->where('classes.school_id', $schoolId)
+                ->whereNotNull('class_departments.class_teacher_user_id')
+                ->whereIn('class_departments.class_teacher_user_id', $staffUserIds)
+                ->select([
+                    'class_departments.class_teacher_user_id',
+                    'classes.name as class_name',
+                    'class_departments.name as department_name',
+                ]);
+
+            if (Schema::hasColumn('class_departments', 'school_id')) {
+                $departmentQuery->where('class_departments.school_id', $schoolId);
+            }
+            if ($currentSessionId) {
+                $departmentQuery->where('classes.academic_session_id', $currentSessionId);
+            }
+
+            foreach ($departmentQuery->get() as $row) {
+                $userId = (int) ($row->class_teacher_user_id ?? 0);
+                $className = trim((string) ($row->class_name ?? ''));
+                $departmentName = trim((string) ($row->department_name ?? ''));
+
+                $this->addStaffAssignmentValue($classSetsByUserId, $userId, $className);
+
+                if ($departmentName !== '') {
+                    $assignment = $className !== ''
+                        ? trim($className . ' ' . $departmentName)
+                        : $departmentName;
+                    $this->addStaffAssignmentValue($departmentSetsByUserId, $userId, $assignment);
+                }
+            }
+        }
+
+        return [
+            $this->compileStaffAssignmentValues($classSetsByUserId),
+            $this->compileStaffAssignmentValues($departmentSetsByUserId),
+        ];
+    }
+
+    private function addStaffAssignmentValue(array &$setMap, int $userId, string $value): void
+    {
+        $cleaned = trim($value);
+        if ($userId < 1 || $cleaned === '') {
+            return;
+        }
+
+        if (!isset($setMap[$userId])) {
+            $setMap[$userId] = [];
+        }
+
+        $setMap[$userId][strtolower($cleaned)] = $cleaned;
+    }
+
+    private function compileStaffAssignmentValues(array $setMap): array
+    {
+        $compiled = [];
+
+        foreach ($setMap as $userId => $valuesByKey) {
+            $values = array_values($valuesByKey);
+            natcasesort($values);
+            $compiled[(int) $userId] = implode(', ', $values);
+        }
+
+        return $compiled;
     }
 
     private function normalizeLevelValue(string $value): string

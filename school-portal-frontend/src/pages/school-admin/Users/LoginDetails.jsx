@@ -206,8 +206,8 @@ export default function LoginDetails() {
               <th>Name</th>
               <th>Role</th>
               <th>Education Level</th>
-              <th>Class</th>
-              <th>Department</th>
+              <th>{role === "staff" ? "Teaching Classes" : "Class"}</th>
+              <th>{role === "staff" ? "Assigned Departments" : "Department"}</th>
               <th>Username</th>
               <th>Email</th>
               <th>Password</th>
