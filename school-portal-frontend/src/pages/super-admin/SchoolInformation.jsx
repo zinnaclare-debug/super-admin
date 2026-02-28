@@ -39,11 +39,14 @@ const normalizeExamRecord = (record) => {
 const normalizeClassRow = (row) => {
   if (row && typeof row === "object" && !Array.isArray(row)) {
     const classEnabled = row.enabled !== false;
+    const departmentInput = Object.prototype.hasOwnProperty.call(row, "department_input")
+      ? String(row.department_input || "")
+      : toDepartmentCsv(row.department_names || []);
     return {
       name: String(row.name || "").trim(),
       enabled: classEnabled,
       department_enabled: classEnabled && row.department_enabled !== false,
-      department_input: toDepartmentCsv(row.department_names || []),
+      department_input: departmentInput,
     };
   }
 
