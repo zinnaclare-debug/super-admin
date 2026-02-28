@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
- import UserProfilePanel from "./UserProfilePanel";
+import UserProfilePanel from "./UserProfilePanel";
 
 export default function ActiveUsers() {
   const { role } = useParams(); // staff | student
@@ -11,6 +11,8 @@ export default function ActiveUsers() {
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -30,6 +32,7 @@ export default function ActiveUsers() {
 
   useEffect(() => {
     load();
+    setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
@@ -52,6 +55,33 @@ export default function ActiveUsers() {
     }
   };
 
+  const bulkDeleteUsers = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected user(s) permanently? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await api.delete("/api/school-admin/users/bulk-delete", {
+        data: { ids: Array.from(selectedIds) },
+      });
+      const deletedIds = Array.isArray(res?.data?.data?.deleted_ids)
+        ? res.data.data.deleted_ids
+        : [];
+
+      if (selectedUserId && deletedIds.includes(selectedUserId)) {
+        setSelectedUserId(null);
+      }
+
+      await load();
+      setSelectedIds(new Set());
+      alert(res?.data?.message || "Bulk delete completed.");
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to bulk delete users");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
@@ -62,6 +92,34 @@ export default function ActiveUsers() {
       return name.includes(s) || email.includes(s) || username.includes(s);
     });
   }, [rows, q]);
+
+  const visibleIds = useMemo(
+    () => filtered.map((u) => u.id),
+    [filtered]
+  );
+
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
 
   return (
     <div>
@@ -76,6 +134,21 @@ export default function ActiveUsers() {
         />
       </div>
 
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          onClick={bulkDeleteUsers}
+          disabled={selectedIds.size === 0 || bulkDeleting}
+          style={{
+            background: "#dc2626",
+            border: "1px solid #b91c1c",
+            color: "#fff",
+            opacity: selectedIds.size === 0 || bulkDeleting ? 0.6 : 1,
+          }}
+        >
+          {bulkDeleting ? "Deleting..." : `Bulk Delete (${selectedIds.size})`}
+        </button>
+      </div>
+
       <div style={{ marginTop: 14 }}>
         {loading ? (
           <p>Loading...</p>
@@ -83,7 +156,16 @@ export default function ActiveUsers() {
           <table border="1" cellPadding="10" cellSpacing="0" width="100%">
             <thead>
               <tr>
-                <th>S/N</th>
+                <th>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleAllVisible}
+                    />
+                    <span>S/N</span>
+                  </div>
+                </th>
                 <th>Name</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -93,7 +175,16 @@ export default function ActiveUsers() {
             <tbody>
               {filtered.map((u, idx) => (
                 <tr key={u.id}>
-                  <td>{idx + 1}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(u.id)}
+                        onChange={() => toggleRow(u.id)}
+                      />
+                      <span>{idx + 1}</span>
+                    </div>
+                  </td>
                   <td>{u.name}</td>
                   <td>
                     <strong>{u.status || "active"}</strong>
@@ -148,7 +239,7 @@ export default function ActiveUsers() {
           onClose={() => setSelectedUserId(null)}
           onChanged={load}
         />
-      )} 
+      )}
       </div>
     </div>
   );

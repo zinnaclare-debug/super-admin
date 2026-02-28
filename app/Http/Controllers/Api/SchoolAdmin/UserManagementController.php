@@ -394,20 +394,7 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'Only student/staff can be deleted here'], 422);
         }
 
-        $photoPaths = collect([
-            $user->photo_path,
-            Student::query()
-                ->where('school_id', $schoolId)
-                ->where('user_id', $user->id)
-                ->value('photo_path'),
-            Staff::query()
-                ->where('school_id', $schoolId)
-                ->where('user_id', $user->id)
-                ->value('photo_path'),
-        ])
-            ->filter(fn ($path) => filled($path))
-            ->unique()
-            ->values();
+        $photoPaths = $this->collectUserPhotoPaths($schoolId, $user);
 
         $userName = $user->name;
 
@@ -419,15 +406,84 @@ class UserManagementController extends Controller
             ], 409);
         }
 
-        foreach ($photoPaths as $path) {
-            if (Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
-            }
-        }
+        $this->deleteStoredPhotoPaths($photoPaths);
 
         return response()->json([
             'message' => "User {$userName} deleted successfully",
             'data' => ['id' => $user->id],
+        ]);
+    }
+
+    // DELETE /api/school-admin/users/bulk-delete
+    public function bulkDestroy(Request $request)
+    {
+        $schoolId = (int) $request->user()->school_id;
+
+        $payload = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $requestedIds = collect($payload['ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $users = User::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('id', $requestedIds)
+            ->whereIn('role', ['student', 'staff'])
+            ->get();
+
+        $matchedIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $missingIds = array_values(array_diff($requestedIds->all(), $matchedIds));
+
+        $deletedIds = [];
+        $failed = [];
+
+        foreach ($users as $user) {
+            $photoPaths = $this->collectUserPhotoPaths($schoolId, $user);
+            try {
+                $user->delete();
+            } catch (QueryException $e) {
+                $failed[] = [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'reason' => 'protected',
+                ];
+                continue;
+            }
+
+            $deletedIds[] = (int) $user->id;
+            $this->deleteStoredPhotoPaths($photoPaths);
+        }
+
+        $deletedCount = count($deletedIds);
+        $failedCount = count($failed);
+        $missingCount = count($missingIds);
+
+        $messageParts = [
+            $deletedCount === 1
+                ? '1 user deleted successfully'
+                : "{$deletedCount} users deleted successfully",
+        ];
+        if ($failedCount > 0) {
+            $messageParts[] = "{$failedCount} protected user(s) could not be deleted";
+        }
+        if ($missingCount > 0) {
+            $messageParts[] = "{$missingCount} user(s) not found or not allowed";
+        }
+
+        return response()->json([
+            'message' => implode('. ', $messageParts) . '.',
+            'data' => [
+                'requested' => $requestedIds->count(),
+                'matched' => count($matchedIds),
+                'deleted_count' => $deletedCount,
+                'deleted_ids' => $deletedIds,
+                'failed' => $failed,
+                'missing_ids' => $missingIds,
+            ],
         ]);
     }
 
@@ -752,5 +808,33 @@ class UserManagementController extends Controller
         );
 
         return in_array($normalizedLevel, $activeTemplateLevels, true);
+    }
+
+    private function collectUserPhotoPaths(int $schoolId, User $user): array
+    {
+        return collect([
+            $user->photo_path,
+            Student::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', $user->id)
+                ->value('photo_path'),
+            Staff::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', $user->id)
+                ->value('photo_path'),
+        ])
+            ->filter(fn ($path) => filled($path))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function deleteStoredPhotoPaths(array $photoPaths): void
+    {
+        foreach ($photoPaths as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
     }
 }
