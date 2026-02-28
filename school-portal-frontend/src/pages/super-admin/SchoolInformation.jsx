@@ -10,7 +10,6 @@ const DEFAULT_EXAM_RECORD = {
   exam_max: 70,
   total_max: 100,
 };
-const LEVEL_KEYS = ["pre_nursery", "nursery", "primary", "secondary"];
 
 const toAbsoluteUrl = (u) => {
   if (!u) return "";
@@ -39,15 +38,20 @@ const normalizeExamRecord = (record) => {
 
 const normalizeClassRow = (row) => {
   if (row && typeof row === "object" && !Array.isArray(row)) {
+    const classEnabled = row.enabled !== false;
     return {
       name: String(row.name || "").trim(),
-      enabled: row.enabled !== false,
+      enabled: classEnabled,
+      department_enabled: classEnabled && row.department_enabled !== false,
+      department_input: toDepartmentCsv(row.department_names || []),
     };
   }
 
   return {
     name: String(row || "").trim(),
     enabled: true,
+    department_enabled: true,
+    department_input: "",
   };
 };
 
@@ -71,36 +75,6 @@ const parseDepartmentCsv = (value) =>
     .map((item) => item.trim())
     .filter(Boolean)
     .filter((name, index, arr) => arr.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index);
-
-const normalizeDepartmentTemplatesByLevel = (rawMap, fallbackNames = []) => {
-  const fallbackCsv = toDepartmentCsv(fallbackNames);
-  const normalized = Object.fromEntries(
-    LEVEL_KEYS.map((level) => [
-      level,
-      {
-        enabled: Boolean(fallbackCsv),
-        input: fallbackCsv,
-      },
-    ])
-  );
-
-  if (!rawMap || typeof rawMap !== "object") {
-    return normalized;
-  }
-
-  LEVEL_KEYS.forEach((level) => {
-    const row = rawMap?.[level];
-    if (!row || typeof row !== "object") return;
-
-    const names = toDepartmentCsv(row?.names || []);
-    normalized[level] = {
-      enabled: Boolean(row?.enabled) && Boolean(names),
-      input: names,
-    };
-  });
-
-  return normalized;
-};
 
 export default function SchoolInformation() {
   const navigate = useNavigate();
@@ -135,9 +109,6 @@ export default function SchoolInformation() {
 
   const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
   const [classTemplates, setClassTemplates] = useState([]);
-  const [departmentTemplatesByLevel, setDepartmentTemplatesByLevel] = useState(() =>
-    normalizeDepartmentTemplatesByLevel(null, [])
-  );
 
   useEffect(() => {
     const load = async () => {
@@ -162,12 +133,6 @@ export default function SchoolInformation() {
         setExamRecord(normalizeExamRecord(payload.exam_record));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
-        setDepartmentTemplatesByLevel(
-          normalizeDepartmentTemplatesByLevel(
-            payload.department_templates_by_level,
-            payload.department_templates || []
-          )
-        );
       } catch (err) {
         alert(err?.response?.data?.message || "Failed to load school information.");
       } finally {
@@ -358,30 +323,43 @@ export default function SchoolInformation() {
         if (idx !== sectionIndex) return section;
         const classes = Array.isArray(section.classes) ? [...section.classes] : [];
         const current = normalizeClassRow(classes[classIndex]);
-        classes[classIndex] = { ...current, enabled: Boolean(enabled) };
+        classes[classIndex] = {
+          ...current,
+          enabled: Boolean(enabled),
+          department_enabled: Boolean(enabled),
+          department_input: Boolean(enabled) ? current.department_input : "",
+        };
         return { ...section, classes };
       })
     );
   };
 
-  const updateDepartmentEnabled = (levelKey, enabled) => {
-    setDepartmentTemplatesByLevel((prev) => ({
-      ...prev,
-      [levelKey]: {
-        ...(prev[levelKey] || { enabled: false, input: "" }),
-        enabled: Boolean(enabled),
-      },
-    }));
+  const updateClassDepartmentEnabled = (sectionIndex, classIndex, enabled) => {
+    setClassTemplates((prev) =>
+      prev.map((section, idx) => {
+        if (idx !== sectionIndex) return section;
+        const classes = Array.isArray(section.classes) ? [...section.classes] : [];
+        const current = normalizeClassRow(classes[classIndex]);
+        classes[classIndex] = {
+          ...current,
+          department_enabled: Boolean(enabled),
+          department_input: Boolean(enabled) ? current.department_input : "",
+        };
+        return { ...section, classes };
+      })
+    );
   };
 
-  const updateDepartmentInput = (levelKey, value) => {
-    setDepartmentTemplatesByLevel((prev) => ({
-      ...prev,
-      [levelKey]: {
-        ...(prev[levelKey] || { enabled: false, input: "" }),
-        input: value,
-      },
-    }));
+  const updateClassDepartmentInput = (sectionIndex, classIndex, value) => {
+    setClassTemplates((prev) =>
+      prev.map((section, idx) => {
+        if (idx !== sectionIndex) return section;
+        const classes = Array.isArray(section.classes) ? [...section.classes] : [];
+        const current = normalizeClassRow(classes[classIndex]);
+        classes[classIndex] = { ...current, department_input: value };
+        return { ...section, classes };
+      })
+    );
   };
 
   const saveClassTemplates = async () => {
@@ -394,15 +372,20 @@ export default function SchoolInformation() {
       return alert(`Select at least one checked class in ${enabledSectionWithoutClass.label || enabledSectionWithoutClass.key}.`);
     }
 
-    const enabledDepartmentWithoutName = classTemplates.find((section) => {
-      const key = section.key;
-      const row = departmentTemplatesByLevel[key] || { enabled: false, input: "" };
-      if (!section.enabled || !row.enabled) return false;
-      return parseDepartmentCsv(row.input).length === 0;
-    });
-    if (enabledDepartmentWithoutName) {
+    const classWithMissingDepartment = classTemplates
+      .flatMap((section) =>
+        (section.classes || []).map((row) => ({
+          section,
+          row: normalizeClassRow(row),
+        }))
+      )
+      .find(({ section, row }) => {
+        if (!section.enabled || !row.enabled || !row.department_enabled) return false;
+        return parseDepartmentCsv(row.department_input).length === 0;
+      });
+    if (classWithMissingDepartment) {
       return alert(
-        `Enter at least one department for ${enabledDepartmentWithoutName.label || enabledDepartmentWithoutName.key} or disable department.`
+        `Enter at least one department for ${classWithMissingDepartment.row.name} or disable its department checkbox.`
       );
     }
 
@@ -410,13 +393,14 @@ export default function SchoolInformation() {
       key: section.key,
       label: section.label,
       enabled: Boolean(section.enabled),
-      department_enabled: Boolean(section.enabled) && Boolean(departmentTemplatesByLevel[section.key]?.enabled),
-      department_names: Boolean(section.enabled) && Boolean(departmentTemplatesByLevel[section.key]?.enabled)
-        ? parseDepartmentCsv(departmentTemplatesByLevel[section.key]?.input)
-        : [],
       classes: (Array.isArray(section.classes) ? section.classes : []).map((row) => ({
-        name: String(row?.name || ""),
+        name: String(row?.name || "").trim(),
         enabled: Boolean(row?.enabled),
+        department_enabled: Boolean(section.enabled) && Boolean(row?.enabled) && Boolean(row?.department_enabled),
+        department_names:
+          Boolean(section.enabled) && Boolean(row?.enabled) && Boolean(row?.department_enabled)
+            ? parseDepartmentCsv(row?.department_input)
+            : [],
       })),
     }));
 
@@ -427,11 +411,6 @@ export default function SchoolInformation() {
       });
       const normalized = normalizeTemplates(Array.isArray(res.data?.data) ? res.data.data : payload);
       setClassTemplates(normalized);
-      if (res.data?.department_templates_by_level) {
-        setDepartmentTemplatesByLevel(
-          normalizeDepartmentTemplatesByLevel(res.data.department_templates_by_level, [])
-        );
-      }
       alert("Class templates saved.");
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to save class templates.");
@@ -597,7 +576,7 @@ export default function SchoolInformation() {
       <section className="sai-card">
         <h3>Class Templates</h3>
         <p className="sai-note">
-          Configure levels, classes, and per-level departments. Department names support bulk input with comma (,).
+          Configure levels, classes, and departments per class row. Use comma (,) for bulk department input.
         </p>
 
         <div className="sai-template-table">
@@ -607,9 +586,7 @@ export default function SchoolInformation() {
             <div>Department Setup</div>
           </div>
 
-          {classTemplates.map((section, sectionIndex) => {
-            const departmentRow = departmentTemplatesByLevel[section.key] || { enabled: false, input: "" };
-            return (
+          {classTemplates.map((section, sectionIndex) => (
               <div className="sai-template-line" key={section.key || sectionIndex}>
                 <div className="sai-template-level">
                   <label className="sai-check">
@@ -655,27 +632,35 @@ export default function SchoolInformation() {
                 </div>
 
                 <div className="sai-template-departments">
-                  <label className="sai-check">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(departmentRow.enabled)}
-                      onChange={(e) => updateDepartmentEnabled(section.key, e.target.checked)}
-                      disabled={!section.enabled}
-                    />
-                    <span>Enable Department</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={departmentRow.input}
-                    onChange={(e) => updateDepartmentInput(section.key, e.target.value)}
-                    placeholder="Gold, Diamond, Silver"
-                    disabled={!section.enabled || !departmentRow.enabled}
-                  />
-                  <small>Use comma (,) to add multiple departments at once.</small>
+                  {(section.classes || []).map((row, classIndex) => {
+                    const classRow = normalizeClassRow(row);
+                    return (
+                      <div key={`${section.key}-department-${classIndex}`} className="sai-template-row">
+                        <label className="sai-check">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(classRow.department_enabled)}
+                            onChange={(e) =>
+                              updateClassDepartmentEnabled(sectionIndex, classIndex, e.target.checked)
+                            }
+                            disabled={!section.enabled || !classRow.enabled}
+                          />
+                          <span>Enable</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={classRow.department_input}
+                          onChange={(e) => updateClassDepartmentInput(sectionIndex, classIndex, e.target.value)}
+                          placeholder="Gold, Diamond, Silver"
+                          disabled={!section.enabled || !classRow.enabled || !classRow.department_enabled}
+                        />
+                      </div>
+                    );
+                  })}
+                  <small>Each class has its own department list.</small>
                 </div>
               </div>
-            );
-          })}
+            ))}
         </div>
 
         <div className="sai-actions">

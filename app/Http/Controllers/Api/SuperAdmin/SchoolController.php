@@ -200,8 +200,13 @@ foreach ($defs as $def) {
 
     public function information(School $school)
     {
-        $departmentTemplateMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
-            $school->department_templates ?? []
+        $normalizedClassTemplates = ClassTemplateSchema::normalize($school->class_templates);
+        $departmentTemplateMapByClass = DepartmentTemplateSync::normalizeClassTemplateMap(
+            $school->department_templates ?? [],
+            $normalizedClassTemplates
+        );
+        $departmentTemplateMapByLevel = DepartmentTemplateSync::normalizeLevelTemplateMap(
+            ['by_class' => $departmentTemplateMapByClass]
         );
 
         return response()->json([
@@ -220,9 +225,13 @@ foreach ($defs as $def) {
                 'head_signature_url' => $this->storageUrl($school->head_signature_path),
             ],
             'exam_record' => AssessmentSchema::normalizeSchema($school->assessment_schema),
-            'class_templates' => ClassTemplateSchema::normalize($school->class_templates),
-            'department_templates' => DepartmentTemplateSync::flattenLevelTemplateNames($departmentTemplateMap),
-            'department_templates_by_level' => $departmentTemplateMap,
+            'class_templates' => $this->attachDepartmentTemplatesToClassTemplates(
+                $normalizedClassTemplates,
+                $departmentTemplateMapByClass
+            ),
+            'department_templates' => DepartmentTemplateSync::flattenClassTemplateNames($departmentTemplateMapByClass),
+            'department_templates_by_class' => $departmentTemplateMapByClass,
+            'department_templates_by_level' => $departmentTemplateMapByLevel,
         ]);
     }
 
@@ -358,9 +367,11 @@ foreach ($defs as $def) {
             'class_templates.*.enabled' => 'required|boolean',
             'class_templates.*.classes' => 'required|array|min:1|max:20',
             'class_templates.*.classes.*' => 'nullable',
-            'class_templates.*.department_enabled' => 'nullable|boolean',
-            'class_templates.*.department_names' => 'nullable|array|max:30',
-            'class_templates.*.department_names.*' => 'nullable|string|max:80',
+            'class_templates.*.classes.*.name' => 'nullable|string|max:80',
+            'class_templates.*.classes.*.enabled' => 'nullable|boolean',
+            'class_templates.*.classes.*.department_enabled' => 'nullable|boolean',
+            'class_templates.*.classes.*.department_names' => 'nullable|array|max:30',
+            'class_templates.*.classes.*.department_names.*' => 'nullable|string|max:80',
         ]);
 
         $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
@@ -381,21 +392,29 @@ foreach ($defs as $def) {
             }
         }
 
-        $departmentTemplateMap = $this->buildDepartmentTemplateMapFromClassTemplates(
+        $departmentTemplateMapByClass = $this->buildDepartmentTemplateMapFromClassTemplates(
             $payload['class_templates'] ?? [],
             $normalized
         );
 
         $school->class_templates = $normalized;
-        $school->department_templates = DepartmentTemplateSync::serializeLevelTemplateMap($departmentTemplateMap);
+        $school->department_templates = DepartmentTemplateSync::serializeClassTemplateMap(
+            $departmentTemplateMapByClass,
+            $normalized
+        );
         $school->save();
 
-        $this->syncClassTemplatesToExistingSessions($school, $normalized, $departmentTemplateMap);
+        $this->syncClassTemplatesToExistingSessions($school, $normalized, $departmentTemplateMapByClass);
+
+        $departmentTemplateMapByLevel = DepartmentTemplateSync::normalizeLevelTemplateMap([
+            'by_class' => $departmentTemplateMapByClass,
+        ]);
 
         return response()->json([
             'message' => 'Class templates saved successfully.',
-            'data' => $normalized,
-            'department_templates_by_level' => $departmentTemplateMap,
+            'data' => $this->attachDepartmentTemplatesToClassTemplates($normalized, $departmentTemplateMapByClass),
+            'department_templates_by_class' => $departmentTemplateMapByClass,
+            'department_templates_by_level' => $departmentTemplateMapByLevel,
         ]);
     }
 
@@ -516,7 +535,7 @@ foreach ($defs as $def) {
     private function syncClassTemplatesToExistingSessions(
         School $school,
         array $templates,
-        ?array $departmentTemplateMap = null
+        ?array $departmentTemplateMapByClass = null
     ): void
     {
         $schoolId = (int) $school->id;
@@ -526,9 +545,9 @@ foreach ($defs as $def) {
             $activeSections
         ));
 
-        $departmentTemplateMap = $departmentTemplateMap
-            ? DepartmentTemplateSync::normalizeLevelTemplateMap(['by_level' => $departmentTemplateMap])
-            : DepartmentTemplateSync::normalizeLevelTemplateMap($school->department_templates ?? []);
+        $departmentTemplateMapByClass = $departmentTemplateMapByClass
+            ? DepartmentTemplateSync::normalizeClassTemplateMap(['by_class' => $departmentTemplateMapByClass], $templates)
+            : DepartmentTemplateSync::normalizeClassTemplateMap($school->department_templates ?? [], $templates);
 
         $sessions = AcademicSession::query()
             ->where('school_id', $schoolId)
@@ -556,54 +575,151 @@ foreach ($defs as $def) {
                 }
             }
 
-            DepartmentTemplateSync::syncLevelTemplatesToSession(
+            DepartmentTemplateSync::syncClassTemplatesToSession(
                 $schoolId,
                 (int) $session->id,
-                $activeLevels,
-                $departmentTemplateMap
+                $templates,
+                ['by_class' => $departmentTemplateMapByClass]
             );
         }
     }
 
     private function buildDepartmentTemplateMapFromClassTemplates(array $rawTemplates, array $normalizedTemplates): array
     {
-        $map = DepartmentTemplateSync::emptyLevelTemplateMap();
+        $map = DepartmentTemplateSync::emptyClassTemplateMap($normalizedTemplates);
         $normalizedByKey = collect($normalizedTemplates)->keyBy(
             fn (array $section) => strtolower(trim((string) ($section['key'] ?? '')))
         );
+        $rawByKey = collect($rawTemplates)
+            ->filter(fn ($section) => is_array($section))
+            ->keyBy(fn (array $section) => strtolower(trim((string) ($section['key'] ?? ''))));
 
-        foreach ($rawTemplates as $rawSection) {
-            if (!is_array($rawSection)) {
-                continue;
-            }
-
-            $key = strtolower(trim((string) ($rawSection['key'] ?? '')));
+        foreach ($normalizedByKey as $key => $normalizedSection) {
             if (!array_key_exists($key, $map)) {
                 continue;
             }
 
-            $sectionEnabled = (bool) ($normalizedByKey->get($key)['enabled'] ?? false);
-            $departmentEnabled = filter_var(
-                $rawSection['department_enabled'] ?? false,
-                FILTER_VALIDATE_BOOLEAN
-            );
-            $departmentNames = DepartmentTemplateSync::normalizeTemplateNames(
-                $rawSection['department_names'] ?? []
-            );
+            $sectionEnabled = (bool) ($normalizedSection['enabled'] ?? false);
+            $rawSection = $rawByKey->get($key, []);
+            $rawClasses = is_array($rawSection['classes'] ?? null) ? $rawSection['classes'] : [];
+            $normalizedClasses = is_array($normalizedSection['classes'] ?? null) ? $normalizedSection['classes'] : [];
 
-            if ($departmentEnabled && $sectionEnabled && empty($departmentNames)) {
-                throw ValidationException::withMessages([
-                    'class_templates' => ["Provide at least one department name for {$key} or disable department."],
-                ]);
+            foreach ($normalizedClasses as $classIndex => $normalizedClassRow) {
+                $className = trim((string) ($normalizedClassRow['name'] ?? ''));
+                if ($className === '') {
+                    continue;
+                }
+
+                $classEnabled = $sectionEnabled && (bool) ($normalizedClassRow['enabled'] ?? false);
+                $rawClassRow = $this->resolveRawClassRow($rawClasses, $classIndex, $className);
+                $departmentEnabled = filter_var(
+                    $rawClassRow['department_enabled'] ?? $classEnabled,
+                    FILTER_VALIDATE_BOOLEAN
+                );
+                $departmentNames = DepartmentTemplateSync::normalizeTemplateNames(
+                    $rawClassRow['department_names'] ?? []
+                );
+
+                if ($classEnabled && $departmentEnabled && empty($departmentNames)) {
+                    throw ValidationException::withMessages([
+                        'class_templates' => [
+                            "Provide at least one department for {$className} or disable its department checkbox.",
+                        ],
+                    ]);
+                }
+
+                $map[$key][$className] = [
+                    'enabled' => $classEnabled && $departmentEnabled && !empty($departmentNames),
+                    'names' => $departmentNames,
+                ];
             }
-
-            $map[$key] = [
-                'enabled' => $sectionEnabled && $departmentEnabled && !empty($departmentNames),
-                'names' => $departmentNames,
-            ];
         }
 
         return $map;
+    }
+
+    private function resolveRawClassRow(array $rawClasses, int $classIndex, string $className): array
+    {
+        $byIndex = $rawClasses[$classIndex] ?? null;
+        if (is_array($byIndex)) {
+            return $byIndex;
+        }
+
+        $needle = strtolower(trim($className));
+        foreach ($rawClasses as $rawClassRow) {
+            if (!is_array($rawClassRow)) {
+                continue;
+            }
+
+            $rawName = strtolower(trim((string) ($rawClassRow['name'] ?? '')));
+            if ($rawName === $needle) {
+                return $rawClassRow;
+            }
+        }
+
+        return [];
+    }
+
+    private function attachDepartmentTemplatesToClassTemplates(array $templates, array $departmentTemplateMapByClass): array
+    {
+        return collect(ClassTemplateSchema::normalize($templates))
+            ->map(function (array $section) use ($departmentTemplateMapByClass) {
+                $level = strtolower(trim((string) ($section['key'] ?? '')));
+                $classes = is_array($section['classes'] ?? null) ? $section['classes'] : [];
+                $section['classes'] = collect($classes)
+                    ->map(function ($classRow) use ($departmentTemplateMapByClass, $level) {
+                        $name = trim((string) (is_array($classRow) ? ($classRow['name'] ?? '') : ''));
+                        $enabled = (bool) (is_array($classRow) ? ($classRow['enabled'] ?? false) : false);
+                        $departmentRow = $this->resolveDepartmentRowForClass(
+                            $departmentTemplateMapByClass,
+                            $level,
+                            $name
+                        );
+
+                        return [
+                            'name' => $name,
+                            'enabled' => $enabled,
+                            'department_enabled' => $enabled && (bool) ($departmentRow['enabled'] ?? false),
+                            'department_names' => $departmentRow['names'] ?? [],
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                return $section;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function resolveDepartmentRowForClass(
+        array $departmentTemplateMapByClass,
+        string $level,
+        string $className
+    ): array {
+        $rows = is_array($departmentTemplateMapByClass[$level] ?? null)
+            ? $departmentTemplateMapByClass[$level]
+            : [];
+        $needle = strtolower(trim($className));
+        foreach ($rows as $rowName => $row) {
+            if (strtolower(trim((string) $rowName)) !== $needle) {
+                continue;
+            }
+
+            if (!is_array($row)) {
+                break;
+            }
+
+            return [
+                'enabled' => (bool) ($row['enabled'] ?? false),
+                'names' => is_array($row['names'] ?? null) ? array_values($row['names']) : [],
+            ];
+        }
+
+        return [
+            'enabled' => false,
+            'names' => [],
+        ];
     }
 
     private function clearApplicationCache(): void
