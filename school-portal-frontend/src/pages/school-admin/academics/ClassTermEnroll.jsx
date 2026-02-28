@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 
 export default function ClassTermEnroll() {
   const { classId, termId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const departmentId = searchParams.get("department_id") || "";
+  const departmentName = searchParams.get("department_name") || "";
+  const isDepartmentContext = departmentId !== "";
 
   const [available, setAvailable] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -64,22 +68,27 @@ export default function ClassTermEnroll() {
 
   const enrollOne = async (row) => {
     if (!row?.student_id) return alert("No valid student profile for this row");
-    if (departments.length > 0 && !getDepartmentId(row.id)) {
+    if (isDepartmentContext && !departmentId) {
+      return alert("No department selected");
+    }
+    if (!isDepartmentContext && departments.length > 0 && !getDepartmentId(row.id)) {
       return alert("Select a department for this student");
     }
 
     try {
       const res = await api.post(`/api/school-admin/classes/${classId}/terms/${termId}/enroll/bulk`, {
+        department_id: isDepartmentContext ? Number(departmentId) : undefined,
         enrollments: [
           {
             student_id: row.student_id,
-            department_id: getDepartmentId(row.id),
+            department_id: isDepartmentContext ? Number(departmentId) : getDepartmentId(row.id),
           },
         ],
       });
       const count = Number(res.data?.count || 0);
+      const updatedRows = Number(res.data?.updated_department_rows || 0);
       const skipped = res.data?.skipped_duplicates || [];
-      if (count > 0) {
+      if (count > 0 || updatedRows > 0) {
         alert("Student enrolled");
       } else if (skipped.length > 0) {
         alert(skipped[0]?.reason || "This student name/email is already enrolled in this session and term.");
@@ -100,28 +109,30 @@ export default function ClassTermEnroll() {
       .filter((u) => !!u.student_id)
       .map((u) => ({
         student_id: u.student_id,
-        department_id: getDepartmentId(u.id),
+        department_id: isDepartmentContext ? Number(departmentId) : getDepartmentId(u.id),
       }));
 
     if (enrollments.length === 0) {
       return alert("No valid student records found");
     }
 
-    if (departments.length > 0 && enrollments.some((r) => !r.department_id)) {
+    if (!isDepartmentContext && departments.length > 0 && enrollments.some((r) => !r.department_id)) {
       return alert("Select department for all selected students");
     }
 
     setSubmitting(true);
     try {
       const res = await api.post(`/api/school-admin/classes/${classId}/terms/${termId}/enroll/bulk`, {
+        department_id: isDepartmentContext ? Number(departmentId) : undefined,
         enrollments,
       });
       const count = Number(res.data?.count || 0);
+      const updatedRows = Number(res.data?.updated_department_rows || 0);
       const skipped = res.data?.skipped_duplicates || [];
-      if (count > 0) {
+      if (count > 0 || updatedRows > 0) {
         alert(
           skipped.length > 0
-            ? `Enrollment successful for ${count} student(s). ${skipped.length} skipped due to duplicate name/email in this term.`
+            ? `Enrollment updated for ${count + updatedRows} student(s). ${skipped.length} skipped due to duplicate name/email in this term.`
             : "Enrollment successful"
         );
       } else if (skipped.length > 0) {
@@ -129,7 +140,12 @@ export default function ClassTermEnroll() {
       } else {
         alert("No enrollment was created.");
       }
-      navigate(`/school/admin/classes/${classId}/terms/${termId}/students`);
+      navigate(
+        `/school/admin/classes/${classId}/terms/${termId}/students` +
+          (isDepartmentContext
+            ? `?department_id=${encodeURIComponent(departmentId)}&department_name=${encodeURIComponent(departmentName)}`
+            : "")
+      );
     } catch (e) {
       alert(e?.response?.data?.message || "Enrollment failed");
     } finally {
@@ -140,6 +156,11 @@ export default function ClassTermEnroll() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {isDepartmentContext ? (
+          <p style={{ margin: 0, opacity: 0.75 }}>
+            Enrolling into department: <strong>{departmentName || "Selected Department"}</strong>
+          </p>
+        ) : null}
       </div>
 
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
@@ -184,7 +205,7 @@ export default function ClassTermEnroll() {
                 <th style={{ width: 70 }}>S/N</th>
                 <th>Name</th>
                 <th>Email</th>
-                <th style={{ width: 220 }}>Department</th>
+                {!isDepartmentContext && <th style={{ width: 220 }}>Department</th>}
                 <th style={{ width: 140 }}>Action</th>
               </tr>
             </thead>
@@ -201,23 +222,25 @@ export default function ClassTermEnroll() {
                   <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || available.length || 0) + idx + 1}</td>
                   <td>{u.name}</td>
                   <td>{u.email || ""}</td>
-                  <td>
-                    <select
-                      value={rowDepartment[u.id] || ""}
-                      onChange={(e) => setDepartment(u.id, e.target.value)}
-                      style={{ width: "100%" }}
-                      disabled={departments.length === 0}
-                    >
-                      <option value="">
-                        {departments.length === 0 ? "No department configured" : "Select department"}
-                      </option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
+                  {!isDepartmentContext && (
+                    <td>
+                      <select
+                        value={rowDepartment[u.id] || ""}
+                        onChange={(e) => setDepartment(u.id, e.target.value)}
+                        style={{ width: "100%" }}
+                        disabled={departments.length === 0}
+                      >
+                        <option value="">
+                          {departments.length === 0 ? "No department configured" : "Select department"}
                         </option>
-                      ))}
-                    </select>
-                  </td>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td>
                     <button onClick={() => enrollOne(u)}>Enroll One</button>
                   </td>
@@ -225,7 +248,7 @@ export default function ClassTermEnroll() {
               ))}
               {available.length === 0 && (
                 <tr>
-                  <td colSpan="6">No students available.</td>
+                  <td colSpan={isDepartmentContext ? "5" : "6"}>No students available.</td>
                 </tr>
               )}
             </tbody>

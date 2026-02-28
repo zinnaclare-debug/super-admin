@@ -69,6 +69,36 @@ class EnrollmentController extends Controller
 
         $this->syncClassDepartmentsFromLevel($schoolId, $class);
 
+        $classDepartmentIds = ClassDepartment::where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $hasDepartments = !empty($classDepartmentIds);
+
+        $contextDepartmentId = null;
+        if (array_key_exists('department_id', $data) && $data['department_id'] !== null) {
+            $contextDepartmentId = (int) $data['department_id'];
+            if (!in_array($contextDepartmentId, $classDepartmentIds, true)) {
+                return response()->json(['message' => 'Invalid department selected for this class'], 422);
+            }
+        }
+
+        $rows = $rows->map(function ($row) use ($contextDepartmentId) {
+            if ($contextDepartmentId !== null) {
+                $row['department_id'] = $contextDepartmentId;
+            }
+            if (empty($row['department_id'])) {
+                $row['department_id'] = null;
+            }
+            return $row;
+        })->values();
+
+        if ($hasDepartments && $rows->contains(fn ($row) => empty($row['department_id']))) {
+            return response()->json(['message' => 'Select department for all selected students'], 422);
+        }
+
         $departmentIds = $rows
             ->pluck('department_id')
             ->filter(fn ($id) => $id !== null)
@@ -76,12 +106,10 @@ class EnrollmentController extends Controller
             ->values();
 
         if ($departmentIds->isNotEmpty()) {
-            $validDepartmentCount = ClassDepartment::where('school_id', $schoolId)
-                ->where('class_id', $class->id)
-                ->whereIn('id', $departmentIds->all())
-                ->count();
-
-            if ($validDepartmentCount !== $departmentIds->count()) {
+            $invalid = $departmentIds
+                ->reject(fn ($id) => in_array((int) $id, $classDepartmentIds, true))
+                ->values();
+            if ($invalid->isNotEmpty()) {
                 return response()->json(['message' => 'Invalid department selected for this class'], 422);
             }
         }
@@ -103,11 +131,12 @@ class EnrollmentController extends Controller
         return DB::transaction(function () use ($rows, $class, $schoolId, $sessionTermIds, $currentSessionTermId) {
 
             $inserted = [];
+            $updatedDepartmentRows = 0;
             $skippedDuplicates = [];
 
             foreach ($rows as $row) {
                 $studentId = (int) $row['student_id'];
-                $departmentId = $row['department_id'];
+                $departmentId = $row['department_id'] ? (int) $row['department_id'] : null;
 
                 // ensure student belongs to this school
                 $student = Student::where('id', $studentId)
@@ -166,13 +195,28 @@ class EnrollmentController extends Controller
                 ]);
 
                 foreach ($sessionTermIds as $sessionTermId) {
-                    $exists = Enrollment::where([
-                        'student_id' => $studentId,
-                        'class_id' => $class->id,
-                        'term_id' => $sessionTermId,
-                    ])->exists();
+                    $enrollmentQuery = Enrollment::query()
+                        ->where('student_id', $studentId)
+                        ->where('class_id', $class->id)
+                        ->where('term_id', $sessionTermId)
+                        ->orderByDesc('id');
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $enrollmentQuery->where('school_id', $schoolId);
+                    }
 
-                    if ($exists) {
+                    $existingRows = $enrollmentQuery->get();
+                    if ($existingRows->isNotEmpty()) {
+                        $keeper = $existingRows->first();
+                        if ((int) ($keeper->department_id ?? 0) !== (int) ($departmentId ?? 0)) {
+                            $keeper->department_id = $departmentId;
+                            $keeper->save();
+                            $updatedDepartmentRows++;
+                        }
+
+                        $duplicateIds = $existingRows->skip(1)->pluck('id')->map(fn ($id) => (int) $id)->all();
+                        if (!empty($duplicateIds)) {
+                            Enrollment::query()->whereIn('id', $duplicateIds)->delete();
+                        }
                         continue;
                     }
 
@@ -193,6 +237,7 @@ class EnrollmentController extends Controller
             return response()->json([
                 'message' => 'Enrollment completed for all terms in this session',
                 'count' => count($inserted),
+                'updated_department_rows' => $updatedDepartmentRows,
                 'skipped_duplicates' => $skippedDuplicates,
                 'data' => $inserted
             ]);
@@ -210,12 +255,33 @@ class EnrollmentController extends Controller
         abort_unless($term->school_id === $schoolId, 403);
         abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
 
+        $departmentId = $request->filled('department_id')
+            ? (int) $request->query('department_id')
+            : null;
+
+        $this->syncClassDepartmentsFromLevel($schoolId, $class);
+        $departments = ClassDepartment::where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        if ($departmentId !== null && !in_array($departmentId, $departments, true)) {
+            return response()->json(['message' => 'Invalid department selected for this class'], 422);
+        }
+
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 15);
 
         $q = Enrollment::where('class_id', $class->id)
             ->where('term_id', $term->id)
             ->with(['student.user', 'department']);
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $q->where('school_id', $schoolId);
+        }
+        if ($departmentId !== null) {
+            $q->where('department_id', $departmentId);
+        }
 
         if ($search !== '') {
             $q->whereHas('student.user', function ($sub) use ($search) {
@@ -249,6 +315,7 @@ class EnrollmentController extends Controller
             'last_page' => $p->lastPage(),
             'per_page' => $p->perPage(),
             'total' => $p->total(),
+            'selected_department_id' => $departmentId,
         ]]);
     }
 

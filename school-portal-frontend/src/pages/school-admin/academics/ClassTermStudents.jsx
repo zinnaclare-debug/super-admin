@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 
 export default function ClassTermStudents() {
   const { classId, termId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const departmentId = searchParams.get("department_id") || "";
+  const departmentName = searchParams.get("department_name") || "";
 
   const [students, setStudents] = useState([]);
   const [cls, setCls] = useState(null);
@@ -18,7 +21,9 @@ export default function ClassTermStudents() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/school-admin/classes/${classId}/terms/${termId}/students`, { params: { search, page } });
+      const params = { search, page };
+      if (departmentId) params.department_id = Number(departmentId);
+      const res = await api.get(`/api/school-admin/classes/${classId}/terms/${termId}/students`, { params });
       setStudents(res.data.data || []);
       setMeta(res.data.meta || null);
     } catch (e) {
@@ -28,7 +33,7 @@ export default function ClassTermStudents() {
     }
   };
 
-  useEffect(() => { load(); }, [classId, termId, search, page]);
+  useEffect(() => { load(); }, [classId, termId, departmentId, search, page]);
 
   const toggle = (id) => {
     const s = new Set(selected);
@@ -61,7 +66,20 @@ export default function ClassTermStudents() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <button onClick={() => navigate(`/school/admin/classes/${classId}/terms/${termId}/enroll`)} style={{ marginLeft: 8 }}>
+          {departmentName ? (
+            <p style={{ margin: "0 0 8px", opacity: 0.75 }}>
+              Showing enrolled students for department: <strong>{departmentName}</strong>
+            </p>
+          ) : null}
+          <button
+            onClick={() =>
+              navigate(
+                `/school/admin/classes/${classId}/terms/${termId}/enroll` +
+                  (departmentId ? `?department_id=${encodeURIComponent(departmentId)}&department_name=${encodeURIComponent(departmentName)}` : "")
+              )
+            }
+            style={{ marginLeft: 8 }}
+          >
             Open Enroll Table
           </button>
         </div>

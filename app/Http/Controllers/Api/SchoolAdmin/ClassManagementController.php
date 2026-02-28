@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClassDepartment;
 use App\Models\SchoolClass;
 use App\Models\Staff;
 use App\Models\Term;
@@ -19,6 +20,8 @@ class ClassManagementController extends Controller
         $schoolId = $request->user()->school_id;
         abort_unless($class->school_id === $schoolId, 403);
 
+        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
+
         $level = $class->level; // nursery|primary|secondary
 
         $teachers = User::query()
@@ -31,13 +34,72 @@ class ClassManagementController extends Controller
             ->orderBy('name')
             ->get();
 
+        $departmentsQuery = ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name');
+        if (Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+            $departmentsQuery->addSelect(['id', 'name', 'class_teacher_user_id']);
+        } else {
+            $departmentsQuery->addSelect(['id', 'name']);
+        }
+        $departments = $departmentsQuery->get();
+
+        $selectedDepartmentId = null;
+        $selectedDepartment = null;
+        if ($departments->isNotEmpty()) {
+            $requestedDepartmentId = (int) $request->query('department_id', 0);
+            $selectedDepartment = $requestedDepartmentId > 0
+                ? $departments->firstWhere('id', $requestedDepartmentId)
+                : $departments->first();
+            if (!$selectedDepartment) {
+                return response()->json(['message' => 'Invalid department selected for this class'], 422);
+            }
+            $selectedDepartmentId = (int) $selectedDepartment->id;
+        }
+
+        $canUseDepartmentTeacher = Schema::hasColumn('class_departments', 'class_teacher_user_id');
         $currentTeacher = null;
-        if ($class->class_teacher_user_id) {
+        if ($selectedDepartmentId !== null && $canUseDepartmentTeacher) {
+            $teacherUserId = ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('class_id', $class->id)
+                ->where('id', $selectedDepartmentId)
+                ->value('class_teacher_user_id');
+
+            if ($teacherUserId) {
+                $currentTeacher = User::where('id', $teacherUserId)
+                    ->where('school_id', $schoolId)
+                    ->select('id', 'name', 'email')
+                    ->first();
+            }
+        } elseif ($class->class_teacher_user_id) {
             $currentTeacher = User::where('id', $class->class_teacher_user_id)
                 ->where('school_id', $schoolId)
                 ->select('id', 'name', 'email')
                 ->first();
         }
+
+        $departmentRows = $departments->map(function ($department) use ($schoolId, $canUseDepartmentTeacher) {
+            $teacher = null;
+            if ($canUseDepartmentTeacher && $department->class_teacher_user_id) {
+                $teacher = User::query()
+                    ->where('id', (int) $department->class_teacher_user_id)
+                    ->where('school_id', $schoolId)
+                    ->select('id', 'name', 'email')
+                    ->first();
+            }
+
+            return [
+                'id' => (int) $department->id,
+                'name' => (string) $department->name,
+                'current_teacher' => $teacher ? [
+                    'id' => (int) $teacher->id,
+                    'name' => (string) $teacher->name,
+                    'email' => $teacher->email,
+                ] : null,
+            ];
+        })->values()->all();
 
         return response()->json([
             'data' => $teachers,
@@ -47,6 +109,9 @@ class ClassManagementController extends Controller
                     'name' => $class->name,
                     'level' => $class->level,
                 ],
+                'has_departments' => !empty($departmentRows),
+                'selected_department_id' => $selectedDepartmentId,
+                'departments' => $departmentRows,
                 'current_teacher' => $currentTeacher,
             ],
         ]);
@@ -59,7 +124,8 @@ class ClassManagementController extends Controller
         abort_unless($class->school_id === $schoolId, 403);
 
         $payload = $request->validate([
-            'teacher_user_id' => 'required|integer|exists:users,id'
+            'teacher_user_id' => 'required|integer|exists:users,id',
+            'department_id' => 'nullable|integer|exists:class_departments,id',
         ]);
 
         $teacher = User::where('id', $payload['teacher_user_id'])
@@ -76,7 +142,50 @@ class ClassManagementController extends Controller
             return response()->json(['message' => 'Teacher level does not match this class'], 422);
         }
 
-        $class->update(['class_teacher_user_id' => $teacher->id]);
+        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
+        $departments = ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        if ($departments->isNotEmpty()) {
+            if (!Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+                return response()->json(['message' => 'Department teacher support is not ready. Run migrations.'], 422);
+            }
+
+            $departmentId = (int) ($payload['department_id'] ?? 0);
+            if ($departmentId < 1) {
+                return response()->json(['message' => 'Select a department for class teacher assignment'], 422);
+            }
+
+            $department = $departments->firstWhere('id', $departmentId);
+            if (!$department) {
+                return response()->json(['message' => 'Invalid department selected for this class'], 422);
+            }
+
+            ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('class_id', $class->id)
+                ->where('id', $departmentId)
+                ->update(['class_teacher_user_id' => $teacher->id]);
+
+            return response()->json([
+                'message' => 'Department class teacher assigned',
+                'data' => [
+                    'class_id' => (int) $class->id,
+                    'department_id' => $departmentId,
+                    'class_teacher_user_id' => (int) $teacher->id,
+                    'teacher' => [
+                        'id' => (int) $teacher->id,
+                        'name' => (string) $teacher->name,
+                        'email' => $teacher->email,
+                    ],
+                ],
+            ]);
+        }
+
+        $class->update(['class_teacher_user_id' => (int) $teacher->id]);
 
         return response()->json([
             'message' => 'Teacher assigned',
@@ -87,8 +196,8 @@ class ClassManagementController extends Controller
                     'id' => $teacher->id,
                     'name' => $teacher->name,
                     'email' => $teacher->email,
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -97,6 +206,47 @@ class ClassManagementController extends Controller
     {
         $schoolId = $request->user()->school_id;
         abort_unless($class->school_id === $schoolId, 403);
+
+        $payload = $request->validate([
+            'department_id' => 'nullable|integer|exists:class_departments,id',
+        ]);
+
+        $this->syncClassDepartmentsFromLevel((int) $schoolId, $class);
+        $departments = ClassDepartment::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $class->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        if ($departments->isNotEmpty()) {
+            if (!Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+                return response()->json(['message' => 'Department teacher support is not ready. Run migrations.'], 422);
+            }
+
+            $departmentId = (int) ($payload['department_id'] ?? 0);
+            if ($departmentId < 1) {
+                return response()->json(['message' => 'Select a department to unassign class teacher'], 422);
+            }
+
+            $department = $departments->firstWhere('id', $departmentId);
+            if (!$department) {
+                return response()->json(['message' => 'Invalid department selected for this class'], 422);
+            }
+
+            ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('class_id', $class->id)
+                ->where('id', $departmentId)
+                ->update(['class_teacher_user_id' => null]);
+
+            return response()->json([
+                'message' => 'Department class teacher unassigned',
+                'data' => [
+                    'class_id' => (int) $class->id,
+                    'department_id' => $departmentId,
+                ],
+            ]);
+        }
 
         $class->update(['class_teacher_user_id' => null]);
 
@@ -297,5 +447,26 @@ class ClassManagementController extends Controller
 
         $classId = $query->value('class_id');
         return $classId ? (int) $classId : null;
+    }
+
+    private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
+    {
+        if (!Schema::hasTable('level_departments') || !Schema::hasTable('class_departments')) {
+            return;
+        }
+
+        $levelDepartments = DB::table('level_departments')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $class->academic_session_id)
+            ->where('level', $class->level)
+            ->pluck('name');
+
+        foreach ($levelDepartments as $name) {
+            ClassDepartment::firstOrCreate([
+                'school_id' => $schoolId,
+                'class_id' => $class->id,
+                'name' => $name,
+            ]);
+        }
     }
 }

@@ -6,35 +6,69 @@ export default function AssignTeacher() {
   const { classId } = useParams();
 
   const [teachers, setTeachers] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [currentTeacher, setCurrentTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = async (departmentId = "") => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/school-admin/classes/${classId}/eligible-teachers`);
+      const params = {};
+      if (departmentId) params.department_id = Number(departmentId);
+      const res = await api.get(`/api/school-admin/classes/${classId}/eligible-teachers`, { params });
       setTeachers(res.data.data || []);
       setCurrentTeacher(res.data?.meta?.current_teacher || null);
+      const rows = res.data?.meta?.departments || [];
+      setDepartments(rows);
+      if (rows.length > 0) {
+        const backendSelected = res.data?.meta?.selected_department_id
+          ? String(res.data.meta.selected_department_id)
+          : "";
+        setSelectedDepartmentId((prev) => {
+          if (prev && rows.some((row) => String(row.id) === String(prev))) return prev;
+          if (backendSelected && rows.some((row) => String(row.id) === backendSelected)) return backendSelected;
+          return String(rows[0].id);
+        });
+      } else {
+        setSelectedDepartmentId("");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-  }, [classId]);
+    load(selectedDepartmentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, selectedDepartmentId]);
+
+  useEffect(() => {
+    setTeacherId("");
+  }, [selectedDepartmentId]);
+
+  const selectedDepartment = departments.find((department) => String(department.id) === String(selectedDepartmentId));
+
+  const payloadForDepartment = () => (
+    departments.length > 0
+      ? { department_id: Number(selectedDepartmentId) }
+      : {}
+  );
 
   const assign = async () => {
     if (!teacherId) return alert("Select a teacher");
+    if (departments.length > 0 && !selectedDepartmentId) return alert("Select department");
+
     setSaving(true);
     try {
       await api.patch(`/api/school-admin/classes/${classId}/assign-teacher`, {
         teacher_user_id: Number(teacherId),
+        ...payloadForDepartment(),
       });
       alert("Teacher assigned");
-      await load();
+      await load(selectedDepartmentId);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to assign teacher");
     } finally {
@@ -43,12 +77,15 @@ export default function AssignTeacher() {
   };
 
   const unassign = async () => {
-    if (!window.confirm("Unassign current class teacher?")) return;
+    const label = departments.length > 0
+      ? "Unassign class teacher for this department?"
+      : "Unassign current class teacher?";
+    if (!window.confirm(label)) return;
     setSaving(true);
     try {
-      await api.patch(`/api/school-admin/classes/${classId}/unassign-teacher`);
+      await api.patch(`/api/school-admin/classes/${classId}/unassign-teacher`, payloadForDepartment());
       alert("Teacher unassigned");
-      await load();
+      await load(selectedDepartmentId);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to unassign teacher");
     } finally {
@@ -66,12 +103,33 @@ export default function AssignTeacher() {
         <p>Loading teachers...</p>
       ) : (
         <>
+          {departments.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 6 }}>Department</label>
+              <select
+                value={selectedDepartmentId}
+                onChange={(e) => setSelectedDepartmentId(e.target.value)}
+              >
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <p style={{ opacity: 0.75 }}>
             Only teachers registered for this class level will show here.
           </p>
 
           <div style={{ marginBottom: 10 }}>
-            <strong>Current Class Teacher:</strong>{" "}
+            <strong>
+              {departments.length > 0
+                ? `Current Class Teacher (${selectedDepartment?.name || "Department"})`
+                : "Current Class Teacher"}
+              :
+            </strong>{" "}
             {currentTeacher ? `${currentTeacher.name}${currentTeacher.email ? ` (${currentTeacher.email})` : ""}` : "Not assigned"}
           </div>
 
