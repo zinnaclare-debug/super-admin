@@ -10,6 +10,7 @@ const DEFAULT_EXAM_RECORD = {
   exam_max: 70,
   total_max: 100,
 };
+const LEVEL_KEYS = ["pre_nursery", "nursery", "primary", "secondary"];
 
 const toAbsoluteUrl = (u) => {
   if (!u) return "";
@@ -58,6 +59,49 @@ const normalizeTemplates = (items) =>
     classes: (Array.isArray(section?.classes) ? section.classes : []).map(normalizeClassRow),
   }));
 
+const toDepartmentCsv = (names) =>
+  (Array.isArray(names) ? names : [])
+    .map((name) => String(name || "").trim())
+    .filter(Boolean)
+    .join(", ");
+
+const parseDepartmentCsv = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((name, index, arr) => arr.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index);
+
+const normalizeDepartmentTemplatesByLevel = (rawMap, fallbackNames = []) => {
+  const fallbackCsv = toDepartmentCsv(fallbackNames);
+  const normalized = Object.fromEntries(
+    LEVEL_KEYS.map((level) => [
+      level,
+      {
+        enabled: Boolean(fallbackCsv),
+        input: fallbackCsv,
+      },
+    ])
+  );
+
+  if (!rawMap || typeof rawMap !== "object") {
+    return normalized;
+  }
+
+  LEVEL_KEYS.forEach((level) => {
+    const row = rawMap?.[level];
+    if (!row || typeof row !== "object") return;
+
+    const names = toDepartmentCsv(row?.names || []);
+    normalized[level] = {
+      enabled: Boolean(row?.enabled) && Boolean(names),
+      input: names,
+    };
+  });
+
+  return normalized;
+};
+
 export default function SchoolInformation() {
   const navigate = useNavigate();
   const { schoolId } = useParams();
@@ -91,6 +135,9 @@ export default function SchoolInformation() {
 
   const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
   const [classTemplates, setClassTemplates] = useState([]);
+  const [departmentTemplatesByLevel, setDepartmentTemplatesByLevel] = useState(() =>
+    normalizeDepartmentTemplatesByLevel(null, [])
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -113,7 +160,14 @@ export default function SchoolInformation() {
         setContactEmail(brandingData.contact_email ?? "");
         setContactPhone(brandingData.contact_phone ?? "");
         setExamRecord(normalizeExamRecord(payload.exam_record));
-        setClassTemplates(normalizeTemplates(payload.class_templates));
+        const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
+        setClassTemplates(normalizedClassTemplates);
+        setDepartmentTemplatesByLevel(
+          normalizeDepartmentTemplatesByLevel(
+            payload.department_templates_by_level,
+            payload.department_templates || []
+          )
+        );
       } catch (err) {
         alert(err?.response?.data?.message || "Failed to load school information.");
       } finally {
@@ -310,6 +364,26 @@ export default function SchoolInformation() {
     );
   };
 
+  const updateDepartmentEnabled = (levelKey, enabled) => {
+    setDepartmentTemplatesByLevel((prev) => ({
+      ...prev,
+      [levelKey]: {
+        ...(prev[levelKey] || { enabled: false, input: "" }),
+        enabled: Boolean(enabled),
+      },
+    }));
+  };
+
+  const updateDepartmentInput = (levelKey, value) => {
+    setDepartmentTemplatesByLevel((prev) => ({
+      ...prev,
+      [levelKey]: {
+        ...(prev[levelKey] || { enabled: false, input: "" }),
+        input: value,
+      },
+    }));
+  };
+
   const saveClassTemplates = async () => {
     const enabledSectionWithoutClass = classTemplates.find((section) => {
       if (!section.enabled) return false;
@@ -320,10 +394,26 @@ export default function SchoolInformation() {
       return alert(`Select at least one checked class in ${enabledSectionWithoutClass.label || enabledSectionWithoutClass.key}.`);
     }
 
+    const enabledDepartmentWithoutName = classTemplates.find((section) => {
+      const key = section.key;
+      const row = departmentTemplatesByLevel[key] || { enabled: false, input: "" };
+      if (!section.enabled || !row.enabled) return false;
+      return parseDepartmentCsv(row.input).length === 0;
+    });
+    if (enabledDepartmentWithoutName) {
+      return alert(
+        `Enter at least one department for ${enabledDepartmentWithoutName.label || enabledDepartmentWithoutName.key} or disable department.`
+      );
+    }
+
     const payload = classTemplates.map((section) => ({
       key: section.key,
       label: section.label,
       enabled: Boolean(section.enabled),
+      department_enabled: Boolean(section.enabled) && Boolean(departmentTemplatesByLevel[section.key]?.enabled),
+      department_names: Boolean(section.enabled) && Boolean(departmentTemplatesByLevel[section.key]?.enabled)
+        ? parseDepartmentCsv(departmentTemplatesByLevel[section.key]?.input)
+        : [],
       classes: (Array.isArray(section.classes) ? section.classes : []).map((row) => ({
         name: String(row?.name || ""),
         enabled: Boolean(row?.enabled),
@@ -337,6 +427,11 @@ export default function SchoolInformation() {
       });
       const normalized = normalizeTemplates(Array.isArray(res.data?.data) ? res.data.data : payload);
       setClassTemplates(normalized);
+      if (res.data?.department_templates_by_level) {
+        setDepartmentTemplatesByLevel(
+          normalizeDepartmentTemplatesByLevel(res.data.department_templates_by_level, [])
+        );
+      }
       alert("Class templates saved.");
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to save class templates.");
@@ -501,54 +596,88 @@ export default function SchoolInformation() {
 
       <section className="sai-card">
         <h3>Class Templates</h3>
-        <p className="sai-note">Class templates are used for new sessions and synced into existing sessions.</p>
-        <div className="sai-template-grid">
-          {classTemplates.map((section, sectionIndex) => (
-            <div className="sai-template-card" key={section.key || sectionIndex}>
-              <div className="sai-template-head">
-                <label className="sai-check">
+        <p className="sai-note">
+          Configure levels, classes, and per-level departments. Department names support bulk input with comma (,).
+        </p>
+
+        <div className="sai-template-table">
+          <div className="sai-template-header">
+            <div>Level Setup</div>
+            <div>Class Setup</div>
+            <div>Department Setup</div>
+          </div>
+
+          {classTemplates.map((section, sectionIndex) => {
+            const departmentRow = departmentTemplatesByLevel[section.key] || { enabled: false, input: "" };
+            return (
+              <div className="sai-template-line" key={section.key || sectionIndex}>
+                <div className="sai-template-level">
+                  <label className="sai-check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(section.enabled)}
+                      onChange={(e) => updateSection(sectionIndex, { enabled: e.target.checked })}
+                    />
+                    <span>Enable Level</span>
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={Boolean(section.enabled)}
-                    onChange={(e) => updateSection(sectionIndex, { enabled: e.target.checked })}
+                    type="text"
+                    value={section.label || ""}
+                    onChange={(e) => updateSection(sectionIndex, { label: e.target.value })}
+                    placeholder={section.key}
                   />
-                  <span>Enable</span>
-                </label>
-                <input
-                  type="text"
-                  value={section.label || ""}
-                  onChange={(e) => updateSection(sectionIndex, { label: e.target.value })}
-                  placeholder={section.key}
-                />
-              </div>
-              <div className="sai-template-fields">
-                {(section.classes || []).map((row, classIndex) => {
-                  const classRow = normalizeClassRow(row);
-                  return (
-                    <div key={`${section.key}-${classIndex}`} className="sai-template-row">
-                      <label className="sai-check">
+                </div>
+
+                <div className="sai-template-classes">
+                  {(section.classes || []).map((row, classIndex) => {
+                    const classRow = normalizeClassRow(row);
+                    return (
+                      <div key={`${section.key}-${classIndex}`} className="sai-template-row">
+                        <label className="sai-check">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(classRow.enabled)}
+                            onChange={(e) => updateClassEnabled(sectionIndex, classIndex, e.target.checked)}
+                            disabled={!section.enabled}
+                          />
+                          <span>Show</span>
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={Boolean(classRow.enabled)}
-                          onChange={(e) => updateClassEnabled(sectionIndex, classIndex, e.target.checked)}
+                          type="text"
+                          value={classRow.name || ""}
+                          onChange={(e) => updateClassName(sectionIndex, classIndex, e.target.value)}
+                          placeholder={`${section.label || section.key} ${classIndex + 1}`}
                           disabled={!section.enabled}
                         />
-                        <span>Show</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={classRow.name || ""}
-                        onChange={(e) => updateClassName(sectionIndex, classIndex, e.target.value)}
-                        placeholder={`${section.label || section.key} ${classIndex + 1}`}
-                        disabled={!section.enabled}
-                      />
-                    </div>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="sai-template-departments">
+                  <label className="sai-check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(departmentRow.enabled)}
+                      onChange={(e) => updateDepartmentEnabled(section.key, e.target.checked)}
+                      disabled={!section.enabled}
+                    />
+                    <span>Enable Department</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={departmentRow.input}
+                    onChange={(e) => updateDepartmentInput(section.key, e.target.value)}
+                    placeholder="Gold, Diamond, Silver"
+                    disabled={!section.enabled || !departmentRow.enabled}
+                  />
+                  <small>Use comma (,) to add multiple departments at once.</small>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
         <div className="sai-actions">
           <button type="button" onClick={saveClassTemplates} disabled={savingClassTemplates}>
             {savingClassTemplates ? "Saving..." : "Save Class Templates"}

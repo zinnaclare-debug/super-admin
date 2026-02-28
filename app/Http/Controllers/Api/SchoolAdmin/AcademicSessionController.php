@@ -89,14 +89,14 @@ class AcademicSessionController extends Controller
                 }
             }
 
-            $departmentTemplates = DepartmentTemplateSync::normalizeTemplateNames(
+            $departmentTemplateMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
                 $school->department_templates ?? []
             );
-            DepartmentTemplateSync::syncTemplatesToSession(
+            DepartmentTemplateSync::syncLevelTemplatesToSession(
                 $schoolId,
                 (int) $session->id,
                 $activeLevels,
-                $departmentTemplates
+                $departmentTemplateMap
             );
 
             $this->copyPreviousSessionSubjectMappings($schoolId, (int) $session->id);

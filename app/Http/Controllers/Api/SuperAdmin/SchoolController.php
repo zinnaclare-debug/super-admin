@@ -20,6 +20,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\UserCredentialStore;
+use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
@@ -199,6 +200,10 @@ foreach ($defs as $def) {
 
     public function information(School $school)
     {
+        $departmentTemplateMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
+            $school->department_templates ?? []
+        );
+
         return response()->json([
             'school' => [
                 'id' => $school->id,
@@ -216,6 +221,8 @@ foreach ($defs as $def) {
             ],
             'exam_record' => AssessmentSchema::normalizeSchema($school->assessment_schema),
             'class_templates' => ClassTemplateSchema::normalize($school->class_templates),
+            'department_templates' => DepartmentTemplateSync::flattenLevelTemplateNames($departmentTemplateMap),
+            'department_templates_by_level' => $departmentTemplateMap,
         ]);
     }
 
@@ -351,6 +358,9 @@ foreach ($defs as $def) {
             'class_templates.*.enabled' => 'required|boolean',
             'class_templates.*.classes' => 'required|array|min:1|max:20',
             'class_templates.*.classes.*' => 'nullable',
+            'class_templates.*.department_enabled' => 'nullable|boolean',
+            'class_templates.*.department_names' => 'nullable|array|max:30',
+            'class_templates.*.department_names.*' => 'nullable|string|max:80',
         ]);
 
         $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
@@ -371,14 +381,21 @@ foreach ($defs as $def) {
             }
         }
 
+        $departmentTemplateMap = $this->buildDepartmentTemplateMapFromClassTemplates(
+            $payload['class_templates'] ?? [],
+            $normalized
+        );
+
         $school->class_templates = $normalized;
+        $school->department_templates = DepartmentTemplateSync::serializeLevelTemplateMap($departmentTemplateMap);
         $school->save();
 
-        $this->syncClassTemplatesToExistingSessions($school, $normalized);
+        $this->syncClassTemplatesToExistingSessions($school, $normalized, $departmentTemplateMap);
 
         return response()->json([
             'message' => 'Class templates saved successfully.',
             'data' => $normalized,
+            'department_templates_by_level' => $departmentTemplateMap,
         ]);
     }
 
@@ -496,7 +513,11 @@ foreach ($defs as $def) {
             : url($relativeOrAbsolute);
     }
 
-    private function syncClassTemplatesToExistingSessions(School $school, array $templates): void
+    private function syncClassTemplatesToExistingSessions(
+        School $school,
+        array $templates,
+        ?array $departmentTemplateMap = null
+    ): void
     {
         $schoolId = (int) $school->id;
         $activeSections = ClassTemplateSchema::activeSections($templates);
@@ -505,9 +526,9 @@ foreach ($defs as $def) {
             $activeSections
         ));
 
-        $departmentTemplates = DepartmentTemplateSync::normalizeTemplateNames(
-            $school->department_templates ?? []
-        );
+        $departmentTemplateMap = $departmentTemplateMap
+            ? DepartmentTemplateSync::normalizeLevelTemplateMap(['by_level' => $departmentTemplateMap])
+            : DepartmentTemplateSync::normalizeLevelTemplateMap($school->department_templates ?? []);
 
         $sessions = AcademicSession::query()
             ->where('school_id', $schoolId)
@@ -535,13 +556,54 @@ foreach ($defs as $def) {
                 }
             }
 
-            DepartmentTemplateSync::syncTemplatesToSession(
+            DepartmentTemplateSync::syncLevelTemplatesToSession(
                 $schoolId,
                 (int) $session->id,
                 $activeLevels,
-                $departmentTemplates
+                $departmentTemplateMap
             );
         }
+    }
+
+    private function buildDepartmentTemplateMapFromClassTemplates(array $rawTemplates, array $normalizedTemplates): array
+    {
+        $map = DepartmentTemplateSync::emptyLevelTemplateMap();
+        $normalizedByKey = collect($normalizedTemplates)->keyBy(
+            fn (array $section) => strtolower(trim((string) ($section['key'] ?? '')))
+        );
+
+        foreach ($rawTemplates as $rawSection) {
+            if (!is_array($rawSection)) {
+                continue;
+            }
+
+            $key = strtolower(trim((string) ($rawSection['key'] ?? '')));
+            if (!array_key_exists($key, $map)) {
+                continue;
+            }
+
+            $sectionEnabled = (bool) ($normalizedByKey->get($key)['enabled'] ?? false);
+            $departmentEnabled = filter_var(
+                $rawSection['department_enabled'] ?? false,
+                FILTER_VALIDATE_BOOLEAN
+            );
+            $departmentNames = DepartmentTemplateSync::normalizeTemplateNames(
+                $rawSection['department_names'] ?? []
+            );
+
+            if ($departmentEnabled && $sectionEnabled && empty($departmentNames)) {
+                throw ValidationException::withMessages([
+                    'class_templates' => ["Provide at least one department name for {$key} or disable department."],
+                ]);
+            }
+
+            $map[$key] = [
+                'enabled' => $sectionEnabled && $departmentEnabled && !empty($departmentNames),
+                'names' => $departmentNames,
+            ];
+        }
+
+        return $map;
     }
 
     private function clearApplicationCache(): void

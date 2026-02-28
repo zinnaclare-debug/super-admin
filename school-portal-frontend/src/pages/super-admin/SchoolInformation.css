@@ -172,8 +172,89 @@
   color: #334155;
 }
 
+.sai-template-table {
+  margin-top: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sai-template-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(220px, 1fr);
+  background: #eef4ff;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.sai-template-header > div {
+  padding: 10px;
+  border-right: 1px solid #dbe3ef;
+}
+
+.sai-template-header > div:last-child {
+  border-right: 0;
+}
+
+.sai-template-line {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(220px, 1fr);
+  border-top: 1px solid #dbe3ef;
+}
+
+.sai-template-level,
+.sai-template-classes,
+.sai-template-departments {
+  padding: 10px;
+  border-right: 1px solid #dbe3ef;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.sai-template-level:last-child,
+.sai-template-classes:last-child,
+.sai-template-departments:last-child {
+  border-right: 0;
+}
+
+.sai-template-level input,
+.sai-template-classes input,
+.sai-template-departments input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 10px;
+}
+
+.sai-template-departments small {
+  color: #64748b;
+  font-size: 12px;
+}
+
 @media (max-width: 700px) {
   .sai-card {
     padding: 12px;
+  }
+
+  .sai-template-header {
+    display: none;
+  }
+
+  .sai-template-line {
+    grid-template-columns: 1fr;
+  }
+
+  .sai-template-level,
+  .sai-template-classes,
+  .sai-template-departments {
+    border-right: 0;
+    border-top: 1px solid #dbe3ef;
+  }
+
+  .sai-template-line > :first-child {
+    border-top: 0;
   }
 }

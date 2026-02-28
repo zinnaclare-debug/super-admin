@@ -213,9 +213,10 @@ class DashboardController extends Controller
         }
 
         return DB::transaction(function () use ($school, $name) {
-            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+            $levelMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
                 $school->department_templates ?? []
             );
+            $templates = DepartmentTemplateSync::flattenLevelTemplateNames($levelMap);
 
             $exists = collect($templates)
                 ->contains(fn ($item) => strcasecmp((string) $item, $name) === 0);
@@ -227,15 +228,30 @@ class DashboardController extends Controller
                 ], 409);
             }
 
-            $templates[] = $name;
-            $school->department_templates = $templates;
+            foreach (array_keys($levelMap) as $level) {
+                $row = $levelMap[$level] ?? ['enabled' => false, 'names' => []];
+                $names = collect($row['names'] ?? [])
+                    ->push($name)
+                    ->map(fn ($item) => trim((string) $item))
+                    ->filter(fn ($item) => $item !== '')
+                    ->unique(fn ($item) => strtolower((string) $item))
+                    ->values()
+                    ->all();
+
+                $levelMap[$level] = [
+                    'enabled' => !empty($names),
+                    'names' => $names,
+                ];
+            }
+
+            $school->department_templates = DepartmentTemplateSync::serializeLevelTemplateMap($levelMap);
             $school->save();
 
             DepartmentTemplateSync::syncTemplateToAllSessions((int) $school->id, $name);
 
             return response()->json([
                 'message' => 'Department template saved and applied across all levels/classes.',
-                'data' => $templates,
+                'data' => DepartmentTemplateSync::flattenLevelTemplateNames($levelMap),
             ], 201);
         });
     }
@@ -260,9 +276,10 @@ class DashboardController extends Controller
         }
 
         return DB::transaction(function () use ($school, $oldName, $newName) {
-            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+            $levelMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
                 $school->department_templates ?? []
             );
+            $templates = DepartmentTemplateSync::flattenLevelTemplateNames($levelMap);
 
             $oldIndex = collect($templates)->search(
                 fn ($item) => strcasecmp((string) $item, $oldName) === 0
@@ -285,10 +302,27 @@ class DashboardController extends Controller
             }
 
             $existingStoredName = (string) $templates[(int) $oldIndex];
-            $templates[(int) $oldIndex] = $newName;
-            $templates = DepartmentTemplateSync::normalizeTemplateNames($templates);
+            foreach (array_keys($levelMap) as $level) {
+                $row = $levelMap[$level] ?? ['enabled' => false, 'names' => []];
+                $names = collect($row['names'] ?? [])
+                    ->map(function ($item) use ($existingStoredName, $newName) {
+                        return strcasecmp((string) $item, $existingStoredName) === 0
+                            ? $newName
+                            : (string) $item;
+                    })
+                    ->map(fn ($item) => trim((string) $item))
+                    ->filter(fn ($item) => $item !== '')
+                    ->unique(fn ($item) => strtolower((string) $item))
+                    ->values()
+                    ->all();
 
-            $school->department_templates = $templates;
+                $levelMap[$level] = [
+                    'enabled' => !empty($names) && (bool) ($row['enabled'] ?? false),
+                    'names' => $names,
+                ];
+            }
+
+            $school->department_templates = DepartmentTemplateSync::serializeLevelTemplateMap($levelMap);
             $school->save();
 
             if (strcasecmp($existingStoredName, $newName) !== 0) {
@@ -297,7 +331,7 @@ class DashboardController extends Controller
 
             return response()->json([
                 'message' => 'Department template updated successfully.',
-                'data' => $templates,
+                'data' => DepartmentTemplateSync::flattenLevelTemplateNames($levelMap),
             ]);
         });
     }
@@ -319,9 +353,10 @@ class DashboardController extends Controller
         }
 
         return DB::transaction(function () use ($school, $name) {
-            $templates = DepartmentTemplateSync::normalizeTemplateNames(
+            $levelMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
                 $school->department_templates ?? []
             );
+            $templates = DepartmentTemplateSync::flattenLevelTemplateNames($levelMap);
 
             $existingName = collect($templates)->first(
                 fn ($item) => strcasecmp((string) $item, $name) === 0
@@ -332,19 +367,30 @@ class DashboardController extends Controller
                 ], 404);
             }
 
-            $templates = collect($templates)
-                ->reject(fn ($item) => strcasecmp((string) $item, (string) $existingName) === 0)
-                ->values()
-                ->all();
+            foreach (array_keys($levelMap) as $level) {
+                $row = $levelMap[$level] ?? ['enabled' => false, 'names' => []];
+                $names = collect($row['names'] ?? [])
+                    ->reject(fn ($item) => strcasecmp((string) $item, (string) $existingName) === 0)
+                    ->map(fn ($item) => trim((string) $item))
+                    ->filter(fn ($item) => $item !== '')
+                    ->unique(fn ($item) => strtolower((string) $item))
+                    ->values()
+                    ->all();
 
-            $school->department_templates = $templates;
+                $levelMap[$level] = [
+                    'enabled' => !empty($names) && (bool) ($row['enabled'] ?? false),
+                    'names' => $names,
+                ];
+            }
+
+            $school->department_templates = DepartmentTemplateSync::serializeLevelTemplateMap($levelMap);
             $school->save();
 
             $cleanup = $this->removeDepartmentAcrossSchool((int) $school->id, (string) $existingName);
 
             return response()->json([
                 'message' => 'Department template deleted.',
-                'data' => $templates,
+                'data' => DepartmentTemplateSync::flattenLevelTemplateNames($levelMap),
                 'meta' => $cleanup,
             ]);
         });
@@ -420,7 +466,7 @@ class DashboardController extends Controller
             $activeSections
         ));
 
-        $departmentTemplates = DepartmentTemplateSync::normalizeTemplateNames(
+        $departmentTemplateMap = DepartmentTemplateSync::normalizeLevelTemplateMap(
             $school->department_templates ?? []
         );
 
@@ -450,11 +496,11 @@ class DashboardController extends Controller
                 }
             }
 
-            DepartmentTemplateSync::syncTemplatesToSession(
+            DepartmentTemplateSync::syncLevelTemplatesToSession(
                 $schoolId,
                 (int) $session->id,
                 $activeLevels,
-                $departmentTemplates
+                $departmentTemplateMap
             );
         }
     }
