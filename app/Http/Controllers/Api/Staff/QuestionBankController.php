@@ -238,6 +238,8 @@ class QuestionBankController extends Controller
     $aiModel = trim((string) config('services.ai.model', 'gpt-4.1-mini'));
     $aiApiKey = trim((string) config('services.ai.api_key', ''));
     $aiCaBundle = trim((string) config('services.ai.ca_bundle', ''));
+    $aiTimeout = max(5, (int) config('services.ai.timeout', 45));
+    $aiConnectTimeout = max(3, (int) config('services.ai.connect_timeout', 10));
 
     $chatCompletionsUrl = rtrim($aiBaseUrl, '/') . '/chat/completions';
     $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
@@ -270,7 +272,7 @@ Rules:
 
     $userPrompt = "Subject: {$subject->name}\nCount: {$data['count']}\nStatement:\n{$data['prompt']}";
 
-    $http = Http::timeout(90);
+    $http = Http::timeout($aiTimeout)->connectTimeout($aiConnectTimeout);
 
     $isHttpsEndpoint = str_starts_with(strtolower($chatCompletionsUrl), 'https://');
     $verifyPath = null;
