@@ -134,13 +134,18 @@ export default function QuestionBankHome() {
     } catch (err) {
       const code = err?.response?.data?.code || err?.response?.data?.details?.error?.code;
       const msg = err?.response?.data?.message || "AI generate failed";
+      const providerMessage =
+        err?.response?.data?.provider_message ||
+        err?.response?.data?.details?.error?.message ||
+        err?.response?.data?.details?.message ||
+        "";
       if (code === "insufficient_quota") {
         setAiFallbackMessage("AI quota exceeded. Switched to manual question creation mode.");
         manualCreateRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         setTimeout(() => questionTextRef.current?.focus(), 350);
         return;
       }
-      alert(msg);
+      alert(providerMessage ? `${msg}\n${providerMessage}` : msg);
     }
   };
 

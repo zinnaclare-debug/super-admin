@@ -345,22 +345,34 @@ Rules:
     }
 
     if ($response->failed()) {
+      $providerStatus = (int) $response->status();
       $errorCode = data_get($response->json(), 'error.code');
+      $providerMessage = trim((string) (
+        data_get($response->json(), 'error.message')
+        ?: data_get($response->json(), 'message')
+        ?: ''
+      ));
+
       if ($errorCode === 'insufficient_quota') {
         return response()->json([
-          'message' => 'OpenAI quota exceeded. Use manual question creation or update billing.',
+          'message' => 'AI quota exceeded. Use manual question creation or update billing.',
           'code' => 'insufficient_quota',
+          'provider_status' => $providerStatus ?: null,
+          'provider_message' => $providerMessage ?: null,
           'ca_verify' => $verifyPath ?: null,
           'details' => $response->json(),
         ], 402);
       }
 
+      $status = $providerStatus >= 400 && $providerStatus <= 599 ? $providerStatus : 502;
       return response()->json([
-        'message' => 'AI generation failed',
+        'message' => $providerMessage !== '' ? "AI generation failed: {$providerMessage}" : 'AI generation failed',
         'code' => $errorCode,
+        'provider_status' => $providerStatus ?: null,
+        'provider_message' => $providerMessage !== '' ? $providerMessage : null,
         'ca_verify' => $verifyPath ?: null,
         'details' => $response->json(),
-      ], 502);
+      ], $status);
     }
 
     $content = (string) data_get($response->json(), 'choices.0.message.content', '');
