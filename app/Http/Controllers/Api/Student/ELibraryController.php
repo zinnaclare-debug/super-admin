@@ -174,9 +174,9 @@ class ELibraryController extends Controller
         if (empty($classIds)) return response()->json(['data' => []]);
 
         $allowedTermSubjects = TermSubject::query()
-            ->where('school_id', $schoolId)
-            ->where('term_id', $currentTermId)
-            ->whereIn('class_id', $classIds)
+            ->where('term_subjects.school_id', $schoolId)
+            ->where('term_subjects.term_id', $currentTermId)
+            ->whereIn('term_subjects.class_id', $classIds)
             ->when(Schema::hasTable('student_subject_exclusions'), function ($query) use ($schoolId, $session, $student) {
                 $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $session, $student) {
                     $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
@@ -187,7 +187,7 @@ class ELibraryController extends Controller
                 })
                 ->whereNull('student_subject_exclusions.id');
             })
-            ->get(['id', 'subject_id']);
+            ->get(['term_subjects.id', 'term_subjects.subject_id']);
 
         $allowedTermSubjectIds = $allowedTermSubjects
             ->pluck('id')
