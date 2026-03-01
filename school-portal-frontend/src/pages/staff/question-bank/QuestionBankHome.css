@@ -1,0 +1,285 @@
+.qbx-page {
+  display: grid;
+  gap: 14px;
+}
+
+.qbx-hero {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  border-radius: 16px;
+  padding: 18px;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 52%, #fff8ef 100%);
+  border: 1px solid #d7e5f8;
+}
+
+.qbx-pill {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.qbx-hero h2 {
+  margin: 10px 0 8px;
+  color: #102a43;
+}
+
+.qbx-subtitle {
+  margin: 0;
+  color: #3f5873;
+}
+
+.qbx-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.qbx-metrics span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #d0dff4;
+  color: #1e3a5f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.qbx-hero-art {
+  position: relative;
+  min-height: 230px;
+}
+
+.qbx-art {
+  position: absolute;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #d9e6f8;
+  box-shadow: 0 12px 26px rgba(16, 42, 67, 0.11);
+  display: grid;
+  place-items: center;
+  padding: 8px;
+}
+
+.qbx-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qbx-art--main {
+  width: 55%;
+  height: 170px;
+  top: 20px;
+  left: 16px;
+  z-index: 3;
+}
+
+.qbx-art--questions {
+  width: 46%;
+  height: 145px;
+  right: 14px;
+  top: 6px;
+  z-index: 2;
+}
+
+.qbx-art--searching {
+  width: 42%;
+  height: 130px;
+  right: 40px;
+  bottom: 8px;
+  z-index: 1;
+}
+
+.qbx-panel {
+  border-radius: 14px;
+  border: 1px solid #d7e2f2;
+  padding: 14px;
+  background: #fff;
+}
+
+.qbx-panel h3 {
+  margin-top: 0;
+  color: #112742;
+}
+
+.qbx-filter-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 10px;
+  align-items: end;
+}
+
+.qbx-filter {
+  display: grid;
+  gap: 6px;
+}
+
+.qbx-filter label {
+  color: #304a66;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.qbx-selected {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px dashed #c2d7f1;
+  border-radius: 10px;
+  background: #f6faff;
+}
+
+.qbx-selected span {
+  color: #4a6480;
+  font-size: 12px;
+}
+
+.qbx-selected strong {
+  color: #15395b;
+  font-size: 14px;
+}
+
+.qbx-field {
+  width: 100%;
+  border: 1px solid #bfd3ec;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 14px;
+  color: #173758;
+  background: #fbfdff;
+}
+
+.qbx-subject-buttons {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qbx-subject-btn {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #c6d9f1;
+  border-radius: 10px;
+  background: #fff;
+  color: #17395d;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 132px;
+}
+
+.qbx-subject-btn small {
+  color: #577294;
+  font-size: 12px;
+}
+
+.qbx-subject-btn.is-active {
+  border-color: #1d4ed8;
+  background: linear-gradient(135deg, #eff6ff, #f8fbff);
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.qbx-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.qbx-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.qbx-check {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: #2f4d6a;
+  font-size: 14px;
+}
+
+.qbx-btn {
+  border: none;
+  border-radius: 10px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 600;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.qbx-btn--danger {
+  background: #b91c1c;
+}
+
+.qbx-alert {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid #f2c471;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #8f5b04;
+}
+
+.qbx-state {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.qbx-state--warn {
+  border: 1px solid #f1cb82;
+  background: #fff8e8;
+  color: #875307;
+}
+
+.qbx-state--loading {
+  border: 1px solid #bdd4ef;
+  background: #f6faff;
+  color: #254f7b;
+}
+
+.qbx-table-wrap {
+  overflow-x: auto;
+}
+
+.qbx-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.qbx-table th,
+.qbx-table td {
+  border: 1px solid #d7e2f2;
+  padding: 8px;
+  vertical-align: top;
+  color: #173758;
+  font-size: 14px;
+}
+
+.qbx-table th {
+  background: #f4f8ff;
+}
+
+@media (max-width: 960px) {
+  .qbx-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .qbx-hero-art {
+    min-height: 200px;
+  }
+
+  .qbx-filter-row {
+    grid-template-columns: 1fr;
+  }
+}
