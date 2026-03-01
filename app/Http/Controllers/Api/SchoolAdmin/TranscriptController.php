@@ -26,6 +26,78 @@ use Throwable;
 
 class TranscriptController extends Controller
 {
+    private function resolveClassTeacherForStudentTerm(
+        int $schoolId,
+        SchoolClass $class,
+        int $studentId,
+        int $termId
+    ): ?User {
+        if (!empty($class->class_teacher_user_id)) {
+            $teacher = User::where('id', (int) $class->class_teacher_user_id)
+                ->where('school_id', $schoolId)
+                ->first(['id', 'name', 'email']);
+            if ($teacher) {
+                return $teacher;
+            }
+        }
+
+        if (
+            !Schema::hasTable('class_departments')
+            || !Schema::hasColumn('class_departments', 'class_teacher_user_id')
+            || !Schema::hasColumn('enrollments', 'department_id')
+        ) {
+            return null;
+        }
+
+        $enrollmentQuery = Enrollment::query()
+            ->where('enrollments.class_id', (int) $class->id)
+            ->where('enrollments.term_id', $termId)
+            ->where('enrollments.student_id', $studentId);
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollmentQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $departmentId = (int) ($enrollmentQuery
+            ->orderByDesc('enrollments.id')
+            ->value('enrollments.department_id') ?? 0);
+
+        if ($departmentId > 0) {
+            $teacherUserId = DB::table('class_departments')
+                ->where('school_id', $schoolId)
+                ->where('class_id', (int) $class->id)
+                ->where('id', $departmentId)
+                ->value('class_teacher_user_id');
+
+            if (!empty($teacherUserId)) {
+                $teacher = User::where('id', (int) $teacherUserId)
+                    ->where('school_id', $schoolId)
+                    ->first(['id', 'name', 'email']);
+                if ($teacher) {
+                    return $teacher;
+                }
+            }
+        }
+
+        $candidateTeacherIds = DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->where('class_id', (int) $class->id)
+            ->whereNotNull('class_teacher_user_id')
+            ->distinct()
+            ->pluck('class_teacher_user_id')
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->values();
+
+        if ($candidateTeacherIds->count() === 1) {
+            return User::where('id', (int) $candidateTeacherIds->first())
+                ->where('school_id', $schoolId)
+                ->first(['id', 'name', 'email']);
+        }
+
+        return null;
+    }
+
     public function options(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
@@ -743,12 +815,12 @@ class TranscriptController extends Controller
                 ->where('term_id', $term->id)
                 ->first();
 
-            $classTeacher = null;
-            if ($class->class_teacher_user_id) {
-                $classTeacher = User::where('id', $class->class_teacher_user_id)
-                    ->where('school_id', $schoolId)
-                    ->first(['id', 'name', 'email']);
-            }
+            $classTeacher = $this->resolveClassTeacherForStudentTerm(
+                $schoolId,
+                $class,
+                (int) $student->id,
+                (int) $term->id
+            );
 
             $totalScore = (int) collect($gradedRows)->sum('total');
             $subjectCount = max(1, count($gradedRows));
