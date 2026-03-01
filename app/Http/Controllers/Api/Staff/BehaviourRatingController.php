@@ -24,12 +24,58 @@ class BehaviourRatingController extends Controller
       return ['session' => null, 'class' => null, 'term' => null, 'classes' => collect(), 'terms' => collect()];
     }
 
-    $classes = SchoolClass::where('school_id', $schoolId)
+    $directClassIds = SchoolClass::query()
+      ->where('school_id', $schoolId)
       ->where('academic_session_id', $session->id)
       ->where('class_teacher_user_id', $staffUserId)
-      ->orderBy('level')
-      ->orderBy('name')
-      ->get(['id', 'name', 'level', 'academic_session_id']);
+      ->pluck('id')
+      ->map(fn($id) => (int) $id)
+      ->values();
+
+    $departmentScopeByClass = [];
+    if (
+      Schema::hasTable('class_departments')
+      && Schema::hasColumn('class_departments', 'class_teacher_user_id')
+    ) {
+      $departmentRows = DB::table('class_departments')
+        ->join('classes', 'classes.id', '=', 'class_departments.class_id')
+        ->where('class_departments.school_id', $schoolId)
+        ->where('classes.school_id', $schoolId)
+        ->where('classes.academic_session_id', $session->id)
+        ->where('class_departments.class_teacher_user_id', $staffUserId)
+        ->get([
+          'class_departments.class_id',
+          'class_departments.id as department_id',
+        ]);
+
+      foreach ($departmentRows as $row) {
+        $cid = (int) $row->class_id;
+        $did = (int) $row->department_id;
+        if ($cid < 1 || $did < 1) continue;
+        $departmentScopeByClass[$cid] = $departmentScopeByClass[$cid] ?? [];
+        $departmentScopeByClass[$cid][] = $did;
+      }
+      foreach ($departmentScopeByClass as $cid => $ids) {
+        $departmentScopeByClass[$cid] = array_values(array_unique(array_map('intval', $ids)));
+      }
+    }
+
+    $classIds = $directClassIds
+      ->merge(array_keys($departmentScopeByClass))
+      ->map(fn($id) => (int) $id)
+      ->filter(fn($id) => $id > 0)
+      ->unique()
+      ->values();
+
+    $classes = $classIds->isEmpty()
+      ? collect()
+      : SchoolClass::query()
+          ->where('school_id', $schoolId)
+          ->where('academic_session_id', $session->id)
+          ->whereIn('id', $classIds->all())
+          ->orderBy('level')
+          ->orderBy('name')
+          ->get(['id', 'name', 'level', 'academic_session_id']);
 
     $selectedClass = $classId ? $classes->firstWhere('id', $classId) : $classes->first();
 
@@ -46,7 +92,22 @@ class BehaviourRatingController extends Controller
       'term' => $selectedTerm,
       'classes' => $classes,
       'terms' => $terms,
+      'direct_class_ids' => $directClassIds->all(),
+      'department_scope_by_class' => $departmentScopeByClass,
     ];
+  }
+
+  private function hasDirectClassAccess(array $ctx, int $classId): bool
+  {
+    $ids = array_map('intval', $ctx['direct_class_ids'] ?? []);
+    return in_array($classId, $ids, true);
+  }
+
+  private function departmentScopeForClass(array $ctx, int $classId): array
+  {
+    $scopes = $ctx['department_scope_by_class'] ?? [];
+    $raw = $scopes[$classId] ?? $scopes[(string) $classId] ?? [];
+    return array_values(array_unique(array_map('intval', (array) $raw)));
   }
 
   // GET /api/staff/behaviour-rating/status
@@ -96,7 +157,7 @@ class BehaviourRatingController extends Controller
       return response()->json(['data' => null, 'message' => 'No terms found for current session'], 422);
     }
 
-    $enrollments = Enrollment::query()
+    $enrollmentsQuery = Enrollment::query()
       ->where('class_id', $ctx['class']->id)
       ->where('term_id', $ctx['term']->id)
       ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
@@ -104,11 +165,23 @@ class BehaviourRatingController extends Controller
       })
       ->join('students', 'students.id', '=', 'enrollments.student_id')
       ->join('users', 'users.id', '=', 'students.user_id')
-      ->orderBy('users.name')
-      ->get([
-        'students.id as student_id',
-        'users.name as student_name',
-      ]);
+      ->orderBy('users.name');
+
+    if (
+      !$this->hasDirectClassAccess($ctx, (int) $ctx['class']->id)
+      && Schema::hasColumn('enrollments', 'department_id')
+    ) {
+      $departmentIds = $this->departmentScopeForClass($ctx, (int) $ctx['class']->id);
+      if (empty($departmentIds)) {
+        return response()->json(['data' => null, 'message' => 'Only class teachers can access behaviour rating'], 403);
+      }
+      $enrollmentsQuery->whereIn('enrollments.department_id', $departmentIds);
+    }
+
+    $enrollments = $enrollmentsQuery->get([
+      'students.id as student_id',
+      'users.name as student_name',
+    ]);
 
     $ratings = StudentBehaviourRating::query()
       ->where('school_id', $schoolId)
@@ -180,12 +253,25 @@ class BehaviourRatingController extends Controller
       return response()->json(['message' => 'Invalid term'], 422);
     }
 
-    $validStudentIds = Enrollment::query()
+    $validStudentIdsQuery = Enrollment::query()
       ->where('class_id', $ctx['class']->id)
       ->where('term_id', $ctx['term']->id)
       ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
         $q->where('school_id', $schoolId);
-      })
+      });
+
+    if (
+      !$this->hasDirectClassAccess($ctx, (int) $ctx['class']->id)
+      && Schema::hasColumn('enrollments', 'department_id')
+    ) {
+      $departmentIds = $this->departmentScopeForClass($ctx, (int) $ctx['class']->id);
+      if (empty($departmentIds)) {
+        return response()->json(['message' => 'Only class teachers can save behaviour ratings'], 403);
+      }
+      $validStudentIdsQuery->whereIn('department_id', $departmentIds);
+    }
+
+    $validStudentIds = $validStudentIdsQuery
       ->pluck('student_id')
       ->map(fn($id) => (int)$id)
       ->toArray();
