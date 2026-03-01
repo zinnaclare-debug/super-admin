@@ -43,23 +43,6 @@ function SchoolFeatures() {
     });
   }, [features]);
 
-  const toggleFeature = async (key, enabled) => {
-    try {
-      await api.post("/api/schools/features/toggle", {
-        feature: key,
-        enabled,
-      });
-
-      setFeatures((prev) =>
-        prev.map((f) =>
-          f.feature === key ? { ...f, enabled } : f
-        )
-      );
-    } catch {
-      alert("Failed to toggle feature");
-    }
-  };
-
   if (loading) return <p>Loading features...</p>;
 
   return (
@@ -69,9 +52,9 @@ function SchoolFeatures() {
 
       <FeatureTable
         features={generalFeatures}
-        onToggle={toggleFeature}
         labelMap={labelMap}
         showDescription={false}
+        readOnly
       />
     </div>
   );

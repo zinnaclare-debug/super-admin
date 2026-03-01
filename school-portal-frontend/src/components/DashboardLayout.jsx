@@ -150,6 +150,16 @@ function DashboardLayout() {
       }),
     [features, resultsPublished]
   );
+  const schoolAdminPaymentsEnabled = useMemo(
+    () =>
+      features.some(
+        (f) =>
+          f?.enabled &&
+          String(f?.category || "").toLowerCase() === "general" &&
+          String(f?.feature || "").toLowerCase() === "school fees"
+      ),
+    [features]
+  );
 
   const roleLabel = useMemo(() => {
     if (!user?.role) return "";
@@ -291,9 +301,11 @@ function DashboardLayout() {
               <NavLink to="/school/dashboard" title="Dashboard" style={linkStyle}>
                 {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
               </NavLink>
-              <NavLink to="/school/admin/payments" title="Payments" style={linkStyle}>
-                {isCompactSidebar ? "PAYMENTS" : "Payments"}
-              </NavLink>
+              {schoolAdminPaymentsEnabled ? (
+                <NavLink to="/school/admin/payments" title="Payments" style={linkStyle}>
+                  {isCompactSidebar ? "PAYMENTS" : "Payments"}
+                </NavLink>
+              ) : null}
               <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle}>
                 {isCompactSidebar ? "PROMOTION" : "Promotion"}
               </NavLink>

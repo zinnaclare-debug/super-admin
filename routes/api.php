@@ -122,7 +122,6 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
 
     // ✅ School features (school admin only)
     Route::get('/schools/features', [SchoolFeatureController::class, 'index']);
-    Route::post('/schools/features/toggle', [SchoolFeatureController::class, 'toggle']);
 
     Route::get('/school-admin/payments/config', [SchoolAdminPaymentsController::class, 'config'])
         ->middleware('feature:school fees');

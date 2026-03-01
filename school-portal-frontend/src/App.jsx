@@ -58,6 +58,7 @@ import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLay
 // Layout & Guard
 import DashboardLayout from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RequireFeature from "./components/RequireFeature";
 
 // Staff/Student
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -180,7 +181,14 @@ function App() {
           path="admin/academics/classes/:classId/terms/:termId/subjects/:subjectId/cbt"
           element={<SubjectCbtPublish />}
         />
-        <Route path="admin/payments" element={<SchoolAdminPayments />} />
+        <Route
+          path="admin/payments"
+          element={
+            <RequireFeature feature="school fees">
+              <SchoolAdminPayments />
+            </RequireFeature>
+          }
+        />
         <Route path="admin/promotion" element={<Promotion />} />
         <Route path="admin/broadsheet" element={<Broadsheet />} />
         <Route path="admin/transcript" element={<Transcript />} />

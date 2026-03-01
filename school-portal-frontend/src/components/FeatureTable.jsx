@@ -13,6 +13,7 @@ export default function FeatureTable({
   onToggle = () => {},
   labelMap = {},
   showDescription = true,
+  readOnly = false,
 }) {
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -53,7 +54,7 @@ export default function FeatureTable({
             {showDescription && <th>Description</th>}
             {hasCategory && <th>Category</th>}
             <th>Status</th>
-            <th>Action</th>
+            {!readOnly ? <th>Action</th> : null}
           </tr>
         </thead>
 
@@ -70,11 +71,13 @@ export default function FeatureTable({
               <td>
                 <strong>{f.enabled ? "Enabled" : "Disabled"}</strong>
               </td>
-              <td>
-                <button onClick={() => onToggle(f.feature, !f.enabled)}>
-                  {f.enabled ? "Disable" : "Enable"}
-                </button>
-              </td>
+              {!readOnly ? (
+                <td>
+                  <button onClick={() => onToggle(f.feature, !f.enabled)}>
+                    {f.enabled ? "Disable" : "Enable"}
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
