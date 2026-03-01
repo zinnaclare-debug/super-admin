@@ -42,4 +42,11 @@ return [
         'callback_url' => env('PAYSTACK_CALLBACK_URL'),
     ],
 
+    'ai' => [
+        'base_url' => env('AI_BASE_URL', 'https://api.openai.com/v1'),
+        'model' => env('AI_MODEL', env('OPENAI_MODEL', 'gpt-4.1-mini')),
+        'api_key' => env('AI_API_KEY', env('OPENAI_API_KEY')),
+        'ca_bundle' => env('OPENAI_CA_BUNDLE'),
+    ],
+
 ];

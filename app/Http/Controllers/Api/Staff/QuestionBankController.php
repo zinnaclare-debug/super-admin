@@ -234,19 +234,10 @@ class QuestionBankController extends Controller
       ->first();
     if (!$subject) return response()->json(['message' => 'Invalid subject'], 422);
 
-    $aiBaseUrl = trim((string) env('AI_BASE_URL', ''));
-    $aiModel = trim((string) env('AI_MODEL', ''));
-    $aiApiKey = trim((string) env('AI_API_KEY', ''));
-
-    if ($aiBaseUrl === '') {
-      $aiBaseUrl = 'https://api.openai.com/v1';
-    }
-    if ($aiModel === '') {
-      $aiModel = (string) env('OPENAI_MODEL', 'gpt-4.1-mini');
-    }
-    if ($aiApiKey === '') {
-      $aiApiKey = trim((string) env('OPENAI_API_KEY', ''));
-    }
+    $aiBaseUrl = trim((string) config('services.ai.base_url', 'https://api.openai.com/v1'));
+    $aiModel = trim((string) config('services.ai.model', 'gpt-4.1-mini'));
+    $aiApiKey = trim((string) config('services.ai.api_key', ''));
+    $aiCaBundle = trim((string) config('services.ai.ca_bundle', ''));
 
     $chatCompletionsUrl = rtrim($aiBaseUrl, '/') . '/chat/completions';
     $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
@@ -285,7 +276,7 @@ Rules:
     $verifyPath = null;
     if ($isHttpsEndpoint) {
       $verifyCandidates = array_values(array_filter([
-        env('OPENAI_CA_BUNDLE'),
+        $aiCaBundle,
         ini_get('curl.cainfo'),
         ini_get('openssl.cafile'),
         base_path('cacert.pem'),
