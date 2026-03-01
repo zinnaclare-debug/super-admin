@@ -222,11 +222,11 @@ class TeacherResultsController extends Controller
     ]);
 
     $eligibleStudentIdsQuery = Enrollment::query()
-      ->where('class_id', $termSubject->class_id)
-      ->where('term_id', $termSubject->term_id)
-      ->select('student_id');
+      ->where('enrollments.class_id', $termSubject->class_id)
+      ->where('enrollments.term_id', $termSubject->term_id)
+      ->select('enrollments.student_id');
     if (Schema::hasColumn('enrollments', 'school_id')) {
-      $eligibleStudentIdsQuery->where('school_id', $schoolId);
+      $eligibleStudentIdsQuery->where('enrollments.school_id', $schoolId);
     }
     if ($canUseExclusions) {
       $eligibleStudentIdsQuery->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
@@ -240,7 +240,7 @@ class TeacherResultsController extends Controller
     }
     $eligibleStudentIds = $eligibleStudentIdsQuery
       ->distinct()
-      ->pluck('student_id')
+      ->pluck('enrollments.student_id')
       ->map(fn ($id) => (int) $id)
       ->all();
 
