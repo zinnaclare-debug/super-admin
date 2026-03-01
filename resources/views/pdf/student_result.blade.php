@@ -368,13 +368,13 @@
                     <td style="width: 74%;">
                         <table class="info-box">
                             <tr>
-                                <th>School Head Name</th>
+                                <th>Head of School Name</th>
                                 <td>{{ strtoupper($school?->head_of_school_name ?: '-') }}</td>
                             </tr>
                         </table>
                         <table class="info-box">
                             <tr>
-                                <th>School Head Comment</th>
+                                <th>Head of School Comment</th>
                                 <td>{{ strtoupper($schoolHeadComment ?? '-') }}</td>
                             </tr>
                         </table>

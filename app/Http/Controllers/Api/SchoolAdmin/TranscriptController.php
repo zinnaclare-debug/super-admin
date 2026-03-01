@@ -409,8 +409,8 @@ class TranscriptController extends Controller
             . '</table>'
             . implode("\n", $pageBlocks)
             . '<table class="meta" style="margin-top:10px;">'
-            . '<tr><th style="width:24%;">School Head Name</th><td>' . e($headName) . '</td></tr>'
-            . '<tr><th style="width:24%;">School Head Comment</th><td>' . e($headComment) . '</td></tr>'
+            . '<tr><th style="width:24%;">Head of School Name</th><td>' . e($headName) . '</td></tr>'
+            . '<tr><th style="width:24%;">Head of School Comment</th><td>' . e($headComment) . '</td></tr>'
             . '<tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr>'
             . '</table>'
             . '</div></div></body></html>';
