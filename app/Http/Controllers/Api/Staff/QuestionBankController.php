@@ -215,7 +215,7 @@ class QuestionBankController extends Controller
   }
 
   // POST /api/staff/question-bank/ai-generate
-  // Generate objective questions from a statement using OpenAI.
+  // Generate objective questions from a statement using an OpenAI-compatible API.
   public function aiGenerate(Request $request)
   {
     $user = $request->user();
@@ -234,12 +234,26 @@ class QuestionBankController extends Controller
       ->first();
     if (!$subject) return response()->json(['message' => 'Invalid subject'], 422);
 
-    $openAiKey = (string) env('OPENAI_API_KEY', '');
-    if ($openAiKey === '') {
-      return response()->json(['message' => 'OpenAI key missing on server'], 500);
+    $aiBaseUrl = trim((string) env('AI_BASE_URL', ''));
+    $aiModel = trim((string) env('AI_MODEL', ''));
+    $aiApiKey = trim((string) env('AI_API_KEY', ''));
+
+    if ($aiBaseUrl === '') {
+      $aiBaseUrl = 'https://api.openai.com/v1';
+    }
+    if ($aiModel === '') {
+      $aiModel = (string) env('OPENAI_MODEL', 'gpt-4.1-mini');
+    }
+    if ($aiApiKey === '') {
+      $aiApiKey = trim((string) env('OPENAI_API_KEY', ''));
     }
 
-    $model = (string) env('OPENAI_MODEL', 'gpt-4.1-mini');
+    $chatCompletionsUrl = rtrim($aiBaseUrl, '/') . '/chat/completions';
+    $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
+
+    if ($aiApiKey === '' && !$isLocalAiEndpoint) {
+      return response()->json(['message' => 'AI API key missing on server'], 500);
+    }
 
     $systemPrompt = "You generate multiple-choice questions from the user's statement.
 Return STRICT JSON only:
@@ -265,43 +279,44 @@ Rules:
 
     $userPrompt = "Subject: {$subject->name}\nCount: {$data['count']}\nStatement:\n{$data['prompt']}";
 
-    $verifyCandidates = array_values(array_filter([
-      env('OPENAI_CA_BUNDLE'),
-      ini_get('curl.cainfo'),
-      ini_get('openssl.cafile'),
-      base_path('cacert.pem'),
-      'C:\\Users\\EMMY\\AppData\\Local\\Programs\\PHP\\current\\extras\\ssl\\cacert.pem',
-    ], fn($v) => is_string($v) && trim($v) !== ''));
+    $http = Http::timeout(90);
 
+    $isHttpsEndpoint = str_starts_with(strtolower($chatCompletionsUrl), 'https://');
     $verifyPath = null;
-    foreach ($verifyCandidates as $cand) {
-      if (file_exists($cand)) {
-        $verifyPath = $cand;
-        break;
+    if ($isHttpsEndpoint) {
+      $verifyCandidates = array_values(array_filter([
+        env('OPENAI_CA_BUNDLE'),
+        ini_get('curl.cainfo'),
+        ini_get('openssl.cafile'),
+        base_path('cacert.pem'),
+        'C:\\Users\\EMMY\\AppData\\Local\\Programs\\PHP\\current\\extras\\ssl\\cacert.pem',
+      ], fn($v) => is_string($v) && trim($v) !== ''));
+
+      foreach ($verifyCandidates as $cand) {
+        if (file_exists($cand)) {
+          $verifyPath = $cand;
+          break;
+        }
+      }
+
+      if ($verifyPath) {
+        $http = $http->withOptions([
+          'verify' => $verifyPath,
+          'curl' => [
+            CURLOPT_CAINFO => $verifyPath,
+          ],
+        ]);
       }
     }
 
-    if (!$verifyPath) {
-      return response()->json([
-        'message' => 'AI generation failed: CA bundle not found',
-        'ca_candidates' => $verifyCandidates,
-      ], 500);
-    }
-
-    $http = Http::timeout(90);
-    $http = $http->withOptions([
-      'verify' => $verifyPath,
-      'curl' => [
-        CURLOPT_CAINFO => $verifyPath,
-      ],
-    ]);
-
     try {
-      $response = $http
-        ->withToken($openAiKey)
-        ->acceptJson()
-        ->post('https://api.openai.com/v1/chat/completions', [
-          'model' => $model,
+      $requestBuilder = $http->acceptJson();
+      if ($aiApiKey !== '') {
+        $requestBuilder = $requestBuilder->withToken($aiApiKey);
+      }
+
+      $response = $requestBuilder->post($chatCompletionsUrl, [
+          'model' => $aiModel,
           'temperature' => 0.4,
           'messages' => [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -309,22 +324,30 @@ Rules:
           ],
         ]);
     } catch (ConnectionException $e) {
-      Log::error('OpenAI connection failed', [
+      Log::error('AI provider connection failed', [
+        'base_url' => $aiBaseUrl,
+        'endpoint' => $chatCompletionsUrl,
+        'model' => $aiModel,
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
       return response()->json([
         'message' => 'AI generation failed: SSL connection error',
+        'ai_base_url' => $aiBaseUrl,
         'ca_verify' => $verifyPath,
         'error' => $e->getMessage(),
       ], 502);
     } catch (Throwable $e) {
-      Log::error('OpenAI unexpected failure', [
+      Log::error('AI provider unexpected failure', [
+        'base_url' => $aiBaseUrl,
+        'endpoint' => $chatCompletionsUrl,
+        'model' => $aiModel,
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
       return response()->json([
         'message' => 'AI generation failed',
+        'ai_base_url' => $aiBaseUrl,
         'ca_verify' => $verifyPath,
         'error' => $e->getMessage(),
       ], 502);
