@@ -52,16 +52,27 @@ class ELibraryController extends Controller
             return [(int) $activeClassId];
         }
 
-        $classIds = DB::table('class_students')
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->where('student_id', $studentId)
-            ->pluck('class_id')
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->unique()
-            ->values()
-            ->all();
+        $classIds = [];
+        if (Schema::hasTable('class_students')) {
+            $classStudentQuery = DB::table('class_students');
+            if (Schema::hasColumn('class_students', 'school_id')) {
+                $classStudentQuery->where('school_id', $schoolId);
+            }
+            if (Schema::hasColumn('class_students', 'academic_session_id')) {
+                $classStudentQuery->where('academic_session_id', $sessionId);
+            }
+            if (Schema::hasColumn('class_students', 'student_id')) {
+                $classStudentQuery->where('student_id', $studentId);
+            }
+
+            $classIds = $classStudentQuery
+                ->pluck('class_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
 
         if (!empty($classIds)) {
             return [(int) $classIds[0]];
@@ -162,7 +173,7 @@ class ELibraryController extends Controller
         $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id, $currentTermId);
         if (empty($classIds)) return response()->json(['data' => []]);
 
-        $allowedTermSubjectIds = TermSubject::query()
+        $allowedTermSubjects = TermSubject::query()
             ->where('school_id', $schoolId)
             ->where('term_id', $currentTermId)
             ->whereIn('class_id', $classIds)
@@ -176,8 +187,23 @@ class ELibraryController extends Controller
                 })
                 ->whereNull('student_subject_exclusions.id');
             })
+            ->get(['id', 'subject_id']);
+
+        $allowedTermSubjectIds = $allowedTermSubjects
             ->pluck('id')
-            ->toArray();
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $allowedSubjectIds = $allowedTermSubjects
+            ->pluck('subject_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $termSubjectToSubjectId = $allowedTermSubjects
+            ->mapWithKeys(fn ($row) => [(int) $row->id => (int) $row->subject_id])
+            ->all();
 
         if (empty($allowedTermSubjectIds)) return response()->json(['data' => []]);
 
@@ -186,15 +212,35 @@ class ELibraryController extends Controller
         }
 
         $query = ELibraryBook::query()
-            ->where('school_id', $schoolId)
-            ->whereIn('term_subject_id', $allowedTermSubjectIds);
+            ->where('school_id', $schoolId);
 
-        if ($filterTermSubjectId) {
-            $query->where('term_subject_id', (int)$filterTermSubjectId);
+        if (Schema::hasColumn('e_library_books', 'term_subject_id')) {
+            $query->whereIn('term_subject_id', $allowedTermSubjectIds);
+
+            if ($filterTermSubjectId) {
+                $query->where('term_subject_id', (int)$filterTermSubjectId);
+            }
+        } elseif (Schema::hasColumn('e_library_books', 'subject_id')) {
+            if (empty($allowedSubjectIds)) {
+                return response()->json(['data' => []]);
+            }
+
+            $query->whereIn('subject_id', $allowedSubjectIds);
+
+            if ($filterTermSubjectId) {
+                $mappedSubjectId = $termSubjectToSubjectId[(int) $filterTermSubjectId] ?? null;
+                if (!$mappedSubjectId) {
+                    return response()->json(['data' => []]);
+                }
+                $query->where('subject_id', (int) $mappedSubjectId);
+            }
+        } else {
+            return response()->json(['data' => []]);
         }
 
         $items = $query->orderByDesc('id')->get()->map(function ($b) {
-            $b->file_url = Storage::disk('public')->url($b->file_path);
+            $path = trim((string) ($b->file_path ?? ''));
+            $b->file_url = $path !== '' ? Storage::disk('public')->url($path) : null;
             return $b;
         });
 
