@@ -17,6 +17,35 @@ use Illuminate\Validation\ValidationException;
 
 class TeacherResultsController extends Controller
 {
+  private function hasResultCaBreakdownColumn(): bool
+  {
+    return Schema::hasColumn('results', 'ca_breakdown');
+  }
+
+  private function canUseStudentSubjectExclusions(): bool
+  {
+    if (!Schema::hasTable('student_subject_exclusions')) {
+      return false;
+    }
+
+    $required = [
+      'id',
+      'student_id',
+      'school_id',
+      'academic_session_id',
+      'class_id',
+      'subject_id',
+    ];
+
+    foreach ($required as $column) {
+      if (!Schema::hasColumn('student_subject_exclusions', $column)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   // GET /api/staff/results/subjects
   public function mySubjects(Request $request)
   {
@@ -65,6 +94,9 @@ class TeacherResultsController extends Controller
     $school = School::find((int) $schoolId);
     $assessmentSchema = AssessmentSchema::normalizeSchema($school?->assessment_schema);
 
+    $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
+    $canUseExclusions = $this->canUseStudentSubjectExclusions();
+
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
 
@@ -97,7 +129,7 @@ class TeacherResultsController extends Controller
         $join->on('results.student_id', '=', 'students.id')
           ->where('results.term_subject_id', '=', $termSubject->id);
       })
-      ->when(Schema::hasTable('student_subject_exclusions'), function ($query) use ($schoolId, $termSubject, $session) {
+      ->when($canUseExclusions, function ($query) use ($schoolId, $termSubject, $session) {
         $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
           $join->on('student_subject_exclusions.student_id', '=', 'students.id')
             ->where('student_subject_exclusions.school_id', '=', $schoolId)
@@ -111,7 +143,7 @@ class TeacherResultsController extends Controller
         'students.id as student_id',
         'users.name as student_name',
         DB::raw('COALESCE(results.ca, 0) as ca'),
-        'results.ca_breakdown',
+        ...($hasCaBreakdown ? ['results.ca_breakdown'] : [DB::raw('NULL as ca_breakdown')]),
         DB::raw('COALESCE(results.exam, 0) as exam'),
       ])
       ->orderBy('users.name');
@@ -167,6 +199,10 @@ class TeacherResultsController extends Controller
     $examMax = (int) $assessmentSchema['exam_max'];
     $caTotalMax = array_sum($caMaxes);
 
+    $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
+    $canUseExclusions = $this->canUseStudentSubjectExclusions();
+    $caSlotCount = max(1, count($caMaxes));
+
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
 
@@ -180,8 +216,8 @@ class TeacherResultsController extends Controller
       'scores' => 'required|array|min:1',
       'scores.*.student_id' => 'required|integer',
       'scores.*.ca' => 'nullable|integer|min:0|max:100',
-      'scores.*.ca_breakdown' => 'nullable|array|size:5',
-      'scores.*.ca_breakdown.*' => 'nullable|integer|min:0|max:100',
+      'scores.*.ca_breakdown' => 'nullable|array|size:' . $caSlotCount,
+      'scores.*.ca_breakdown.*' => 'nullable|numeric|min:0|max:100',
       'scores.*.exam' => 'required|integer|min:0|max:100',
     ]);
 
@@ -192,7 +228,7 @@ class TeacherResultsController extends Controller
     if (Schema::hasColumn('enrollments', 'school_id')) {
       $eligibleStudentIdsQuery->where('school_id', $schoolId);
     }
-    if (Schema::hasTable('student_subject_exclusions')) {
+    if ($canUseExclusions) {
       $eligibleStudentIdsQuery->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
         $join->on('student_subject_exclusions.student_id', '=', 'enrollments.student_id')
           ->where('student_subject_exclusions.school_id', '=', $schoolId)
@@ -216,7 +252,7 @@ class TeacherResultsController extends Controller
       $legacyCa = (int) ($score['ca'] ?? 0);
 
       if (is_array($rawBreakdown)) {
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < $caSlotCount; $i++) {
           $inputVal = (int) ($rawBreakdown[$i] ?? 0);
           if ($inputVal > (int) $caMaxes[$i]) {
             $errors["scores.$idx.ca_breakdown.$i"] = [
@@ -266,18 +302,23 @@ class TeacherResultsController extends Controller
     }
 
     DB::transaction(function () use ($preparedScores, $termSubject, $schoolId) {
+      $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
       foreach ($preparedScores as $score) {
+        $updateData = [
+          'ca' => $score['ca'],
+          'exam' => $score['exam'],
+        ];
+        if ($hasCaBreakdown) {
+          $updateData['ca_breakdown'] = $score['ca_breakdown'];
+        }
+
         Result::updateOrCreate(
           [
             'school_id' => $schoolId,
             'term_subject_id' => $termSubject->id,
             'student_id' => $score['student_id'],
           ],
-          [
-            'ca' => $score['ca'],
-            'ca_breakdown' => $score['ca_breakdown'],
-            'exam' => $score['exam'],
-          ]
+          $updateData
         );
       }
     });
