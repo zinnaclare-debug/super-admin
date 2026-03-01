@@ -32,25 +32,12 @@ function SchoolDashboard() {
   const [contactPhone, setContactPhone] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [departmentTemplates, setDepartmentTemplates] = useState([]);
-  const [newDepartmentName, setNewDepartmentName] = useState("");
-  const [savingDepartmentTemplate, setSavingDepartmentTemplate] = useState(false);
-  const [updatingDepartmentTemplate, setUpdatingDepartmentTemplate] = useState("");
-  const [deletingDepartmentTemplate, setDeletingDepartmentTemplate] = useState("");
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [statsRes, departmentRes] = await Promise.allSettled([
-          api.get("/api/school-admin/stats"),
-          api.get("/api/school-admin/department-templates"),
-        ]);
-
-        if (statsRes.status !== "fulfilled") {
-          throw statsRes.reason;
-        }
-
-        const res = statsRes.value;
+        const res = await api.get("/api/school-admin/stats");
         setStats({
           school_name: res.data?.school_name ?? "",
           school_location: res.data?.school_location ?? "",
@@ -67,22 +54,8 @@ function SchoolDashboard() {
         setContactEmail(res.data?.contact_email ?? "");
         setContactPhone(res.data?.contact_phone ?? "");
 
-        const departmentsFromStats = Array.isArray(res.data?.department_templates)
-          ? res.data.department_templates
-          : [];
-        const departmentsFromEndpoint =
-          departmentRes.status === "fulfilled" && Array.isArray(departmentRes.value?.data?.data)
-            ? departmentRes.value.data.data
-            : [];
-        setDepartmentTemplates(
-          Array.from(
-            new Set(
-              [...departmentsFromStats, ...departmentsFromEndpoint]
-                .map((x) => String(x).trim())
-                .filter(Boolean)
-            )
-          )
-        );
+        const departmentsFromStats = Array.isArray(res.data?.department_templates) ? res.data.department_templates : [];
+        setDepartmentTemplates(Array.from(new Set(departmentsFromStats.map((x) => String(x).trim()).filter(Boolean))));
       } catch {
         setStats({
           school_name: "",
@@ -166,89 +139,6 @@ function SchoolDashboard() {
       alert(firstValidationError || apiMessage || "Failed to update contact information");
     } finally {
       setSavingBranding(false);
-    }
-  };
-
-  const addDepartmentTemplate = async () => {
-    const name = (newDepartmentName || "").trim();
-    if (!name) {
-      alert("Enter a department name.");
-      return;
-    }
-
-    setSavingDepartmentTemplate(true);
-    try {
-      const res = await api.post("/api/school-admin/department-templates", { name });
-      const items = Array.isArray(res.data?.data) ? res.data.data : [];
-      setDepartmentTemplates(items);
-      setNewDepartmentName("");
-      alert("Department saved and applied to all sessions/classes.");
-    } catch (err) {
-      const apiMessage = err?.response?.data?.message;
-      const firstValidationError = Object.values(err?.response?.data?.errors || {})
-        .flat()
-        .find(Boolean);
-      alert(firstValidationError || apiMessage || "Failed to add department");
-    } finally {
-      setSavingDepartmentTemplate(false);
-    }
-  };
-
-  const editDepartmentTemplate = async (currentName) => {
-    const nextName = window.prompt("Enter new department name", currentName);
-    if (nextName === null) return;
-
-    const trimmed = String(nextName || "").trim();
-    if (!trimmed) {
-      alert("Department name cannot be empty.");
-      return;
-    }
-    if (trimmed.toLowerCase() === String(currentName || "").trim().toLowerCase()) {
-      return;
-    }
-
-    setUpdatingDepartmentTemplate(currentName);
-    try {
-      const res = await api.patch("/api/school-admin/department-templates", {
-        old_name: currentName,
-        new_name: trimmed,
-      });
-      setDepartmentTemplates(Array.isArray(res.data?.data) ? res.data.data : departmentTemplates);
-      alert("Department updated.");
-    } catch (err) {
-      const apiMessage = err?.response?.data?.message;
-      const firstValidationError = Object.values(err?.response?.data?.errors || {})
-        .flat()
-        .find(Boolean);
-      alert(firstValidationError || apiMessage || "Failed to update department");
-    } finally {
-      setUpdatingDepartmentTemplate("");
-    }
-  };
-
-  const deleteDepartmentTemplate = async (name) => {
-    if (!window.confirm(`Delete "${name}" from branding templates?`)) return;
-
-    setDeletingDepartmentTemplate(name);
-    try {
-      const res = await api.delete("/api/school-admin/department-templates", {
-        data: { name },
-      });
-      setDepartmentTemplates(Array.isArray(res.data?.data) ? res.data.data : []);
-      const retained = Number(res.data?.meta?.retained_class_departments || 0);
-      if (retained > 0) {
-        alert(`Template deleted. ${retained} class department(s) still have enrolled students and were retained.`);
-      } else {
-        alert("Department deleted.");
-      }
-    } catch (err) {
-      const apiMessage = err?.response?.data?.message;
-      const firstValidationError = Object.values(err?.response?.data?.errors || {})
-        .flat()
-        .find(Boolean);
-      alert(firstValidationError || apiMessage || "Failed to delete department");
-    } finally {
-      setDeletingDepartmentTemplate("");
     }
   };
 
@@ -351,7 +241,7 @@ function SchoolDashboard() {
         <div className="sd-branding__form">
           <div className="sd-section-head">
             <h2>School Information</h2>
-            <p>Update contact details and manage department templates. Logo, head details, exam record, and class templates are now managed by Super Admin.</p>
+            <p>Update contact details here. Logo, head details, exam record, class templates, and department setup are managed by Super Admin.</p>
           </div>
 
           <div className="sd-field-grid">
@@ -388,19 +278,8 @@ function SchoolDashboard() {
             <div className="sd-field">
               <label>Department Templates</label>
               <div className="sd-dept-box">
-                <div className="sd-dept-add">
-                  <input
-                    type="text"
-                    value={newDepartmentName}
-                    onChange={(e) => setNewDepartmentName(e.target.value)}
-                    placeholder="e.g. Science, Arts, Commercial"
-                  />
-                  <button type="button" onClick={addDepartmentTemplate} disabled={savingDepartmentTemplate}>
-                    {savingDepartmentTemplate ? "Saving..." : "Add Department"}
-                  </button>
-                </div>
                 <p className="sd-note" style={{ marginTop: 8 }}>
-                  New department here is auto-applied to all levels and all class terms.
+                  Department creation and edit are now controlled in Super Admin / School / Information / Class Templates.
                 </p>
                 <div className="sd-dept-tags">
                   {departmentTemplates.length === 0 ? (
@@ -409,22 +288,6 @@ function SchoolDashboard() {
                     departmentTemplates.map((name) => (
                       <span key={name} className="sd-dept-tag">
                         <span>{name}</span>
-                        <button
-                          type="button"
-                          className="sd-dept-tag-btn"
-                          onClick={() => editDepartmentTemplate(name)}
-                          disabled={updatingDepartmentTemplate === name || deletingDepartmentTemplate === name}
-                        >
-                          {updatingDepartmentTemplate === name ? "..." : "Edit"}
-                        </button>
-                        <button
-                          type="button"
-                          className="sd-dept-tag-btn sd-dept-tag-btn--danger"
-                          onClick={() => deleteDepartmentTemplate(name)}
-                          disabled={updatingDepartmentTemplate === name || deletingDepartmentTemplate === name}
-                        >
-                          {deletingDepartmentTemplate === name ? "..." : "Delete"}
-                        </button>
                       </span>
                     ))
                   )}
