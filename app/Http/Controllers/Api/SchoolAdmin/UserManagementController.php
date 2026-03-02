@@ -47,8 +47,9 @@ class UserManagementController extends Controller
         }
 
         $users = $query->orderBy('name')->get(['id', 'name', 'email', 'username', 'role', 'is_active']);
+        $rows = $this->buildUserIndexRows((int) $schoolId, $users);
 
-        return response()->json(['data' => $users]);
+        return response()->json(['data' => $rows]);
     }
 
     // GET /api/school-admin/users/{user}
@@ -485,6 +486,199 @@ class UserManagementController extends Controller
                 'missing_ids' => $missingIds,
             ],
         ]);
+    }
+
+    private function buildUserIndexRows(int $schoolId, $users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        $studentsByUserId = Student::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('user_id', $userIds)
+            ->get(['id', 'user_id', 'education_level'])
+            ->keyBy('user_id');
+
+        $staffByUserId = Staff::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('user_id', $userIds)
+            ->get(['id', 'user_id', 'education_level'])
+            ->keyBy('user_id');
+
+        $staffAssignments = $this->resolveStaffAssignmentsForUsers($schoolId, $userIds);
+
+        return $users->map(function ($user) use ($schoolId, $studentsByUserId, $staffByUserId, $staffAssignments) {
+            $row = [
+                'id' => (int) $user->id,
+                'name' => (string) $user->name,
+                'email' => (string) ($user->email ?? ''),
+                'username' => (string) ($user->username ?? ''),
+                'role' => (string) $user->role,
+                'is_active' => (bool) $user->is_active,
+                'status' => $user->is_active ? 'active' : 'inactive',
+                'education_level' => null,
+                'class_name' => null,
+                'department_name' => null,
+                'levels' => [],
+                'classes' => [],
+                'departments' => [],
+            ];
+
+            if ($user->role === 'student') {
+                $student = $studentsByUserId->get($user->id);
+                if ($student) {
+                    $educationLevel = $this->normalizeEducationLevel($student->education_level ?? null);
+                    $placement = $this->resolveStudentCurrentPlacement($schoolId, (int) $student->id);
+
+                    $className = trim((string) ($placement['class_name'] ?? ''));
+                    $departmentName = trim((string) ($placement['department_name'] ?? ''));
+
+                    $row['education_level'] = $educationLevel;
+                    $row['class_name'] = $className !== '' ? $className : null;
+                    $row['department_name'] = $departmentName !== '' ? $departmentName : null;
+                    $row['levels'] = $educationLevel ? [$educationLevel] : [];
+                    $row['classes'] = $className !== '' ? [$className] : [];
+                    $row['departments'] = $departmentName !== '' ? [$departmentName] : [];
+                }
+
+                return $row;
+            }
+
+            if ($user->role === 'staff') {
+                $staff = $staffByUserId->get($user->id);
+                $assignment = $staffAssignments[(int) $user->id] ?? [
+                    'levels' => [],
+                    'classes' => [],
+                    'departments' => [],
+                ];
+
+                $educationLevel = $this->normalizeEducationLevel($staff?->education_level ?? null);
+                $levels = collect($assignment['levels'] ?? [])
+                    ->map(fn ($level) => $this->normalizeEducationLevel((string) $level))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                if ($educationLevel && !in_array($educationLevel, $levels, true)) {
+                    array_unshift($levels, $educationLevel);
+                }
+
+                $classes = collect($assignment['classes'] ?? [])
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter(fn ($name) => $name !== '')
+                    ->unique(fn ($name) => strtolower($name))
+                    ->values()
+                    ->all();
+
+                $departments = collect($assignment['departments'] ?? [])
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter(fn ($name) => $name !== '')
+                    ->unique(fn ($name) => strtolower($name))
+                    ->values()
+                    ->all();
+
+                $row['education_level'] = $educationLevel ?: ($levels[0] ?? null);
+                $row['class_name'] = $classes[0] ?? null;
+                $row['department_name'] = $departments[0] ?? null;
+                $row['levels'] = $levels;
+                $row['classes'] = $classes;
+                $row['departments'] = $departments;
+            }
+
+            return $row;
+        })->values()->all();
+    }
+
+    private function resolveStaffAssignmentsForUsers(int $schoolId, array $staffUserIds): array
+    {
+        $userIds = collect($staffUserIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $assignments = [];
+        foreach ($userIds as $userId) {
+            $assignments[$userId] = [
+                'levels' => [],
+                'classes' => [],
+                'departments' => [],
+            ];
+        }
+
+        $currentSession = $this->resolveCurrentSession($schoolId);
+
+        $classTeacherQuery = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('class_teacher_user_id', $userIds);
+        if ($currentSession) {
+            $classTeacherQuery->where('academic_session_id', (int) $currentSession->id);
+        }
+
+        $classTeacherRows = $classTeacherQuery->get(['class_teacher_user_id', 'name', 'level']);
+        foreach ($classTeacherRows as $row) {
+            $userId = (int) ($row->class_teacher_user_id ?? 0);
+            if ($userId <= 0 || !array_key_exists($userId, $assignments)) {
+                continue;
+            }
+            $level = $this->normalizeEducationLevel((string) ($row->level ?? ''));
+            $className = trim((string) ($row->name ?? ''));
+            if ($level && !in_array($level, $assignments[$userId]['levels'], true)) {
+                $assignments[$userId]['levels'][] = $level;
+            }
+            if ($className !== '' && !in_array($className, $assignments[$userId]['classes'], true)) {
+                $assignments[$userId]['classes'][] = $className;
+            }
+        }
+
+        if (Schema::hasTable('class_departments') && Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+            $departmentTeacherQuery = DB::table('class_departments')
+                ->join('classes', 'classes.id', '=', 'class_departments.class_id')
+                ->where('classes.school_id', $schoolId)
+                ->whereIn('class_departments.class_teacher_user_id', $userIds)
+                ->whereNotNull('class_departments.class_teacher_user_id')
+                ->select([
+                    'class_departments.class_teacher_user_id',
+                    'class_departments.name as department_name',
+                    'classes.name as class_name',
+                    'classes.level as class_level',
+                ]);
+            if ($currentSession) {
+                $departmentTeacherQuery->where('classes.academic_session_id', (int) $currentSession->id);
+            }
+
+            $departmentTeacherRows = $departmentTeacherQuery->get();
+            foreach ($departmentTeacherRows as $row) {
+                $userId = (int) ($row->class_teacher_user_id ?? 0);
+                if ($userId <= 0 || !array_key_exists($userId, $assignments)) {
+                    continue;
+                }
+
+                $level = $this->normalizeEducationLevel((string) ($row->class_level ?? ''));
+                $className = trim((string) ($row->class_name ?? ''));
+                $departmentName = trim((string) ($row->department_name ?? ''));
+
+                if ($level && !in_array($level, $assignments[$userId]['levels'], true)) {
+                    $assignments[$userId]['levels'][] = $level;
+                }
+                if ($className !== '' && !in_array($className, $assignments[$userId]['classes'], true)) {
+                    $assignments[$userId]['classes'][] = $className;
+                }
+                if ($departmentName !== '' && !in_array($departmentName, $assignments[$userId]['departments'], true)) {
+                    $assignments[$userId]['departments'][] = $departmentName;
+                }
+            }
+        }
+
+        return $assignments;
     }
 
     private function resolveStudentCurrentPlacement(int $schoolId, int $studentId): array

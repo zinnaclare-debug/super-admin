@@ -8,9 +8,7 @@ import {
   unreadAnnouncementCount,
 } from "../../utils/announcementNotifier";
 import { getStoredUser } from "../../utils/authStorage";
-import teachingArt from "../../assets/student-dashboard/teaching.svg";
-import trendsArt from "../../assets/student-dashboard/trends.svg";
-import articlesArt from "../../assets/student-dashboard/online-articles.svg";
+import adminHeroArt from "../../assets/dashboard/features.svg";
 import swipeProfilesArt from "../../assets/student-dashboard/swipe-profiles.svg";
 import "./Dashboard.css";
 
@@ -142,13 +140,13 @@ export default function StudentDashboard() {
 
         <div className="sdx-hero-art" aria-hidden="true">
           <div className="sdx-art sdx-art--main">
-            <img src={teachingArt} alt="" />
+            <img src={adminHeroArt} alt="" />
           </div>
           <div className="sdx-art sdx-art--trend">
-            <img src={trendsArt} alt="" />
+            <img src={adminHeroArt} alt="" />
           </div>
           <div className="sdx-art sdx-art--article">
-            <img src={articlesArt} alt="" />
+            <img src={adminHeroArt} alt="" />
           </div>
         </div>
       </section>

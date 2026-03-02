@@ -8,6 +8,9 @@ export default function ActiveUsers() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -33,8 +36,44 @@ export default function ActiveUsers() {
   useEffect(() => {
     load();
     setSelectedIds(new Set());
+    setLevelFilter("");
+    setClassFilter("");
+    setDepartmentFilter("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  const levelOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        rows
+          .flatMap((u) => (Array.isArray(u.levels) ? u.levels : [u.education_level]))
+          .map((v) => String(v || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const classOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        rows
+          .flatMap((u) => (Array.isArray(u.classes) ? u.classes : [u.class_name]))
+          .map((v) => String(v || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const departmentOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        rows
+          .flatMap((u) => (Array.isArray(u.departments) ? u.departments : [u.department_name]))
+          .map((v) => String(v || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
 
   const removeUser = async (u) => {
     if (!u?.id) return;
@@ -84,14 +123,35 @@ export default function ActiveUsers() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((u) => {
+    const level = levelFilter.trim().toLowerCase();
+    const className = classFilter.trim().toLowerCase();
+    const department = departmentFilter.trim().toLowerCase();
+
+    const textFiltered = rows.filter((u) => {
+      if (!s) return true;
       const name = (u.name || "").toLowerCase();
       const email = (u.email || "").toLowerCase();
       const username = (u.username || "").toLowerCase();
       return name.includes(s) || email.includes(s) || username.includes(s);
     });
-  }, [rows, q]);
+
+    return textFiltered.filter((u) => {
+      const rowLevels = (Array.isArray(u.levels) ? u.levels : [u.education_level])
+        .map((v) => String(v || "").trim().toLowerCase())
+        .filter(Boolean);
+      const rowClasses = (Array.isArray(u.classes) ? u.classes : [u.class_name])
+        .map((v) => String(v || "").trim().toLowerCase())
+        .filter(Boolean);
+      const rowDepartments = (Array.isArray(u.departments) ? u.departments : [u.department_name])
+        .map((v) => String(v || "").trim().toLowerCase())
+        .filter(Boolean);
+
+      if (level && !rowLevels.includes(level)) return false;
+      if (className && !rowClasses.includes(className)) return false;
+      if (department && !rowDepartments.includes(department)) return false;
+      return true;
+    });
+  }, [rows, q, levelFilter, classFilter, departmentFilter]);
 
   const visibleIds = useMemo(
     () => filtered.map((u) => u.id),
@@ -126,12 +186,32 @@ export default function ActiveUsers() {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <h4 style={{ margin: 0 }}>Active {role === "staff" ? "Staff" : "Students"}</h4>
 
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, username..."
-          style={{ padding: 8, width: 320 }}
-        />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+            <option value="">All Levels</option>
+            {levelOptions.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+            <option value="">All Classes</option>
+            {classOptions.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+            <option value="">All Departments</option>
+            {departmentOptions.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, email, username..."
+            style={{ padding: 8, width: 320 }}
+          />
+        </div>
       </div>
 
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -167,13 +247,27 @@ export default function ActiveUsers() {
                   </div>
                 </th>
                 <th>Name</th>
+                <th>Level</th>
+                <th>Class</th>
+                <th>Department</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
 
             <tbody>
-              {filtered.map((u, idx) => (
+              {filtered.map((u, idx) => {
+                const levels = Array.isArray(u.levels) && u.levels.length > 0
+                  ? u.levels
+                  : (u.education_level ? [u.education_level] : []);
+                const classes = Array.isArray(u.classes) && u.classes.length > 0
+                  ? u.classes
+                  : (u.class_name ? [u.class_name] : []);
+                const departments = Array.isArray(u.departments) && u.departments.length > 0
+                  ? u.departments
+                  : (u.department_name ? [u.department_name] : []);
+
+                return (
                 <tr key={u.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -186,6 +280,9 @@ export default function ActiveUsers() {
                     </div>
                   </td>
                   <td>{u.name}</td>
+                  <td>{levels.length ? levels.join(", ") : "-"}</td>
+                  <td>{classes.length ? classes.join(", ") : "-"}</td>
+                  <td>{departments.length ? departments.join(", ") : "-"}</td>
                   <td>
                     <strong>{u.status || "active"}</strong>
                   </td>
@@ -220,11 +317,12 @@ export default function ActiveUsers() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="4" style={{ textAlign: "center", opacity: 0.7 }}>
+                  <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
                     No users found
                   </td>
                 </tr>
