@@ -33,7 +33,7 @@ const EXTRA_VALUE = [
 ];
 
 const CONTACT_LINES = [
-  { phone: "+234 806 798 8449", dial: "+2348067988449", location: "FCT" },
+  { phone: "+2348027453306", dial: "+2348027453306", location: "FCT" },
   { phone: "+234 9136806652", dial: "+2349136806652", location: "Ekiti State" },
   { phone: "+234 816 986 6477", dial: "+2348169866477", location: "Kwara State" },
   { phone: "+234 706 690 6190", dial: "+2347066906190", location: "FCT" },
@@ -70,8 +70,8 @@ function Home() {
               <span>One-time Setup: N40,000</span>
             </div>
             <div className="home-hero-actions">
-              <a href="tel:08067988449">Call 08067988449</a>
-              <a href="https://wa.me/2348067988449" target="_blank" rel="noreferrer">
+              <a href="tel:+2348027453306">Call +2348027453306</a>
+              <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
                 WhatsApp Us
               </a>
             </div>
@@ -154,7 +154,7 @@ function Home() {
               <a href="mailto:lytebridgeprofessionalservices@gmail.com">
                 lytebridgeprofessionalservices@gmail.com
               </a>
-              <a href="https://wa.me/2348067988449" target="_blank" rel="noreferrer">
+              <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
                 WhatsApp Chat
               </a>
             </div>
