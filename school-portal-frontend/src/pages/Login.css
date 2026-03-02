@@ -394,6 +394,12 @@
   font-weight: 700;
 }
 
+.login-contact-address {
+  margin: 0 0 4px;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
 .login-help a {
   color: #0369a1;
   font-weight: 700;

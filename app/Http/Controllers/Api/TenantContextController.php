@@ -29,6 +29,8 @@ class TenantContextController extends Controller
                 'subdomain' => $tenantSchool->subdomain,
                 'logo_path' => $tenantSchool->logo_path,
                 'logo_url' => $this->storageUrl($tenantSchool->logo_path),
+                'location' => $tenantSchool->location,
+                'school_location' => $tenantSchool->location,
                 'contact_email' => $tenantSchool->contact_email,
                 'contact_phone' => $tenantSchool->contact_phone,
             ],
