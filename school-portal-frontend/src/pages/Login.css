@@ -289,7 +289,7 @@
 
 .login-brand {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .login-mark {
@@ -315,34 +315,10 @@
   padding: 0;
 }
 
-.login-brand-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.login-card h2 {
-  margin: 0;
-  color: #0b3b66;
-  font-size: 1.2rem;
-  line-height: 1.1;
-}
-
-.login-school-name {
-  margin: 3px 0 0;
-  color: #0369a1;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.login-subtitle {
-  margin: 8px 0 10px;
-  color: #475569;
-  font-size: 0.86rem;
-}
-
 .login-form {
   display: grid;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .login-form label {
@@ -400,9 +376,22 @@
 }
 
 .login-help {
-  margin: 10px 2px 2px;
+  margin: 0;
   font-size: 0.78rem;
   color: #64748b;
+}
+
+.login-contact-block {
+  margin: 10px 2px 2px;
+  border-top: 1px solid #dbeafe;
+  padding-top: 8px;
+}
+
+.login-contact-school-name {
+  margin: 0 0 4px;
+  color: #0b3b66;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .login-help a {
@@ -505,8 +494,4 @@
 
 .login-page--compact .login-mark img {
   max-height: 140px;
-}
-
-.login-page--compact .login-subtitle {
-  margin: 6px 0 8px;
 }

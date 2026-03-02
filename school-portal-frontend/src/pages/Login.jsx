@@ -166,19 +166,7 @@ function Login() {
                 }}
               />
             </div>
-            <div className="login-brand-copy">
-              <h2>Sign In to Continue</h2>
-              <p className="login-school-name">
-                {tenantSchool?.name || "School Portal"}
-              </p>
-            </div>
           </div>
-
-          <p className="login-subtitle">
-            {tenantSchool?.name
-              ? `Use your ${tenantSchool.name} account email and password.`
-              : "Use your official school email and password."}
-          </p>
 
           <form onSubmit={handleSubmit} className="login-form">
             <label htmlFor="login-email">Email</label>
@@ -208,26 +196,31 @@ function Login() {
             </button>
           </form>
 
-          <p className="login-help">
-            {tenantContactEmail || tenantContactPhone ? (
-              <>
-                Protected access. Contact school admin:
-                {tenantContactEmail ? (
-                  <>
-                    {" "}
-                    <a href={`mailto:${tenantContactEmail}`}>{tenantContactEmail}</a>
-                  </>
-                ) : null}
-                {tenantContactEmail && tenantContactPhone ? " | " : " "}
-                {tenantContactPhone ? (
-                  <a href={`tel:${tenantDialPhone || tenantContactPhone}`}>{tenantContactPhone}</a>
-                ) : null}
-                .
-              </>
-            ) : (
-              "Protected access. Contact school admin if you cannot sign in."
-            )}
-          </p>
+          <div className="login-contact-block">
+            <p className="login-contact-school-name">
+              {tenantSchool?.name || "School Portal"}
+            </p>
+            <p className="login-help">
+              {tenantContactEmail || tenantContactPhone ? (
+                <>
+                  Protected access. Contact school admin:
+                  {tenantContactEmail ? (
+                    <>
+                      {" "}
+                      <a href={`mailto:${tenantContactEmail}`}>{tenantContactEmail}</a>
+                    </>
+                  ) : null}
+                  {tenantContactEmail && tenantContactPhone ? " | " : " "}
+                  {tenantContactPhone ? (
+                    <a href={`tel:${tenantDialPhone || tenantContactPhone}`}>{tenantContactPhone}</a>
+                  ) : null}
+                  .
+                </>
+              ) : (
+                "Protected access. Contact school admin if you cannot sign in."
+              )}
+            </p>
+          </div>
         </section>
       </div>
     </div>
