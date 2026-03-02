@@ -56,6 +56,14 @@ class LoginController extends Controller
         // Keep existing tokens so the same account can stay logged in on multiple devices.
         // If you later want limits, prune old tokens with a retention policy instead of deleting all.
         $token = $user->createToken('auth-token')->plainTextToken;
+        $schoolName = '';
+        if ($tenantSchool) {
+            $schoolName = (string) ($tenantSchool->name ?? '');
+        } elseif (!empty($user->school_id)) {
+            $schoolName = (string) (School::query()
+                ->where('id', $user->school_id)
+                ->value('name') ?? '');
+        }
 
         return response()->json([
             'token' => $token,
@@ -65,6 +73,7 @@ class LoginController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'school_id' => $user->school_id,
+                'school_name' => $schoolName,
             ]
         ]);
     }

@@ -15,6 +15,7 @@ import "./Dashboard.css";
 export default function StaffDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [tenantSchoolName, setTenantSchoolName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -42,6 +43,22 @@ export default function StaffDashboard() {
 
     return `${apiOrigin}${url.startsWith("/") ? "" : "/"}${url}`;
   };
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/api/tenant/context")
+      .then((res) => {
+        if (!active) return;
+        const name = String(res?.data?.school?.name || "").trim();
+        setTenantSchoolName(name);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -96,11 +113,12 @@ export default function StaffDashboard() {
   const schoolName =
     profile?.school_name ||
     profile?.school?.name ||
+    tenantSchoolName ||
     user?.school_name ||
     user?.school?.name ||
     storedUser?.school_name ||
     storedUser?.school?.name ||
-    "PROJECT SCHOOL";
+    "School";
   const isClassTeacher = classes.length > 0;
   const staffPhotoUrl = toAbsoluteUrl(
     staff.photo_url || (staff.photo_path ? `/storage/${staff.photo_path}` : "")

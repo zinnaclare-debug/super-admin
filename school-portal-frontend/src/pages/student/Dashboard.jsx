@@ -15,10 +15,27 @@ import "./Dashboard.css";
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [tenantSchoolName, setTenantSchoolName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/api/tenant/context")
+      .then((res) => {
+        if (!active) return;
+        const name = String(res?.data?.school?.name || "").trim();
+        setTenantSchoolName(name);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -94,11 +111,12 @@ export default function StudentDashboard() {
   const schoolName =
     profile?.school_name ||
     profile?.school?.name ||
+    tenantSchoolName ||
     user?.school_name ||
     user?.school?.name ||
     storedUser?.school_name ||
     storedUser?.school?.name ||
-    "PROJECT SCHOOL";
+    "School";
   const currentSession = profile?.current_session || null;
   const currentTerm = profile?.current_term || null;
   const currentClass = profile?.current_class || null;
