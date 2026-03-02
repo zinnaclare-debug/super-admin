@@ -36,6 +36,7 @@ function Login() {
   }, [tenantSchool]);
 
   const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
+  const tenantAddress = (tenantSchool?.school_location || tenantSchool?.location || "").trim();
   const tenantContactEmail = (tenantSchool?.contact_email || "").trim();
   const tenantContactPhone = (tenantSchool?.contact_phone || "").trim();
   const tenantDialPhone = tenantContactPhone.replace(/[^\d+]/g, "");
@@ -200,6 +201,9 @@ function Login() {
             <p className="login-contact-school-name">
               {tenantSchool?.name || "School Portal"}
             </p>
+            {tenantAddress ? (
+              <p className="login-contact-address">{tenantAddress}</p>
+            ) : null}
             <p className="login-help">
               {tenantContactEmail || tenantContactPhone ? (
                 <>
