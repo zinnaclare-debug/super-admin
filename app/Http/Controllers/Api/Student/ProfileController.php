@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 use App\Models\Student;
 use App\Models\Guardian;
+use App\Models\School;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\Term;
@@ -97,12 +98,21 @@ class ProfileController extends Controller
                 ? $relativeOrAbsolute
                 : url($relativeOrAbsolute);
         }
+        $schoolName = (string) (School::query()
+            ->where('id', $schoolId)
+            ->value('name') ?? '');
 
         return response()->json([
             'data' => [
+                'school_name' => $schoolName,
+                'school' => [
+                    'id' => $schoolId,
+                    'name' => $schoolName,
+                ],
                 'user' => [
                     'id' => $user->id,
                     'school_id' => $user->school_id,
+                    'school_name' => $schoolName,
                     'name' => $user->name,
                     'username' => $user->username,
                     'email' => $user->email,

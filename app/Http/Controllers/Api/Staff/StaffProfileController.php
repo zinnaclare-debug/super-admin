@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
+use App\Models\School;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -43,11 +44,21 @@ class StaffProfileController extends Controller
         if ($photoPath) {
             $photoUrl = $this->publicUrl($request, $photoPath);
         }
+        $schoolName = (string) (School::query()
+            ->where('id', $user->school_id)
+            ->value('name') ?? '');
 
         return response()->json([
             'data' => [
+                'school_name' => $schoolName,
+                'school' => [
+                    'id' => (int) $user->school_id,
+                    'name' => $schoolName,
+                ],
                 'user' => [
                     'id' => $user->id,
+                    'school_id' => (int) $user->school_id,
+                    'school_name' => $schoolName,
                     'name' => $user->name,
                     'email' => $user->email,
                     'username' => $user->username,
