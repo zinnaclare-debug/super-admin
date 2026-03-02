@@ -1,4 +1,5 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import FeatureShell from "../../components/FeatureShell";
 
 const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/register",
@@ -33,56 +34,12 @@ function titleFromPath(pathname) {
 }
 
 export default function SchoolAdminFeatureLayout() {
-  const navigate = useNavigate();
   const { pathname } = useLocation();
   const showBack = !NO_BACK_EXACT_PATHS.has(pathname);
 
   return (
-    <div
-      style={{
-        minHeight: "100%",
-        width: "100%",
-        boxSizing: "border-box",
-        padding: 16,
-        background: "#f4f8ff",
-        borderRadius: 12,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          background: "#0d6efd",
-          color: "#fff",
-          padding: "12px 16px",
-          borderRadius: 10,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "clamp(1.05rem, 3.5vw, 1.5rem)" }}>{titleFromPath(pathname)}</h2>
-        {showBack ? (
-          <button
-            onClick={() => navigate(-1)}
-            style={{
-              background: "#fff",
-              color: "#0d6efd",
-              border: "none",
-              borderRadius: 6,
-              padding: "6px 12px",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            Back
-          </button>
-        ) : null}
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <Outlet />
-      </div>
-    </div>
+    <FeatureShell title={titleFromPath(pathname)} showBack={showBack}>
+      <Outlet />
+    </FeatureShell>
   );
 }
