@@ -135,7 +135,6 @@ export default function StudentDashboard() {
     <div className="sdx-page">
       <section className="sdx-hero">
         <div>
-          <span className="sdx-pill">Student Dashboard</span>
           <h2>{schoolName}</h2>
           <p>
             Access learning tools quickly, track your profile details, and stay up to date with school announcements.
