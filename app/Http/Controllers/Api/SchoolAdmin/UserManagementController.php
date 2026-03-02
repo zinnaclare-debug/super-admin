@@ -16,6 +16,8 @@ use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\UserCredentialStore;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class UserManagementController extends Controller
 {
@@ -50,6 +53,99 @@ class UserManagementController extends Controller
         $rows = $this->buildUserIndexRows((int) $schoolId, $users);
 
         return response()->json(['data' => $rows]);
+    }
+
+    // GET /api/school-admin/users/download/pdf?status=active|inactive&role=staff|student&level=&class=&department=&q=
+    public function downloadPdf(Request $request)
+    {
+        $schoolId = (int) $request->user()->school_id;
+        $payload = $request->validate([
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'role' => ['nullable', Rule::in(['student', 'staff'])],
+            'level' => ['nullable', 'string', 'max:60'],
+            'class' => ['nullable', 'string', 'max:120'],
+            'department' => ['nullable', 'string', 'max:120'],
+            'q' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $status = (string) ($payload['status'] ?? 'active');
+        $role = $payload['role'] ?? null;
+        $isActive = $status === 'active';
+
+        $users = User::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('role', ['student', 'staff'])
+            ->where('is_active', $isActive)
+            ->when($role, fn ($q) => $q->where('role', $role))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'username', 'role', 'is_active']);
+
+        $rows = $this->buildUserIndexRows($schoolId, $users);
+        $rows = $this->filterUserIndexRows(
+            $rows,
+            $payload['level'] ?? null,
+            $payload['class'] ?? null,
+            $payload['department'] ?? null,
+            $payload['q'] ?? null
+        );
+
+        $rows = collect($rows)
+            ->values()
+            ->map(function (array $row, int $index) {
+                $row['sn'] = $index + 1;
+                return $row;
+            })
+            ->all();
+
+        $school = School::query()->find($schoolId);
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.users_list', [
+                'school' => $school,
+                'rows' => $rows,
+                'filters' => [
+                    'status' => $status,
+                    'role' => $role,
+                    'level' => $payload['level'] ?? null,
+                    'class' => $payload['class'] ?? null,
+                    'department' => $payload['department'] ?? null,
+                    'q' => $payload['q'] ?? null,
+                ],
+                'generatedAt' => now(),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+
+            $fileName = 'users_' . $status . '_' . now()->format('Ymd_His') . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate users PDF download.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     // GET /api/school-admin/users/{user}
@@ -590,6 +686,71 @@ class UserManagementController extends Controller
 
             return $row;
         })->values()->all();
+    }
+
+    private function filterUserIndexRows(
+        array $rows,
+        ?string $level = null,
+        ?string $className = null,
+        ?string $department = null,
+        ?string $search = null
+    ): array {
+        $levelNeedle = strtolower(trim((string) ($level ?? '')));
+        $classNeedle = strtolower(trim((string) ($className ?? '')));
+        $departmentNeedle = strtolower(trim((string) ($department ?? '')));
+        $searchNeedle = strtolower(trim((string) ($search ?? '')));
+
+        return collect($rows)
+            ->filter(function (array $row) use ($levelNeedle, $classNeedle, $departmentNeedle, $searchNeedle) {
+                $levels = collect($row['levels'] ?? [])
+                    ->push($row['education_level'] ?? null)
+                    ->map(fn ($v) => strtolower(trim((string) $v)))
+                    ->filter(fn ($v) => $v !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+                $classes = collect($row['classes'] ?? [])
+                    ->push($row['class_name'] ?? null)
+                    ->map(fn ($v) => strtolower(trim((string) $v)))
+                    ->filter(fn ($v) => $v !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+                $departments = collect($row['departments'] ?? [])
+                    ->push($row['department_name'] ?? null)
+                    ->map(fn ($v) => strtolower(trim((string) $v)))
+                    ->filter(fn ($v) => $v !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($levelNeedle !== '' && !in_array($levelNeedle, $levels, true)) {
+                    return false;
+                }
+                if ($classNeedle !== '' && !in_array($classNeedle, $classes, true)) {
+                    return false;
+                }
+                if ($departmentNeedle !== '' && !in_array($departmentNeedle, $departments, true)) {
+                    return false;
+                }
+
+                if ($searchNeedle !== '') {
+                    $name = strtolower((string) ($row['name'] ?? ''));
+                    $email = strtolower((string) ($row['email'] ?? ''));
+                    $username = strtolower((string) ($row['username'] ?? ''));
+                    if (
+                        !str_contains($name, $searchNeedle)
+                        && !str_contains($email, $searchNeedle)
+                        && !str_contains($username, $searchNeedle)
+                    ) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            ->values()
+            ->all();
     }
 
     private function resolveStaffAssignmentsForUsers(int $schoolId, array $staffUserIds): array

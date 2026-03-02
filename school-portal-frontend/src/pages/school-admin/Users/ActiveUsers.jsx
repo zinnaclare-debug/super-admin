@@ -3,6 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 import UserProfilePanel from "./UserProfilePanel";
 
+const parseFileName = (headers, fallback = "users_active.pdf") => {
+  const contentDisposition = headers?.["content-disposition"] || "";
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!match?.[1]) return fallback;
+  return decodeURIComponent(match[1].replace(/"/g, "").trim());
+};
+
 export default function ActiveUsers() {
   const { role } = useParams(); // staff | student
   const navigate = useNavigate();
@@ -16,6 +23,7 @@ export default function ActiveUsers() {
   const [deletingId, setDeletingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -118,6 +126,39 @@ export default function ActiveUsers() {
       alert(e?.response?.data?.message || "Failed to bulk delete users");
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const downloadUsersPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const params = {
+        status: "active",
+        role,
+      };
+      if (levelFilter) params.level = levelFilter;
+      if (classFilter) params.class = classFilter;
+      if (departmentFilter) params.department = departmentFilter;
+      if (q) params.q = q;
+
+      const res = await api.get("/api/school-admin/users/download/pdf", {
+        params,
+        responseType: "blob",
+      });
+
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, `users_${role || "all"}_active.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download users PDF.");
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -226,6 +267,9 @@ export default function ActiveUsers() {
           }}
         >
           {bulkDeleting ? "Deleting..." : `Bulk Delete (${selectedIds.size})`}
+        </button>
+        <button onClick={downloadUsersPdf} disabled={downloadingPdf}>
+          {downloadingPdf ? "Downloading..." : "Download PDF"}
         </button>
       </div>
 

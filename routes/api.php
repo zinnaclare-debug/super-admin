@@ -168,6 +168,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:users');
     Route::get('/school-admin/users/login-details/download/pdf', [LoginDetailsController::class, 'downloadPdf'])
         ->middleware('feature:users');
+    Route::get('/school-admin/users/download/pdf', [UserManagementController::class, 'downloadPdf'])
+        ->middleware('feature:users');
 
     Route::delete('/school-admin/users/bulk-delete', [UserManagementController::class, 'bulkDestroy'])
         ->middleware('feature:users');
