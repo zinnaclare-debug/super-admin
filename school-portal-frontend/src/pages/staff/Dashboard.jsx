@@ -134,13 +134,7 @@ export default function StaffDashboard() {
         </div>
 
         <div className="stx-hero-art" aria-hidden="true">
-          <div className="stx-art stx-art--main">
-            <img src={adminHeroArt} alt="" />
-          </div>
-          <div className="stx-art stx-art--trend">
-            <img src={adminHeroArt} alt="" />
-          </div>
-          <div className="stx-art stx-art--article">
+          <div className="stx-art stx-art--single">
             <img src={adminHeroArt} alt="" />
           </div>
         </div>

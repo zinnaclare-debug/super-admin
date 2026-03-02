@@ -139,13 +139,7 @@ export default function StudentDashboard() {
         </div>
 
         <div className="sdx-hero-art" aria-hidden="true">
-          <div className="sdx-art sdx-art--main">
-            <img src={adminHeroArt} alt="" />
-          </div>
-          <div className="sdx-art sdx-art--trend">
-            <img src={adminHeroArt} alt="" />
-          </div>
-          <div className="sdx-art sdx-art--article">
+          <div className="sdx-art sdx-art--single">
             <img src={adminHeroArt} alt="" />
           </div>
         </div>

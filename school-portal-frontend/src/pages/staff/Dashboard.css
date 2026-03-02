@@ -1,11 +1,8 @@
 .stx-page {
   border-radius: 24px;
   padding: 20px;
-  background:
-    radial-gradient(circle at 16% 10%, rgba(251, 191, 36, 0.28), transparent 42%),
-    radial-gradient(circle at 88% 86%, rgba(45, 212, 191, 0.26), transparent 48%),
-    linear-gradient(135deg, #0f3d56, #155e75 52%, #0f766e);
-  box-shadow: 0 24px 42px rgba(15, 23, 42, 0.24);
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
 }
 
 .stx-hero {
@@ -13,6 +10,10 @@
   grid-template-columns: 1.1fr 0.9fr;
   align-items: center;
   gap: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
+  background: linear-gradient(135deg, #ecf6ff 0%, #f4fcfa 100%);
 }
 
 .stx-pill {
@@ -29,14 +30,14 @@
 
 .stx-hero h2 {
   margin: 10px 0 6px;
-  color: #f8fafc;
+  color: #0b3a63;
   line-height: 1.06;
   font-size: clamp(1.35rem, 2.1vw, 2rem);
 }
 
 .stx-hero p {
   margin: 0;
-  color: #dbeafe;
+  color: #334155;
   line-height: 1.5;
   max-width: 58ch;
 }
@@ -53,13 +54,13 @@
   padding: 7px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #0f172a;
-  background: rgba(255, 255, 255, 0.9);
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.9);
 }
 
 .stx-hero-art {
   position: relative;
-  min-height: 220px;
+  min-height: 210px;
 }
 
 .stx-art {
@@ -80,24 +81,8 @@
   object-fit: contain;
 }
 
-.stx-art--main {
-  inset: 12px 58px 18px 0;
-}
-
-.stx-art--trend {
-  width: 42%;
-  height: 40%;
-  right: 0;
-  top: 8px;
-  background: linear-gradient(160deg, #fff7ed, #e0f2fe);
-}
-
-.stx-art--article {
-  width: 40%;
-  height: 38%;
-  right: 14px;
-  bottom: 0;
-  background: linear-gradient(160deg, #f5f3ff, #dcfce7);
+.stx-art--single {
+  inset: 6px 0 6px 0;
 }
 
 .stx-panel {
@@ -375,8 +360,8 @@
     min-height: 200px;
   }
 
-  .stx-art--main {
-    inset: 8px 44px 12px 0;
+  .stx-art--single {
+    inset: 8px 0 10px 0;
   }
 
   .stx-row {
