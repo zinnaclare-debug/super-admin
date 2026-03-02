@@ -106,8 +106,8 @@
                 @endphp
                 <td>{{ $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.') }}</td>
             @endforeach
-            <td>{{ rtrim(rtrim(number_format((float) ($row['total'] ?? 0), 2, '.', ''), '0'), '.') }}</td>
-            <td>{{ rtrim(rtrim(number_format((float) ($row['average'] ?? 0), 2, '.', ''), '0'), '.') }}</td>
+            <td>{{ $row['total'] === null ? '-' : rtrim(rtrim(number_format((float) $row['total'], 2, '.', ''), '0'), '.') }}</td>
+            <td>{{ $row['average'] === null ? '-' : rtrim(rtrim(number_format((float) $row['average'], 2, '.', ''), '0'), '.') }}</td>
             <td>{{ $row['position_label'] ?? '-' }}</td>
         </tr>
     @empty

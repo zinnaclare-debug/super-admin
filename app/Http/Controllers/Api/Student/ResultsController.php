@@ -1007,6 +1007,8 @@ class ResultsController extends Controller
                 'results.ca',
                 'results.ca_breakdown',
                 'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
             ])
             ->orderBy('subjects.name')
             ->get();
@@ -1016,7 +1018,13 @@ class ResultsController extends Controller
 
         return $subjects
             ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema) {
-                $isGraded = !is_null($r->result_id) && !is_null($r->result_student_id);
+                $isGraded = $this->isResultRecordGraded(
+                    $r->result_id ?? null,
+                    $r->ca ?? null,
+                    $r->exam ?? null,
+                    $r->result_created_at ?? null,
+                    $r->result_updated_at ?? null
+                );
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
                 $position = $isGraded ? ($stats['positions'][$studentId] ?? null) : null;
@@ -1053,9 +1061,9 @@ class ResultsController extends Controller
                     'ca_breakdown_text' => $caBreakdownText,
                     'exam' => $exam,
                     'total' => $total,
-                    'min_score' => $stats['min_score'] ?? 0,
-                    'max_score' => $stats['max_score'] ?? 0,
-                    'class_average' => $stats['class_average'] ?? 0,
+                    'min_score' => $isGraded ? ($stats['min_score'] ?? 0) : '-',
+                    'max_score' => $isGraded ? ($stats['max_score'] ?? 0) : '-',
+                    'class_average' => $isGraded ? ($stats['class_average'] ?? 0) : '-',
                     'position' => $position,
                     'position_label' => $position ? $this->ordinalPosition($position) : '-',
                     'grade' => $grade,
@@ -1091,10 +1099,20 @@ class ResultsController extends Controller
         }
 
         $rows = $rowsQuery
-            ->select(['results.term_subject_id', 'results.student_id', 'results.ca', 'results.exam'])
+            ->select(['results.id', 'results.term_subject_id', 'results.student_id', 'results.ca', 'results.exam', 'results.created_at', 'results.updated_at'])
             ->get();
 
-        $grouped = $rows->groupBy(fn ($r) => (int) $r->term_subject_id);
+        $gradedRows = $rows->filter(function ($row) {
+            return $this->isResultRecordGraded(
+                $row->id ?? null,
+                $row->ca ?? null,
+                $row->exam ?? null,
+                $row->created_at ?? null,
+                $row->updated_at ?? null
+            );
+        });
+
+        $grouped = $gradedRows->groupBy(fn ($r) => (int) $r->term_subject_id);
         $stats = [];
 
         foreach ($grouped as $termSubjectId => $subjectRows) {
@@ -1166,6 +1184,33 @@ class ResultsController extends Controller
                 ? $this->gradeFromTotal((int) round($averageScore))
                 : '-',
         ];
+    }
+
+    private function isResultRecordGraded(
+        $resultId,
+        $ca,
+        $exam,
+        $createdAt,
+        $updatedAt
+    ): bool {
+        if (empty($resultId)) {
+            return false;
+        }
+
+        $caScore = (int) ($ca ?? 0);
+        $examScore = (int) ($exam ?? 0);
+        if (($caScore + $examScore) > 0) {
+            return true;
+        }
+
+        if (empty($createdAt) || empty($updatedAt)) {
+            return false;
+        }
+
+        $createdTs = strtotime((string) $createdAt);
+        $updatedTs = strtotime((string) $updatedAt);
+
+        return $createdTs !== false && $updatedTs !== false && $updatedTs > $createdTs;
     }
 
     private function assessmentSchemaForSchool(int $schoolId): array

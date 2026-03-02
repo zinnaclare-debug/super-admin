@@ -50,13 +50,13 @@
           <td class="num">{{ $row['sn'] ?? '-' }}</td>
           <td>{{ $row['name'] ?? '-' }}</td>
           <td>{{ $row['email'] ?? '-' }}</td>
-          <td class="small">{{ $row['grades']['A'] ?? 0 }}</td>
-          <td class="small">{{ $row['grades']['B'] ?? 0 }}</td>
-          <td class="small">{{ $row['grades']['C'] ?? 0 }}</td>
-          <td class="small">{{ $row['grades']['D'] ?? 0 }}</td>
-          <td class="small">{{ $row['grades']['E'] ?? 0 }}</td>
-          <td class="small">{{ $row['grades']['F'] ?? 0 }}</td>
-          <td class="total">{{ $row['total_graded'] ?? 0 }}</td>
+          <td class="small">{{ $row['grades']['A'] ?? '-' }}</td>
+          <td class="small">{{ $row['grades']['B'] ?? '-' }}</td>
+          <td class="small">{{ $row['grades']['C'] ?? '-' }}</td>
+          <td class="small">{{ $row['grades']['D'] ?? '-' }}</td>
+          <td class="small">{{ $row['grades']['E'] ?? '-' }}</td>
+          <td class="small">{{ $row['grades']['F'] ?? '-' }}</td>
+          <td class="total">{{ $row['total_graded'] ?? '-' }}</td>
         </tr>
       @empty
         <tr>

@@ -467,7 +467,7 @@ class ReportsController extends Controller
 
     private function teacherRows(int $schoolId, int $termId)
     {
-        return DB::table('results')
+        $rawRows = DB::table('results')
             ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
             ->join('users as teachers', 'teachers.id', '=', 'term_subjects.teacher_user_id')
             ->where('results.school_id', $schoolId)
@@ -477,32 +477,51 @@ class ReportsController extends Controller
                 'teachers.id as teacher_user_id',
                 'teachers.name as teacher_name',
                 'teachers.email as teacher_email',
-                DB::raw('COUNT(*) as total_graded'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) >= 70 THEN 1 ELSE 0 END) as grade_a'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 60 AND 69 THEN 1 ELSE 0 END) as grade_b'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 50 AND 59 THEN 1 ELSE 0 END) as grade_c'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 40 AND 49 THEN 1 ELSE 0 END) as grade_d'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 30 AND 39 THEN 1 ELSE 0 END) as grade_e'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) < 30 THEN 1 ELSE 0 END) as grade_f'),
+                'results.id as result_id',
+                'results.ca',
+                'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
             ])
-            ->groupBy('teachers.id', 'teachers.name', 'teachers.email')
             ->orderBy('teachers.name')
-            ->get()
-            ->map(function ($row, $index) {
+            ->get();
+
+        $grouped = $rawRows
+            ->groupBy(fn ($row) => (int) $row->teacher_user_id)
+            ->sortBy(fn ($rows) => strtolower((string) ($rows->first()->teacher_name ?? '')));
+
+        return $grouped
+            ->values()
+            ->map(function ($rows, $index) {
+                $first = $rows->first();
+                $gradeCounts = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
+                $gradedCount = 0;
+
+                foreach ($rows as $row) {
+                    if (!$this->isResultRecordGraded(
+                        $row->result_id ?? null,
+                        $row->ca ?? null,
+                        $row->exam ?? null,
+                        $row->result_created_at ?? null,
+                        $row->result_updated_at ?? null
+                    )) {
+                        continue;
+                    }
+
+                    $gradedCount++;
+                    $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
+                    $gradeCounts[$band] = (int) ($gradeCounts[$band] ?? 0) + 1;
+                }
+
                 return [
                     'sn' => $index + 1,
-                    'teacher_user_id' => (int) $row->teacher_user_id,
-                    'name' => $row->teacher_name,
-                    'email' => $row->teacher_email,
-                    'total_graded' => (int) $row->total_graded,
-                    'grades' => [
-                        'A' => (int) $row->grade_a,
-                        'B' => (int) $row->grade_b,
-                        'C' => (int) $row->grade_c,
-                        'D' => (int) $row->grade_d,
-                        'E' => (int) $row->grade_e,
-                        'F' => (int) $row->grade_f,
-                    ],
+                    'teacher_user_id' => (int) ($first->teacher_user_id ?? 0),
+                    'name' => (string) ($first->teacher_name ?? '-'),
+                    'email' => (string) ($first->teacher_email ?? '-'),
+                    'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
+                    'grades' => $gradedCount > 0
+                        ? $gradeCounts
+                        : ['A' => '-', 'B' => '-', 'C' => '-', 'D' => '-', 'E' => '-', 'F' => '-'],
                 ];
             })
             ->values();
@@ -510,7 +529,7 @@ class ReportsController extends Controller
 
     private function studentRows(int $schoolId, int $termId)
     {
-        return DB::table('results')
+        $rawRows = DB::table('results')
             ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
             ->join('students', 'students.id', '=', 'results.student_id')
             ->join('users', 'users.id', '=', 'students.user_id')
@@ -522,36 +541,66 @@ class ReportsController extends Controller
                 'students.id as student_id',
                 'users.name as student_name',
                 'users.email as student_email',
-                DB::raw('COUNT(*) as total_graded'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) >= 70 THEN 1 ELSE 0 END) as grade_a'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 60 AND 69 THEN 1 ELSE 0 END) as grade_b'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 50 AND 59 THEN 1 ELSE 0 END) as grade_c'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 40 AND 49 THEN 1 ELSE 0 END) as grade_d'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) BETWEEN 30 AND 39 THEN 1 ELSE 0 END) as grade_e'),
-                DB::raw('SUM(CASE WHEN (results.ca + results.exam) < 30 THEN 1 ELSE 0 END) as grade_f'),
+                'results.id as result_id',
+                'results.ca',
+                'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
             ])
-            ->groupBy('students.id', 'users.name', 'users.email')
-            ->orderByDesc('total_graded')
             ->orderBy('users.name')
-            ->get()
-            ->map(function ($row, $index) {
+            ->get();
+
+        $rows = $rawRows
+            ->groupBy(fn ($row) => (int) $row->student_id)
+            ->map(function ($rows) {
+                $first = $rows->first();
+                $gradeCounts = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
+                $gradedCount = 0;
+
+                foreach ($rows as $row) {
+                    if (!$this->isResultRecordGraded(
+                        $row->result_id ?? null,
+                        $row->ca ?? null,
+                        $row->exam ?? null,
+                        $row->result_created_at ?? null,
+                        $row->result_updated_at ?? null
+                    )) {
+                        continue;
+                    }
+
+                    $gradedCount++;
+                    $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
+                    $gradeCounts[$band] = (int) ($gradeCounts[$band] ?? 0) + 1;
+                }
+
                 return [
-                    'sn' => $index + 1,
-                    'student_id' => (int) $row->student_id,
-                    'name' => $row->student_name,
-                    'email' => $row->student_email,
-                    'total_graded' => (int) $row->total_graded,
-                    'grades' => [
-                        'A' => (int) $row->grade_a,
-                        'B' => (int) $row->grade_b,
-                        'C' => (int) $row->grade_c,
-                        'D' => (int) $row->grade_d,
-                        'E' => (int) $row->grade_e,
-                        'F' => (int) $row->grade_f,
-                    ],
+                    'student_id' => (int) ($first->student_id ?? 0),
+                    'name' => (string) ($first->student_name ?? '-'),
+                    'email' => (string) ($first->student_email ?? '-'),
+                    'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
+                    'grades' => $gradedCount > 0
+                        ? $gradeCounts
+                        : ['A' => '-', 'B' => '-', 'C' => '-', 'D' => '-', 'E' => '-', 'F' => '-'],
                 ];
             })
-            ->values();
+            ->values()
+            ->all();
+
+        usort($rows, function (array $a, array $b) {
+            $aCount = is_numeric($a['total_graded']) ? (int) $a['total_graded'] : -1;
+            $bCount = is_numeric($b['total_graded']) ? (int) $b['total_graded'] : -1;
+            if ($aCount !== $bCount) {
+                return $bCount <=> $aCount;
+            }
+            return strcasecmp((string) $a['name'], (string) $b['name']);
+        });
+
+        foreach ($rows as $index => &$row) {
+            $row['sn'] = $index + 1;
+        }
+        unset($row);
+
+        return collect($rows)->values();
     }
 
     private function resolveBroadsheetSession(int $schoolId, int $requestedSessionId): ?AcademicSession
@@ -842,10 +891,13 @@ class ReportsController extends Controller
             ->where('results.school_id', $schoolId)
             ->whereIn('results.term_subject_id', array_keys($termSubjectMetaById))
             ->select([
+                'results.id as result_id',
                 'results.student_id',
                 'results.term_subject_id',
                 'results.ca',
                 'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
             ]);
         if ($departmentStudentIdSet !== null) {
             $resultRowsQuery->whereIn('results.student_id', array_keys($departmentStudentIdSet));
@@ -918,6 +970,16 @@ class ReportsController extends Controller
 
         $scoreBuckets = [];
         foreach ($resultRows as $resultRow) {
+            if (!$this->isResultRecordGraded(
+                $resultRow->result_id ?? null,
+                $resultRow->ca ?? null,
+                $resultRow->exam ?? null,
+                $resultRow->result_created_at ?? null,
+                $resultRow->result_updated_at ?? null
+            )) {
+                continue;
+            }
+
             $termSubjectId = (int) $resultRow->term_subject_id;
             $studentId = (int) $resultRow->student_id;
             $meta = $termSubjectMetaById[$termSubjectId] ?? null;
@@ -965,7 +1027,7 @@ class ReportsController extends Controller
                 $scoredCount++;
             }
 
-            $average = $scoredCount > 0 ? round($total / $scoredCount, 2) : 0.0;
+            $average = $scoredCount > 0 ? round($total / $scoredCount, 2) : null;
             $rows[] = [
                 'student_id' => (int) $studentId,
                 'name' => (string) $meta['name'],
@@ -973,7 +1035,7 @@ class ReportsController extends Controller
                 'class_id' => $classId,
                 'class_name' => (string) ($classNameById[$classId] ?? '-'),
                 'scores' => $subjectScores,
-                'total' => round($total, 2),
+                'total' => $scoredCount > 0 ? round($total, 2) : null,
                 'average' => $average,
                 'position' => null,
                 'position_label' => '-',
@@ -990,6 +1052,15 @@ class ReportsController extends Controller
 
         $ranking = $rows;
         usort($ranking, function (array $a, array $b) {
+            if ($a['average'] === null && $b['average'] === null) {
+                return strcasecmp((string) $a['name'], (string) $b['name']);
+            }
+            if ($a['average'] === null) {
+                return 1;
+            }
+            if ($b['average'] === null) {
+                return -1;
+            }
             if ((float) $a['average'] === (float) $b['average']) {
                 return strcasecmp((string) $a['name'], (string) $b['name']);
             }
@@ -1000,6 +1071,9 @@ class ReportsController extends Controller
         $previousAverage = null;
         $previousRank = 0;
         foreach ($ranking as $index => $item) {
+            if ($item['average'] === null) {
+                continue;
+            }
             $average = (float) $item['average'];
             $rank = ($previousAverage !== null && abs($average - $previousAverage) < 0.00001)
                 ? $previousRank
@@ -1011,6 +1085,11 @@ class ReportsController extends Controller
         }
 
         foreach ($rows as &$row) {
+            if ($row['average'] === null) {
+                $row['position'] = null;
+                $row['position_label'] = '-';
+                continue;
+            }
             $position = (int) ($positionByStudent[(int) $row['student_id']] ?? 0);
             $row['position'] = $position;
             $row['position_label'] = $position > 0 ? $this->ordinalPosition($position) : '-';
@@ -1022,6 +1101,45 @@ class ReportsController extends Controller
             'subjects' => $subjects->values()->all(),
             'rows' => $rows,
         ];
+    }
+
+    private function isResultRecordGraded(
+        $resultId,
+        $ca,
+        $exam,
+        $createdAt,
+        $updatedAt
+    ): bool {
+        if (empty($resultId)) {
+            return false;
+        }
+
+        $caScore = (int) ($ca ?? 0);
+        $examScore = (int) ($exam ?? 0);
+        if (($caScore + $examScore) > 0) {
+            return true;
+        }
+
+        if (empty($createdAt) || empty($updatedAt)) {
+            return false;
+        }
+
+        $createdTs = strtotime((string) $createdAt);
+        $updatedTs = strtotime((string) $updatedAt);
+
+        return $createdTs !== false && $updatedTs !== false && $updatedTs > $createdTs;
+    }
+
+    private function gradeBandFromScore(int $total): string
+    {
+        return match (true) {
+            $total >= 70 => 'A',
+            $total >= 60 => 'B',
+            $total >= 50 => 'C',
+            $total >= 40 => 'D',
+            $total >= 30 => 'E',
+            default => 'F',
+        };
     }
 
     private function classOrderIndex(string $className): int

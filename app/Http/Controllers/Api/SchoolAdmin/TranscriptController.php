@@ -973,9 +973,12 @@ class TranscriptController extends Controller
                 'term_subjects.id as term_subject_id',
                 'subjects.name as subject_name',
                 'subjects.code as subject_code',
+                'results.id as result_id',
                 'results.student_id as result_student_id',
                 'results.ca',
                 'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
             ])
             ->orderBy('subjects.name')
             ->get();
@@ -988,7 +991,13 @@ class TranscriptController extends Controller
                 $ca = (int) ($r->ca ?? 0);
                 $exam = (int) ($r->exam ?? 0);
                 $total = $ca + $exam;
-                $hasResult = !is_null($r->result_student_id);
+                $hasResult = $this->isResultRecordGraded(
+                    $r->result_id ?? null,
+                    $r->ca ?? null,
+                    $r->exam ?? null,
+                    $r->result_created_at ?? null,
+                    $r->result_updated_at ?? null
+                );
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
                 $position = $stats['positions'][$studentId] ?? null;
@@ -998,13 +1007,13 @@ class TranscriptController extends Controller
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
                     'has_result' => $hasResult,
-                    'ca' => $ca,
-                    'exam' => $exam,
-                    'total' => $total,
-                    'min_score' => $stats['min_score'] ?? 0,
-                    'max_score' => $stats['max_score'] ?? 0,
-                    'class_average' => $stats['class_average'] ?? 0,
-                    'position' => $position,
+                    'ca' => $hasResult ? $ca : '-',
+                    'exam' => $hasResult ? $exam : '-',
+                    'total' => $hasResult ? $total : '-',
+                    'min_score' => $hasResult ? ($stats['min_score'] ?? 0) : '-',
+                    'max_score' => $hasResult ? ($stats['max_score'] ?? 0) : '-',
+                    'class_average' => $hasResult ? ($stats['class_average'] ?? 0) : '-',
+                    'position' => $hasResult ? $position : null,
                     'position_label' => ($position && $hasResult) ? $this->ordinalPosition($position) : '-',
                     'grade' => $hasResult ? $this->gradeFromTotal($total) : '-',
                     'remark' => $hasResult ? $this->remarkFromTotal($total) : '-',
@@ -1151,10 +1160,20 @@ class TranscriptController extends Controller
         $rows = DB::table('results')
             ->where('school_id', $schoolId)
             ->whereIn('term_subject_id', $termSubjectIds)
-            ->select(['term_subject_id', 'student_id', 'ca', 'exam'])
+            ->select(['id', 'term_subject_id', 'student_id', 'ca', 'exam', 'created_at', 'updated_at'])
             ->get();
 
-        $grouped = $rows->groupBy(fn ($r) => (int) $r->term_subject_id);
+        $gradedRows = $rows->filter(function ($row) {
+            return $this->isResultRecordGraded(
+                $row->id ?? null,
+                $row->ca ?? null,
+                $row->exam ?? null,
+                $row->created_at ?? null,
+                $row->updated_at ?? null
+            );
+        });
+
+        $grouped = $gradedRows->groupBy(fn ($r) => (int) $r->term_subject_id);
         $stats = [];
 
         foreach ($grouped as $termSubjectId => $subjectRows) {
@@ -1203,6 +1222,33 @@ class TranscriptController extends Controller
         }
 
         return $stats;
+    }
+
+    private function isResultRecordGraded(
+        $resultId,
+        $ca,
+        $exam,
+        $createdAt,
+        $updatedAt
+    ): bool {
+        if (empty($resultId)) {
+            return false;
+        }
+
+        $caScore = (int) ($ca ?? 0);
+        $examScore = (int) ($exam ?? 0);
+        if (($caScore + $examScore) > 0) {
+            return true;
+        }
+
+        if (empty($createdAt) || empty($updatedAt)) {
+            return false;
+        }
+
+        $createdTs = strtotime((string) $createdAt);
+        $updatedTs = strtotime((string) $updatedAt);
+
+        return $createdTs !== false && $updatedTs !== false && $updatedTs > $createdTs;
     }
 
     private function gradeFromTotal(int $total): string

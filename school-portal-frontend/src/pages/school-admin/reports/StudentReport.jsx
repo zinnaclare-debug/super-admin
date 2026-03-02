@@ -33,6 +33,15 @@ const toCsvCell = (value) => {
   return `"${escaped}"`;
 };
 
+const asDash = (value) => (value == null || value === "" ? "-" : value);
+
+const formatMaybeNumber = (value, digits = 2) => {
+  if (value == null || value === "") return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(digits);
+};
+
 const downloadCsv = (rows, context) => {
   if (!rows?.length) return;
 
@@ -56,13 +65,13 @@ const downloadCsv = (rows, context) => {
         row.sn,
         row.name,
         row.email || "-",
-        row.grades?.A ?? 0,
-        row.grades?.B ?? 0,
-        row.grades?.C ?? 0,
-        row.grades?.D ?? 0,
-        row.grades?.E ?? 0,
-        row.grades?.F ?? 0,
-        row.total_graded ?? 0,
+        asDash(row.grades?.A),
+        asDash(row.grades?.B),
+        asDash(row.grades?.C),
+        asDash(row.grades?.D),
+        asDash(row.grades?.E),
+        asDash(row.grades?.F),
+        asDash(row.total_graded),
       ]
         .map(toCsvCell)
         .join(",")
@@ -435,8 +444,8 @@ export default function StudentReport() {
           <div style={{ marginTop: 12, overflowX: "auto" }}>
             <p style={{ margin: 0, fontWeight: 600 }}>
               {resultEntry.term?.name || "-"} | {resultEntry.class?.name || "-"} | Average:{" "}
-              {Number(resultEntry.summary?.average_score || 0).toFixed(2)} | Grade:{" "}
-              {resultEntry.summary?.overall_grade || "-"}
+              {formatMaybeNumber(resultEntry.summary?.average_score)} | Grade:{" "}
+              {asDash(resultEntry.summary?.overall_grade)}
             </p>
             <table border="1" cellPadding="8" cellSpacing="0" width="100%" style={{ marginTop: 8, minWidth: 860 }}>
               <thead>
@@ -457,15 +466,15 @@ export default function StudentReport() {
                 {(resultEntry.rows || []).map((row) => (
                   <tr key={row.term_subject_id}>
                     <td>{row.subject_name}</td>
-                    <td>{row.ca}</td>
-                    <td>{row.exam}</td>
-                    <td>{row.total}</td>
-                    <td>{row.min_score}</td>
-                    <td>{row.max_score}</td>
-                    <td>{Number(row.class_average || 0).toFixed(2)}</td>
+                    <td>{asDash(row.ca)}</td>
+                    <td>{asDash(row.exam)}</td>
+                    <td>{asDash(row.total)}</td>
+                    <td>{asDash(row.min_score)}</td>
+                    <td>{asDash(row.max_score)}</td>
+                    <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
                     <td>{row.position_label || "-"}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.remark}</td>
+                    <td>{asDash(row.grade)}</td>
+                    <td>{asDash(row.remark)}</td>
                   </tr>
                 ))}
                 {(resultEntry.rows || []).length === 0 ? (
@@ -541,13 +550,13 @@ export default function StudentReport() {
                 <td>{row.sn}</td>
                 <td>{row.name}</td>
                 <td>{row.email || "-"}</td>
-                <td>{row.grades?.A ?? 0}</td>
-                <td>{row.grades?.B ?? 0}</td>
-                <td>{row.grades?.C ?? 0}</td>
-                <td>{row.grades?.D ?? 0}</td>
-                <td>{row.grades?.E ?? 0}</td>
-                <td>{row.grades?.F ?? 0}</td>
-                <td>{row.total_graded ?? 0}</td>
+                <td>{asDash(row.grades?.A)}</td>
+                <td>{asDash(row.grades?.B)}</td>
+                <td>{asDash(row.grades?.C)}</td>
+                <td>{asDash(row.grades?.D)}</td>
+                <td>{asDash(row.grades?.E)}</td>
+                <td>{asDash(row.grades?.F)}</td>
+                <td>{asDash(row.total_graded)}</td>
               </tr>
             ))}
             {rows.length === 0 && (
