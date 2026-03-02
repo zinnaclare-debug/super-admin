@@ -92,6 +92,15 @@ export default function StaffDashboard() {
   const user = profile?.user || {};
   const staff = profile?.staff || {};
   const classes = profile?.classes || [];
+  const storedUser = getStoredUser();
+  const schoolName =
+    profile?.school_name ||
+    profile?.school?.name ||
+    user?.school_name ||
+    user?.school?.name ||
+    storedUser?.school_name ||
+    storedUser?.school?.name ||
+    "PROJECT SCHOOL";
   const isClassTeacher = classes.length > 0;
   const staffPhotoUrl = toAbsoluteUrl(
     staff.photo_url || (staff.photo_path ? `/storage/${staff.photo_path}` : "")
@@ -122,7 +131,7 @@ export default function StaffDashboard() {
       <section className="stx-hero">
         <div>
           <span className="stx-pill">Staff Dashboard</span>
-          <h2>Manage teaching tools from one colorful workspace</h2>
+          <h2>{schoolName}</h2>
           <p>
             Open your teaching modules faster, stay updated with announcements, and review your profile in one place.
           </p>

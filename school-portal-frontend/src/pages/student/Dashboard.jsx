@@ -90,6 +90,15 @@ export default function StudentDashboard() {
 
   const user = profile?.user || {};
   const student = profile?.student || {};
+  const storedUser = getStoredUser();
+  const schoolName =
+    profile?.school_name ||
+    profile?.school?.name ||
+    user?.school_name ||
+    user?.school?.name ||
+    storedUser?.school_name ||
+    storedUser?.school?.name ||
+    "PROJECT SCHOOL";
   const currentSession = profile?.current_session || null;
   const currentTerm = profile?.current_term || null;
   const currentClass = profile?.current_class || null;
@@ -127,7 +136,7 @@ export default function StudentDashboard() {
       <section className="sdx-hero">
         <div>
           <span className="sdx-pill">Student Dashboard</span>
-          <h2>All your academic tools in one colorful workspace</h2>
+          <h2>{schoolName}</h2>
           <p>
             Access learning tools quickly, track your profile details, and stay up to date with school announcements.
           </p>
