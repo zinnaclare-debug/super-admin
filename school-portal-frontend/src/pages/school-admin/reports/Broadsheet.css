@@ -120,25 +120,6 @@
   min-width: 54px;
 }
 
-.broadsheet-subject-head {
-  width: 36px;
-  min-width: 36px;
-  height: 170px;
-  padding: 0;
-  vertical-align: bottom;
-}
-
-.broadsheet-subject-head > span {
-  display: inline-block;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  text-align: left;
-  font-size: 11px;
-  line-height: 1.1;
-  white-space: normal;
-  padding: 8px 0;
-}
-
 .broadsheet-table td:nth-child(2),
 .broadsheet-table td:nth-child(3) {
   text-align: left;

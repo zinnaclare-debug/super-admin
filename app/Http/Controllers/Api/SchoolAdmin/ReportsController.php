@@ -887,7 +887,7 @@ class ReportsController extends Controller
                 ];
             })
             ->values()
-            ->sortBy(fn ($item) => strtoupper((string) $item['name']))
+            ->sortBy(fn ($item) => strtoupper((string) ($item['short_code'] ?: $item['name'])))
             ->values();
 
         $subjectIds = $subjects->pluck('id')->all();

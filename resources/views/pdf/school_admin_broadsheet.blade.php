@@ -66,25 +66,7 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 32px;
-            min-width: 32px;
-            height: 165px;
-            padding: 0;
-            vertical-align: bottom;
-            overflow: hidden;
-            position: relative;
-        }
-        .subject-head > .vertical-text {
-            display: inline-block;
-            position: absolute;
-            left: 4px;
-            bottom: 4px;
-            transform: rotate(-90deg);
-            transform-origin: left bottom;
-            text-align: left;
-            font-size: 7px;
-            line-height: 1;
-            letter-spacing: 0.12px;
+            min-width: 56px;
             white-space: nowrap;
         }
         .summary-col {
@@ -125,7 +107,7 @@
                 $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
             @endphp
             <th class="subject-head">
-                <span class="vertical-text">{{ $subjectLabel }}</span>
+                {{ $subjectLabel }}
             </th>
         @endforeach
         <th class="summary-col nowrap">TOTAL</th>
