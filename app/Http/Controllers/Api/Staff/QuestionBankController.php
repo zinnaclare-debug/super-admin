@@ -238,8 +238,11 @@ class QuestionBankController extends Controller
     $aiModel = trim((string) config('services.ai.model', 'gpt-4.1-mini'));
     $aiApiKey = trim((string) config('services.ai.api_key', ''));
     $aiCaBundle = trim((string) config('services.ai.ca_bundle', ''));
-    $aiTimeout = max(5, (int) config('services.ai.timeout', 45));
-    $aiConnectTimeout = max(3, (int) config('services.ai.connect_timeout', 10));
+    // Keep request time below typical proxy/gateway limits to avoid surfacing 504 to the UI.
+    $configuredTimeout = (int) config('services.ai.timeout', 45);
+    $configuredConnectTimeout = (int) config('services.ai.connect_timeout', 10);
+    $aiTimeout = max(5, min($configuredTimeout, 25));
+    $aiConnectTimeout = max(3, min($configuredConnectTimeout, 8));
 
     $chatCompletionsUrl = rtrim($aiBaseUrl, '/') . '/chat/completions';
     $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
@@ -268,7 +271,8 @@ Rules:
 - Questions must be based on the statement and subject.
 - question_text must NOT include numbering/prefixes.
 - Keep options concise and plausible.
-- correct_option must be one of A,B,C,D.";
+- correct_option must be one of A,B,C,D.
+- Keep explanation to one short sentence.";
 
     $userPrompt = "Subject: {$subject->name}\nCount: {$data['count']}\nStatement:\n{$data['prompt']}";
 
@@ -308,9 +312,14 @@ Rules:
         $requestBuilder = $requestBuilder->withToken($aiApiKey);
       }
 
-      $response = $requestBuilder->post($chatCompletionsUrl, [
+      $maxTokens = max(250, min(1200, ((int) $data['count']) * 120));
+      $response = $requestBuilder
+        ->retry(1, 500)
+        ->post($chatCompletionsUrl, [
           'model' => $aiModel,
-          'temperature' => 0.4,
+          'temperature' => 0.3,
+          'max_tokens' => $maxTokens,
+          'stream' => false,
           'messages' => [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userPrompt],
