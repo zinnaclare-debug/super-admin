@@ -17,6 +17,59 @@ use Throwable;
 
 class QuestionBankController extends Controller
 {
+  private function buildFallbackQuestions(string $subjectName, string $prompt, int $count): array
+  {
+    $cleanPrompt = trim(preg_replace('/\s+/', ' ', $prompt) ?? '');
+    $subjectLabel = trim($subjectName) !== '' ? $subjectName : 'the subject';
+
+    preg_match_all('/[A-Za-z][A-Za-z0-9\-]{3,}/', strtolower($cleanPrompt), $matches);
+    $keywords = array_values(array_unique(array_slice($matches[0] ?? [], 0, 20)));
+    if (count($keywords) < 4) {
+      $keywords = array_values(array_unique(array_merge($keywords, ['concept', 'application', 'analysis', 'evaluation'])));
+    }
+
+    $summaries = array_values(array_filter(array_map('trim', preg_split('/[.;!?]+/', $cleanPrompt) ?: [])));
+    if (empty($summaries)) {
+      $summaries = ["Core ideas in {$subjectLabel}"];
+    }
+
+    $rows = [];
+    for ($i = 0; $i < $count; $i++) {
+      $focus = ucfirst($keywords[$i % count($keywords)]);
+      $alt1 = ucfirst($keywords[($i + 1) % count($keywords)]);
+      $alt2 = ucfirst($keywords[($i + 2) % count($keywords)]);
+      $alt3 = ucfirst($keywords[($i + 3) % count($keywords)]);
+      $summary = $summaries[$i % count($summaries)];
+
+      $rows[] = [
+        'question_text' => "In {$subjectLabel}, which option best relates to \"{$summary}\"?",
+        'option_a' => $focus,
+        'option_b' => $alt1,
+        'option_c' => $alt2,
+        'option_d' => $alt3,
+        'correct_option' => 'A',
+        'explanation' => "{$focus} is the closest match to the key idea from the prompt.",
+        'source_type' => 'ai',
+      ];
+    }
+
+    return $rows;
+  }
+
+  private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): void
+  {
+    foreach ($generated as $q) {
+      QuestionBankQuestion::create([
+        'school_id' => $schoolId,
+        'teacher_user_id' => $teacherUserId,
+        'subject_id' => $subjectId,
+        ...$q,
+        'media_path' => null,
+        'media_type' => null,
+      ]);
+    }
+  }
+
   private function aiErrorMeta($response): array
   {
     $providerStatus = (int) $response->status();
@@ -286,7 +339,15 @@ class QuestionBankController extends Controller
     $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
 
     if ($aiApiKey === '' && !$isLocalAiEndpoint) {
-      return response()->json(['message' => 'AI API key missing on server'], 500);
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
+      }
+      return response()->json([
+        'message' => 'AI API key missing on server. Generated fallback questions.',
+        'fallback' => true,
+        'data' => $fallback,
+      ]);
     }
 
     $systemPrompt = "You generate multiple-choice questions from the user's statement.
@@ -456,12 +517,18 @@ Rules:
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
+      }
       return response()->json([
-        'message' => 'AI generation failed: SSL connection error',
+        'message' => 'AI provider unavailable. Generated fallback questions.',
+        'fallback' => true,
         'ai_base_url' => $aiBaseUrl,
         'ca_verify' => $verifyPath,
         'error' => $e->getMessage(),
-      ], 502);
+        'data' => $fallback,
+      ]);
     } catch (Throwable $e) {
       Log::error('AI provider unexpected failure', [
         'base_url' => $aiBaseUrl,
@@ -470,38 +537,38 @@ Rules:
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
+      }
       return response()->json([
-        'message' => 'AI generation failed',
+        'message' => 'AI provider failed. Generated fallback questions.',
+        'fallback' => true,
         'ai_base_url' => $aiBaseUrl,
         'ca_verify' => $verifyPath,
         'error' => $e->getMessage(),
-      ], 502);
+        'data' => $fallback,
+      ]);
     }
 
     if ($response->failed()) {
       [$providerStatus, $errorCode, $providerMessage] = $this->aiErrorMeta($response);
 
-      if ($errorCode === 'insufficient_quota') {
-        return response()->json([
-          'message' => 'AI quota exceeded. Use manual question creation or update billing.',
-          'code' => 'insufficient_quota',
-          'provider_status' => $providerStatus ?: null,
-          'provider_message' => $providerMessage ?: null,
-          'ca_verify' => $verifyPath ?: null,
-          'details' => $response->json(),
-        ], 402);
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
-
-      $status = $providerStatus >= 400 && $providerStatus <= 599 ? $providerStatus : 502;
       return response()->json([
-        'message' => $providerMessage !== '' ? "AI generation failed: {$providerMessage}" : 'AI generation failed',
+        'message' => $providerMessage !== '' ? "AI provider failed ({$providerMessage}). Generated fallback questions." : 'AI provider failed. Generated fallback questions.',
+        'fallback' => true,
         'code' => $errorCode,
         'provider_status' => $providerStatus ?: null,
         'provider_message' => $providerMessage !== '' ? $providerMessage : null,
         'model' => $activeModel,
         'ca_verify' => $verifyPath ?: null,
         'details' => $response->json(),
-      ], $status);
+        'data' => $fallback,
+      ]);
     }
 
     if ($content === '') {
@@ -510,9 +577,15 @@ Rules:
     $payload = $this->extractJsonObject($content);
 
     if (!$payload || !is_array($payload['questions'] ?? null)) {
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
+      }
       return response()->json([
-        'message' => 'AI returned invalid format. Please try again.',
-      ], 502);
+        'message' => 'AI returned invalid format. Generated fallback questions.',
+        'fallback' => true,
+        'data' => $fallback,
+      ]);
     }
 
     $generated = collect($payload['questions'])
@@ -539,20 +612,19 @@ Rules:
       ->all();
 
     if (count($generated) === 0) {
-      return response()->json(['message' => 'AI did not return usable questions'], 502);
+      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      if (!empty($data['import_to_bank'])) {
+        $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
+      }
+      return response()->json([
+        'message' => 'AI did not return usable questions. Generated fallback questions.',
+        'fallback' => true,
+        'data' => $fallback,
+      ]);
     }
 
     if (!empty($data['import_to_bank'])) {
-      foreach ($generated as $q) {
-        QuestionBankQuestion::create([
-          'school_id' => $schoolId,
-          'teacher_user_id' => $user->id,
-          'subject_id' => $subject->id,
-          ...$q,
-          'media_path' => null,
-          'media_type' => null,
-        ]);
-      }
+      $this->maybeImportToBank($generated, (int) $schoolId, (int) $user->id, (int) $subject->id);
     }
 
     return response()->json([
