@@ -66,9 +66,9 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 34px;
-            min-width: 34px;
-            height: 175px;
+            width: 40px;
+            min-width: 40px;
+            height: 185px;
             padding: 0;
             vertical-align: bottom;
             overflow: hidden;
@@ -77,20 +77,20 @@
         .subject-head > .vertical-text {
             display: inline-block;
             position: absolute;
-            left: 50%;
-            bottom: 8px;
-            transform: translateX(-50%) rotate(-90deg);
-            transform-origin: center center;
+            left: 4px;
+            bottom: 4px;
+            transform: rotate(-90deg);
+            transform-origin: left bottom;
             text-align: left;
-            font-size: 6.6px;
+            font-size: 6.5px;
             line-height: 1.05;
             letter-spacing: 0.12px;
             white-space: pre-line;
-            max-width: 160px;
+            width: 170px;
         }
         .summary-col {
-            width: 48px;
-            min-width: 48px;
+            width: 56px;
+            min-width: 56px;
         }
     </style>
 </head>
