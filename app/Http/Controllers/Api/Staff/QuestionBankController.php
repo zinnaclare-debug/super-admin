@@ -65,53 +65,199 @@ class QuestionBankController extends Controller
     return array_slice($merged, 0, $count);
   }
 
+  private function extractPromptTopic(string $prompt, string $subjectName): string
+  {
+    $clean = trim((string) (preg_replace('/\s+/', ' ', strip_tags($prompt)) ?? ''));
+    $clean = preg_replace('/^(what\s+is|define|explain|describe|discuss|write\s+about)\s+/i', '', $clean) ?? $clean;
+    $clean = preg_replace('/[?.!]+$/', '', $clean) ?? $clean;
+
+    $words = preg_split('/\s+/', $clean) ?: [];
+    $topic = trim(implode(' ', array_slice($words, 0, 8)));
+
+    if ($topic !== '') {
+      return $topic;
+    }
+
+    return trim($subjectName) !== '' ? trim($subjectName) : 'this topic';
+  }
+
+  private function buildFallbackMcq(
+    string $questionText,
+    string $correctOptionText,
+    array $wrongPool,
+    string $explanation,
+    int $index
+  ): array {
+    $correct = trim($correctOptionText);
+    if ($correct === '') {
+      $correct = 'Correct option';
+    }
+
+    $wrong = [];
+    $wrongSeen = [];
+    foreach ($wrongPool as $item) {
+      $candidate = trim((string)$item);
+      $key = strtolower($candidate);
+      if ($candidate === '' || strcasecmp($candidate, $correct) === 0 || isset($wrongSeen[$key])) {
+        continue;
+      }
+      $wrongSeen[$key] = true;
+      $wrong[] = $candidate;
+      if (count($wrong) >= 3) {
+        break;
+      }
+    }
+
+    $fallbackWrong = [
+      'It is based on guessing without understanding.',
+      'It avoids practice and ignores feedback.',
+      'It relies only on unrelated facts.',
+    ];
+    foreach ($fallbackWrong as $item) {
+      if (count($wrong) >= 3) {
+        break;
+      }
+      if (strcasecmp($item, $correct) !== 0 && !in_array(strtolower($item), array_map('strtolower', $wrong), true)) {
+        $wrong[] = $item;
+      }
+    }
+
+    $options = array_merge([$correct], array_slice($wrong, 0, 3));
+    while (count($options) < 4) {
+      $options[] = 'None of the above';
+    }
+
+    $shift = $index % 4;
+    $rotated = array_merge(array_slice($options, $shift), array_slice($options, 0, $shift));
+    $letters = ['A', 'B', 'C', 'D'];
+    $correctIndex = 0;
+    foreach ($rotated as $i => $opt) {
+      if ($opt === $correct) {
+        $correctIndex = $i;
+        break;
+      }
+    }
+
+    return [
+      'question_text' => trim($questionText),
+      'option_a' => $rotated[0],
+      'option_b' => $rotated[1],
+      'option_c' => $rotated[2],
+      'option_d' => $rotated[3],
+      'correct_option' => $letters[$correctIndex] ?? 'A',
+      'explanation' => trim($explanation),
+      'source_type' => 'ai',
+    ];
+  }
+
   private function buildFallbackQuestions(string $subjectName, string $prompt, int $count): array
   {
-    $cleanPrompt = trim(preg_replace('/\s+/', ' ', $prompt) ?? '');
+    $cleanPrompt = trim((string)(preg_replace('/\s+/', ' ', $prompt) ?? ''));
     $subjectLabel = trim($subjectName) !== '' ? $subjectName : 'the subject';
+    $topic = $this->extractPromptTopic($cleanPrompt, $subjectLabel);
+    $topicTitle = ucfirst($topic);
 
-    preg_match_all('/[A-Za-z][A-Za-z0-9\-]{3,}/', strtolower($cleanPrompt), $matches);
-    $keywords = array_values(array_unique(array_slice($matches[0] ?? [], 0, 20)));
-    if (count($keywords) < 4) {
-      $keywords = array_values(array_unique(array_merge($keywords, ['concept', 'application', 'analysis', 'evaluation'])));
+    preg_match_all('/[A-Za-z][A-Za-z0-9\-]{2,}/', strtolower($cleanPrompt), $matches);
+    $keywords = array_values(array_unique(array_slice($matches[0] ?? [], 0, 10)));
+    if (empty($keywords)) {
+      $keywords = ['concept', 'practice', 'application', 'understanding'];
     }
 
-    $summaries = array_values(array_filter(array_map('trim', preg_split('/[.;!?]+/', $cleanPrompt) ?: [])));
-    if (empty($summaries)) {
-      $summaries = ["Core ideas in {$subjectLabel}"];
-    }
-
-    $stems = [
-      'In %s, which option best explains "%s"?',
-      'Which term in %s is most connected to "%s"?',
-      'From this %s topic, choose the best answer for "%s".',
-      'Identify the most accurate concept in %s for "%s".',
-      'Which option is the best interpretation in %s of "%s"?',
-    ];
+    $k1 = ucfirst($keywords[0] ?? 'Concept');
+    $k2 = ucfirst($keywords[1] ?? 'Practice');
+    $k3 = ucfirst($keywords[2] ?? 'Application');
+    $k4 = ucfirst($keywords[3] ?? 'Understanding');
 
     $rows = [];
-    for ($i = 0; $i < $count; $i++) {
-      $focus = ucfirst($keywords[$i % count($keywords)]);
-      $alt1 = ucfirst($keywords[($i + 1) % count($keywords)]);
-      $alt2 = ucfirst($keywords[($i + 2) % count($keywords)]);
-      $alt3 = ucfirst($keywords[($i + 3) % count($keywords)]);
-      $summary = $summaries[$i % count($summaries)];
-      $stem = $stems[$i % count($stems)];
-      $questionText = sprintf($stem, $subjectLabel, $summary) . " (Focus: {$focus})";
+    $rows[] = $this->buildFallbackMcq(
+      "Which statement best defines {$topicTitle}?",
+      "{$topicTitle} means understanding core ideas and applying them correctly.",
+      [
+        "{$topicTitle} means memorizing terms without understanding.",
+        "{$topicTitle} means avoiding examples and real tasks.",
+        "{$topicTitle} means using unrelated facts only.",
+      ],
+      "A good definition includes understanding and correct application.",
+      0
+    );
 
-      $rows[] = [
-        'question_text' => $questionText,
-        'option_a' => $focus,
-        'option_b' => $alt1,
-        'option_c' => $alt2,
-        'option_d' => $alt3,
-        'correct_option' => 'A',
-        'explanation' => "{$focus} is the closest match to the key idea from the prompt.",
-        'source_type' => 'ai',
-      ];
+    $rows[] = $this->buildFallbackMcq(
+      "Which activity is the best practical example of {$topicTitle}?",
+      "Applying {$topicTitle} concepts to solve a real classroom task.",
+      [
+        "Copying answers without checking how they were obtained.",
+        "Skipping practice and waiting for final exams.",
+        "Studying topics that are unrelated to {$topicTitle}.",
+      ],
+      "Practical examples involve real application, not passive memorization.",
+      1
+    );
+
+    $rows[] = $this->buildFallbackMcq(
+      "Which study habit most improves performance in {$topicTitle}?",
+      "Regular practice, correction of mistakes, and feedback review.",
+      [
+        "Relying only on last-minute cramming.",
+        "Ignoring feedback after each attempt.",
+        "Studying without solving any questions.",
+      ],
+      "Consistent practice and feedback are the strongest improvement tools.",
+      2
+    );
+
+    $rows[] = $this->buildFallbackMcq(
+      "Which option is NOT a good approach to learning {$topicTitle}?",
+      "Guessing answers without understanding the underlying idea.",
+      [
+        "Reviewing worked examples and explanations.",
+        "Linking new ideas to what was learned before.",
+        "Practicing with varied question formats.",
+      ],
+      "Guessing without understanding prevents long-term mastery.",
+      3
+    );
+
+    $rows[] = $this->buildFallbackMcq(
+      "In {$subjectLabel}, what should a student do first when learning {$topicTitle}?",
+      "Understand the key concept, then apply it with guided examples.",
+      [
+        "Jump straight to difficult tests without learning basics.",
+        "Memorize answers only and skip concept review.",
+        "Avoid asking questions when confused.",
+      ],
+      "Strong foundations come before advanced problem-solving.",
+      4
+    );
+
+    $rows[] = $this->buildFallbackMcq(
+      "Which pair best matches {$topicTitle}?",
+      "{$k1} and {$k3} used together in problem-solving.",
+      [
+        "{$k2} and random guessing without checking.",
+        "{$k4} and ignoring correction feedback.",
+        "{$k1} and unrelated assumptions only.",
+      ],
+      "The best pair combines concept and application.",
+      5
+    );
+
+    $rows = $this->uniqueQuestions($rows);
+    for ($i = count($rows); $i < $count; $i++) {
+      $rows[] = $this->buildFallbackMcq(
+        "Which action best strengthens {$topicTitle} skills in {$subjectLabel}? (#" . ($i + 1) . ")",
+        "Practice on mixed questions and review each explanation carefully.",
+        [
+          "Read only the topic title and skip the lesson details.",
+          "Use one method for every question without checking fit.",
+          "Ignore errors because final answers matter more than process.",
+        ],
+        "Skill growth requires practice, reflection, and correction.",
+        $i
+      );
+      $rows = $this->uniqueQuestions($rows);
     }
 
-    return $this->uniqueQuestions($rows);
+    return array_slice($rows, 0, $count);
   }
 
   private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): void
