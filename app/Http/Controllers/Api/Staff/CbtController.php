@@ -378,6 +378,9 @@ class CbtController extends Controller
     $attemptRows = CbtExamAttempt::query()
       ->join('students', 'students.id', '=', 'cbt_exam_attempts.student_id')
       ->join('users', 'users.id', '=', 'students.user_id')
+      ->join('cbt_exams', 'cbt_exams.id', '=', 'cbt_exam_attempts.cbt_exam_id')
+      ->join('term_subjects', 'term_subjects.id', '=', 'cbt_exams.term_subject_id')
+      ->leftJoin('classes', 'classes.id', '=', 'term_subjects.class_id')
       ->where('cbt_exam_attempts.school_id', $schoolId)
       ->where('cbt_exam_attempts.cbt_exam_id', (int) $exam->id)
       ->orderByDesc('cbt_exam_attempts.score_percent')
@@ -395,7 +398,7 @@ class CbtController extends Controller
         'cbt_exam_attempts.started_at',
         'cbt_exam_attempts.ended_at',
         'students.id as student_profile_id',
-        'students.education_level',
+        DB::raw("COALESCE(NULLIF(TRIM(students.education_level), ''), classes.level, '-') as education_level"),
         'users.name as student_name',
         'users.username as student_username',
         'users.email as student_email',
