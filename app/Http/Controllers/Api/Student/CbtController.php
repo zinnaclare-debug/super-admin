@@ -328,7 +328,7 @@ class CbtController extends Controller
                 'id' => (int) $attempt->id,
                 'status' => (string) $attempt->status,
                 'started_at' => $attempt->started_at,
-                'allowed_end_at' => $effectiveEndsAt ? $effectiveEndsAt->toDateTimeString() : null,
+                'allowed_end_at' => $effectiveEndsAt ? $effectiveEndsAt->toIso8601String() : null,
             ],
         ]);
     }

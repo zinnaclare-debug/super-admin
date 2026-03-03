@@ -132,13 +132,6 @@ export default function StudentCBTHome() {
       onWarning: ({ reason, warnings }) => {
         setSecurityWarnings(warnings || 0);
         setSecurityStatus(`Security warning: ${reason}`);
-        if (
-          ["tab_switch", "fullscreen_exit", "external_navigation_attempt", "navigation_attempt"].includes(
-            String(reason)
-          )
-        ) {
-          submitExam("auto", String(reason));
-        }
       },
       onHeadMovement: ({ count }) => {
         setHeadMovementWarnings(count || 0);
