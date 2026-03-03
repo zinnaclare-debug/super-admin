@@ -66,20 +66,26 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 22px;
-            min-width: 22px;
-            height: 190px;
-            padding: 2px 1px;
+            width: 34px;
+            min-width: 34px;
+            height: 175px;
+            padding: 0;
             vertical-align: bottom;
             overflow: hidden;
+            position: relative;
         }
         .subject-head > .vertical-text {
-            display: block;
-            text-align: center;
-            font-size: 6px;
-            line-height: 0.95;
-            letter-spacing: 0;
-            white-space: normal;
+            position: absolute;
+            left: 50%;
+            bottom: 8px;
+            transform: translateX(-50%) rotate(-90deg);
+            transform-origin: center center;
+            display: inline-block;
+            text-align: left;
+            font-size: 7px;
+            line-height: 1.05;
+            letter-spacing: 0.15px;
+            white-space: pre-line;
         }
         .summary-col {
             width: 48px;
@@ -116,10 +122,11 @@
         @foreach($subjects as $subject)
             @php
                 $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
-                $subjectChars = preg_split('/(?<!^)(?!$)/u', preg_replace('/\s+/', '', $subjectLabel) ?: '-') ?: ['-'];
+                $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
+                $subjectWrapped = wordwrap($subjectLabel, 19, "\n", true);
             @endphp
             <th class="subject-head">
-                <span class="vertical-text">{!! implode('<br>', array_map(fn($char) => e($char), $subjectChars)) !!}</span>
+                <span class="vertical-text">{{ $subjectWrapped }}</span>
             </th>
         @endforeach
         <th class="summary-col nowrap">TOTAL</th>
