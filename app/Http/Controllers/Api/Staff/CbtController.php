@@ -27,6 +27,49 @@ class CbtController extends Controller
     return Schema::hasColumn('term_subjects', 'teacher_user_id');
   }
 
+  private function buildExamPayload(array $data, int $schoolId, int $teacherUserId, int $termSubjectId, bool $includeSchoolId = false): array
+  {
+    $startsAt = Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s');
+    $endsAt = Carbon::parse($data['ends_at'])->format('Y-m-d H:i:s');
+    $durationMinutes = (int) $data['duration_minutes'];
+
+    $payload = [
+      'title' => $data['title'],
+      'status' => $data['status'] ?? 'draft',
+    ];
+
+    if ($includeSchoolId) {
+      $payload['school_id'] = $schoolId;
+    }
+    if ($this->cbtHasColumn('teacher_user_id')) {
+      $payload['teacher_user_id'] = $teacherUserId;
+    }
+    if ($this->cbtHasColumn('term_subject_id')) {
+      $payload['term_subject_id'] = $termSubjectId;
+    }
+    if ($this->cbtHasColumn('instructions')) {
+      $payload['instructions'] = $data['instructions'] ?? null;
+    }
+    if ($this->cbtHasColumn('starts_at')) {
+      $payload['starts_at'] = $startsAt;
+    }
+    if ($this->cbtHasColumn('ends_at')) {
+      $payload['ends_at'] = $endsAt;
+    }
+    if ($this->cbtHasColumn('duration_minutes')) {
+      $payload['duration_minutes'] = $durationMinutes;
+    }
+    // Legacy compatibility: old schema requires `duration` and fails insert/update if omitted.
+    if ($this->cbtHasColumn('duration')) {
+      $payload['duration'] = $durationMinutes;
+    }
+    if ($this->cbtHasColumn('security_policy')) {
+      $payload['security_policy'] = $data['security_policy'] ?? null;
+    }
+
+    return $payload;
+  }
+
   // GET /api/staff/cbt/subjects
   public function subjects(Request $request)
   {
@@ -173,41 +216,7 @@ class CbtController extends Controller
       return response()->json(['message' => 'CBT can only be created for current session and current term'], 403);
     }
 
-    $startsAt = Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s');
-    $endsAt = Carbon::parse($data['ends_at'])->format('Y-m-d H:i:s');
-    $durationMinutes = (int) $data['duration_minutes'];
-
-    $payload = [
-      'school_id' => $schoolId,
-      'title' => $data['title'],
-      'status' => $data['status'] ?? 'draft',
-    ];
-
-    if ($this->cbtHasColumn('teacher_user_id')) {
-      $payload['teacher_user_id'] = $user->id;
-    }
-    if ($this->cbtHasColumn('term_subject_id')) {
-      $payload['term_subject_id'] = $ts->id;
-    }
-    if ($this->cbtHasColumn('instructions')) {
-      $payload['instructions'] = $data['instructions'] ?? null;
-    }
-    if ($this->cbtHasColumn('starts_at')) {
-      $payload['starts_at'] = $startsAt;
-    }
-    if ($this->cbtHasColumn('ends_at')) {
-      $payload['ends_at'] = $endsAt;
-    }
-    if ($this->cbtHasColumn('duration_minutes')) {
-      $payload['duration_minutes'] = $durationMinutes;
-    }
-    // Legacy compatibility: old schema requires `duration` and fails insert if omitted.
-    if ($this->cbtHasColumn('duration')) {
-      $payload['duration'] = $durationMinutes;
-    }
-    if ($this->cbtHasColumn('security_policy')) {
-      $payload['security_policy'] = $data['security_policy'] ?? null;
-    }
+    $payload = $this->buildExamPayload($data, (int) $schoolId, (int) $user->id, (int) $ts->id, true);
 
     try {
       $exam = CbtExam::create($payload);
@@ -219,6 +228,80 @@ class CbtController extends Controller
     }
 
     return response()->json(['message' => 'CBT exam created', 'data' => $exam], 201);
+  }
+
+  // PATCH /api/staff/cbt/exams/{exam}
+  public function update(Request $request, CbtExam $exam)
+  {
+    $user = $request->user();
+    abort_unless($user->role === 'staff', 403);
+    $schoolId = $user->school_id;
+
+    abort_unless((int) $exam->school_id === (int) $schoolId, 403);
+    abort_unless((int) $exam->teacher_user_id === (int) $user->id, 403);
+
+    if (!$this->hasTeacherAssignmentColumn()) {
+      return response()->json([
+        'message' => 'Teacher assignment schema is missing. Run database migrations and try again.'
+      ], 500);
+    }
+
+    $data = $request->validate([
+      'term_subject_id' => 'required|integer',
+      'title' => 'required|string|max:150',
+      'instructions' => 'nullable|string|max:5000',
+      'starts_at' => 'required|date',
+      'ends_at' => 'required|date|after:starts_at',
+      'duration_minutes' => 'required|integer|min:1|max:300',
+      'status' => 'nullable|string|in:draft,closed',
+      'security_policy' => 'nullable|array',
+      'security_policy.fullscreen_required' => 'nullable|boolean',
+      'security_policy.block_copy_paste' => 'nullable|boolean',
+      'security_policy.block_tab_switch' => 'nullable|boolean',
+      'security_policy.no_face_timeout_seconds' => 'nullable|integer|min:10|max:300',
+      'security_policy.max_warnings' => 'nullable|integer|min:1|max:20',
+      'security_policy.auto_submit_on_violation' => 'nullable|boolean',
+      'security_policy.logout_on_violation' => 'nullable|boolean',
+      'security_policy.ai_proctoring_enabled' => 'nullable|boolean',
+    ]);
+
+    $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
+    if (!$session) return response()->json(['message' => 'No current session'], 422);
+
+    $currentTerm = Term::where('school_id', $schoolId)
+      ->where('academic_session_id', $session->id)
+      ->where('is_current', true)
+      ->first();
+    if (!$currentTerm) return response()->json(['message' => 'No current term'], 422);
+
+    $ts = TermSubject::where('id', $data['term_subject_id'])
+      ->where('school_id', $schoolId)
+      ->where('teacher_user_id', $user->id)
+      ->first();
+    if (!$ts) return response()->json(['message' => 'You are not assigned to this subject'], 403);
+
+    $term = Term::where('id', $ts->term_id)->where('school_id', $schoolId)->first();
+    if (
+      !$term ||
+      (int) $term->academic_session_id !== (int) $session->id ||
+      (int) $term->id !== (int) $currentTerm->id
+    ) {
+      return response()->json(['message' => 'CBT can only be edited for current session and current term'], 403);
+    }
+
+    $payload = $this->buildExamPayload($data, (int) $schoolId, (int) $user->id, (int) $ts->id);
+
+    try {
+      $exam->fill($payload);
+      $exam->save();
+    } catch (QueryException $e) {
+      return response()->json([
+        'message' => 'Unable to update CBT exam. CBT schema may be outdated. Run migrations and try again.',
+        'error' => $e->getMessage(),
+      ], 500);
+    }
+
+    return response()->json(['message' => 'CBT exam updated', 'data' => $exam]);
   }
 
   // GET /api/staff/cbt/exams/{exam}/questions

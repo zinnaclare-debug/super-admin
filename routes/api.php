@@ -389,6 +389,7 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/cbt/subjects', [StaffCbtController::class, 'subjects']);
     Route::get('/staff/cbt/exams', [StaffCbtController::class, 'index']);
     Route::post('/staff/cbt/exams', [StaffCbtController::class, 'store']);
+    Route::patch('/staff/cbt/exams/{exam}', [StaffCbtController::class, 'update']);
     Route::get('/staff/cbt/exams/{exam}/questions', [StaffCbtController::class, 'examQuestions']);
     Route::post('/staff/cbt/exams/{exam}/export-question-bank', [StaffCbtController::class, 'exportFromQuestionBank']);
     Route::delete('/staff/cbt/exams/{exam}', [StaffCbtController::class, 'destroy']);

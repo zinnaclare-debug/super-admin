@@ -6,6 +6,30 @@ import cbtResumeArt from "../../../assets/cbt-dashboard/online-resume.svg";
 import cbtProfilesArt from "../../../assets/cbt-dashboard/swipe-profiles.svg";
 import "../../shared/CbtShowcase.css";
 
+const defaultSecurityPolicy = {
+  fullscreen_required: true,
+  block_copy_paste: true,
+  block_tab_switch: true,
+  no_face_timeout_seconds: 30,
+  max_warnings: 3,
+  auto_submit_on_violation: true,
+  logout_on_violation: true,
+  ai_proctoring_enabled: true,
+};
+
+function createDefaultForm() {
+  return {
+    term_subject_id: "",
+    title: "",
+    instructions: "",
+    starts_at: "",
+    ends_at: "",
+    duration_minutes: 60,
+    status: "draft",
+    security_policy: { ...defaultSecurityPolicy },
+  };
+}
+
 function formatDate(value) {
   if (!value) return "-";
   try {
@@ -15,32 +39,23 @@ function formatDate(value) {
   }
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 16);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function CBTHome() {
   const [subjects, setSubjects] = useState([]);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedExamId, setSelectedExamId] = useState("");
   const [examQuestions, setExamQuestions] = useState([]);
+  const [editingExamId, setEditingExamId] = useState(null);
 
-  const [form, setForm] = useState({
-    term_subject_id: "",
-    title: "",
-    instructions: "",
-    starts_at: "",
-    ends_at: "",
-    duration_minutes: 60,
-    status: "draft",
-    security_policy: {
-      fullscreen_required: true,
-      block_copy_paste: true,
-      block_tab_switch: true,
-      no_face_timeout_seconds: 30,
-      max_warnings: 3,
-      auto_submit_on_violation: true,
-      logout_on_violation: true,
-      ai_proctoring_enabled: true,
-    },
-  });
+  const [form, setForm] = useState(createDefaultForm());
 
   const load = async () => {
     setLoading(true);
@@ -70,18 +85,52 @@ export default function CBTHome() {
     load();
   }, []);
 
-  const createExam = async (e) => {
+  const resetForm = () => {
+    setEditingExamId(null);
+    setForm(createDefaultForm());
+  };
+
+  const saveExam = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...form,
+      term_subject_id: Number(form.term_subject_id),
+      duration_minutes: Number(form.duration_minutes),
+      security_policy: {
+        ...form.security_policy,
+        no_face_timeout_seconds: Number(form.security_policy.no_face_timeout_seconds),
+        max_warnings: Number(form.security_policy.max_warnings),
+      },
+    };
+
     try {
-      await api.post("/api/staff/cbt/exams", {
-        ...form,
-        term_subject_id: Number(form.term_subject_id),
-      });
+      if (editingExamId) {
+        await api.patch(`/api/staff/cbt/exams/${editingExamId}`, payload);
+      } else {
+        await api.post("/api/staff/cbt/exams", payload);
+      }
       await load();
-      alert("CBT exam created");
+      alert(editingExamId ? "CBT exam updated" : "CBT exam created");
+      resetForm();
     } catch (err) {
-      alert(err?.response?.data?.message || "Create failed");
+      alert(err?.response?.data?.message || (editingExamId ? "Update failed" : "Create failed"));
     }
+  };
+
+  const startEdit = (exam) => {
+    const examPolicy = exam?.security_policy && typeof exam.security_policy === "object" ? exam.security_policy : {};
+    setEditingExamId(exam.id);
+    setForm({
+      term_subject_id: exam.term_subject_id ? String(exam.term_subject_id) : "",
+      title: exam.title || "",
+      instructions: exam.instructions || "",
+      starts_at: toDateTimeLocal(exam.starts_at),
+      ends_at: toDateTimeLocal(exam.ends_at),
+      duration_minutes: Number(exam.duration_minutes ?? exam.duration ?? 60),
+      status: exam.status || "draft",
+      security_policy: { ...defaultSecurityPolicy, ...examPolicy },
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const removeExam = async (id) => {
@@ -138,8 +187,8 @@ export default function CBTHome() {
         </section>
 
         <section className="cbx-panel">
-          <h3 style={{ marginTop: 0 }}>Create CBT Exam</h3>
-          <form onSubmit={createExam} className="cbx-form cbx-form--wide">
+          <h3 style={{ marginTop: 0 }}>{editingExamId ? "Edit CBT Exam" : "Create CBT Exam"}</h3>
+          <form onSubmit={saveExam} className="cbx-form cbx-form--wide">
             <select
               className="cbx-field"
               value={form.term_subject_id}
@@ -258,7 +307,14 @@ export default function CBTHome() {
                 />
               </div>
             </div>
-            <button className="cbx-btn" type="submit">Create CBT</button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="cbx-btn" type="submit">{editingExamId ? "Update CBT" : "Create CBT"}</button>
+              {editingExamId ? (
+                <button className="cbx-btn cbx-btn--soft" type="button" onClick={resetForm}>
+                  Cancel Edit
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
 
@@ -293,7 +349,12 @@ export default function CBTHome() {
                         <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x.id)}>View</button>
                       </td>
                       <td>
-                        <button className="cbx-btn cbx-btn--danger" onClick={() => removeExam(x.id)}>Delete</button>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button className="cbx-btn cbx-btn--danger" onClick={() => removeExam(x.id)}>Delete</button>
+                          <button className="cbx-btn cbx-btn--soft" onClick={() => startEdit(x)}>
+                            {editingExamId === x.id ? "Editing..." : "Edit"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
