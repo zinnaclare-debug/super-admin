@@ -120,6 +120,16 @@
   min-width: 54px;
 }
 
+.broadsheet-subject-head-horizontal {
+  min-width: 72px;
+  max-width: 96px;
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.05;
+  padding: 6px 4px;
+}
+
 .broadsheet-table td:nth-child(2),
 .broadsheet-table td:nth-child(3) {
   text-align: left;

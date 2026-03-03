@@ -67,7 +67,12 @@
         }
         .subject-head {
             min-width: 56px;
-            white-space: nowrap;
+            max-width: 92px;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.05;
+            padding: 4px 3px;
         }
         .summary-col {
             width: 50px;

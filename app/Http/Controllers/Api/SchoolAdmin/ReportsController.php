@@ -1204,7 +1204,7 @@ class ReportsController extends Controller
         }
 
         $words = preg_split('/\s+/', $normalized) ?: [];
-        $isLongMultiWord = count($words) >= 3 && mb_strlen($normalized) > 19;
+        $isLongMultiWord = count($words) >= 2 && mb_strlen($normalized) > 19;
         if (!$isLongMultiWord) {
             return strtoupper($normalized);
         }
