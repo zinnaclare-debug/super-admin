@@ -66,24 +66,26 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 38px;
-            min-width: 38px;
-            height: 170px;
+            width: 42px;
+            min-width: 42px;
+            height: 190px;
             padding: 0;
             vertical-align: bottom;
             overflow: hidden;
+            position: relative;
         }
-        .subject-head > span {
+        .subject-head > .vertical-text {
+            position: absolute;
+            left: 50%;
+            bottom: 10px;
+            transform: translateX(-50%) rotate(-90deg);
+            transform-origin: center center;
             display: inline-block;
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
+            white-space: nowrap;
             text-align: left;
-            font-size: 7px;
-            line-height: 1.1;
-            white-space: normal;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-            padding: 8px 0;
+            font-size: 6.5px;
+            line-height: 1;
+            letter-spacing: 0.2px;
         }
         .summary-col {
             width: 48px;
@@ -119,7 +121,7 @@
         <th class="left-text nowrap class-col">CLASS</th>
         @foreach($subjects as $subject)
             <th class="subject-head">
-                <span>{{ strtoupper((string) ($subject['name'] ?? '-')) }}</span>
+                <span class="vertical-text">{{ strtoupper((string) ($subject['name'] ?? '-')) }}</span>
             </th>
         @endforeach
         <th class="summary-col nowrap">TOTAL</th>
