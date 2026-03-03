@@ -66,26 +66,20 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 42px;
-            min-width: 42px;
+            width: 22px;
+            min-width: 22px;
             height: 190px;
-            padding: 0;
+            padding: 2px 1px;
             vertical-align: bottom;
             overflow: hidden;
-            position: relative;
         }
         .subject-head > .vertical-text {
-            position: absolute;
-            left: 50%;
-            bottom: 10px;
-            transform: translateX(-50%) rotate(-90deg);
-            transform-origin: center center;
-            display: inline-block;
-            white-space: nowrap;
-            text-align: left;
-            font-size: 6.5px;
-            line-height: 1;
-            letter-spacing: 0.2px;
+            display: block;
+            text-align: center;
+            font-size: 6px;
+            line-height: 0.95;
+            letter-spacing: 0;
+            white-space: normal;
         }
         .summary-col {
             width: 48px;
@@ -120,8 +114,12 @@
         <th class="left-text nowrap student-col">STUDENT NAME</th>
         <th class="left-text nowrap class-col">CLASS</th>
         @foreach($subjects as $subject)
+            @php
+                $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
+                $subjectChars = preg_split('/(?<!^)(?!$)/u', preg_replace('/\s+/', '', $subjectLabel) ?: '-') ?: ['-'];
+            @endphp
             <th class="subject-head">
-                <span class="vertical-text">{{ strtoupper((string) ($subject['name'] ?? '-')) }}</span>
+                <span class="vertical-text">{!! implode('<br>', array_map(fn($char) => e($char), $subjectChars)) !!}</span>
             </th>
         @endforeach
         <th class="summary-col nowrap">TOTAL</th>
