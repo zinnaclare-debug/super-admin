@@ -17,6 +17,44 @@ use Throwable;
 
 class QuestionBankController extends Controller
 {
+  private function aiErrorMeta($response): array
+  {
+    $providerStatus = (int) $response->status();
+    $errorCode = data_get($response->json(), 'error.code');
+    $providerMessage = trim((string) (
+      data_get($response->json(), 'error.message')
+      ?: data_get($response->json(), 'message')
+      ?: ''
+    ));
+
+    return [$providerStatus, $errorCode, $providerMessage];
+  }
+
+  private function localModelFallbackCandidates(string $model): array
+  {
+    $fallback = trim((string) config('services.ai.fallback_model', ''));
+    $base = preg_replace('/:.+$/', '', $model);
+
+    $candidates = array_values(array_filter([
+      $fallback,
+      $base,
+      $base !== '' ? "{$base}:latest" : null,
+    ], fn($v) => is_string($v) && trim($v) !== ''));
+
+    $seen = [];
+    $unique = [];
+    foreach ($candidates as $candidate) {
+      $key = strtolower(trim($candidate));
+      if ($key === '' || isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $unique[] = trim($candidate);
+    }
+
+    return $unique;
+  }
+
   private function stripQuestionPrefix(string $text): string
   {
     $cleaned = preg_replace('/^\s*(?:\(?\d+\)?[\).\-\:]*|[ivxlcdm]+[\).\-\:])\s*/i', '', $text);
@@ -306,6 +344,7 @@ Rules:
       }
     }
 
+    $activeModel = $aiModel;
     try {
       $requestBuilder = $http->acceptJson();
       if ($aiApiKey !== '') {
@@ -316,7 +355,7 @@ Rules:
       $response = $requestBuilder
         ->retry(1, 500)
         ->post($chatCompletionsUrl, [
-          'model' => $aiModel,
+          'model' => $activeModel,
           'temperature' => 0.3,
           'max_tokens' => $maxTokens,
           'stream' => false,
@@ -325,11 +364,45 @@ Rules:
             ['role' => 'user', 'content' => $userPrompt],
           ],
         ]);
+
+      // Ollama often exposes models as "<name>:latest". Retry with compatible local tags when needed.
+      if ($response->failed() && $isLocalAiEndpoint) {
+        [$providerStatus, , $providerMessage] = $this->aiErrorMeta($response);
+        $errorLower = strtolower($providerMessage);
+        $isLikelyModelIssue = $providerStatus === 404
+          || str_contains($errorLower, 'model')
+          || str_contains($errorLower, 'not found');
+
+        if ($isLikelyModelIssue) {
+          foreach ($this->localModelFallbackCandidates($aiModel) as $candidateModel) {
+            if (strcasecmp($candidateModel, $activeModel) === 0) {
+              continue;
+            }
+
+            $retry = $requestBuilder->post($chatCompletionsUrl, [
+              'model' => $candidateModel,
+              'temperature' => 0.3,
+              'max_tokens' => $maxTokens,
+              'stream' => false,
+              'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+              ],
+            ]);
+
+            if ($retry->successful()) {
+              $response = $retry;
+              $activeModel = $candidateModel;
+              break;
+            }
+          }
+        }
+      }
     } catch (ConnectionException $e) {
       Log::error('AI provider connection failed', [
         'base_url' => $aiBaseUrl,
         'endpoint' => $chatCompletionsUrl,
-        'model' => $aiModel,
+        'model' => $activeModel,
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
@@ -343,7 +416,7 @@ Rules:
       Log::error('AI provider unexpected failure', [
         'base_url' => $aiBaseUrl,
         'endpoint' => $chatCompletionsUrl,
-        'model' => $aiModel,
+        'model' => $activeModel,
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
@@ -356,13 +429,7 @@ Rules:
     }
 
     if ($response->failed()) {
-      $providerStatus = (int) $response->status();
-      $errorCode = data_get($response->json(), 'error.code');
-      $providerMessage = trim((string) (
-        data_get($response->json(), 'error.message')
-        ?: data_get($response->json(), 'message')
-        ?: ''
-      ));
+      [$providerStatus, $errorCode, $providerMessage] = $this->aiErrorMeta($response);
 
       if ($errorCode === 'insufficient_quota') {
         return response()->json([
@@ -381,6 +448,7 @@ Rules:
         'code' => $errorCode,
         'provider_status' => $providerStatus ?: null,
         'provider_message' => $providerMessage !== '' ? $providerMessage : null,
+        'model' => $activeModel,
         'ca_verify' => $verifyPath ?: null,
         'details' => $response->json(),
       ], $status);
