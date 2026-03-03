@@ -66,9 +66,9 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 40px;
-            min-width: 40px;
-            height: 185px;
+            width: 32px;
+            min-width: 32px;
+            height: 165px;
             padding: 0;
             vertical-align: bottom;
             overflow: hidden;
@@ -82,18 +82,14 @@
             transform: rotate(-90deg);
             transform-origin: left bottom;
             text-align: left;
-            font-size: 6.5px;
-            line-height: 1.05;
+            font-size: 7px;
+            line-height: 1;
             letter-spacing: 0.12px;
-            white-space: pre-line;
-            width: 170px;
+            white-space: nowrap;
         }
         .summary-col {
-            width: 56px;
-            min-width: 56px;
-        }
-        .page-break {
-            page-break-after: always;
+            width: 50px;
+            min-width: 50px;
         }
     </style>
 </head>
@@ -118,64 +114,47 @@
     <h2>CLASS: {{ $classLabel }}</h2>
 </div>
 
-@php
-    $chunks = $subjectChunks ?? [($subjects ?? [])];
-@endphp
-
-@foreach($chunks as $chunkIndex => $chunkSubjects)
-    @if($chunkIndex > 0)
-        <div class="title" style="margin-top: 4px;">
-            <h2>ANNUAL BROADSHEET (CONTINUED)</h2>
-        </div>
-    @endif
-
-    <table>
-        <thead>
+<table>
+    <thead>
+    <tr>
+        <th class="left-text nowrap student-col">STUDENT NAME</th>
+        <th class="left-text nowrap class-col">CLASS</th>
+        @foreach($subjects as $subject)
+            @php
+                $subjectLabel = strtoupper((string) ($subject['short_code'] ?? $subject['code'] ?? $subject['name'] ?? '-'));
+                $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
+            @endphp
+            <th class="subject-head">
+                <span class="vertical-text">{{ $subjectLabel }}</span>
+            </th>
+        @endforeach
+        <th class="summary-col nowrap">TOTAL</th>
+        <th class="summary-col nowrap">AVERAGE</th>
+        <th class="summary-col nowrap">POSITION</th>
+    </tr>
+    </thead>
+    <tbody>
+    @forelse($rows as $row)
         <tr>
-            <th class="left-text nowrap student-col">STUDENT NAME</th>
-            <th class="left-text nowrap class-col">CLASS</th>
-            @foreach($chunkSubjects as $subject)
+            <td class="left-text">{{ strtoupper((string) ($row['name'] ?? '-')) }}</td>
+            <td class="left-text">{{ strtoupper((string) ($row['class_name'] ?? '-')) }}</td>
+            @foreach($subjects as $subject)
                 @php
-                    $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
-                    $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
-                    $subjectWrapped = wordwrap($subjectLabel, 19, "\n", true);
+                    $subjectKey = (string) ($subject['id'] ?? '');
+                    $value = $row['scores'][$subjectKey] ?? null;
                 @endphp
-                <th class="subject-head">
-                    <span class="vertical-text">{{ $subjectWrapped }}</span>
-                </th>
+                <td>{{ $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.') }}</td>
             @endforeach
-            <th class="summary-col nowrap">TOTAL</th>
-            <th class="summary-col nowrap">AVERAGE</th>
-            <th class="summary-col nowrap">POSITION</th>
+            <td>{{ $row['total'] === null ? '-' : rtrim(rtrim(number_format((float) $row['total'], 2, '.', ''), '0'), '.') }}</td>
+            <td>{{ $row['average'] === null ? '-' : rtrim(rtrim(number_format((float) $row['average'], 2, '.', ''), '0'), '.') }}</td>
+            <td>{{ $row['position_label'] ?? '-' }}</td>
         </tr>
-        </thead>
-        <tbody>
-        @forelse($rows as $row)
-            <tr>
-                <td class="left-text">{{ strtoupper((string) ($row['name'] ?? '-')) }}</td>
-                <td class="left-text">{{ strtoupper((string) ($row['class_name'] ?? '-')) }}</td>
-                @foreach($chunkSubjects as $subject)
-                    @php
-                        $subjectKey = (string) ($subject['id'] ?? '');
-                        $value = $row['scores'][$subjectKey] ?? null;
-                    @endphp
-                    <td>{{ $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.') }}</td>
-                @endforeach
-                <td>{{ $row['total'] === null ? '-' : rtrim(rtrim(number_format((float) $row['total'], 2, '.', ''), '0'), '.') }}</td>
-                <td>{{ $row['average'] === null ? '-' : rtrim(rtrim(number_format((float) $row['average'], 2, '.', ''), '0'), '.') }}</td>
-                <td>{{ $row['position_label'] ?? '-' }}</td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="{{ count($chunkSubjects) + 5 }}">No broadsheet result data found.</td>
-            </tr>
-        @endforelse
-        </tbody>
-    </table>
-
-    @if($chunkIndex < count($chunks) - 1)
-        <div class="page-break"></div>
-    @endif
-@endforeach
+    @empty
+        <tr>
+            <td colspan="{{ count($subjects) + 5 }}">No broadsheet result data found.</td>
+        </tr>
+    @endforelse
+    </tbody>
+</table>
 </body>
 </html>

@@ -273,7 +273,6 @@ class ReportsController extends Controller
                 'department' => $selectedDepartment,
                 'className' => $selectedClassName,
                 'subjects' => $broadsheet['subjects'],
-                'subjectChunks' => array_chunk($broadsheet['subjects'], 10),
                 'rows' => $broadsheet['rows'],
             ])->render();
 
