@@ -30,6 +30,9 @@ export default function StudentCBTHome() {
 
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState(null);
+  const [reviewExam, setReviewExam] = useState(null);
+  const [reviewData, setReviewData] = useState(null);
+  const [loadingReview, setLoadingReview] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -76,6 +79,12 @@ export default function StudentCBTHome() {
     setSecurityStatus("");
     setAttemptEndsAtMs(null);
     setTimeLeftSeconds(null);
+  };
+
+  const closeReview = () => {
+    setReviewExam(null);
+    setReviewData(null);
+    setLoadingReview(false);
   };
 
   const load = async () => {
@@ -192,6 +201,21 @@ export default function StudentCBTHome() {
     }
   };
 
+  const openReview = async (exam) => {
+    setReviewExam(exam);
+    setLoadingReview(true);
+    setReviewData(null);
+    try {
+      const res = await api.get(`/api/student/cbt/exams/${exam.id}/review`);
+      setReviewData(res.data?.data || null);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to load exam review");
+      setReviewExam(null);
+    } finally {
+      setLoadingReview(false);
+    }
+  };
+
   useEffect(() => {
     if (!selectedExam || !attemptEndsAtMs) return undefined;
 
@@ -235,7 +259,7 @@ export default function StudentCBTHome() {
 
   return (
     <div className="cbx-page cbx-page--student">
-      {!selectedExam ? (
+      {!selectedExam && !reviewExam ? (
         <>
           <section className="cbx-hero">
             <div>
@@ -290,9 +314,16 @@ export default function StudentCBTHome() {
                         </td>
                         <td>{x.has_taken ? `Ended (${x.attempt_status || "submitted"})` : x.is_open ? "Open" : "Closed/Upcoming"}</td>
                         <td>
-                          <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.can_start}>
-                            {x.has_taken ? "Ended" : x.is_open ? "Start CBT" : "Not Open"}
-                          </button>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.can_start}>
+                              {x.has_taken ? "Ended" : x.is_open ? "Start CBT" : "Not Open"}
+                            </button>
+                            {x.has_taken ? (
+                              <button className="cbx-btn cbx-btn--soft" onClick={() => openReview(x)}>
+                                View Exam
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -302,7 +333,7 @@ export default function StudentCBTHome() {
             ) : null}
           </section>
         </>
-      ) : (
+      ) : selectedExam ? (
         <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
           <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
 
@@ -360,16 +391,91 @@ export default function StudentCBTHome() {
                 >
                   Next
                 </button>
-                <button className="cbx-btn" onClick={() => submitExam("manual")} disabled={submitting || !questions.length}>
-                  {submitting ? "Submitting..." : "Submit"}
-                </button>
                 <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
                   {submitting ? "Ending..." : "Exit"}
+                </button>
+                <button
+                  className="cbx-btn"
+                  style={{ marginLeft: "auto" }}
+                  onClick={() => submitExam("manual")}
+                  disabled={submitting || !questions.length}
+                >
+                  {submitting ? "Submitting..." : "Submit"}
                 </button>
               </div>
             </>
           ) : (
             <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
+          )}
+        </section>
+      ) : (
+        <section className="cbx-panel" style={{ maxWidth: 980, margin: "0 auto" }}>
+          <h3 style={{ marginTop: 0 }}>{reviewExam?.title || "Exam Review"}</h3>
+          {loadingReview ? (
+            <p className="cbx-state cbx-state--loading">Loading review...</p>
+          ) : reviewData ? (
+            <>
+              <div className="cbx-table-wrap">
+                <table className="cbx-table">
+                  <thead>
+                    <tr>
+                      <th>S/N</th>
+                      <th>Question</th>
+                      <th>Options</th>
+                      <th>Your Answer</th>
+                      <th>Correct</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(reviewData.questions || []).map((q) => (
+                      <tr key={q.id}>
+                        <td>{q.sn}</td>
+                        <td>{q.question_text}</td>
+                        <td>
+                          {[
+                            ["A", q.option_a],
+                            ["B", q.option_b],
+                            ["C", q.option_c],
+                            ["D", q.option_d],
+                          ].map(([key, text]) => {
+                            const isCorrect = q.correct_option === key;
+                            const isWrongStudent = q.selected_option === key && q.selected_option !== q.correct_option;
+                            return (
+                              <div
+                                key={key}
+                                style={{
+                                  color: isCorrect ? "#166534" : isWrongStudent ? "#b91c1c" : "inherit",
+                                  fontWeight: isCorrect || isWrongStudent ? 700 : 400,
+                                }}
+                              >
+                                {key}. {text || "-"}
+                              </div>
+                            );
+                          })}
+                        </td>
+                        <td style={{ color: q.selected_option && !q.is_correct ? "#b91c1c" : "inherit", fontWeight: q.selected_option && !q.is_correct ? 700 : 400 }}>
+                          {q.selected_option || "-"}
+                        </td>
+                        <td style={{ color: "#166534", fontWeight: 700 }}>{q.correct_option || "-"}</td>
+                      </tr>
+                    ))}
+                    {!reviewData.questions?.length ? (
+                      <tr>
+                        <td colSpan="5">No questions to review.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: 12, fontWeight: 700 }}>
+                Total Score: {reviewData.attempt?.score_percent ?? 0}% ({reviewData.attempt?.correct ?? 0}/{reviewData.attempt?.total_questions ?? 0})
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <button className="cbx-btn cbx-btn--soft" onClick={closeReview}>Back</button>
+              </div>
+            </>
+          ) : (
+            <p className="cbx-state cbx-state--empty">No review data found.</p>
           )}
         </section>
       )}

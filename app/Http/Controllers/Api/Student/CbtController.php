@@ -464,4 +464,89 @@ class CbtController extends Controller
             ],
         ]);
     }
+
+    // GET /api/student/cbt/exams/{exam}/review
+    public function review(Request $request, CbtExam $exam)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+        $schoolId = $user->school_id;
+
+        abort_unless((int) $exam->school_id === (int) $schoolId, 403);
+
+        $student = $this->resolveStudentRecord((int) $schoolId, (int) $user->id);
+        if (!$student) {
+            return response()->json(['message' => 'Student profile not found'], 403);
+        }
+
+        $allowed = $this->allowedTermSubjectIds($request);
+        abort_unless(in_array((int) $exam->term_subject_id, $allowed, true), 403);
+
+        $attempt = CbtExamAttempt::where('school_id', $schoolId)
+            ->where('cbt_exam_id', (int) $exam->id)
+            ->where('student_id', (int) $student->id)
+            ->first();
+
+        if (!$attempt || !$this->isEndedAttemptStatus($attempt->status)) {
+            return response()->json([
+                'message' => 'No ended CBT attempt found for this exam yet.',
+            ], 422);
+        }
+
+        $answers = collect($attempt->answers ?? [])
+            ->mapWithKeys(fn ($v, $k) => [(int) $k => strtoupper((string) $v)]);
+
+        $questions = CbtExamQuestion::query()
+            ->where('school_id', $schoolId)
+            ->where('cbt_exam_id', (int) $exam->id)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'question_text',
+                'option_a',
+                'option_b',
+                'option_c',
+                'option_d',
+                'correct_option',
+            ])
+            ->map(function ($q, $index) use ($answers) {
+                $selected = strtoupper((string) $answers->get((int) $q->id, ''));
+                $correct = strtoupper((string) $q->correct_option);
+                return [
+                    'sn' => $index + 1,
+                    'id' => (int) $q->id,
+                    'question_text' => $q->question_text,
+                    'option_a' => $q->option_a,
+                    'option_b' => $q->option_b,
+                    'option_c' => $q->option_c,
+                    'option_d' => $q->option_d,
+                    'correct_option' => $correct,
+                    'selected_option' => $selected ?: null,
+                    'is_correct' => $selected && $selected === $correct,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'exam' => [
+                    'id' => (int) $exam->id,
+                    'title' => (string) $exam->title,
+                ],
+                'attempt' => [
+                    'status' => (string) $attempt->status,
+                    'submit_mode' => (string) ($attempt->submit_mode ?? 'manual'),
+                    'score_percent' => (float) $attempt->score_percent,
+                    'total_questions' => (int) $attempt->total_questions,
+                    'attempted' => (int) $attempt->attempted,
+                    'correct' => (int) $attempt->correct,
+                    'wrong' => (int) $attempt->wrong,
+                    'unanswered' => (int) $attempt->unanswered,
+                    'ended_at' => $attempt->ended_at,
+                ],
+                'questions' => $questions,
+            ],
+        ]);
+    }
 }

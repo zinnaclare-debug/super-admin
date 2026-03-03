@@ -349,7 +349,6 @@ export default function CBTHome() {
                     <th>Subject</th>
                     <th>Window</th>
                     <th>Status</th>
-                    <th>Questions</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -364,13 +363,13 @@ export default function CBTHome() {
                       </td>
                       <td>{x.status}</td>
                       <td>
-                        <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x.id)}>View</button>
-                      </td>
-                      <td>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button className="cbx-btn cbx-btn--danger" onClick={() => removeExam(x.id)}>Delete</button>
                           <button className="cbx-btn cbx-btn--soft" onClick={() => startEdit(x)}>
                             {editingExamId === x.id ? "Editing..." : "Edit"}
+                          </button>
+                          <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x.id)}>
+                            View Exam
                           </button>
                         </div>
                       </td>
@@ -378,7 +377,7 @@ export default function CBTHome() {
                   ))}
                   {!exams.length && (
                     <tr>
-                      <td colSpan="7">No CBT exams created yet.</td>
+                      <td colSpan="6">No CBT exams created yet.</td>
                     </tr>
                   )}
                 </tbody>

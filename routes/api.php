@@ -439,6 +439,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/cbt/subjects', [StudentCbtController::class, 'subjects']);
     Route::get('/student/cbt/exams', [StudentCbtController::class, 'exams']);
     Route::get('/student/cbt/exams/{exam}/questions', [StudentCbtController::class, 'questions']);
+    Route::get('/student/cbt/exams/{exam}/review', [StudentCbtController::class, 'review']);
     Route::post('/student/cbt/exams/{exam}/submit', [StudentCbtController::class, 'submit']);
     Route::get('/student/class-activities/subjects', [StudentClassActivitiesController::class, 'mySubjects']);
     Route::get('/student/class-activities', [StudentClassActivitiesController::class, 'index']);
