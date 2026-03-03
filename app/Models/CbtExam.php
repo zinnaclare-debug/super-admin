@@ -14,6 +14,7 @@ class CbtExam extends Model
     'instructions',
     'starts_at',
     'ends_at',
+    'duration',
     'duration_minutes',
     'status',
     'security_policy',
@@ -25,4 +26,3 @@ class CbtExam extends Model
     'security_policy' => 'array',
   ];
 }
-

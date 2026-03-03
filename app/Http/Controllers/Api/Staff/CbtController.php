@@ -13,9 +13,15 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 
 class CbtController extends Controller
 {
+  private function cbtHasColumn(string $column): bool
+  {
+    return Schema::hasTable('cbt_exams') && Schema::hasColumn('cbt_exams', $column);
+  }
+
   private function hasTeacherAssignmentColumn(): bool
   {
     return Schema::hasColumn('term_subjects', 'teacher_user_id');
@@ -167,18 +173,50 @@ class CbtController extends Controller
       return response()->json(['message' => 'CBT can only be created for current session and current term'], 403);
     }
 
-    $exam = CbtExam::create([
+    $startsAt = Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s');
+    $endsAt = Carbon::parse($data['ends_at'])->format('Y-m-d H:i:s');
+    $durationMinutes = (int) $data['duration_minutes'];
+
+    $payload = [
       'school_id' => $schoolId,
-      'teacher_user_id' => $user->id,
-      'term_subject_id' => $ts->id,
       'title' => $data['title'],
-      'instructions' => $data['instructions'] ?? null,
-      'starts_at' => Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s'),
-      'ends_at' => Carbon::parse($data['ends_at'])->format('Y-m-d H:i:s'),
-      'duration_minutes' => $data['duration_minutes'],
       'status' => $data['status'] ?? 'draft',
-      'security_policy' => $data['security_policy'] ?? null,
-    ]);
+    ];
+
+    if ($this->cbtHasColumn('teacher_user_id')) {
+      $payload['teacher_user_id'] = $user->id;
+    }
+    if ($this->cbtHasColumn('term_subject_id')) {
+      $payload['term_subject_id'] = $ts->id;
+    }
+    if ($this->cbtHasColumn('instructions')) {
+      $payload['instructions'] = $data['instructions'] ?? null;
+    }
+    if ($this->cbtHasColumn('starts_at')) {
+      $payload['starts_at'] = $startsAt;
+    }
+    if ($this->cbtHasColumn('ends_at')) {
+      $payload['ends_at'] = $endsAt;
+    }
+    if ($this->cbtHasColumn('duration_minutes')) {
+      $payload['duration_minutes'] = $durationMinutes;
+    }
+    // Legacy compatibility: old schema requires `duration` and fails insert if omitted.
+    if ($this->cbtHasColumn('duration')) {
+      $payload['duration'] = $durationMinutes;
+    }
+    if ($this->cbtHasColumn('security_policy')) {
+      $payload['security_policy'] = $data['security_policy'] ?? null;
+    }
+
+    try {
+      $exam = CbtExam::create($payload);
+    } catch (QueryException $e) {
+      return response()->json([
+        'message' => 'Unable to create CBT exam. CBT schema may be outdated. Run migrations and try again.',
+        'error' => $e->getMessage(),
+      ], 500);
+    }
 
     return response()->json(['message' => 'CBT exam created', 'data' => $exam], 201);
   }
