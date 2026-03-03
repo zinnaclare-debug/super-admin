@@ -17,7 +17,6 @@ export default function ExamResults() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [exam, setExam] = useState(null);
-  const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState([]);
 
   const load = async () => {
@@ -26,12 +25,10 @@ export default function ExamResults() {
       const res = await api.get(`/api/staff/cbt/exams/${examId}/results`);
       const payload = res.data?.data || {};
       setExam(payload.exam || null);
-      setSummary(payload.summary || null);
       setRows(payload.students || []);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load exam results");
       setExam(null);
-      setSummary(null);
       setRows([]);
     } finally {
       setLoading(false);
@@ -52,15 +49,6 @@ export default function ExamResults() {
           </div>
         </div>
         <button className="cbx-btn cbx-btn--soft" onClick={() => navigate("/staff/cbt")}>Back</button>
-      </div>
-
-      <div className="cbx-panel" style={{ marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 14 }}>
-          <span><strong>Attempts:</strong> {summary?.attempt_count ?? 0}</span>
-          <span><strong>Average:</strong> {summary?.average_score ?? 0}%</span>
-          <span><strong>Highest:</strong> {summary?.highest_score ?? 0}%</span>
-          <span><strong>Lowest:</strong> {summary?.lowest_score ?? 0}%</span>
-        </div>
       </div>
 
       <section className="cbx-panel">

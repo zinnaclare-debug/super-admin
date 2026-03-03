@@ -354,9 +354,15 @@ export default function CBTHome() {
                           </button>
                           <button
                             className="cbx-btn cbx-btn--soft"
-                            onClick={() => navigate(`/staff/cbt/${x.id}/results`)}
+                            onClick={() => navigate(`/staff/cbt/${x.id}/questions`)}
                           >
                             View Exam
+                          </button>
+                          <button
+                            className="cbx-btn cbx-btn--soft"
+                            onClick={() => navigate(`/staff/cbt/${x.id}/results`)}
+                          >
+                            View Result
                           </button>
                         </div>
                       </td>

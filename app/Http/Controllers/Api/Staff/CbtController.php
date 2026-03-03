@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\QueryException;
 
 class CbtController extends Controller
@@ -337,6 +338,11 @@ class CbtController extends Controller
       ->orderBy('position')
       ->orderBy('id')
       ->get();
+
+    $items->transform(function ($q) {
+      $q->media_url = $q->media_path ? Storage::disk('public')->url($q->media_path) : null;
+      return $q;
+    });
 
     return response()->json(['data' => $items]);
   }

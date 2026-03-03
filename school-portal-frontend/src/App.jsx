@@ -76,6 +76,7 @@ import ClassActivitiesHome from "./pages/staff/class-activities/ClassActivitiesH
 import VirtualClassHome from "./pages/staff/virtual-class/VirtualClassHome";
 import QuestionBankHome from "./pages/staff/question-bank/QuestionBankHome";
 import CBTHome from "./pages/staff/cbt/CBTHome";
+import StaffCbtExamQuestions from "./pages/staff/cbt/ExamQuestions";
 import StaffCbtExamResults from "./pages/staff/cbt/ExamResults";
 import StaffAnnouncementsHome from "./pages/staff/announcements/AnnouncementsHome";
 import StudentELibrary from "./pages/student/e-library/StudentELibrary";
@@ -225,6 +226,7 @@ function App() {
         <Route path="virtual-class" element={<VirtualClassHome />} />
         <Route path="question-bank" element={<QuestionBankHome />} />
         <Route path="cbt" element={<CBTHome />} />
+        <Route path="cbt/:examId/questions" element={<StaffCbtExamQuestions />} />
         <Route path="cbt/:examId/results" element={<StaffCbtExamResults />} />
 
       </Route>
