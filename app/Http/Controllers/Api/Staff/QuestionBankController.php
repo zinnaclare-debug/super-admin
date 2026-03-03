@@ -17,6 +17,54 @@ use Throwable;
 
 class QuestionBankController extends Controller
 {
+  private function questionKey(array $q): string
+  {
+    $parts = [
+      strtolower(trim((string)($q['question_text'] ?? ''))),
+      strtolower(trim((string)($q['option_a'] ?? ''))),
+      strtolower(trim((string)($q['option_b'] ?? ''))),
+      strtolower(trim((string)($q['option_c'] ?? ''))),
+      strtolower(trim((string)($q['option_d'] ?? ''))),
+    ];
+
+    $normalized = implode('|', array_map(
+      fn($v) => preg_replace('/\s+/', ' ', (string)$v) ?? '',
+      $parts
+    ));
+
+    return trim((string)$normalized);
+  }
+
+  private function uniqueQuestions(array $rows): array
+  {
+    $seen = [];
+    $unique = [];
+    foreach ($rows as $q) {
+      $row = (array)$q;
+      $key = $this->questionKey($row);
+      if ($key === '' || isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $unique[] = $row;
+    }
+    return $unique;
+  }
+
+  private function withUniqueFallbackFill(array $rows, string $subjectName, string $prompt, int $count): array
+  {
+    $unique = $this->uniqueQuestions($rows);
+    if (count($unique) >= $count) {
+      return array_slice($unique, 0, $count);
+    }
+
+    $needed = $count - count($unique);
+    $pool = $this->buildFallbackQuestions($subjectName, $prompt, max($count * 2, $needed + 2));
+    $merged = $this->uniqueQuestions(array_merge($unique, $pool));
+
+    return array_slice($merged, 0, $count);
+  }
+
   private function buildFallbackQuestions(string $subjectName, string $prompt, int $count): array
   {
     $cleanPrompt = trim(preg_replace('/\s+/', ' ', $prompt) ?? '');
@@ -33,6 +81,14 @@ class QuestionBankController extends Controller
       $summaries = ["Core ideas in {$subjectLabel}"];
     }
 
+    $stems = [
+      'In %s, which option best explains "%s"?',
+      'Which term in %s is most connected to "%s"?',
+      'From this %s topic, choose the best answer for "%s".',
+      'Identify the most accurate concept in %s for "%s".',
+      'Which option is the best interpretation in %s of "%s"?',
+    ];
+
     $rows = [];
     for ($i = 0; $i < $count; $i++) {
       $focus = ucfirst($keywords[$i % count($keywords)]);
@@ -40,9 +96,11 @@ class QuestionBankController extends Controller
       $alt2 = ucfirst($keywords[($i + 2) % count($keywords)]);
       $alt3 = ucfirst($keywords[($i + 3) % count($keywords)]);
       $summary = $summaries[$i % count($summaries)];
+      $stem = $stems[$i % count($stems)];
+      $questionText = sprintf($stem, $subjectLabel, $summary) . " (Focus: {$focus})";
 
       $rows[] = [
-        'question_text' => "In {$subjectLabel}, which option best relates to \"{$summary}\"?",
+        'question_text' => $questionText,
         'option_a' => $focus,
         'option_b' => $alt1,
         'option_c' => $alt2,
@@ -53,7 +111,7 @@ class QuestionBankController extends Controller
       ];
     }
 
-    return $rows;
+    return $this->uniqueQuestions($rows);
   }
 
   private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): void
@@ -339,7 +397,7 @@ class QuestionBankController extends Controller
     $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
 
     if ($aiApiKey === '' && !$isLocalAiEndpoint) {
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
@@ -367,6 +425,7 @@ Return STRICT JSON only:
 }
 Rules:
 - Generate exactly the requested count.
+- Every question must be unique. Do not repeat or rephrase the same stem.
 - Questions must be based on the statement and subject.
 - question_text must NOT include numbering/prefixes.
 - Keep options concise and plausible.
@@ -517,7 +576,7 @@ Rules:
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
@@ -537,7 +596,7 @@ Rules:
         'verify_path' => $verifyPath,
         'message' => $e->getMessage(),
       ]);
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
@@ -554,7 +613,7 @@ Rules:
     if ($response->failed()) {
       [$providerStatus, $errorCode, $providerMessage] = $this->aiErrorMeta($response);
 
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
@@ -577,7 +636,7 @@ Rules:
     $payload = $this->extractJsonObject($content);
 
     if (!$payload || !is_array($payload['questions'] ?? null)) {
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
@@ -611,8 +670,15 @@ Rules:
       ->values()
       ->all();
 
+    $generated = $this->withUniqueFallbackFill(
+      $generated,
+      $subject->name,
+      (string) $data['prompt'],
+      (int) $data['count']
+    );
+
     if (count($generated) === 0) {
-      $fallback = $this->buildFallbackQuestions($subject->name, (string) $data['prompt'], (int) $data['count']);
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, (string) $data['prompt'], (int) $data['count']);
       if (!empty($data['import_to_bank'])) {
         $this->maybeImportToBank($fallback, (int) $schoolId, (int) $user->id, (int) $subject->id);
       }
