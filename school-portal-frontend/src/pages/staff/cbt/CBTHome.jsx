@@ -378,6 +378,10 @@ export default function CBTHome() {
                   <tr>
                     <th>S/N</th>
                     <th>Question</th>
+                    <th>Option A</th>
+                    <th>Option B</th>
+                    <th>Option C</th>
+                    <th>Option D</th>
                     <th>Correct</th>
                   </tr>
                 </thead>
@@ -386,12 +390,16 @@ export default function CBTHome() {
                     <tr key={q.id}>
                       <td>{idx + 1}</td>
                       <td>{q.question_text}</td>
+                      <td>{q.option_a || "-"}</td>
+                      <td>{q.option_b || "-"}</td>
+                      <td>{q.option_c || "-"}</td>
+                      <td>{q.option_d || "-"}</td>
                       <td>{q.correct_option}</td>
                     </tr>
                   ))}
                   {!examQuestions.length && (
                     <tr>
-                      <td colSpan="3">No questions exported to this exam yet.</td>
+                      <td colSpan="7">No questions exported to this exam yet.</td>
                     </tr>
                   )}
                 </tbody>
