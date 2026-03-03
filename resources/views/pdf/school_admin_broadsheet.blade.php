@@ -41,6 +41,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
         th, td {
             border: 1px solid #111827;
@@ -65,25 +66,28 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 32px;
-            min-width: 32px;
-            height: 150px;
+            width: 38px;
+            min-width: 38px;
+            height: 170px;
             padding: 0;
             vertical-align: bottom;
+            overflow: hidden;
         }
         .subject-head > span {
             display: inline-block;
-            white-space: nowrap;
-            transform: rotate(-90deg);
-            transform-origin: center center;
-            font-size: 9px;
-            line-height: 1;
-            letter-spacing: 0.2px;
-            margin-bottom: 8px;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            text-align: left;
+            font-size: 8px;
+            line-height: 1.1;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            padding: 8px 0;
         }
         .summary-col {
-            width: 40px;
-            min-width: 40px;
+            width: 48px;
+            min-width: 48px;
         }
     </style>
 </head>
