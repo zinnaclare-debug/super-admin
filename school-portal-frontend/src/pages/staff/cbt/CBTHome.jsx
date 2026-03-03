@@ -81,6 +81,8 @@ export default function CBTHome() {
     setLoading(false);
   };
 
+  const selectedExam = exams.find((x) => String(x.id) === String(selectedExamId)) || null;
+
   useEffect(() => {
     load();
   }, []);
@@ -113,7 +115,13 @@ export default function CBTHome() {
       alert(editingExamId ? "CBT exam updated" : "CBT exam created");
       resetForm();
     } catch (err) {
-      alert(err?.response?.data?.message || (editingExamId ? "Update failed" : "Create failed"));
+      const validationErrors = err?.response?.data?.errors || {};
+      const firstValidationError = Object.values(validationErrors)?.[0]?.[0];
+      alert(
+        err?.response?.data?.message ||
+          firstValidationError ||
+          (editingExamId ? "Update failed" : "Create failed")
+      );
     }
   };
 
@@ -243,6 +251,7 @@ export default function CBTHome() {
               <select className="cbx-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                 <option value="draft">Draft</option>
                 <option value="closed">Closed</option>
+                {form.status === "published" ? <option value="published">Published</option> : null}
               </select>
             </div>
             <small className="cbx-note">Note: School admin publishes CBT to make it visible to students.</small>
@@ -371,7 +380,39 @@ export default function CBTHome() {
 
         {selectedExamId ? (
           <section className="cbx-panel">
-            <h3 style={{ marginTop: 0 }}>Exam Questions (from Question Bank export)</h3>
+            <h3 style={{ marginTop: 0 }}>CBT Exam View</h3>
+            {selectedExam ? (
+              <div className="cbx-table-wrap" style={{ marginBottom: 14 }}>
+                <table className="cbx-table">
+                  <tbody>
+                    <tr>
+                      <th style={{ width: 160 }}>Title</th>
+                      <td>{selectedExam.title || "-"}</td>
+                      <th style={{ width: 160 }}>Subject</th>
+                      <td>{selectedExam.subject_name || "-"}</td>
+                    </tr>
+                    <tr>
+                      <th>Class</th>
+                      <td>{selectedExam.class_name || "-"}</td>
+                      <th>Term</th>
+                      <td>{selectedExam.term_name || "-"}</td>
+                    </tr>
+                    <tr>
+                      <th>Start Time</th>
+                      <td>{formatDate(selectedExam.starts_at)}</td>
+                      <th>End Time</th>
+                      <td>{formatDate(selectedExam.ends_at)}</td>
+                    </tr>
+                    <tr>
+                      <th>Duration</th>
+                      <td>{selectedExam.duration_minutes || selectedExam.duration || "-"} mins</td>
+                      <th>Status</th>
+                      <td>{selectedExam.status || "-"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             <div className="cbx-table-wrap">
               <table className="cbx-table">
                 <thead>
