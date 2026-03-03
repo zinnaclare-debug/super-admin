@@ -92,6 +92,9 @@
             width: 56px;
             min-width: 56px;
         }
+        .page-break {
+            page-break-after: always;
+        }
     </style>
 </head>
 <body>
@@ -115,48 +118,64 @@
     <h2>CLASS: {{ $classLabel }}</h2>
 </div>
 
-<table>
-    <thead>
-    <tr>
-        <th class="left-text nowrap student-col">STUDENT NAME</th>
-        <th class="left-text nowrap class-col">CLASS</th>
-        @foreach($subjects as $subject)
-            @php
-                $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
-                $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
-                $subjectWrapped = wordwrap($subjectLabel, 19, "\n", true);
-            @endphp
-            <th class="subject-head">
-                <span class="vertical-text">{{ $subjectWrapped }}</span>
-            </th>
-        @endforeach
-        <th class="summary-col nowrap">TOTAL</th>
-        <th class="summary-col nowrap">AVERAGE</th>
-        <th class="summary-col nowrap">POSITION</th>
-    </tr>
-    </thead>
-    <tbody>
-    @forelse($rows as $row)
+@php
+    $chunks = $subjectChunks ?? [($subjects ?? [])];
+@endphp
+
+@foreach($chunks as $chunkIndex => $chunkSubjects)
+    @if($chunkIndex > 0)
+        <div class="title" style="margin-top: 4px;">
+            <h2>ANNUAL BROADSHEET (CONTINUED)</h2>
+        </div>
+    @endif
+
+    <table>
+        <thead>
         <tr>
-            <td class="left-text">{{ strtoupper((string) ($row['name'] ?? '-')) }}</td>
-            <td class="left-text">{{ strtoupper((string) ($row['class_name'] ?? '-')) }}</td>
-            @foreach($subjects as $subject)
+            <th class="left-text nowrap student-col">STUDENT NAME</th>
+            <th class="left-text nowrap class-col">CLASS</th>
+            @foreach($chunkSubjects as $subject)
                 @php
-                    $subjectKey = (string) ($subject['id'] ?? '');
-                    $value = $row['scores'][$subjectKey] ?? null;
+                    $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
+                    $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
+                    $subjectWrapped = wordwrap($subjectLabel, 19, "\n", true);
                 @endphp
-                <td>{{ $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.') }}</td>
+                <th class="subject-head">
+                    <span class="vertical-text">{{ $subjectWrapped }}</span>
+                </th>
             @endforeach
-            <td>{{ $row['total'] === null ? '-' : rtrim(rtrim(number_format((float) $row['total'], 2, '.', ''), '0'), '.') }}</td>
-            <td>{{ $row['average'] === null ? '-' : rtrim(rtrim(number_format((float) $row['average'], 2, '.', ''), '0'), '.') }}</td>
-            <td>{{ $row['position_label'] ?? '-' }}</td>
+            <th class="summary-col nowrap">TOTAL</th>
+            <th class="summary-col nowrap">AVERAGE</th>
+            <th class="summary-col nowrap">POSITION</th>
         </tr>
-    @empty
-        <tr>
-            <td colspan="{{ count($subjects) + 5 }}">No broadsheet result data found.</td>
-        </tr>
-    @endforelse
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+        @forelse($rows as $row)
+            <tr>
+                <td class="left-text">{{ strtoupper((string) ($row['name'] ?? '-')) }}</td>
+                <td class="left-text">{{ strtoupper((string) ($row['class_name'] ?? '-')) }}</td>
+                @foreach($chunkSubjects as $subject)
+                    @php
+                        $subjectKey = (string) ($subject['id'] ?? '');
+                        $value = $row['scores'][$subjectKey] ?? null;
+                    @endphp
+                    <td>{{ $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.') }}</td>
+                @endforeach
+                <td>{{ $row['total'] === null ? '-' : rtrim(rtrim(number_format((float) $row['total'], 2, '.', ''), '0'), '.') }}</td>
+                <td>{{ $row['average'] === null ? '-' : rtrim(rtrim(number_format((float) $row['average'], 2, '.', ''), '0'), '.') }}</td>
+                <td>{{ $row['position_label'] ?? '-' }}</td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="{{ count($chunkSubjects) + 5 }}">No broadsheet result data found.</td>
+            </tr>
+        @endforelse
+        </tbody>
+    </table>
+
+    @if($chunkIndex < count($chunks) - 1)
+        <div class="page-break"></div>
+    @endif
+@endforeach
 </body>
 </html>
