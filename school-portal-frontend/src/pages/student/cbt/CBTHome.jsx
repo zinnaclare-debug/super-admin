@@ -16,6 +16,18 @@ function formatDate(value) {
 }
 
 export default function StudentCBTHome() {
+  const strictSecurityDefaults = {
+    fullscreen_required: true,
+    block_copy_paste: true,
+    block_tab_switch: true,
+    auto_submit_on_violation: true,
+    ai_proctoring_enabled: true,
+    max_warnings: 3,
+    no_face_timeout_seconds: 30,
+    max_head_movement_warnings: 2,
+    head_movement_threshold_px: 60,
+  };
+
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -26,6 +38,7 @@ export default function StudentCBTHome() {
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [securityWarnings, setSecurityWarnings] = useState(0);
+  const [headMovementWarnings, setHeadMovementWarnings] = useState(0);
   const [securityStatus, setSecurityStatus] = useState("");
   const [attemptEndsAtMs, setAttemptEndsAtMs] = useState(null);
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(null);
@@ -59,6 +72,7 @@ export default function StudentCBTHome() {
     setActiveQuestionIndex(0);
     setSubmitResult(null);
     setSecurityWarnings(0);
+    setHeadMovementWarnings(0);
     setSecurityStatus("");
     setAttemptEndsAtMs(null);
     setTimeLeftSeconds(null);
@@ -76,8 +90,8 @@ export default function StudentCBTHome() {
     }
   };
 
-  const submitExam = async (submitMode = "manual") => {
-    if (!selectedExam || submittingRef.current || submitResult) return;
+  const submitExam = async (submitMode = "manual", violationReason = null) => {
+    if (!selectedExam || submittingRef.current || submitResult) return false;
 
     setSubmitting(true);
     submittingRef.current = true;
@@ -85,17 +99,23 @@ export default function StudentCBTHome() {
       const res = await api.post(`/api/student/cbt/exams/${selectedExam.id}/submit`, {
         answers,
         submit_mode: submitMode,
+        violation_reason: violationReason || undefined,
+        security_warnings: securityWarnings,
+        head_movement_warnings: headMovementWarnings,
       });
       setSubmitResult(res.data?.data || null);
       stopSecurityRuntime();
       await exitFullscreenSafely();
+      await load();
       setSecurityStatus(
         submitMode === "auto"
           ? "Exam was auto-submitted by policy/timer."
           : "Exam submitted successfully."
       );
+      return true;
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to submit CBT");
+      return false;
     } finally {
       setSubmitting(false);
       submittingRef.current = false;
@@ -105,18 +125,26 @@ export default function StudentCBTHome() {
   const startSecurityRuntime = async (exam) => {
     stopSecurityRuntime();
 
-    const policy = exam?.security_policy || {};
+    const policy = { ...(exam?.security_policy || {}), ...strictSecurityDefaults };
     const runtime = createCbtSecurityFramework(policy, {
       onStatus: ({ message }) => setSecurityStatus(message || ""),
       onWarning: ({ reason, warnings }) => {
         setSecurityWarnings(warnings || 0);
         setSecurityStatus(`Security warning: ${reason}`);
+        if (
+          ["tab_switch", "fullscreen_exit", "external_navigation_attempt", "navigation_attempt"].includes(
+            String(reason)
+          )
+        ) {
+          submitExam("auto", String(reason));
+        }
+      },
+      onHeadMovement: ({ count }) => {
+        setHeadMovementWarnings(count || 0);
       },
       onMajorViolation: ({ reason }) => {
         setSecurityStatus(`Major violation detected: ${reason}`);
-        if (policy?.auto_submit_on_violation) {
-          submitExam("auto");
-        }
+        submitExam("auto", reason || "major_violation");
       },
     });
 
@@ -125,6 +153,10 @@ export default function StudentCBTHome() {
   };
 
   const openExam = async (exam) => {
+    if (exam?.has_taken) {
+      alert("You already ended this CBT. Re-entry is not allowed.");
+      return;
+    }
     if (!exam?.is_open) {
       alert("This CBT is not open yet. Check the exam start time.");
       return;
@@ -140,13 +172,16 @@ export default function StudentCBTHome() {
       setActiveQuestionIndex(0);
       setSubmitResult(null);
       setSecurityWarnings(0);
+      setHeadMovementWarnings(0);
       setSecurityStatus("");
 
       const now = Date.now();
+      const allowedEndAt = res.data?.attempt?.allowed_end_at ? new Date(res.data.attempt.allowed_end_at).getTime() : null;
       const durationMs = Math.max(1, Number(exam.duration_minutes || 60)) * 60 * 1000;
       const byDuration = now + durationMs;
       const byWindow = exam.ends_at ? new Date(exam.ends_at).getTime() : byDuration;
-      const finalEndsAt = Number.isFinite(byWindow) ? Math.min(byDuration, byWindow) : byDuration;
+      const fallbackEndsAt = Number.isFinite(byWindow) ? Math.min(byDuration, byWindow) : byDuration;
+      const finalEndsAt = Number.isFinite(allowedEndAt) ? allowedEndAt : fallbackEndsAt;
       setAttemptEndsAtMs(finalEndsAt);
       setTimeLeftSeconds(Math.max(0, Math.floor((finalEndsAt - now) / 1000)));
 
@@ -197,6 +232,14 @@ export default function StudentCBTHome() {
     const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
     const ss = String(s % 60).padStart(2, "0");
     return `${hh}:${mm}:${ss}`;
+  };
+
+  const handleExitExam = async () => {
+    if (!selectedExam) return;
+    const ok = await submitExam("exit");
+    if (ok) {
+      await closeExam();
+    }
   };
 
   return (
@@ -255,13 +298,15 @@ export default function StudentCBTHome() {
                     <td>
                       {formatDate(x.starts_at)} - {formatDate(x.ends_at)}
                     </td>
-                    <td>{x.is_open ? "Open" : "Closed/Upcoming"}</td>
+                    <td>{x.has_taken ? `Ended (${x.attempt_status || "submitted"})` : x.is_open ? "Open" : "Closed/Upcoming"}</td>
                     <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.is_open}>
-                        {x.is_open ? "Start CBT" : "Not Open"}
+                      <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.can_start}>
+                        {x.has_taken ? "Ended" : x.is_open ? "Start CBT" : "Not Open"}
                       </button>
                       {selectedExam && selectedExam.id === x.id ? (
-                        <button className="cbx-btn cbx-btn--danger" onClick={closeExam}>Exit</button>
+                        <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
+                          {submitting ? "Ending..." : "Exit"}
+                        </button>
                       ) : null}
                     </td>
                   </tr>
@@ -289,6 +334,12 @@ export default function StudentCBTHome() {
                   <td>{attemptedCount} / {totalCount}</td>
                   <th>Security Warnings</th>
                   <td>{securityWarnings}</td>
+                </tr>
+                <tr>
+                  <th>Head Movement Warnings</th>
+                  <td>{headMovementWarnings}</td>
+                  <th>Policy</th>
+                  <td>Exam ends after 2 excessive head movements</td>
                 </tr>
                 <tr>
                   <th>Security Status</th>

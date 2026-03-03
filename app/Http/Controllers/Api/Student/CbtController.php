@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Student;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\CbtExam;
+use App\Models\CbtExamAttempt;
 use App\Models\CbtExamQuestion;
 use App\Models\Enrollment;
 use App\Models\Student;
@@ -17,6 +18,45 @@ use Illuminate\Support\Facades\Schema;
 
 class CbtController extends Controller
 {
+    private function endedAttemptStatuses(): array
+    {
+        return ['submitted', 'exited', 'time_up', 'disqualified'];
+    }
+
+    private function isEndedAttemptStatus(?string $status): bool
+    {
+        return in_array((string) $status, $this->endedAttemptStatuses(), true);
+    }
+
+    private function examDurationMinutes(CbtExam $exam): int
+    {
+        $minutes = (int) ($exam->duration_minutes ?? $exam->duration ?? 60);
+        return max(1, $minutes);
+    }
+
+    private function attemptWindow(CbtExam $exam, ?Carbon $attemptStartedAt = null): array
+    {
+        $startsAt = $exam->starts_at ? Carbon::parse($exam->starts_at) : null;
+        $hardEndsAt = $exam->ends_at ? Carbon::parse($exam->ends_at) : null;
+        if (!$startsAt || !$hardEndsAt) {
+            return [null, null];
+        }
+
+        if (!$attemptStartedAt) {
+            return [$startsAt, $hardEndsAt];
+        }
+
+        $durationEndsAt = $attemptStartedAt->copy()->addMinutes($this->examDurationMinutes($exam));
+        $effectiveEndsAt = $durationEndsAt->lessThan($hardEndsAt) ? $durationEndsAt : $hardEndsAt;
+
+        return [$startsAt, $effectiveEndsAt];
+    }
+
+    private function resolveStudentRecord(int $schoolId, int $userId): ?Student
+    {
+        return Student::where('user_id', $userId)->where('school_id', $schoolId)->first();
+    }
+
     private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId, int $currentTermId): array
     {
         $enrollQuery = Enrollment::query()
@@ -69,7 +109,7 @@ class CbtController extends Controller
                 ->where('academic_session_id', $sessionId)
                 ->where('is_current', true)
                 ->first();
-            if ($current) return (int)$current->id;
+            if ($current) return (int) $current->id;
         }
 
         $fallback = Term::where('school_id', $schoolId)
@@ -77,7 +117,7 @@ class CbtController extends Controller
             ->orderBy('id')
             ->first();
 
-        return $fallback ? (int)$fallback->id : null;
+        return $fallback ? (int) $fallback->id : null;
     }
 
     private function allowedTermSubjectIds(Request $request): array
@@ -85,7 +125,7 @@ class CbtController extends Controller
         $subjectsRes = $this->subjects($request)->getData(true);
         return collect($subjectsRes['data'] ?? [])
             ->pluck('term_subject_id')
-            ->map(fn($v) => (int) $v)
+            ->map(fn ($v) => (int) $v)
             ->toArray();
     }
 
@@ -99,10 +139,10 @@ class CbtController extends Controller
         $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
         if (!$session) return response()->json(['data' => []]);
 
-        $currentTermId = $this->resolveCurrentTermId((int)$schoolId, (int)$session->id);
+        $currentTermId = $this->resolveCurrentTermId((int) $schoolId, (int) $session->id);
         if (!$currentTermId) return response()->json(['data' => []]);
 
-        $student = Student::where('user_id', $user->id)->where('school_id', $schoolId)->first();
+        $student = $this->resolveStudentRecord((int) $schoolId, (int) $user->id);
         if (!$student) return response()->json(['data' => []]);
 
         $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id, $currentTermId);
@@ -122,8 +162,7 @@ class CbtController extends Controller
                         ->where('student_subject_exclusions.school_id', '=', $schoolId)
                         ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
                         ->where('student_subject_exclusions.student_id', '=', (int) $student->id);
-                })
-                ->whereNull('student_subject_exclusions.id');
+                })->whereNull('student_subject_exclusions.id');
             })
             ->orderBy('subjects.name')
             ->get([
@@ -147,6 +186,9 @@ class CbtController extends Controller
 
         $allowed = $this->allowedTermSubjectIds($request);
         if (empty($allowed)) return response()->json(['data' => []]);
+
+        $student = $this->resolveStudentRecord((int) $schoolId, (int) $user->id);
+        if (!$student) return response()->json(['data' => []]);
 
         $now = Carbon::now();
 
@@ -172,12 +214,31 @@ class CbtController extends Controller
                 'classes.name as class_name',
                 'terms.name as term_name',
             ])
-            ->map(function ($x) use ($now) {
-                $startsAt = $x->starts_at ? Carbon::parse($x->starts_at) : null;
-                $endsAt = $x->ends_at ? Carbon::parse($x->ends_at) : null;
-                $x->is_open = $startsAt && $endsAt ? $now->between($startsAt, $endsAt) : false;
-                return $x;
-            });
+            ->values();
+
+        $attemptsByExam = CbtExamAttempt::query()
+            ->where('school_id', $schoolId)
+            ->where('student_id', (int) $student->id)
+            ->whereIn('cbt_exam_id', $items->pluck('id')->map(fn ($v) => (int) $v)->all())
+            ->get()
+            ->keyBy('cbt_exam_id');
+
+        $items = $items->map(function ($x) use ($now, $attemptsByExam) {
+            $attempt = $attemptsByExam->get((int) $x->id);
+            [$startsAt, $effectiveEndsAt] = $this->attemptWindow(
+                $x,
+                $attempt?->started_at ? Carbon::parse($attempt->started_at) : null
+            );
+
+            $windowOpen = $startsAt && $effectiveEndsAt ? $now->between($startsAt, $effectiveEndsAt) : false;
+            $hasTaken = $attempt ? $this->isEndedAttemptStatus($attempt->status) : false;
+            $x->is_open = $windowOpen && !$hasTaken;
+            $x->can_start = $x->is_open;
+            $x->has_taken = $hasTaken;
+            $x->attempt_status = $attempt?->status;
+            $x->attempt_ended_at = $attempt?->ended_at;
+            return $x;
+        });
 
         return response()->json(['data' => $items]);
     }
@@ -192,13 +253,52 @@ class CbtController extends Controller
         abort_unless((int) $exam->school_id === (int) $schoolId, 403);
         abort_unless($exam->status === 'published', 403);
 
+        $student = $this->resolveStudentRecord((int) $schoolId, (int) $user->id);
+        if (!$student) {
+            return response()->json(['message' => 'Student profile not found'], 403);
+        }
+
         $allowed = $this->allowedTermSubjectIds($request);
         abort_unless(in_array((int) $exam->term_subject_id, $allowed, true), 403);
 
+        $attempt = CbtExamAttempt::where('school_id', $schoolId)
+            ->where('cbt_exam_id', (int) $exam->id)
+            ->where('student_id', (int) $student->id)
+            ->first();
+
+        if ($attempt && $this->isEndedAttemptStatus($attempt->status)) {
+            return response()->json([
+                'message' => 'This CBT attempt has ended and cannot be reopened.',
+            ], 403);
+        }
+
+        if (!$attempt) {
+            $attempt = CbtExamAttempt::create([
+                'school_id' => (int) $schoolId,
+                'cbt_exam_id' => (int) $exam->id,
+                'student_id' => (int) $student->id,
+                'user_id' => (int) $user->id,
+                'status' => 'in_progress',
+                'started_at' => Carbon::now()->toDateTimeString(),
+            ]);
+        }
+
         $now = Carbon::now();
-        $startsAt = $exam->starts_at ? Carbon::parse($exam->starts_at) : null;
-        $endsAt = $exam->ends_at ? Carbon::parse($exam->ends_at) : null;
-        if (!$startsAt || !$endsAt || !$now->between($startsAt, $endsAt)) {
+        [$startsAt, $effectiveEndsAt] = $this->attemptWindow(
+            $exam,
+            $attempt->started_at ? Carbon::parse($attempt->started_at) : $now
+        );
+        if (!$startsAt || !$effectiveEndsAt || !$now->between($startsAt, $effectiveEndsAt)) {
+            if (
+                !$this->isEndedAttemptStatus($attempt->status) &&
+                $effectiveEndsAt &&
+                $now->greaterThan($effectiveEndsAt)
+            ) {
+                $attempt->status = 'time_up';
+                $attempt->submit_mode = 'auto';
+                $attempt->ended_at = Carbon::now()->toDateTimeString();
+                $attempt->save();
+            }
             return response()->json([
                 'message' => 'CBT questions are available only during the exam time window',
             ], 403);
@@ -222,7 +322,15 @@ class CbtController extends Controller
                 'position',
             ]);
 
-        return response()->json(['data' => $questions]);
+        return response()->json([
+            'data' => $questions,
+            'attempt' => [
+                'id' => (int) $attempt->id,
+                'status' => (string) $attempt->status,
+                'started_at' => $attempt->started_at,
+                'allowed_end_at' => $effectiveEndsAt ? $effectiveEndsAt->toDateTimeString() : null,
+            ],
+        ]);
     }
 
     // POST /api/student/cbt/exams/{exam}/submit
@@ -235,23 +343,55 @@ class CbtController extends Controller
         abort_unless((int) $exam->school_id === (int) $schoolId, 403);
         abort_unless($exam->status === 'published', 403);
 
+        $student = $this->resolveStudentRecord((int) $schoolId, (int) $user->id);
+        if (!$student) {
+            return response()->json(['message' => 'Student profile not found'], 403);
+        }
+
         $allowed = $this->allowedTermSubjectIds($request);
         abort_unless(in_array((int) $exam->term_subject_id, $allowed, true), 403);
-
-        $now = Carbon::now();
-        $startsAt = $exam->starts_at ? Carbon::parse($exam->starts_at) : null;
-        $endsAt = $exam->ends_at ? Carbon::parse($exam->ends_at) : null;
-        if (!$startsAt || !$endsAt || !$now->between($startsAt, $endsAt)) {
-            return response()->json([
-                'message' => 'CBT submit is allowed only during the exam time window',
-            ], 403);
-        }
 
         $data = $request->validate([
             'answers' => 'nullable|array',
             'answers.*' => 'nullable|string|in:A,B,C,D,a,b,c,d',
-            'submit_mode' => 'nullable|string|in:manual,auto',
+            'submit_mode' => 'nullable|string|in:manual,auto,exit',
+            'violation_reason' => 'nullable|string|max:80',
+            'security_warnings' => 'nullable|integer|min:0|max:999',
+            'head_movement_warnings' => 'nullable|integer|min:0|max:999',
         ]);
+
+        $attempt = CbtExamAttempt::where('school_id', $schoolId)
+            ->where('cbt_exam_id', (int) $exam->id)
+            ->where('student_id', (int) $student->id)
+            ->first();
+
+        if (!$attempt) {
+            $attempt = CbtExamAttempt::create([
+                'school_id' => (int) $schoolId,
+                'cbt_exam_id' => (int) $exam->id,
+                'student_id' => (int) $student->id,
+                'user_id' => (int) $user->id,
+                'status' => 'in_progress',
+                'started_at' => Carbon::now()->toDateTimeString(),
+            ]);
+        }
+
+        if ($this->isEndedAttemptStatus($attempt->status)) {
+            return response()->json([
+                'message' => 'This CBT attempt has already ended and cannot be submitted again.',
+            ], 409);
+        }
+
+        $now = Carbon::now();
+        [$startsAt, $effectiveEndsAt] = $this->attemptWindow(
+            $exam,
+            $attempt->started_at ? Carbon::parse($attempt->started_at) : $now
+        );
+        if (!$startsAt || !$effectiveEndsAt || $now->lessThan($startsAt)) {
+            return response()->json([
+                'message' => 'CBT submit is allowed only during the exam time window',
+            ], 403);
+        }
 
         $questions = CbtExamQuestion::query()
             ->where('school_id', $schoolId)
@@ -280,11 +420,40 @@ class CbtController extends Controller
 
         $scorePercent = $total > 0 ? round(($correct / $total) * 100, 2) : 0.0;
 
+        $requestedMode = (string) ($data['submit_mode'] ?? 'manual');
+        $timedOut = $effectiveEndsAt ? $now->greaterThan($effectiveEndsAt) : false;
+        $finalMode = $timedOut ? 'auto' : $requestedMode;
+        $finalStatus = 'submitted';
+        if ($timedOut) {
+            $finalStatus = 'time_up';
+        } elseif ($requestedMode === 'exit') {
+            $finalStatus = 'exited';
+        } elseif ($requestedMode === 'auto' && !empty($data['violation_reason'])) {
+            $finalStatus = 'disqualified';
+        }
+
+        $attempt->fill([
+            'status' => $finalStatus,
+            'submit_mode' => $finalMode,
+            'answers' => $answers->toArray(),
+            'total_questions' => $total,
+            'attempted' => $attempted,
+            'correct' => $correct,
+            'wrong' => max(0, $attempted - $correct),
+            'unanswered' => max(0, $total - $attempted),
+            'score_percent' => $scorePercent,
+            'security_warnings' => (int) ($data['security_warnings'] ?? 0),
+            'head_movement_warnings' => (int) ($data['head_movement_warnings'] ?? 0),
+            'ended_at' => Carbon::now()->toDateTimeString(),
+        ]);
+        $attempt->save();
+
         return response()->json([
             'message' => 'CBT submitted successfully',
             'data' => [
                 'cbt_exam_id' => (int) $exam->id,
-                'submit_mode' => $data['submit_mode'] ?? 'manual',
+                'status' => $finalStatus,
+                'submit_mode' => $finalMode,
                 'total_questions' => $total,
                 'attempted' => $attempted,
                 'correct' => $correct,

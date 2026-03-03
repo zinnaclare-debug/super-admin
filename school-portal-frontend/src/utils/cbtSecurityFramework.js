@@ -8,17 +8,23 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   const state = {
     warnings: 0,
     noFaceSeconds: 0,
+    headMovementWarnings: 0,
     running: false,
     timers: [],
     stream: null,
+    lastFaceCenter: null,
+    lastHeadMovementAt: 0,
   };
 
   const onWarning = callbacks.onWarning || (() => {});
   const onMajorViolation = callbacks.onMajorViolation || (() => {});
   const onStatus = callbacks.onStatus || (() => {});
+  const onHeadMovement = callbacks.onHeadMovement || (() => {});
 
   const maxWarnings = policy?.max_warnings ?? 3;
   const noFaceTimeout = policy?.no_face_timeout_seconds ?? 30;
+  const maxHeadMovements = policy?.max_head_movement_warnings ?? 2;
+  const headMovementThresholdPx = policy?.head_movement_threshold_px ?? 60;
 
   const warn = (reason) => {
     state.warnings += 1;
@@ -52,6 +58,27 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     }
   };
 
+  const beforeUnloadHandler = (e) => {
+    warn("navigation_attempt");
+    e.preventDefault();
+    e.returnValue = "";
+    return "";
+  };
+
+  const popStateHandler = () => {
+    warn("navigation_attempt");
+  };
+
+  const linkClickHandler = (e) => {
+    const anchor = e.target?.closest?.("a[href]");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href") || "";
+    if (!href || href.startsWith("#")) return;
+    warn("external_navigation_attempt");
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   const fullscreenHandler = () => {
     if (policy?.fullscreen_required && !document.fullscreenElement) {
       warn("fullscreen_exit");
@@ -81,6 +108,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
           const faces = await faceDetector.detect(video);
           if (!faces.length) {
             state.noFaceSeconds += 2;
+            state.lastFaceCenter = null;
             if (state.noFaceSeconds >= noFaceTimeout) {
               warn("no_face_detected");
               state.noFaceSeconds = 0;
@@ -89,6 +117,39 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
             state.noFaceSeconds = 0;
             if (faces.length > 1) {
               warn("multiple_faces_detected");
+            }
+
+            // Head movement guard (best effort): if face center jumps repeatedly, treat as violation.
+            const box = faces[0]?.boundingBox;
+            if (box) {
+              const center = {
+                x: box.x + box.width / 2,
+                y: box.y + box.height / 2,
+              };
+
+              if (state.lastFaceCenter) {
+                const dx = center.x - state.lastFaceCenter.x;
+                const dy = center.y - state.lastFaceCenter.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const now = Date.now();
+
+                if (distance >= headMovementThresholdPx && now - state.lastHeadMovementAt >= 1500) {
+                  state.headMovementWarnings += 1;
+                  state.lastHeadMovementAt = now;
+                  onHeadMovement({ count: state.headMovementWarnings, distance });
+                  warn("head_movement_detected");
+
+                  if (state.headMovementWarnings >= maxHeadMovements) {
+                    onMajorViolation({
+                      reason: "head_movement_limit_exceeded",
+                      warnings: state.warnings,
+                      head_movements: state.headMovementWarnings,
+                    });
+                  }
+                }
+              }
+
+              state.lastFaceCenter = center;
             }
           }
         } catch {
@@ -119,6 +180,9 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     document.addEventListener("contextmenu", blockEvent, true);
     document.addEventListener("visibilitychange", visibilityHandler, true);
     document.addEventListener("fullscreenchange", fullscreenHandler, true);
+    window.addEventListener("beforeunload", beforeUnloadHandler, true);
+    window.addEventListener("popstate", popStateHandler, true);
+    document.addEventListener("click", linkClickHandler, true);
     await enterFullscreen();
     await enableWebcamChecks();
     onStatus({ type: "security", message: "CBT security started." });
@@ -133,8 +197,13 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     document.removeEventListener("contextmenu", blockEvent, true);
     document.removeEventListener("visibilitychange", visibilityHandler, true);
     document.removeEventListener("fullscreenchange", fullscreenHandler, true);
+    window.removeEventListener("beforeunload", beforeUnloadHandler, true);
+    window.removeEventListener("popstate", popStateHandler, true);
+    document.removeEventListener("click", linkClickHandler, true);
     state.timers.forEach(clearInterval);
     state.timers = [];
+    state.lastFaceCenter = null;
+    state.lastHeadMovementAt = 0;
     if (state.stream) {
       state.stream.getTracks().forEach((t) => t.stop());
       state.stream = null;
@@ -146,4 +215,3 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     stop,
   };
 }
-
