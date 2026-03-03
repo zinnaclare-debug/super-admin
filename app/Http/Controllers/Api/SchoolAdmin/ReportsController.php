@@ -291,9 +291,18 @@ class ReportsController extends Controller
             $options->set('fontCache', $dompdfTempDir);
             $options->set('chroot', base_path());
 
+            $subjectCount = count($broadsheet['subjects'] ?? []);
+            $paper = 'A4';
+            if ($subjectCount >= 16) {
+                $paper = 'A3';
+            }
+            if ($subjectCount >= 28) {
+                $paper = 'A2';
+            }
+
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->setPaper($paper, 'landscape');
             $dompdf->render();
 
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));

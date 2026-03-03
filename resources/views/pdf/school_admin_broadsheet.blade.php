@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <title>Annual Broadsheet</title>
     <style>
-        @page { margin: 14px; }
+        @page { margin: 8px; }
         body {
             font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 8px;
+            font-size: 7px;
             color: #111827;
         }
         .meta-line {
@@ -78,7 +78,7 @@
             writing-mode: vertical-rl;
             transform: rotate(180deg);
             text-align: left;
-            font-size: 8px;
+            font-size: 7px;
             line-height: 1.1;
             white-space: normal;
             overflow-wrap: anywhere;
