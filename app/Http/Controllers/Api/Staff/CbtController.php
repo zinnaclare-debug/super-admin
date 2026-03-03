@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\CbtExam;
+use App\Models\CbtExamAttempt;
 use App\Models\CbtExamQuestion;
 use App\Models\QuestionBankQuestion;
 use App\Models\Term;
@@ -338,6 +339,76 @@ class CbtController extends Controller
       ->get();
 
     return response()->json(['data' => $items]);
+  }
+
+  // GET /api/staff/cbt/exams/{exam}/results
+  public function examResults(Request $request, CbtExam $exam)
+  {
+    $user = $request->user();
+    abort_unless($user->role === 'staff', 403);
+    $schoolId = (int) $user->school_id;
+
+    abort_unless((int) $exam->school_id === $schoolId, 403);
+    abort_unless((int) $exam->teacher_user_id === (int) $user->id, 403);
+
+    $examMeta = CbtExam::query()
+      ->join('term_subjects', 'term_subjects.id', '=', 'cbt_exams.term_subject_id')
+      ->leftJoin('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+      ->leftJoin('classes', 'classes.id', '=', 'term_subjects.class_id')
+      ->leftJoin('terms', 'terms.id', '=', 'term_subjects.term_id')
+      ->where('cbt_exams.id', (int) $exam->id)
+      ->where('cbt_exams.school_id', $schoolId)
+      ->first([
+        'cbt_exams.id',
+        'cbt_exams.title',
+        'cbt_exams.starts_at',
+        'cbt_exams.ends_at',
+        'cbt_exams.status',
+        'subjects.name as subject_name',
+        'classes.name as class_name',
+        'terms.name as term_name',
+      ]);
+
+    $attemptRows = CbtExamAttempt::query()
+      ->join('students', 'students.id', '=', 'cbt_exam_attempts.student_id')
+      ->join('users', 'users.id', '=', 'students.user_id')
+      ->where('cbt_exam_attempts.school_id', $schoolId)
+      ->where('cbt_exam_attempts.cbt_exam_id', (int) $exam->id)
+      ->orderByDesc('cbt_exam_attempts.score_percent')
+      ->orderBy('users.name')
+      ->get([
+        'cbt_exam_attempts.id',
+        'cbt_exam_attempts.status',
+        'cbt_exam_attempts.submit_mode',
+        'cbt_exam_attempts.score_percent',
+        'cbt_exam_attempts.total_questions',
+        'cbt_exam_attempts.attempted',
+        'cbt_exam_attempts.correct',
+        'cbt_exam_attempts.wrong',
+        'cbt_exam_attempts.unanswered',
+        'cbt_exam_attempts.started_at',
+        'cbt_exam_attempts.ended_at',
+        'students.id as student_profile_id',
+        'students.education_level',
+        'users.name as student_name',
+        'users.username as student_username',
+        'users.email as student_email',
+      ]);
+
+    $summary = [
+      'attempt_count' => $attemptRows->count(),
+      'average_score' => $attemptRows->count() ? round((float) $attemptRows->avg('score_percent'), 2) : 0,
+      'highest_score' => $attemptRows->count() ? (float) $attemptRows->max('score_percent') : 0,
+      'lowest_score' => $attemptRows->count() ? (float) $attemptRows->min('score_percent') : 0,
+    ];
+
+    return response()->json([
+      'data' => [
+        'exam' => $examMeta,
+        'summary' => $summary,
+        'students' => $attemptRows,
+      ],
+    ]);
   }
 
   // POST /api/staff/cbt/exams/{exam}/export-question-bank

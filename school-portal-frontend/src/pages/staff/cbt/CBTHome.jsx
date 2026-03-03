@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import cbtMainArt from "../../../assets/cbt-dashboard/online-meetings.svg";
@@ -55,11 +56,10 @@ function localDateTimeToIso(value) {
 }
 
 export default function CBTHome() {
+  const navigate = useNavigate();
   const [subjects, setSubjects] = useState([]);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExamId, setSelectedExamId] = useState("");
-  const [examQuestions, setExamQuestions] = useState([]);
   const [editingExamId, setEditingExamId] = useState(null);
 
   const [form, setForm] = useState(createDefaultForm());
@@ -87,8 +87,6 @@ export default function CBTHome() {
 
     setLoading(false);
   };
-
-  const selectedExam = exams.find((x) => String(x.id) === String(selectedExamId)) || null;
 
   useEffect(() => {
     load();
@@ -154,23 +152,9 @@ export default function CBTHome() {
     if (!window.confirm("Delete this exam?")) return;
     try {
       await api.delete(`/api/staff/cbt/exams/${id}`);
-      if (String(selectedExamId) === String(id)) {
-        setSelectedExamId("");
-        setExamQuestions([]);
-      }
       await load();
     } catch (err) {
       alert(err?.response?.data?.message || "Delete failed");
-    }
-  };
-
-  const openExam = async (id) => {
-    setSelectedExamId(id);
-    try {
-      const res = await api.get(`/api/staff/cbt/exams/${id}/questions`);
-      setExamQuestions(res.data?.data || []);
-    } catch {
-      alert("Failed to load exam questions");
     }
   };
 
@@ -368,7 +352,10 @@ export default function CBTHome() {
                           <button className="cbx-btn cbx-btn--soft" onClick={() => startEdit(x)}>
                             {editingExamId === x.id ? "Editing..." : "Edit"}
                           </button>
-                          <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x.id)}>
+                          <button
+                            className="cbx-btn cbx-btn--soft"
+                            onClick={() => navigate(`/staff/cbt/${x.id}/results`)}
+                          >
                             View Exam
                           </button>
                         </div>
@@ -385,77 +372,6 @@ export default function CBTHome() {
             </div>
           )}
         </section>
-
-        {selectedExamId ? (
-          <section className="cbx-panel">
-            <h3 style={{ marginTop: 0 }}>CBT Exam View</h3>
-            {selectedExam ? (
-              <div className="cbx-table-wrap" style={{ marginBottom: 14 }}>
-                <table className="cbx-table">
-                  <tbody>
-                    <tr>
-                      <th style={{ width: 160 }}>Title</th>
-                      <td>{selectedExam.title || "-"}</td>
-                      <th style={{ width: 160 }}>Subject</th>
-                      <td>{selectedExam.subject_name || "-"}</td>
-                    </tr>
-                    <tr>
-                      <th>Class</th>
-                      <td>{selectedExam.class_name || "-"}</td>
-                      <th>Term</th>
-                      <td>{selectedExam.term_name || "-"}</td>
-                    </tr>
-                    <tr>
-                      <th>Start Time</th>
-                      <td>{formatDate(selectedExam.starts_at)}</td>
-                      <th>End Time</th>
-                      <td>{formatDate(selectedExam.ends_at)}</td>
-                    </tr>
-                    <tr>
-                      <th>Duration</th>
-                      <td>{selectedExam.duration_minutes || selectedExam.duration || "-"} mins</td>
-                      <th>Status</th>
-                      <td>{selectedExam.status || "-"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-            <div className="cbx-table-wrap">
-              <table className="cbx-table">
-                <thead>
-                  <tr>
-                    <th>S/N</th>
-                    <th>Question</th>
-                    <th>Option A</th>
-                    <th>Option B</th>
-                    <th>Option C</th>
-                    <th>Option D</th>
-                    <th>Correct</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {examQuestions.map((q, idx) => (
-                    <tr key={q.id}>
-                      <td>{idx + 1}</td>
-                      <td>{q.question_text}</td>
-                      <td>{q.option_a || "-"}</td>
-                      <td>{q.option_b || "-"}</td>
-                      <td>{q.option_c || "-"}</td>
-                      <td>{q.option_d || "-"}</td>
-                      <td>{q.correct_option}</td>
-                    </tr>
-                  ))}
-                  {!examQuestions.length && (
-                    <tr>
-                      <td colSpan="7">No questions exported to this exam yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
       </div>
     </StaffFeatureLayout>
   );
