@@ -66,31 +66,27 @@
             min-width: 80px;
         }
         .subject-head {
-            width: 36px;
-            min-width: 36px;
-            height: 170px;
-            padding: 2px 1px;
+            width: 34px;
+            min-width: 34px;
+            height: 175px;
+            padding: 0;
             vertical-align: bottom;
             overflow: hidden;
+            position: relative;
         }
         .subject-head > .vertical-text {
-            display: block;
-            text-align: center;
-            white-space: nowrap;
-            line-height: 1;
-        }
-        .subject-head .vertical-line {
             display: inline-block;
-            vertical-align: bottom;
-            margin-right: 1px;
-        }
-        .subject-head .vertical-line:last-child {
-            margin-right: 0;
-        }
-        .subject-head .vertical-line span {
-            display: block;
-            font-size: 6px;
-            line-height: 0.95;
+            position: absolute;
+            left: 50%;
+            bottom: 8px;
+            transform: translateX(-50%) rotate(-90deg);
+            transform-origin: center center;
+            text-align: left;
+            font-size: 6.6px;
+            line-height: 1.05;
+            letter-spacing: 0.12px;
+            white-space: pre-line;
+            max-width: 160px;
         }
         .summary-col {
             width: 48px;
@@ -128,22 +124,10 @@
             @php
                 $subjectLabel = strtoupper((string) ($subject['name'] ?? '-'));
                 $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
-                $subjectChunks = preg_split('/\r\n|\r|\n/', wordwrap($subjectLabel, 19, "\n", true) ?: '-') ?: ['-'];
+                $subjectWrapped = wordwrap($subjectLabel, 19, "\n", true);
             @endphp
             <th class="subject-head">
-                <span class="vertical-text">
-                    @foreach($subjectChunks as $chunk)
-                        @php
-                            $chunkText = trim((string) $chunk);
-                            $chunkChars = preg_split('/(?<!^)(?!$)/u', $chunkText !== '' ? $chunkText : '-') ?: ['-'];
-                        @endphp
-                        <span class="vertical-line">
-                            @foreach($chunkChars as $char)
-                                <span>{{ $char }}</span>
-                            @endforeach
-                        </span>
-                    @endforeach
-                </span>
+                <span class="vertical-text">{{ $subjectWrapped }}</span>
             </th>
         @endforeach
         <th class="summary-col nowrap">TOTAL</th>
