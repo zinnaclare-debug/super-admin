@@ -91,7 +91,7 @@ export default function StudentCBTHome() {
   };
 
   const submitExam = async (submitMode = "manual", violationReason = null) => {
-    if (!selectedExam || submittingRef.current || submitResult) return false;
+    if (!selectedExam || submittingRef.current) return false;
 
     setSubmitting(true);
     submittingRef.current = true;
@@ -112,6 +112,7 @@ export default function StudentCBTHome() {
           ? "Exam was auto-submitted by policy/timer."
           : "Exam submitted successfully."
       );
+      await closeExam();
       return true;
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to submit CBT");
@@ -199,7 +200,7 @@ export default function StudentCBTHome() {
   };
 
   useEffect(() => {
-    if (!selectedExam || !attemptEndsAtMs || submitResult) return undefined;
+    if (!selectedExam || !attemptEndsAtMs) return undefined;
 
     const tick = () => {
       const left = Math.max(0, Math.floor((attemptEndsAtMs - Date.now()) / 1000));
@@ -212,7 +213,7 @@ export default function StudentCBTHome() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [selectedExam, attemptEndsAtMs, submitResult]);
+  }, [selectedExam, attemptEndsAtMs]);
 
   useEffect(() => {
     load();
@@ -236,208 +237,120 @@ export default function StudentCBTHome() {
 
   const handleExitExam = async () => {
     if (!selectedExam) return;
-    const ok = await submitExam("exit");
-    if (ok) {
-      await closeExam();
-    }
+    await submitExam("exit");
   };
 
   return (
     <div className="cbx-page cbx-page--student">
-      <section className="cbx-hero">
-        <div>
-          <span className="cbx-pill">Student CBT</span>
-          <h2 className="cbx-title">View active computer-based exams</h2>
-          <p className="cbx-subtitle">
-            Enter full-screen exam mode, answer questions, and submit your CBT in one flow.
-          </p>
-          <div className="cbx-meta">
-            <span>{loading ? "Loading..." : `${exams.length} exam${exams.length === 1 ? "" : "s"}`}</span>
-            <span>{`${totalCount} question${totalCount === 1 ? "" : "s"} loaded`}</span>
-          </div>
-        </div>
+      {!selectedExam ? (
+        <>
+          <section className="cbx-hero">
+            <div>
+              <span className="cbx-pill">Student CBT</span>
+              <h2 className="cbx-title">View active computer-based exams</h2>
+              <p className="cbx-subtitle">Click Start CBT to begin your exam.</p>
+              <div className="cbx-meta">
+                <span>{loading ? "Loading..." : `${exams.length} exam${exams.length === 1 ? "" : "s"}`}</span>
+              </div>
+            </div>
 
-        <div className="cbx-hero-art" aria-hidden="true">
-          <div className="cbx-art cbx-art--main">
-            <img src={cbtMainArt} alt="" />
-          </div>
-          <div className="cbx-art cbx-art--resume">
-            <img src={cbtResumeArt} alt="" />
-          </div>
-          <div className="cbx-art cbx-art--profiles">
-            <img src={cbtProfilesArt} alt="" />
-          </div>
-        </div>
-      </section>
+            <div className="cbx-hero-art" aria-hidden="true">
+              <div className="cbx-art cbx-art--main">
+                <img src={cbtMainArt} alt="" />
+              </div>
+              <div className="cbx-art cbx-art--resume">
+                <img src={cbtResumeArt} alt="" />
+              </div>
+              <div className="cbx-art cbx-art--profiles">
+                <img src={cbtProfilesArt} alt="" />
+              </div>
+            </div>
+          </section>
 
-      <section className="cbx-panel">
-        {loading ? <p className="cbx-state cbx-state--loading">Loading CBT exams...</p> : null}
-        {!loading && exams.length === 0 ? (
-          <p className="cbx-state cbx-state--empty">No published CBT exam for your current class and current term.</p>
-        ) : null}
+          <section className="cbx-panel">
+            {loading ? <p className="cbx-state cbx-state--loading">Loading CBT exams...</p> : null}
+            {!loading && exams.length === 0 ? (
+              <p className="cbx-state cbx-state--empty">No published CBT exam for your current class and current term.</p>
+            ) : null}
 
-        {!loading && exams.length > 0 ? (
-          <div className="cbx-table-wrap">
-            <table className="cbx-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 70 }}>S/N</th>
-                  <th>Title</th>
-                  <th>Subject</th>
-                  <th>Window</th>
-                  <th>Status</th>
-                  <th style={{ width: 180 }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {exams.map((x, idx) => (
-                  <tr key={x.id}>
-                    <td>{idx + 1}</td>
-                    <td>{x.title}</td>
-                    <td>{x.subject_name || "-"}</td>
-                    <td>
-                      {formatDate(x.starts_at)} - {formatDate(x.ends_at)}
-                    </td>
-                    <td>{x.has_taken ? `Ended (${x.attempt_status || "submitted"})` : x.is_open ? "Open" : "Closed/Upcoming"}</td>
-                    <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.can_start}>
-                        {x.has_taken ? "Ended" : x.is_open ? "Start CBT" : "Not Open"}
-                      </button>
-                      {selectedExam && selectedExam.id === x.id ? (
-                        <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
-                          {submitting ? "Ending..." : "Exit"}
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
-
-      {selectedExam ? (
-        <section className="cbx-panel">
-          <h3 style={{ marginTop: 0 }}>{selectedExam.title} - Live CBT</h3>
-          <div className="cbx-table-wrap" style={{ marginBottom: 14 }}>
-            <table className="cbx-table">
-              <tbody>
-                <tr>
-                  <th style={{ width: 160 }}>Subject</th>
-                  <td>{selectedExam.subject_name || "-"}</td>
-                  <th style={{ width: 160 }}>Time Left</th>
-                  <td>{formatCountdown(timeLeftSeconds)}</td>
-                </tr>
-                <tr>
-                  <th>Answered</th>
-                  <td>{attemptedCount} / {totalCount}</td>
-                  <th>Security Warnings</th>
-                  <td>{securityWarnings}</td>
-                </tr>
-                <tr>
-                  <th>Head Movement Warnings</th>
-                  <td>{headMovementWarnings}</td>
-                  <th>Policy</th>
-                  <td>Exam ends after 2 excessive head movements</td>
-                </tr>
-                <tr>
-                  <th>Security Status</th>
-                  <td colSpan="3">{securityStatus || "Active"}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            {!loading && exams.length > 0 ? (
+              <div className="cbx-table-wrap">
+                <table className="cbx-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 70 }}>S/N</th>
+                      <th>Title</th>
+                      <th>Subject</th>
+                      <th>Window</th>
+                      <th>Status</th>
+                      <th style={{ width: 180 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exams.map((x, idx) => (
+                      <tr key={x.id}>
+                        <td>{idx + 1}</td>
+                        <td>{x.title}</td>
+                        <td>{x.subject_name || "-"}</td>
+                        <td>
+                          {formatDate(x.starts_at)} - {formatDate(x.ends_at)}
+                        </td>
+                        <td>{x.has_taken ? `Ended (${x.attempt_status || "submitted"})` : x.is_open ? "Open" : "Closed/Upcoming"}</td>
+                        <td>
+                          <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.can_start}>
+                            {x.has_taken ? "Ended" : x.is_open ? "Start CBT" : "Not Open"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
+        </>
+      ) : (
+        <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
+          <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
 
           {loadingQuestions ? (
             <p className="cbx-state cbx-state--loading">Loading questions...</p>
-          ) : submitResult ? (
-            <div className="cbx-table-wrap">
-              <table className="cbx-table">
-                <tbody>
-                  <tr>
-                    <th style={{ width: 180 }}>Total Questions</th>
-                    <td>{submitResult.total_questions}</td>
-                    <th style={{ width: 180 }}>Attempted</th>
-                    <td>{submitResult.attempted}</td>
-                  </tr>
-                  <tr>
-                    <th>Correct</th>
-                    <td>{submitResult.correct}</td>
-                    <th>Wrong</th>
-                    <td>{submitResult.wrong}</td>
-                  </tr>
-                  <tr>
-                    <th>Unanswered</th>
-                    <td>{submitResult.unanswered}</td>
-                    <th>Score (%)</th>
-                    <td>{submitResult.score_percent}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div style={{ marginTop: 12 }}>
-                <button className="cbx-btn" onClick={closeExam}>Back To Exams</button>
-              </div>
-            </div>
-          ) : (
+          ) : currentQuestion ? (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                {questions.map((q, idx) => {
-                  const answered = ["A", "B", "C", "D"].includes(String(answers[q.id] || ""));
-                  return (
-                    <button
-                      key={q.id}
-                      className="cbx-btn cbx-btn--soft"
-                      style={{
-                        background: idx === activeQuestionIndex ? "#1d4ed8" : answered ? "#166534" : undefined,
-                        color: idx === activeQuestionIndex || answered ? "#fff" : undefined,
-                      }}
-                      onClick={() => setActiveQuestionIndex(idx)}
-                    >
-                      Q{idx + 1}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {currentQuestion ? (
-                <div className="cbx-table-wrap">
-                  <table className="cbx-table">
-                    <tbody>
-                      <tr>
-                        <th style={{ width: 120 }}>Question</th>
-                        <td>{activeQuestionIndex + 1}. {currentQuestion.question_text}</td>
+              <div className="cbx-table-wrap">
+                <table className="cbx-table">
+                  <tbody>
+                    <tr>
+                      <th style={{ width: 130 }}>Question</th>
+                      <td>{activeQuestionIndex + 1} of {totalCount}: {currentQuestion.question_text}</td>
+                    </tr>
+                    {[
+                      ["A", currentQuestion.option_a],
+                      ["B", currentQuestion.option_b],
+                      ["C", currentQuestion.option_c],
+                      ["D", currentQuestion.option_d],
+                    ].map(([key, text]) => (
+                      <tr key={key}>
+                        <th>Option {key}</th>
+                        <td>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                            <input
+                              type="radio"
+                              name={`question-${currentQuestion.id}`}
+                              value={key}
+                              checked={answers[currentQuestion.id] === key}
+                              onChange={(e) =>
+                                setAnswers((prev) => ({ ...prev, [currentQuestion.id]: e.target.value }))
+                              }
+                            />
+                            <span>{text || "-"}</span>
+                          </label>
+                        </td>
                       </tr>
-                      {[
-                        ["A", currentQuestion.option_a],
-                        ["B", currentQuestion.option_b],
-                        ["C", currentQuestion.option_c],
-                        ["D", currentQuestion.option_d],
-                      ].map(([key, text]) => (
-                        <tr key={key}>
-                          <th>Option {key}</th>
-                          <td>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                              <input
-                                type="radio"
-                                name={`question-${currentQuestion.id}`}
-                                value={key}
-                                checked={answers[currentQuestion.id] === key}
-                                onChange={(e) =>
-                                  setAnswers((prev) => ({ ...prev, [currentQuestion.id]: e.target.value }))
-                                }
-                              />
-                              <span>{text || "-"}</span>
-                            </label>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
@@ -455,13 +368,18 @@ export default function StudentCBTHome() {
                   Next
                 </button>
                 <button className="cbx-btn" onClick={() => submitExam("manual")} disabled={submitting || !questions.length}>
-                  {submitting ? "Submitting..." : "Submit CBT"}
+                  {submitting ? "Submitting..." : "Submit"}
+                </button>
+                <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
+                  {submitting ? "Ending..." : "Exit"}
                 </button>
               </div>
             </>
+          ) : (
+            <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
           )}
         </section>
-      ) : null}
+      )}
     </div>
   );
 }
