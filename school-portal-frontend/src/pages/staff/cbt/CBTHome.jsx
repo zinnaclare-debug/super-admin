@@ -47,6 +47,13 @@ function toDateTimeLocal(value) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function localDateTimeToIso(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toISOString();
+}
+
 export default function CBTHome() {
   const [subjects, setSubjects] = useState([]);
   const [exams, setExams] = useState([]);
@@ -97,6 +104,8 @@ export default function CBTHome() {
     const payload = {
       ...form,
       term_subject_id: Number(form.term_subject_id),
+      starts_at: localDateTimeToIso(form.starts_at),
+      ends_at: localDateTimeToIso(form.ends_at),
       duration_minutes: Number(form.duration_minutes),
       security_policy: {
         ...form.security_policy,

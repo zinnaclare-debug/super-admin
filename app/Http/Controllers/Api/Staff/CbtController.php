@@ -27,6 +27,13 @@ class CbtController extends Controller
     return Schema::hasColumn('term_subjects', 'teacher_user_id');
   }
 
+  private function hasCbtTimingColumns(): bool
+  {
+    return $this->cbtHasColumn('starts_at')
+      && $this->cbtHasColumn('ends_at')
+      && ($this->cbtHasColumn('duration_minutes') || $this->cbtHasColumn('duration'));
+  }
+
   private function buildExamPayload(array $data, int $schoolId, int $teacherUserId, int $termSubjectId, bool $includeSchoolId = false): array
   {
     $startsAt = Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s');
@@ -172,6 +179,11 @@ class CbtController extends Controller
         'message' => 'Teacher assignment schema is missing. Run database migrations and try again.'
       ], 500);
     }
+    if (!$this->hasCbtTimingColumns()) {
+      return response()->json([
+        'message' => 'CBT timing schema is missing (starts_at/ends_at/duration). Run database migrations and try again.'
+      ], 500);
+    }
 
     $data = $request->validate([
       'term_subject_id' => 'required|integer',
@@ -243,6 +255,11 @@ class CbtController extends Controller
     if (!$this->hasTeacherAssignmentColumn()) {
       return response()->json([
         'message' => 'Teacher assignment schema is missing. Run database migrations and try again.'
+      ], 500);
+    }
+    if (!$this->hasCbtTimingColumns()) {
+      return response()->json([
+        'message' => 'CBT timing schema is missing (starts_at/ends_at/duration). Run database migrations and try again.'
       ], 500);
     }
 
