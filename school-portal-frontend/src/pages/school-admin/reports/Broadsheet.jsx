@@ -351,14 +351,16 @@ export default function Broadsheet() {
           <thead>
             <tr>
               <th>S/N</th>
-              <th>Student Name</th>
-              <th>Class</th>
+              <th className="broadsheet-student-head">Student Name</th>
+              <th className="broadsheet-class-head">Class</th>
               {(subjects || []).map((subject) => (
-                <th key={subject.id}>{subject.short_code || subject.code || subject.name}</th>
+                <th key={subject.id} className="broadsheet-subject-head">
+                  <span>{subject.name || subject.code || subject.short_code || "-"}</span>
+                </th>
               ))}
-              <th>Total</th>
-              <th>Average</th>
-              <th>Position</th>
+              <th className="broadsheet-summary-head">Total</th>
+              <th className="broadsheet-summary-head">Average</th>
+              <th className="broadsheet-summary-head">Position</th>
             </tr>
           </thead>
           <tbody>
