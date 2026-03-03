@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
@@ -14,7 +14,6 @@ function formatDate(value) {
 
 export default function ExamResults() {
   const { examId } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [exam, setExam] = useState(null);
   const [rows, setRows] = useState([]);
@@ -48,7 +47,6 @@ export default function ExamResults() {
             {(exam?.subject_name || "-")} | {(exam?.class_name || "-")} | {(exam?.term_name || "-")}
           </div>
         </div>
-        <button className="cbx-btn cbx-btn--soft" onClick={() => navigate("/staff/cbt")}>Back</button>
       </div>
 
       <section className="cbx-panel">

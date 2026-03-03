@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import "../../shared/CbtShowcase.css";
@@ -15,7 +15,6 @@ function formatDate(value) {
 
 export default function ExamQuestions() {
   const { examId } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [exam, setExam] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -60,9 +59,6 @@ export default function ExamQuestions() {
             {formatDate(exam?.starts_at)} - {formatDate(exam?.ends_at)}
           </div>
         </div>
-        <button className="cbx-btn cbx-btn--soft" onClick={() => navigate("/staff/cbt")}>
-          Back
-        </button>
       </div>
 
       <section className="cbx-panel">
