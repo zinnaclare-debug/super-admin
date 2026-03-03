@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../../../services/api";
 import cbtMainArt from "../../../assets/cbt-dashboard/online-meetings.svg";
 import cbtResumeArt from "../../../assets/cbt-dashboard/online-resume.svg";
 import cbtProfilesArt from "../../../assets/cbt-dashboard/swipe-profiles.svg";
+import { createCbtSecurityFramework } from "../../../utils/cbtSecurityFramework";
 import "../../shared/CbtShowcase.css";
 
 function formatDate(value) {
@@ -20,6 +21,48 @@ export default function StudentCBTHome() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState(null);
+  const [securityWarnings, setSecurityWarnings] = useState(0);
+  const [securityStatus, setSecurityStatus] = useState("");
+  const [attemptEndsAtMs, setAttemptEndsAtMs] = useState(null);
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(null);
+
+  const securityRef = useRef(null);
+  const submittingRef = useRef(false);
+
+  const stopSecurityRuntime = () => {
+    if (securityRef.current) {
+      securityRef.current.stop();
+      securityRef.current = null;
+    }
+  };
+
+  const exitFullscreenSafely = async () => {
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen exit failures.
+    }
+  };
+
+  const closeExam = async () => {
+    stopSecurityRuntime();
+    await exitFullscreenSafely();
+    setSelectedExam(null);
+    setQuestions([]);
+    setAnswers({});
+    setActiveQuestionIndex(0);
+    setSubmitResult(null);
+    setSecurityWarnings(0);
+    setSecurityStatus("");
+    setAttemptEndsAtMs(null);
+    setTimeLeftSeconds(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -33,6 +76,54 @@ export default function StudentCBTHome() {
     }
   };
 
+  const submitExam = async (submitMode = "manual") => {
+    if (!selectedExam || submittingRef.current || submitResult) return;
+
+    setSubmitting(true);
+    submittingRef.current = true;
+    try {
+      const res = await api.post(`/api/student/cbt/exams/${selectedExam.id}/submit`, {
+        answers,
+        submit_mode: submitMode,
+      });
+      setSubmitResult(res.data?.data || null);
+      stopSecurityRuntime();
+      await exitFullscreenSafely();
+      setSecurityStatus(
+        submitMode === "auto"
+          ? "Exam was auto-submitted by policy/timer."
+          : "Exam submitted successfully."
+      );
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to submit CBT");
+    } finally {
+      setSubmitting(false);
+      submittingRef.current = false;
+    }
+  };
+
+  const startSecurityRuntime = async (exam) => {
+    stopSecurityRuntime();
+
+    const policy = exam?.security_policy || {};
+    const runtime = createCbtSecurityFramework(policy, {
+      onStatus: ({ message }) => setSecurityStatus(message || ""),
+      onWarning: ({ reason, warnings }) => {
+        setSecurityWarnings(warnings || 0);
+        setSecurityStatus(`Security warning: ${reason}`);
+      },
+      onMajorViolation: ({ reason }) => {
+        setSecurityStatus(`Major violation detected: ${reason}`);
+        if (policy?.auto_submit_on_violation) {
+          submitExam("auto");
+        }
+      },
+    });
+
+    securityRef.current = runtime;
+    await runtime.start();
+  };
+
   const openExam = async (exam) => {
     if (!exam?.is_open) {
       alert("This CBT is not open yet. Check the exam start time.");
@@ -43,7 +134,27 @@ export default function StudentCBTHome() {
     setLoadingQuestions(true);
     try {
       const res = await api.get(`/api/student/cbt/exams/${exam.id}/questions`);
-      setQuestions(res.data?.data || []);
+      const list = res.data?.data || [];
+      setQuestions(list);
+      setAnswers({});
+      setActiveQuestionIndex(0);
+      setSubmitResult(null);
+      setSecurityWarnings(0);
+      setSecurityStatus("");
+
+      const now = Date.now();
+      const durationMs = Math.max(1, Number(exam.duration_minutes || 60)) * 60 * 1000;
+      const byDuration = now + durationMs;
+      const byWindow = exam.ends_at ? new Date(exam.ends_at).getTime() : byDuration;
+      const finalEndsAt = Number.isFinite(byWindow) ? Math.min(byDuration, byWindow) : byDuration;
+      setAttemptEndsAtMs(finalEndsAt);
+      setTimeLeftSeconds(Math.max(0, Math.floor((finalEndsAt - now) / 1000)));
+
+      try {
+        await startSecurityRuntime(exam);
+      } catch {
+        setSecurityStatus("Security runtime could not fully start. Continue carefully.");
+      }
     } catch (err) {
       setQuestions([]);
       alert(err?.response?.data?.message || "Failed to load exam questions");
@@ -53,8 +164,40 @@ export default function StudentCBTHome() {
   };
 
   useEffect(() => {
+    if (!selectedExam || !attemptEndsAtMs || submitResult) return undefined;
+
+    const tick = () => {
+      const left = Math.max(0, Math.floor((attemptEndsAtMs - Date.now()) / 1000));
+      setTimeLeftSeconds(left);
+      if (left <= 0 && !submittingRef.current) {
+        submitExam("auto");
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [selectedExam, attemptEndsAtMs, submitResult]);
+
+  useEffect(() => {
     load();
+    return () => {
+      stopSecurityRuntime();
+    };
   }, []);
+
+  const currentQuestion = questions[activeQuestionIndex] || null;
+  const attemptedCount = Object.values(answers).filter((v) => ["A", "B", "C", "D"].includes(String(v))).length;
+  const totalCount = questions.length;
+
+  const formatCountdown = (seconds) => {
+    if (seconds == null) return "-";
+    const s = Math.max(0, Number(seconds));
+    const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  };
 
   return (
     <div className="cbx-page cbx-page--student">
@@ -63,11 +206,11 @@ export default function StudentCBTHome() {
           <span className="cbx-pill">Student CBT</span>
           <h2 className="cbx-title">View active computer-based exams</h2>
           <p className="cbx-subtitle">
-            Monitor exam schedules, open available sessions, and preview exam questions in one place.
+            Enter full-screen exam mode, answer questions, and submit your CBT in one flow.
           </p>
           <div className="cbx-meta">
             <span>{loading ? "Loading..." : `${exams.length} exam${exams.length === 1 ? "" : "s"}`}</span>
-            <span>{`${questions.length} question${questions.length === 1 ? "" : "s"} loaded`}</span>
+            <span>{`${totalCount} question${totalCount === 1 ? "" : "s"} loaded`}</span>
           </div>
         </div>
 
@@ -100,7 +243,7 @@ export default function StudentCBTHome() {
                   <th>Subject</th>
                   <th>Window</th>
                   <th>Status</th>
-                  <th style={{ width: 140 }}>Questions</th>
+                  <th style={{ width: 180 }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,10 +256,13 @@ export default function StudentCBTHome() {
                       {formatDate(x.starts_at)} - {formatDate(x.ends_at)}
                     </td>
                     <td>{x.is_open ? "Open" : "Closed/Upcoming"}</td>
-                    <td>
+                    <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button className="cbx-btn cbx-btn--soft" onClick={() => openExam(x)} disabled={!x.is_open}>
-                        {x.is_open ? "View" : "Not Open"}
+                        {x.is_open ? "Start CBT" : "Not Open"}
                       </button>
+                      {selectedExam && selectedExam.id === x.id ? (
+                        <button className="cbx-btn cbx-btn--danger" onClick={closeExam}>Exit</button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -128,40 +274,140 @@ export default function StudentCBTHome() {
 
       {selectedExam ? (
         <section className="cbx-panel">
-          <h3 style={{ marginTop: 0 }}>{selectedExam.title} - Questions</h3>
+          <h3 style={{ marginTop: 0 }}>{selectedExam.title} - Live CBT</h3>
+          <div className="cbx-table-wrap" style={{ marginBottom: 14 }}>
+            <table className="cbx-table">
+              <tbody>
+                <tr>
+                  <th style={{ width: 160 }}>Subject</th>
+                  <td>{selectedExam.subject_name || "-"}</td>
+                  <th style={{ width: 160 }}>Time Left</th>
+                  <td>{formatCountdown(timeLeftSeconds)}</td>
+                </tr>
+                <tr>
+                  <th>Answered</th>
+                  <td>{attemptedCount} / {totalCount}</td>
+                  <th>Security Warnings</th>
+                  <td>{securityWarnings}</td>
+                </tr>
+                <tr>
+                  <th>Security Status</th>
+                  <td colSpan="3">{securityStatus || "Active"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           {loadingQuestions ? (
             <p className="cbx-state cbx-state--loading">Loading questions...</p>
-          ) : (
+          ) : submitResult ? (
             <div className="cbx-table-wrap">
               <table className="cbx-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 70 }}>S/N</th>
-                    <th>Question</th>
-                    <th>Options</th>
-                  </tr>
-                </thead>
                 <tbody>
-                  {questions.map((q, idx) => (
-                    <tr key={q.id}>
-                      <td>{idx + 1}</td>
-                      <td>{q.question_text}</td>
-                      <td>
-                        <div>A. {q.option_a}</div>
-                        <div>B. {q.option_b}</div>
-                        <div>C. {q.option_c}</div>
-                        <div>D. {q.option_d}</div>
-                      </td>
-                    </tr>
-                  ))}
-                  {questions.length === 0 ? (
-                    <tr>
-                      <td colSpan="3">No questions in this exam yet.</td>
-                    </tr>
-                  ) : null}
+                  <tr>
+                    <th style={{ width: 180 }}>Total Questions</th>
+                    <td>{submitResult.total_questions}</td>
+                    <th style={{ width: 180 }}>Attempted</th>
+                    <td>{submitResult.attempted}</td>
+                  </tr>
+                  <tr>
+                    <th>Correct</th>
+                    <td>{submitResult.correct}</td>
+                    <th>Wrong</th>
+                    <td>{submitResult.wrong}</td>
+                  </tr>
+                  <tr>
+                    <th>Unanswered</th>
+                    <td>{submitResult.unanswered}</td>
+                    <th>Score (%)</th>
+                    <td>{submitResult.score_percent}</td>
+                  </tr>
                 </tbody>
               </table>
+              <div style={{ marginTop: 12 }}>
+                <button className="cbx-btn" onClick={closeExam}>Back To Exams</button>
+              </div>
             </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                {questions.map((q, idx) => {
+                  const answered = ["A", "B", "C", "D"].includes(String(answers[q.id] || ""));
+                  return (
+                    <button
+                      key={q.id}
+                      className="cbx-btn cbx-btn--soft"
+                      style={{
+                        background: idx === activeQuestionIndex ? "#1d4ed8" : answered ? "#166534" : undefined,
+                        color: idx === activeQuestionIndex || answered ? "#fff" : undefined,
+                      }}
+                      onClick={() => setActiveQuestionIndex(idx)}
+                    >
+                      Q{idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {currentQuestion ? (
+                <div className="cbx-table-wrap">
+                  <table className="cbx-table">
+                    <tbody>
+                      <tr>
+                        <th style={{ width: 120 }}>Question</th>
+                        <td>{activeQuestionIndex + 1}. {currentQuestion.question_text}</td>
+                      </tr>
+                      {[
+                        ["A", currentQuestion.option_a],
+                        ["B", currentQuestion.option_b],
+                        ["C", currentQuestion.option_c],
+                        ["D", currentQuestion.option_d],
+                      ].map(([key, text]) => (
+                        <tr key={key}>
+                          <th>Option {key}</th>
+                          <td>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                              <input
+                                type="radio"
+                                name={`question-${currentQuestion.id}`}
+                                value={key}
+                                checked={answers[currentQuestion.id] === key}
+                                onChange={(e) =>
+                                  setAnswers((prev) => ({ ...prev, [currentQuestion.id]: e.target.value }))
+                                }
+                              />
+                              <span>{text || "-"}</span>
+                            </label>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
+              )}
+
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="cbx-btn cbx-btn--soft"
+                  onClick={() => setActiveQuestionIndex((x) => Math.max(0, x - 1))}
+                  disabled={activeQuestionIndex <= 0}
+                >
+                  Previous
+                </button>
+                <button
+                  className="cbx-btn cbx-btn--soft"
+                  onClick={() => setActiveQuestionIndex((x) => Math.min(questions.length - 1, x + 1))}
+                  disabled={activeQuestionIndex >= questions.length - 1}
+                >
+                  Next
+                </button>
+                <button className="cbx-btn" onClick={() => submitExam("manual")} disabled={submitting || !questions.length}>
+                  {submitting ? "Submitting..." : "Submit CBT"}
+                </button>
+              </div>
+            </>
           )}
         </section>
       ) : null}

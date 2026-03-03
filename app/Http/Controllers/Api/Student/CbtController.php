@@ -224,4 +224,75 @@ class CbtController extends Controller
 
         return response()->json(['data' => $questions]);
     }
+
+    // POST /api/student/cbt/exams/{exam}/submit
+    public function submit(Request $request, CbtExam $exam)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+        $schoolId = $user->school_id;
+
+        abort_unless((int) $exam->school_id === (int) $schoolId, 403);
+        abort_unless($exam->status === 'published', 403);
+
+        $allowed = $this->allowedTermSubjectIds($request);
+        abort_unless(in_array((int) $exam->term_subject_id, $allowed, true), 403);
+
+        $now = Carbon::now();
+        $startsAt = $exam->starts_at ? Carbon::parse($exam->starts_at) : null;
+        $endsAt = $exam->ends_at ? Carbon::parse($exam->ends_at) : null;
+        if (!$startsAt || !$endsAt || !$now->between($startsAt, $endsAt)) {
+            return response()->json([
+                'message' => 'CBT submit is allowed only during the exam time window',
+            ], 403);
+        }
+
+        $data = $request->validate([
+            'answers' => 'nullable|array',
+            'answers.*' => 'nullable|string|in:A,B,C,D,a,b,c,d',
+            'submit_mode' => 'nullable|string|in:manual,auto',
+        ]);
+
+        $questions = CbtExamQuestion::query()
+            ->where('school_id', $schoolId)
+            ->where('cbt_exam_id', $exam->id)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get(['id', 'correct_option']);
+
+        $answers = collect($data['answers'] ?? [])
+            ->mapWithKeys(fn ($v, $k) => [(int) $k => strtoupper((string) $v)]);
+
+        $total = $questions->count();
+        $attempted = 0;
+        $correct = 0;
+
+        foreach ($questions as $q) {
+            $selected = (string) ($answers->get((int) $q->id, ''));
+            if (!in_array($selected, ['A', 'B', 'C', 'D'], true)) {
+                continue;
+            }
+            $attempted++;
+            if (strtoupper((string) $q->correct_option) === $selected) {
+                $correct++;
+            }
+        }
+
+        $scorePercent = $total > 0 ? round(($correct / $total) * 100, 2) : 0.0;
+
+        return response()->json([
+            'message' => 'CBT submitted successfully',
+            'data' => [
+                'cbt_exam_id' => (int) $exam->id,
+                'submit_mode' => $data['submit_mode'] ?? 'manual',
+                'total_questions' => $total,
+                'attempted' => $attempted,
+                'correct' => $correct,
+                'wrong' => max(0, $attempted - $correct),
+                'unanswered' => max(0, $total - $attempted),
+                'score_percent' => $scorePercent,
+                'submitted_at' => Carbon::now()->toDateTimeString(),
+            ],
+        ]);
+    }
 }
