@@ -19,6 +19,7 @@ function SchoolDashboard() {
     school_location: "",
     contact_email: "",
     contact_phone: "",
+    paystack_subaccount_code: "",
     students: 0,
     male_students: 0,
     female_students: 0,
@@ -30,6 +31,7 @@ function SchoolDashboard() {
   const [schoolLocation, setSchoolLocation] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [departmentTemplates, setDepartmentTemplates] = useState([]);
 
@@ -43,6 +45,7 @@ function SchoolDashboard() {
           school_location: res.data?.school_location ?? "",
           contact_email: res.data?.contact_email ?? "",
           contact_phone: res.data?.contact_phone ?? "",
+          paystack_subaccount_code: res.data?.paystack_subaccount_code ?? "",
           students: res.data?.students ?? 0,
           male_students: res.data?.male_students ?? 0,
           female_students: res.data?.female_students ?? 0,
@@ -53,6 +56,7 @@ function SchoolDashboard() {
         setSchoolLocation(res.data?.school_location ?? "");
         setContactEmail(res.data?.contact_email ?? "");
         setContactPhone(res.data?.contact_phone ?? "");
+        setPaystackSubaccountCode(res.data?.paystack_subaccount_code ?? "");
 
         const departmentsFromStats = Array.isArray(res.data?.department_templates) ? res.data.department_templates : [];
         setDepartmentTemplates(Array.from(new Set(departmentsFromStats.map((x) => String(x).trim()).filter(Boolean))));
@@ -62,6 +66,7 @@ function SchoolDashboard() {
           school_location: "",
           contact_email: "",
           contact_phone: "",
+          paystack_subaccount_code: "",
           students: 0,
           male_students: 0,
           female_students: 0,
@@ -72,6 +77,7 @@ function SchoolDashboard() {
         setSchoolLocation("");
         setContactEmail("");
         setContactPhone("");
+        setPaystackSubaccountCode("");
         setDepartmentTemplates([]);
       } finally {
         setLoading(false);
@@ -85,14 +91,17 @@ function SchoolDashboard() {
     const normalizedLocation = (schoolLocation || "").trim();
     const normalizedContactEmail = (contactEmail || "").trim();
     const normalizedContactPhone = (contactPhone || "").trim();
+    const normalizedSubaccountCode = (paystackSubaccountCode || "").trim();
     const existingLocation = (stats.school_location || "").trim();
     const existingContactEmail = (stats.contact_email || "").trim();
     const existingContactPhone = (stats.contact_phone || "").trim();
+    const existingSubaccountCode = (stats.paystack_subaccount_code || "").trim();
     const hasLocationChange = normalizedLocation !== existingLocation;
     const hasContactEmailChange = normalizedContactEmail !== existingContactEmail;
     const hasContactPhoneChange = normalizedContactPhone !== existingContactPhone;
+    const hasSubaccountCodeChange = normalizedSubaccountCode !== existingSubaccountCode;
 
-    if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange) {
+    if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSubaccountCodeChange) {
       return alert("No contact information changes to save.");
     }
 
@@ -102,6 +111,7 @@ function SchoolDashboard() {
       fd.append("school_location", normalizedLocation);
       fd.append("contact_email", normalizedContactEmail);
       fd.append("contact_phone", normalizedContactPhone);
+      fd.append("paystack_subaccount_code", normalizedSubaccountCode);
 
       const res = await api.post("/api/school-admin/branding", fd, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -115,9 +125,12 @@ function SchoolDashboard() {
         contact_email: Object.prototype.hasOwnProperty.call(data, "contact_email")
           ? (data.contact_email ?? "")
           : prev.contact_email,
-        contact_phone: Object.prototype.hasOwnProperty.call(data, "contact_phone")
-          ? (data.contact_phone ?? "")
-          : prev.contact_phone,
+          contact_phone: Object.prototype.hasOwnProperty.call(data, "contact_phone")
+            ? (data.contact_phone ?? "")
+            : prev.contact_phone,
+          paystack_subaccount_code: Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
+            ? (data.paystack_subaccount_code ?? "")
+            : prev.paystack_subaccount_code,
       }));
       setSchoolLocation(data.school_location ?? normalizedLocation);
       setContactEmail(
@@ -129,6 +142,11 @@ function SchoolDashboard() {
         Object.prototype.hasOwnProperty.call(data, "contact_phone")
           ? (data.contact_phone ?? "")
           : normalizedContactPhone
+      );
+      setPaystackSubaccountCode(
+        Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
+          ? (data.paystack_subaccount_code ?? "")
+          : normalizedSubaccountCode
       );
       alert("Contact information updated");
     } catch (err) {
@@ -272,6 +290,16 @@ function SchoolDashboard() {
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="+234 800 000 0000"
+              />
+            </div>
+
+            <div className="sd-field">
+              <label>Paystack Subaccount Code</label>
+              <input
+                type="text"
+                value={paystackSubaccountCode}
+                onChange={(e) => setPaystackSubaccountCode(e.target.value)}
+                placeholder="ACCT_xxxxxxxxx"
               />
             </div>
 

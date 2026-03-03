@@ -92,6 +92,7 @@ export default function SchoolInformation() {
     school_location: "",
     contact_email: "",
     contact_phone: "",
+    paystack_subaccount_code: "",
     school_logo_url: null,
     head_of_school_name: "",
     head_signature_url: null,
@@ -101,6 +102,7 @@ export default function SchoolInformation() {
   const [schoolLocation, setSchoolLocation] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
 
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -125,6 +127,7 @@ export default function SchoolInformation() {
           school_location: brandingData.school_location ?? "",
           contact_email: brandingData.contact_email ?? "",
           contact_phone: brandingData.contact_phone ?? "",
+          paystack_subaccount_code: brandingData.paystack_subaccount_code ?? "",
           school_logo_url: brandingData.school_logo_url ?? null,
           head_of_school_name: brandingData.head_of_school_name ?? "",
           head_signature_url: brandingData.head_signature_url ?? null,
@@ -133,6 +136,7 @@ export default function SchoolInformation() {
         setSchoolLocation(brandingData.school_location ?? "");
         setContactEmail(brandingData.contact_email ?? "");
         setContactPhone(brandingData.contact_phone ?? "");
+        setPaystackSubaccountCode(brandingData.paystack_subaccount_code ?? "");
         setExamRecord(normalizeExamRecord(payload.exam_record));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
@@ -179,10 +183,13 @@ export default function SchoolInformation() {
     const normalizedLocation = (schoolLocation || "").trim();
     const normalizedContactEmail = (contactEmail || "").trim();
     const normalizedContactPhone = (contactPhone || "").trim();
+    const normalizedSubaccountCode = (paystackSubaccountCode || "").trim();
     const hasNameChange = normalizedName !== (branding.head_of_school_name || "").trim();
     const hasLocationChange = normalizedLocation !== (branding.school_location || "").trim();
     const hasContactEmailChange = normalizedContactEmail !== (branding.contact_email || "").trim();
     const hasContactPhoneChange = normalizedContactPhone !== (branding.contact_phone || "").trim();
+    const hasSubaccountCodeChange =
+      normalizedSubaccountCode !== (branding.paystack_subaccount_code || "").trim();
     const hasLogoChange = Boolean(logoFile);
     const hasSignatureChange = Boolean(signatureFile);
 
@@ -191,6 +198,7 @@ export default function SchoolInformation() {
       !hasLocationChange &&
       !hasContactEmailChange &&
       !hasContactPhoneChange &&
+      !hasSubaccountCodeChange &&
       !hasLogoChange &&
       !hasSignatureChange
     ) {
@@ -204,6 +212,7 @@ export default function SchoolInformation() {
       fd.append("school_location", normalizedLocation);
       fd.append("contact_email", normalizedContactEmail);
       fd.append("contact_phone", normalizedContactPhone);
+      fd.append("paystack_subaccount_code", normalizedSubaccountCode);
       if (logoFile) fd.append("logo", logoFile);
       if (signatureFile) fd.append("head_signature", signatureFile);
 
@@ -220,6 +229,9 @@ export default function SchoolInformation() {
         contact_phone: Object.prototype.hasOwnProperty.call(data, "contact_phone")
           ? (data.contact_phone ?? "")
           : normalizedContactPhone,
+        paystack_subaccount_code: Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
+          ? (data.paystack_subaccount_code ?? "")
+          : normalizedSubaccountCode,
         school_logo_url: data.school_logo_url ?? branding.school_logo_url,
         head_of_school_name: data.head_of_school_name ?? normalizedName,
         head_signature_url: data.head_signature_url ?? branding.head_signature_url,
@@ -235,6 +247,11 @@ export default function SchoolInformation() {
         Object.prototype.hasOwnProperty.call(data, "contact_phone")
           ? (data.contact_phone ?? "")
           : normalizedContactPhone
+      );
+      setPaystackSubaccountCode(
+        Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
+          ? (data.paystack_subaccount_code ?? "")
+          : normalizedSubaccountCode
       );
       setLogoFile(null);
       setLogoPreview(null);
@@ -505,6 +522,16 @@ export default function SchoolInformation() {
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
               placeholder="+234 800 000 0000"
+            />
+          </div>
+
+          <div className="sai-field">
+            <label>Paystack Subaccount Code</label>
+            <input
+              type="text"
+              value={paystackSubaccountCode}
+              onChange={(e) => setPaystackSubaccountCode(e.target.value)}
+              placeholder="ACCT_xxxxxxxxx"
             />
           </div>
 
