@@ -7,7 +7,7 @@
         @page { margin: 14px; }
         body {
             font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 7px;
+            font-size: 8px;
             color: #111827;
         }
         .meta-line {
@@ -58,6 +58,33 @@
         .nowrap {
             white-space: nowrap;
         }
+        .student-col {
+            min-width: 120px;
+        }
+        .class-col {
+            min-width: 80px;
+        }
+        .subject-head {
+            width: 32px;
+            min-width: 32px;
+            height: 150px;
+            padding: 0;
+            vertical-align: bottom;
+        }
+        .subject-head > span {
+            display: inline-block;
+            white-space: nowrap;
+            transform: rotate(-90deg);
+            transform-origin: center center;
+            font-size: 9px;
+            line-height: 1;
+            letter-spacing: 0.2px;
+            margin-bottom: 8px;
+        }
+        .summary-col {
+            width: 40px;
+            min-width: 40px;
+        }
     </style>
 </head>
 <body>
@@ -84,14 +111,16 @@
 <table>
     <thead>
     <tr>
-        <th class="left-text nowrap">STUDENT NAME</th>
-        <th class="left-text nowrap">CLASS</th>
+        <th class="left-text nowrap student-col">STUDENT NAME</th>
+        <th class="left-text nowrap class-col">CLASS</th>
         @foreach($subjects as $subject)
-            <th class="nowrap">{{ strtoupper((string) ($subject['short_code'] ?? $subject['code'] ?? $subject['name'] ?? '-')) }}</th>
+            <th class="subject-head">
+                <span>{{ strtoupper((string) ($subject['name'] ?? '-')) }}</span>
+            </th>
         @endforeach
-        <th class="nowrap">TOTAL</th>
-        <th class="nowrap">AVERAGE</th>
-        <th class="nowrap">POSITION</th>
+        <th class="summary-col nowrap">TOTAL</th>
+        <th class="summary-col nowrap">AVERAGE</th>
+        <th class="summary-col nowrap">POSITION</th>
     </tr>
     </thead>
     <tbody>
