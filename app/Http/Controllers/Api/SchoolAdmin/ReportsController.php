@@ -879,15 +879,17 @@ class ReportsController extends Controller
             ->map(function ($rows, $subjectId) {
                 $sample = $rows->first();
                 $code = (string) ($sample->subject_code ?? '');
+                $name = (string) ($sample->subject_name ?? '');
                 return [
                     'id' => (int) $subjectId,
-                    'name' => (string) $sample->subject_name,
+                    'name' => $name,
+                    'header_name' => $this->broadsheetHeaderName($name),
                     'code' => $code,
-                    'short_code' => $this->subjectShortCode((string) $sample->subject_name, $code),
+                    'short_code' => $this->subjectShortCode($name, $code),
                 ];
             })
             ->values()
-            ->sortBy(fn ($item) => strtoupper((string) ($item['short_code'] ?: $item['name'])))
+            ->sortBy(fn ($item) => strtoupper((string) ($item['name'] ?? '')))
             ->values();
 
         $subjectIds = $subjects->pluck('id')->all();
@@ -1192,6 +1194,35 @@ class ReportsController extends Controller
         }
 
         return substr(str_pad($combined, 3, 'X'), 0, 3);
+    }
+
+    private function broadsheetHeaderName(string $subjectName): string
+    {
+        $normalized = trim((string) (preg_replace('/\s+/', ' ', $subjectName) ?? ''));
+        if ($normalized === '') {
+            return '-';
+        }
+
+        $words = preg_split('/\s+/', $normalized) ?: [];
+        $isLongMultiWord = count($words) >= 3 && mb_strlen($normalized) > 19;
+        if (!$isLongMultiWord) {
+            return strtoupper($normalized);
+        }
+
+        $parts = array_map(function ($word) {
+            $token = trim((string) $word);
+            if ($token === '') {
+                return '';
+            }
+            return mb_strlen($token) > 3 ? mb_substr($token, 0, 3) : $token;
+        }, $words);
+
+        $parts = array_values(array_filter($parts, fn ($v) => $v !== ''));
+        if (empty($parts)) {
+            return strtoupper($normalized);
+        }
+
+        return strtoupper(implode(' ', $parts));
     }
 
     private function ordinalPosition(int $position): string

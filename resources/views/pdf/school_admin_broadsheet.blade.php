@@ -103,7 +103,7 @@
         <th class="left-text nowrap class-col">CLASS</th>
         @foreach($subjects as $subject)
             @php
-                $subjectLabel = strtoupper((string) ($subject['short_code'] ?? $subject['code'] ?? $subject['name'] ?? '-'));
+                $subjectLabel = strtoupper((string) ($subject['header_name'] ?? $subject['name'] ?? $subject['short_code'] ?? $subject['code'] ?? '-'));
                 $subjectLabel = preg_replace('/\s+/', ' ', trim($subjectLabel)) ?: '-';
             @endphp
             <th class="subject-head">
