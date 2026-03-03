@@ -345,6 +345,7 @@ Rules:
     }
 
     $activeModel = $aiModel;
+    $content = '';
     try {
       $requestBuilder = $http->acceptJson();
       if ($aiApiKey !== '') {
@@ -397,6 +398,55 @@ Rules:
             }
           }
         }
+
+        // Fallback for older/non-OpenAI Ollama routes.
+        if ($response->failed()) {
+          [$providerStatus, , $providerMessage] = $this->aiErrorMeta($response);
+          $errorLower = strtolower($providerMessage);
+          $isLikelyCompatIssue = in_array($providerStatus, [404, 405, 501], true)
+            || str_contains($errorLower, 'not found')
+            || str_contains($errorLower, 'unsupported')
+            || str_contains($errorLower, 'route');
+
+          if ($isLikelyCompatIssue) {
+            $nativeBase = preg_replace('/\/v1\/?$/i', '', rtrim($aiBaseUrl, '/'));
+            $nativeUrl = rtrim((string) $nativeBase, '/') . '/api/chat';
+            $nativeCandidates = array_values(array_unique(array_filter([
+              $activeModel,
+              ...$this->localModelFallbackCandidates($aiModel),
+            ])));
+
+            foreach ($nativeCandidates as $candidateModel) {
+              $native = $requestBuilder->post($nativeUrl, [
+                'model' => $candidateModel,
+                'stream' => false,
+                'format' => 'json',
+                'options' => [
+                  'temperature' => 0.3,
+                  'num_predict' => $maxTokens,
+                ],
+                'messages' => [
+                  ['role' => 'system', 'content' => $systemPrompt],
+                  ['role' => 'user', 'content' => $userPrompt],
+                ],
+              ]);
+
+              if ($native->successful()) {
+                $nativeContent = trim((string) data_get($native->json(), 'message.content', ''));
+                if ($nativeContent !== '') {
+                  $response = $native;
+                  $activeModel = $candidateModel;
+                  $content = $nativeContent;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if ($content === '' && $response->successful()) {
+        $content = (string) data_get($response->json(), 'choices.0.message.content', '');
       }
     } catch (ConnectionException $e) {
       Log::error('AI provider connection failed', [
@@ -454,7 +504,9 @@ Rules:
       ], $status);
     }
 
-    $content = (string) data_get($response->json(), 'choices.0.message.content', '');
+    if ($content === '') {
+      $content = (string) data_get($response->json(), 'choices.0.message.content', '');
+    }
     $payload = $this->extractJsonObject($content);
 
     if (!$payload || !is_array($payload['questions'] ?? null)) {
