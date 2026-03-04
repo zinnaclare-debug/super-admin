@@ -375,6 +375,9 @@ class SchoolFeesController extends Controller
         ) {
             return response()->json(['message' => 'Receipt not found.'], 404);
         }
+        if ((string) $payment->status !== 'success') {
+            return response()->json(['message' => 'Receipt is available only for successful payments.'], 422);
+        }
 
         $school = School::query()->find($schoolId);
         if (!$school) {
@@ -601,6 +604,15 @@ class SchoolFeesController extends Controller
     {
         return collect($items)
             ->map(function ($item, $index) {
+                $enabledRaw = $item['enabled'] ?? true;
+                $enabled = filter_var($enabledRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($enabled === null) {
+                    $enabled = true;
+                }
+                if (!$enabled) {
+                    return null;
+                }
+
                 $description = trim((string) ($item['description'] ?? ''));
                 $amountRaw = $item['amount'] ?? null;
                 $amount = is_numeric($amountRaw) ? round((float) $amountRaw, 2) : null;

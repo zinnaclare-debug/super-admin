@@ -448,6 +448,7 @@ class PaymentsController extends Controller
 
         $payload = $request->validate([
             'line_items' => ['required', 'array', 'max:10'],
+            'line_items.*.enabled' => ['nullable', 'boolean'],
             'line_items.*.description' => ['nullable', 'string', 'max:120'],
             'line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -471,7 +472,15 @@ class PaymentsController extends Controller
             ]);
         }
 
-        $amountDue = round((float) collect($lineItems)->sum('amount'), 2);
+        $amountDue = round((float) collect($lineItems)
+            ->filter(fn ($row) => (bool) ($row['enabled'] ?? false))
+            ->sum('amount'), 2);
+
+        if ($amountDue <= 0) {
+            return response()->json([
+                'message' => 'Select at least one checked fee item with amount greater than zero.',
+            ], 422);
+        }
 
         $plan = StudentFeePlan::query()->updateOrCreate(
             [
@@ -894,6 +903,11 @@ class PaymentsController extends Controller
     {
         $rows = [];
         foreach (array_slice($items, 0, $maxItems) as $index => $item) {
+            $enabledRaw = $item['enabled'] ?? true;
+            $enabled = filter_var($enabledRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($enabled === null) {
+                $enabled = true;
+            }
             $description = trim((string) ($item['description'] ?? ''));
             $rawAmount = $item['amount'] ?? null;
             $amount = is_numeric($rawAmount) ? round((float) $rawAmount, 2) : null;
@@ -907,6 +921,7 @@ class PaymentsController extends Controller
             }
 
             $rows[] = [
+                'enabled' => (bool) $enabled,
                 'description' => $description,
                 'amount' => max((float) ($amount ?? 0), 0),
             ];

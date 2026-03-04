@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 
-const EMPTY_ROWS = Array.from({ length: 10 }, () => ({ description: "", amount: "" }));
+const EMPTY_ROWS = Array.from({ length: 10 }, () => ({ enabled: false, description: "", amount: "" }));
 
 function normalizeRows(rows = []) {
-  const next = EMPTY_ROWS.map(() => ({ description: "", amount: "" }));
+  const next = EMPTY_ROWS.map(() => ({ enabled: false, description: "", amount: "" }));
   rows.slice(0, 10).forEach((row, idx) => {
+    const hasValue =
+      String(row?.description || "").trim() !== "" ||
+      !(row?.amount === null || row?.amount === undefined || row?.amount === "");
     next[idx] = {
+      enabled: typeof row?.enabled === "boolean" ? row.enabled : hasValue,
       description: String(row?.description || ""),
       amount: row?.amount === null || row?.amount === undefined || row?.amount === ""
         ? ""
@@ -46,9 +50,8 @@ export default function StudentPaymentSetup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const totalAmount = useMemo(
-    () => rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
-    [rows]
+  const totalAmount = useMemo(() =>
+    rows.reduce((sum, row) => sum + (row.enabled ? (Number(row.amount) || 0) : 0), 0), [rows]
   );
 
   const updateRow = (index, field, value) => {
@@ -62,6 +65,7 @@ export default function StudentPaymentSetup() {
   const save = async () => {
     const payload = {
       line_items: rows.map((row) => ({
+        enabled: !!row.enabled,
         description: row.description,
         amount: row.amount === "" ? null : Number(row.amount),
       })),
@@ -135,6 +139,7 @@ export default function StudentPaymentSetup() {
           <thead>
             <tr>
               <th style={{ width: 80 }}>No.</th>
+              <th style={{ width: 90 }}>Use</th>
               <th>Fee Description</th>
               <th style={{ width: 220 }}>Amount (NGN)</th>
             </tr>
@@ -143,6 +148,13 @@ export default function StudentPaymentSetup() {
             {rows.map((row, idx) => (
               <tr key={idx}>
                 <td>{idx + 1}</td>
+                <td style={{ textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!row.enabled}
+                    onChange={(e) => updateRow(idx, "enabled", e.target.checked)}
+                  />
+                </td>
                 <td>
                   <input
                     value={row.description}
