@@ -16,6 +16,7 @@ export default function StaffDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [tenantSchoolName, setTenantSchoolName] = useState("");
+  const [enabledFeatures, setEnabledFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -79,6 +80,24 @@ export default function StaffDashboard() {
 
   useEffect(() => {
     let active = true;
+    api
+      .get("/api/staff/features")
+      .then((res) => {
+        if (!active) return;
+        const data = Array.isArray(res?.data?.data) ? res.data.data : [];
+        setEnabledFeatures(data.map((x) => String(x || "").toLowerCase()));
+      })
+      .catch(() => {
+        if (!active) return;
+        setEnabledFeatures([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
 
     const loadAnnouncements = async () => {
       try {
@@ -134,15 +153,18 @@ export default function StaffDashboard() {
   };
 
   const quickActions = [
-    { label: "Profile", hint: "Personal details", path: "/staff/profile", tone: "calm" },
-    { label: "Results", hint: "Scores and courses", path: "/staff/results", tone: "bright" },
-    { label: "Topics", hint: "Manage topics", path: "/staff/topics", tone: "warm" },
-    { label: "E-Library", hint: "Learning resources", path: "/staff/e-library", tone: "calm" },
-    { label: "Class Activities", hint: "Assignments and files", path: "/staff/class-activities", tone: "warm" },
-    { label: "Virtual Class", hint: "Live sessions", path: "/staff/virtual-class", tone: "bright" },
-    { label: "CBT Console", hint: "Create and manage CBT exams", path: "/staff/cbt", tone: "bright" },
-    { label: "Announcements", hint: "School updates", path: "/staff/announcements", tone: "calm" },
+    { feature: "profile", label: "Profile", hint: "Personal details", path: "/staff/profile", tone: "calm" },
+    { feature: "results", label: "Results", hint: "Scores and courses", path: "/staff/results", tone: "bright" },
+    { feature: "topics", label: "Topics", hint: "Manage topics", path: "/staff/topics", tone: "warm" },
+    { feature: "e-library", label: "E-Library", hint: "Learning resources", path: "/staff/e-library", tone: "calm" },
+    { feature: "class activities", label: "Class Activities", hint: "Assignments and files", path: "/staff/class-activities", tone: "warm" },
+    { feature: "virtual class", label: "Virtual Class", hint: "Live sessions", path: "/staff/virtual-class", tone: "bright" },
+    { feature: "cbt", label: "CBT Console", hint: "Create and manage CBT exams", path: "/staff/cbt", tone: "bright" },
+    { feature: "announcements", label: "Announcements", hint: "School updates", path: "/staff/announcements", tone: "calm" },
   ];
+  const visibleQuickActions = quickActions.filter((item) =>
+    enabledFeatures.includes(String(item.feature || "").toLowerCase())
+  );
 
   return (
     <div className="stx-page">
@@ -199,7 +221,7 @@ export default function StaffDashboard() {
               </div>
 
               <div className="stx-quick-grid">
-                {quickActions.map((item) => (
+                {visibleQuickActions.map((item) => (
                   <button
                     key={item.path}
                     className={`stx-quick-btn stx-quick-btn--${item.tone}`}

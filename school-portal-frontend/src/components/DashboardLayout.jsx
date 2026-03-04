@@ -160,6 +160,20 @@ function DashboardLayout() {
       ),
     [features]
   );
+  const schoolAdminPromotionEnabled = useMemo(
+    () =>
+      features.some(
+        (f) =>
+          f?.enabled &&
+          String(f?.category || "").toLowerCase() === "admin" &&
+          String(f?.feature || "").toLowerCase() === "promotion"
+      ),
+    [features]
+  );
+  const studentSubjectsEnabled = useMemo(() => {
+    if (user?.role !== "student") return false;
+    return features.some((f) => String(f || "").toLowerCase() === "subjects");
+  }, [features, user?.role]);
 
   const roleLabel = useMemo(() => {
     if (!user?.role) return "";
@@ -306,9 +320,11 @@ function DashboardLayout() {
                   {isCompactSidebar ? "PAYMENTS" : "Payments"}
                 </NavLink>
               ) : null}
-              <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle}>
-                {isCompactSidebar ? "PROMOTION" : "Promotion"}
-              </NavLink>
+              {schoolAdminPromotionEnabled ? (
+                <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle}>
+                  {isCompactSidebar ? "PROMOTION" : "Promotion"}
+                </NavLink>
+              ) : null}
 
               {!isCompactSidebar && (
                 <div style={{ marginTop: 20 }}>
@@ -360,7 +376,7 @@ function DashboardLayout() {
                 {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
               </NavLink>
 
-              {user?.role === "student" && (
+              {user?.role === "student" && studentSubjectsEnabled && (
                 <NavLink to="/student/subjects" title="Subjects" style={linkStyle}>
                   {isCompactSidebar ? "SUBJECTS" : "Subjects"}
                 </NavLink>

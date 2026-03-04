@@ -16,6 +16,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [tenantSchoolName, setTenantSchoolName] = useState("");
+  const [enabledFeatures, setEnabledFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -51,6 +52,24 @@ export default function StudentDashboard() {
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/api/student/features")
+      .then((res) => {
+        if (!active) return;
+        const data = Array.isArray(res?.data?.data) ? res.data.data : [];
+        setEnabledFeatures(data.map((x) => String(x || "").toLowerCase()));
+      })
+      .catch(() => {
+        if (!active) return;
+        setEnabledFeatures([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -136,17 +155,20 @@ export default function StudentDashboard() {
   };
 
   const quickActions = [
-    { label: "Profile", hint: "Personal details", path: "/student/profile", tone: "calm" },
-    { label: "Subjects", hint: "Subject list", path: "/student/subjects", tone: "warm" },
-    { label: "Results", hint: "Scores and grades", path: "/student/results", tone: "bright" },
-    { label: "Topics", hint: "Topic resources", path: "/student/topics", tone: "calm" },
-    { label: "E-Library", hint: "Digital textbooks", path: "/student/e-library", tone: "warm" },
-    { label: "Class Activities", hint: "Assignments", path: "/student/class-activities", tone: "bright" },
-    { label: "Virtual Class", hint: "Join meetings", path: "/student/virtual-class", tone: "calm" },
-    { label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright" },
-    { label: "School Fees", hint: "Payments", path: "/student/school-fees", tone: "warm" },
-    { label: "Announcements", hint: "School updates", path: "/student/announcements", tone: "calm" },
+    { feature: "profile", label: "Profile", hint: "Personal details", path: "/student/profile", tone: "calm" },
+    { feature: "subjects", label: "Subjects", hint: "Subject list", path: "/student/subjects", tone: "warm" },
+    { feature: "results", label: "Results", hint: "Scores and grades", path: "/student/results", tone: "bright" },
+    { feature: "topics", label: "Topics", hint: "Topic resources", path: "/student/topics", tone: "calm" },
+    { feature: "e-library", label: "E-Library", hint: "Digital textbooks", path: "/student/e-library", tone: "warm" },
+    { feature: "class activities", label: "Class Activities", hint: "Assignments", path: "/student/class-activities", tone: "bright" },
+    { feature: "virtual class", label: "Virtual Class", hint: "Join meetings", path: "/student/virtual-class", tone: "calm" },
+    { feature: "cbt", label: "CBT", hint: "Computer tests", path: "/student/cbt", tone: "bright" },
+    { feature: "school fees", label: "School Fees", hint: "Payments", path: "/student/school-fees", tone: "warm" },
+    { feature: "announcements", label: "Announcements", hint: "School updates", path: "/student/announcements", tone: "calm" },
   ];
+  const visibleQuickActions = quickActions.filter((item) =>
+    enabledFeatures.includes(String(item.feature || "").toLowerCase())
+  );
 
   return (
     <div className="sdx-page">
@@ -202,7 +224,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <div className="sdx-quick-grid">
-                {quickActions.map((item) => (
+                {visibleQuickActions.map((item) => (
                   <button
                     key={item.path}
                     className={`sdx-quick-btn sdx-quick-btn--${item.tone}`}
