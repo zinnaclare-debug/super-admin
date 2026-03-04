@@ -21,6 +21,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/academics")) return "Academics";
   if (pathname.startsWith("/school/admin/classes")) return "Class Setup";
   if (pathname.startsWith("/school/admin/payments")) return "Payments";
+  if (pathname.startsWith("/school/admin/students/") && pathname.endsWith("/set-payment")) return "Set Payment";
   if (pathname.startsWith("/school/admin/promotion")) return "Promotion";
   if (pathname.startsWith("/school/admin/class-templates")) return "Class Templates";
   if (pathname.startsWith("/school/admin/broadsheet")) return "Broadsheet";

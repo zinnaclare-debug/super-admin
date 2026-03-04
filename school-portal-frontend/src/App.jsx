@@ -144,12 +144,12 @@ function App() {
         {/* Users */}
         <Route path="admin/users" element={<UsersHome />}>
           <Route path="login-details" element={<LoginDetails />} />
-          <Route path="student/:userId/set-payment" element={<StudentPaymentSetup />} />
           <Route path=":role" element={<UsersRoleHome />}>
             <Route path="active" element={<ActiveUsers />} />
             <Route path="inactive" element={<InactiveUsers />} />
           </Route>
         </Route>
+        <Route path="admin/students/:userId/set-payment" element={<StudentPaymentSetup />} />
 
         {/* Academic Session */}
         <Route path="admin/academic_session" element={<AcademicSessions />} />

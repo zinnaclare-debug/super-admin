@@ -131,6 +131,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/payments', [SchoolAdminPaymentsController::class, 'index'])
         ->middleware('feature:school fees');
+    Route::get('/school-admin/payments/download/pdf', [SchoolAdminPaymentsController::class, 'downloadPdf'])
+        ->middleware('feature:school fees');
     Route::get('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'studentPlan'])
         ->middleware('feature:users');
     Route::put('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'upsertStudentPlan'])

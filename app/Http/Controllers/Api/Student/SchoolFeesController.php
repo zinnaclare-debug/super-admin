@@ -77,6 +77,9 @@ class SchoolFeesController extends Controller
                     'status' => $p->status,
                     'paid_at' => optional($p->paid_at)?->toDateTimeString(),
                     'created_at' => optional($p->created_at)?->toDateTimeString(),
+                    'failure_reason' => $p->status === 'success'
+                        ? null
+                        : ($p->paystack_gateway_response ?: $p->paystack_status ?: 'Payment unsuccessful'),
                     'receipt_download_url' => '/api/student/school-fees/payments/' . $p->id . '/receipt',
                 ];
             })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 import payCardArt from "../../assets/payments/pay-with-credit-card.svg";
 import creditCardArt from "../../assets/payments/credit-card-payments.svg";
@@ -7,6 +7,7 @@ import "../shared/PaymentsShowcase.css";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
+
 const prettyLevel = (level) =>
   String(level || "")
     .replace(/_/g, " ")
@@ -24,11 +25,19 @@ const buildInitialLevelFees = (levels = [], feesByLevel = {}) => {
   return next;
 };
 
+const parseFileName = (headers, fallback = "payments_summary.pdf") => {
+  const contentDisposition = headers?.["content-disposition"] || "";
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!match?.[1]) return fallback;
+  return decodeURIComponent(match[1].replace(/"/g, "").trim());
+};
+
 export default function SchoolAdminPayments() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [activeLevels, setActiveLevels] = useState([]);
   const [levelFees, setLevelFees] = useState({});
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
@@ -38,6 +47,18 @@ export default function SchoolAdminPayments() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState(null);
+  const [viewMode, setViewMode] = useState("payments");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+
+  const filterOptions = context?.filter_options || {};
+  const levelOptions = Array.isArray(filterOptions.levels) ? filterOptions.levels : [];
+  const classOptions = Array.isArray(filterOptions.classes) ? filterOptions.classes : [];
+  const departmentOptions = Array.isArray(filterOptions.departments) ? filterOptions.departments : [];
+
+  const totals = context?.totals || { paid: 0, outstanding: 0 };
 
   const loadConfig = async () => {
     setConfigLoading(true);
@@ -73,7 +94,17 @@ export default function SchoolAdminPayments() {
 
     setTableLoading(true);
     try {
-      const res = await api.get("/api/school-admin/payments", { params: { search, page } });
+      const params = {
+        search,
+        page,
+        view: viewMode,
+        status: statusFilter,
+      };
+      if (levelFilter) params.level = levelFilter;
+      if (classFilter) params.class = classFilter;
+      if (departmentFilter) params.department = departmentFilter;
+
+      const res = await api.get("/api/school-admin/payments", { params });
       setRows(res.data?.data || []);
       setMeta(res.data?.meta || null);
       if (res.data?.context) setContext((prev) => ({ ...(prev || {}), ...res.data.context }));
@@ -94,7 +125,17 @@ export default function SchoolAdminPayments() {
   useEffect(() => {
     if (!configLoaded || sessionConfigError) return;
     loadPayments();
-  }, [configLoaded, search, page, sessionConfigError]);
+  }, [
+    configLoaded,
+    search,
+    page,
+    sessionConfigError,
+    viewMode,
+    statusFilter,
+    levelFilter,
+    classFilter,
+    departmentFilter,
+  ]);
 
   const saveConfig = async () => {
     if (!activeLevels.length) {
@@ -130,6 +171,39 @@ export default function SchoolAdminPayments() {
     }
   };
 
+  const downloadSummaryPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const params = {
+        view: viewMode,
+        status: statusFilter,
+        search,
+      };
+      if (levelFilter) params.level = levelFilter;
+      if (classFilter) params.class = classFilter;
+      if (departmentFilter) params.department = departmentFilter;
+
+      const res = await api.get("/api/school-admin/payments/download/pdf", {
+        params,
+        responseType: "blob",
+      });
+
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, "payments_summary.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download payments PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const toggleLevel = (level, enabled) => {
     setLevelFees((prev) => ({
       ...prev,
@@ -150,14 +224,19 @@ export default function SchoolAdminPayments() {
     }));
   };
 
+  const modeTitle = useMemo(() => {
+    if (viewMode === "outstanding") return "Outstanding Payment Table";
+    return "Payment Records";
+  }, [viewMode]);
+
   return (
     <div className="payx-page payx-page--admin">
       <section className="payx-hero">
         <div>
           <span className="payx-pill">School Admin Payments</span>
-          <h2 className="payx-title">Configure fees and manage payment flow</h2>
+          <h2 className="payx-title">Configure fees and monitor school payments</h2>
           <p className="payx-subtitle">
-            Set fee amount per education level, configure subaccount routing, and monitor student fee payments.
+            Filter by payment status, level, class, department, and view outstanding students with downloadable summary.
           </p>
           <div className="payx-meta">
             <span>{context?.current_session?.session_name || context?.current_session?.academic_year || "Session -"}</span>
@@ -255,27 +334,87 @@ export default function SchoolAdminPayments() {
         )}
 
         <div className="payx-card" style={{ marginTop: 12 }}>
-          <h3>Payment Records</h3>
-          <div className="payx-actions">
+          <h3>{modeTitle}</h3>
+          <div className="payx-actions" style={{ flexWrap: "wrap" }}>
+            <select
+              className="payx-input"
+              value={viewMode}
+              onChange={(e) => {
+                setViewMode(e.target.value);
+                setPage(1);
+              }}
+              style={{ width: 190 }}
+            >
+              <option value="payments">All Payment Records</option>
+              <option value="outstanding">Outstanding Payments</option>
+            </select>
+
+            <select
+              className="payx-input"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              style={{ width: 190 }}
+              disabled={viewMode === "outstanding"}
+            >
+              <option value="all">All Payments</option>
+              <option value="successful">Successful Payments</option>
+              <option value="unsuccessful">Unsuccessful Payments</option>
+            </select>
+
+            <select className="payx-input" value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={{ width: 170 }}>
+              <option value="">All Levels</option>
+              {levelOptions.map((v) => <option key={v} value={v}>{prettyLevel(v)}</option>)}
+            </select>
+
+            <select className="payx-input" value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }} style={{ width: 170 }}>
+              <option value="">All Classes</option>
+              {classOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+
+            <select className="payx-input" value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} style={{ width: 170 }}>
+              <option value="">All Departments</option>
+              {departmentOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+
             <input
               className="payx-input"
-              placeholder="Search by name/email/username/reference"
+              placeholder="Search name/email/username/reference"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              style={{ width: 360 }}
+              style={{ width: 320 }}
             />
-            <button
-              className="payx-btn payx-btn--soft"
-              onClick={() => {
-                setSearch("");
-                setPage(1);
-              }}
-            >
-              Clear
+
+            <button className="payx-btn payx-btn--soft" onClick={() => {
+              setStatusFilter("all");
+              setLevelFilter("");
+              setClassFilter("");
+              setDepartmentFilter("");
+              setSearch("");
+              setPage(1);
+            }}>
+              Clear Filters
             </button>
+
+            <button className="payx-btn" onClick={downloadSummaryPdf} disabled={downloadingPdf}>
+              {downloadingPdf ? "Downloading..." : "Download PDF"}
+            </button>
+          </div>
+
+          <div className="payx-kv" style={{ marginTop: 10 }}>
+            <div className="payx-row">
+              <span className="payx-label">Total Paid</span>
+              <span className="payx-value">NGN {Number(totals.paid || 0).toFixed(2)}</span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Total Outstanding</span>
+              <span className="payx-value">NGN {Number(totals.outstanding || 0).toFixed(2)}</span>
+            </div>
           </div>
 
           {tableLoading ? (
@@ -283,41 +422,77 @@ export default function SchoolAdminPayments() {
           ) : (
             <>
               <div className="payx-table-wrap">
-                <table className="payx-table">
-                  <thead>
-                    <tr>
-                      <th>S/N</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Username</th>
-                      <th>Amount</th>
-                      <th>Status</th>
-                      <th>Reference</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r, idx) => (
-                      <tr key={r.id}>
-                        <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || rows.length || 0) + idx + 1}</td>
-                        <td>{r.student?.name || "-"}</td>
-                        <td>{r.student?.email || "-"}</td>
-                        <td>{r.student?.username || "-"}</td>
-                        <td>
-                          {r.currency} {Number(r.amount_paid || 0).toFixed(2)}
-                        </td>
-                        <td>{r.status}</td>
-                        <td>{r.reference}</td>
-                        <td>{r.paid_at || r.created_at || "-"}</td>
-                      </tr>
-                    ))}
-                    {rows.length === 0 ? (
+                {viewMode === "outstanding" ? (
+                  <table className="payx-table">
+                    <thead>
                       <tr>
-                        <td colSpan="8">No payments found.</td>
+                        <th>S/N</th>
+                        <th>Name</th>
+                        <th>Level</th>
+                        <th>Class</th>
+                        <th>Department</th>
+                        <th>Amount Paid</th>
+                        <th>Amount Remaining</th>
                       </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, idx) => (
+                        <tr key={`${r.student?.id || idx}`}>
+                          <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || rows.length || 0) + idx + 1}</td>
+                          <td>{r.student?.name || "-"}</td>
+                          <td>{prettyLevel(r.level || "-")}</td>
+                          <td>{r.class_name || "-"}</td>
+                          <td>{r.department_name || "-"}</td>
+                          <td>NGN {Number(r.amount_paid || 0).toFixed(2)}</td>
+                          <td>NGN {Number(r.amount_outstanding || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {rows.length === 0 ? (
+                        <tr>
+                          <td colSpan="7">No outstanding students found.</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="payx-table">
+                    <thead>
+                      <tr>
+                        <th>S/N</th>
+                        <th>Name</th>
+                        <th>Level</th>
+                        <th>Class</th>
+                        <th>Department</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Reason</th>
+                        <th>Reference</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, idx) => (
+                        <tr key={r.id}>
+                          <td>{((meta?.current_page || 1) - 1) * (meta?.per_page || rows.length || 0) + idx + 1}</td>
+                          <td>{r.student?.name || "-"}</td>
+                          <td>{prettyLevel(r.level || "-")}</td>
+                          <td>{r.class_name || "-"}</td>
+                          <td>{r.department_name || "-"}</td>
+                          <td>{r.currency} {Number(r.amount_paid || 0).toFixed(2)}</td>
+                          <td>{r.status}</td>
+                          <td>{r.failure_reason || "-"}</td>
+                          <td>{r.reference}</td>
+                          <td>{r.paid_at || r.created_at || "-"}</td>
+                        </tr>
+                      ))}
+                      {rows.length === 0 ? (
+                        <tr>
+                          <td colSpan="10">No payments found.</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {meta ? (
@@ -340,3 +515,4 @@ export default function SchoolAdminPayments() {
     </div>
   );
 }
+

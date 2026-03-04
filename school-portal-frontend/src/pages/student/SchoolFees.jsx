@@ -231,6 +231,7 @@ export default function StudentSchoolFees() {
                       <th>Reference</th>
                       <th>Amount</th>
                       <th>Status</th>
+                      <th>Reason</th>
                       <th>Date</th>
                       <th>Receipt</th>
                     </tr>
@@ -244,6 +245,7 @@ export default function StudentSchoolFees() {
                           {p.currency} {formatMoney(p.amount_paid)}
                         </td>
                         <td>{p.status}</td>
+                        <td>{p.failure_reason || "-"}</td>
                         <td>{p.paid_at || p.created_at || "-"}</td>
                         <td>
                           <button
@@ -257,7 +259,7 @@ export default function StudentSchoolFees() {
                     ))}
                     {(summary?.payments || []).length === 0 ? (
                       <tr>
-                        <td colSpan="6">No payments yet.</td>
+                        <td colSpan="7">No payments yet.</td>
                       </tr>
                     ) : null}
                   </tbody>

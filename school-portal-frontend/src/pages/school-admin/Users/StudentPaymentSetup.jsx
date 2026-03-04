@@ -101,7 +101,6 @@ export default function StudentPaymentSetup() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h3 style={{ margin: 0 }}>Set Student Payment</h3>
-        <button onClick={() => navigate(-1)}>Back</button>
       </div>
 
       <div
@@ -187,4 +186,3 @@ export default function StudentPaymentSetup() {
     </div>
   );
 }
-

@@ -12,9 +12,13 @@ use App\Models\Student;
 use App\Models\StudentFeePlan;
 use App\Models\Term;
 use App\Models\User;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class PaymentsController extends Controller
 {
@@ -182,68 +186,45 @@ class PaymentsController extends Controller
             ], 422);
         }
 
+        $view = strtolower(trim((string) $request->query('view', 'payments')));
+        $view = $view === 'outstanding' ? 'outstanding' : 'payments';
+
+        $status = $this->normalizeStatusFilter((string) $request->query('status', 'all'));
         $search = trim((string) $request->query('search', ''));
+        $level = trim((string) $request->query('level', ''));
+        $class = trim((string) $request->query('class', ''));
+        $department = trim((string) $request->query('department', ''));
         $perPage = max(1, (int) $request->query('per_page', 15));
+        $page = max(1, (int) $request->query('page', 1));
 
-        $q = SchoolFeePayment::query()
-            ->where('school_fee_payments.school_id', $schoolId)
-            ->where('school_fee_payments.academic_session_id', $session->id)
-            ->where('school_fee_payments.term_id', $term->id)
-            ->join('students', 'students.id', '=', 'school_fee_payments.student_id')
-            ->join('users', 'users.id', '=', 'school_fee_payments.student_user_id')
-            ->select([
-                'school_fee_payments.id',
-                'school_fee_payments.reference',
-                'school_fee_payments.amount_paid',
-                'school_fee_payments.currency',
-                'school_fee_payments.status',
-                'school_fee_payments.paid_at',
-                'school_fee_payments.created_at',
-                'students.id as student_id',
-                'users.name as student_name',
-                'users.email as student_email',
-                'users.username as student_username',
-            ])
-            ->orderByDesc('school_fee_payments.id');
-
-        if ($search !== '') {
-            $q->where(function ($sub) use ($search) {
-                $sub->where('users.name', 'like', "%{$search}%")
-                    ->orWhere('users.email', 'like', "%{$search}%")
-                    ->orWhere('users.username', 'like', "%{$search}%")
-                    ->orWhere('school_fee_payments.reference', 'like', "%{$search}%");
-            });
+        if ($view === 'outstanding') {
+            $baseRows = $this->buildOutstandingRows($schoolId, (int) $session->id, (int) $term->id, $search);
+        } else {
+            $baseRows = $this->buildPaymentRows($schoolId, (int) $session->id, (int) $term->id, $search, $status);
         }
 
-        $p = $q->paginate($perPage);
+        $filterOptions = $this->extractFilterOptions($baseRows);
+        $filteredRows = $this->applyCommonFilters($baseRows, $level, $class, $department);
+        $paginator = $this->paginateRows($filteredRows, $perPage, $page);
 
-        $items = collect($p->items())->map(function ($row) {
-            return [
-                'id' => (int) $row->id,
-                'reference' => $row->reference,
-                'amount_paid' => (float) $row->amount_paid,
-                'currency' => $row->currency,
-                'status' => $row->status,
-                'paid_at' => $row->paid_at,
-                'created_at' => $row->created_at,
-                'student' => [
-                    'id' => (int) $row->student_id,
-                    'name' => $row->student_name,
-                    'email' => $row->student_email,
-                    'username' => $row->student_username,
-                ],
-            ];
-        })->values();
+        $totalPaid = (float) collect($filteredRows)->sum(function ($row) use ($view) {
+            return $view === 'outstanding'
+                ? (float) ($row['amount_paid'] ?? 0)
+                : ((($row['status'] ?? '') === 'success') ? (float) ($row['amount_paid'] ?? 0) : 0);
+        });
+        $totalOutstanding = (float) collect($filteredRows)->sum(fn ($row) => (float) ($row['amount_outstanding'] ?? 0));
 
         return response()->json([
-            'data' => $items,
+            'data' => array_values($paginator->items()),
             'meta' => [
-                'current_page' => $p->currentPage(),
-                'last_page' => $p->lastPage(),
-                'per_page' => $p->perPage(),
-                'total' => $p->total(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
             ],
             'context' => [
+                'view' => $view,
+                'status' => $status,
                 'current_session' => [
                     'id' => $session->id,
                     'session_name' => $session->session_name,
@@ -254,8 +235,109 @@ class PaymentsController extends Controller
                     'name' => $term->name,
                 ],
                 'active_levels' => $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []),
+                'filter_options' => $filterOptions,
+                'totals' => [
+                    'paid' => $totalPaid,
+                    'outstanding' => $totalOutstanding,
+                ],
             ],
         ]);
+    }
+
+    public function downloadPdf(Request $request)
+    {
+        $schoolId = (int) $request->user()->school_id;
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$term) {
+            return response()->json([
+                'message' => 'No current academic session/term configured.',
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'view' => 'nullable|string|in:payments,outstanding',
+            'status' => 'nullable|string',
+            'level' => 'nullable|string|max:120',
+            'class' => 'nullable|string|max:120',
+            'department' => 'nullable|string|max:120',
+            'search' => 'nullable|string|max:120',
+        ]);
+
+        $view = strtolower(trim((string) ($payload['view'] ?? 'payments')));
+        $view = $view === 'outstanding' ? 'outstanding' : 'payments';
+        $status = $this->normalizeStatusFilter((string) ($payload['status'] ?? 'all'));
+        $level = trim((string) ($payload['level'] ?? ''));
+        $class = trim((string) ($payload['class'] ?? ''));
+        $department = trim((string) ($payload['department'] ?? ''));
+        $search = trim((string) ($payload['search'] ?? ''));
+
+        if ($view === 'outstanding') {
+            $baseRows = $this->buildOutstandingRows($schoolId, (int) $session->id, (int) $term->id, $search);
+        } else {
+            $baseRows = $this->buildPaymentRows($schoolId, (int) $session->id, (int) $term->id, $search, $status);
+        }
+        $rows = $this->applyCommonFilters($baseRows, $level, $class, $department);
+        $rows = collect($rows)->values()->map(function ($row, $idx) {
+            $row['sn'] = $idx + 1;
+            return $row;
+        })->all();
+
+        $school = School::query()->find($schoolId);
+        $totals = [
+            'paid' => (float) collect($rows)->sum(fn ($row) => (float) ($row['amount_paid'] ?? 0)),
+            'outstanding' => (float) collect($rows)->sum(fn ($row) => (float) ($row['amount_outstanding'] ?? 0)),
+        ];
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.school_admin_payments_summary', [
+                'school' => $school,
+                'session' => $session,
+                'term' => $term,
+                'viewMode' => $view,
+                'statusMode' => $status,
+                'rows' => $rows,
+                'totals' => $totals,
+                'filters' => [
+                    'level' => $level,
+                    'class' => $class,
+                    'department' => $department,
+                    'search' => $search,
+                ],
+                'generatedAt' => now(),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+
+            $fileName = 'payments_' . $view . '_' . now()->format('Ymd_His') . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate payments PDF.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function studentPlan(Request $request, User $user)
@@ -413,6 +495,347 @@ class PaymentsController extends Controller
                 'amount_due' => (float) $plan->amount_due,
             ],
         ]);
+    }
+
+    private function buildPaymentRows(int $schoolId, int $sessionId, int $termId, string $search, string $status): array
+    {
+        $query = SchoolFeePayment::query()
+            ->where('school_fee_payments.school_id', $schoolId)
+            ->where('school_fee_payments.academic_session_id', $sessionId)
+            ->where('school_fee_payments.term_id', $termId)
+            ->join('students', 'students.id', '=', 'school_fee_payments.student_id')
+            ->join('users', 'users.id', '=', 'school_fee_payments.student_user_id')
+            ->select([
+                'school_fee_payments.id',
+                'school_fee_payments.reference',
+                'school_fee_payments.amount_due_snapshot',
+                'school_fee_payments.amount_paid',
+                'school_fee_payments.currency',
+                'school_fee_payments.status',
+                'school_fee_payments.paystack_status',
+                'school_fee_payments.paystack_gateway_response',
+                'school_fee_payments.paid_at',
+                'school_fee_payments.created_at',
+                'students.id as student_id',
+                'students.education_level as student_level',
+                'users.name as student_name',
+                'users.email as student_email',
+                'users.username as student_username',
+            ])
+            ->orderByDesc('school_fee_payments.id');
+
+        if ($search !== '') {
+            $query->where(function ($sub) use ($search) {
+                $sub->where('users.name', 'like', "%{$search}%")
+                    ->orWhere('users.email', 'like', "%{$search}%")
+                    ->orWhere('users.username', 'like', "%{$search}%")
+                    ->orWhere('school_fee_payments.reference', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status === 'successful') {
+            $query->where('school_fee_payments.status', 'success');
+        } elseif ($status === 'unsuccessful') {
+            $query->where('school_fee_payments.status', '!=', 'success');
+        }
+
+        $rows = $query->get();
+        $studentIds = $rows->pluck('student_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+        $placements = $this->resolvePlacementMap($schoolId, $sessionId, $termId, $studentIds);
+        $paidTotals = SchoolFeePayment::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId)
+            ->where('status', 'success')
+            ->whereIn('student_id', $studentIds)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(amount_paid) as total_paid')
+            ->pluck('total_paid', 'student_id');
+
+        return $rows->map(function ($row) use ($placements, $paidTotals) {
+            $studentId = (int) $row->student_id;
+            $placement = $placements[$studentId] ?? [
+                'level' => strtolower(trim((string) ($row->student_level ?? ''))),
+                'class_name' => null,
+                'department_name' => null,
+            ];
+
+            $status = (string) $row->status;
+            $failureReason = null;
+            if ($status !== 'success') {
+                $failureReason = (string) ($row->paystack_gateway_response ?: $row->paystack_status ?: 'Payment unsuccessful');
+            }
+
+            $amountRemaining = max((float) $row->amount_due_snapshot - (float) ($paidTotals[$studentId] ?? 0), 0);
+
+            return [
+                'id' => (int) $row->id,
+                'reference' => $row->reference,
+                'amount_paid' => (float) $row->amount_paid,
+                'currency' => $row->currency,
+                'status' => $status,
+                'paid_at' => $row->paid_at,
+                'created_at' => $row->created_at,
+                'failure_reason' => $failureReason,
+                'level' => $placement['level'] ?: '-',
+                'class_name' => $placement['class_name'] ?: '-',
+                'department_name' => $placement['department_name'] ?: '-',
+                'amount_outstanding' => (float) $amountRemaining,
+                'student' => [
+                    'id' => $studentId,
+                    'name' => $row->student_name,
+                    'email' => $row->student_email,
+                    'username' => $row->student_username,
+                ],
+            ];
+        })->values()->all();
+    }
+
+    private function buildOutstandingRows(int $schoolId, int $sessionId, int $termId, string $search): array
+    {
+        $studentsQuery = Student::query()
+            ->where('students.school_id', $schoolId)
+            ->join('users', 'users.id', '=', 'students.user_id')
+            ->where('users.role', 'student')
+            ->select([
+                'students.id as student_id',
+                'students.education_level as student_level',
+                'users.name as student_name',
+                'users.email as student_email',
+                'users.username as student_username',
+            ])
+            ->orderBy('users.name');
+
+        if ($search !== '') {
+            $studentsQuery->where(function ($sub) use ($search) {
+                $sub->where('users.name', 'like', "%{$search}%")
+                    ->orWhere('users.email', 'like', "%{$search}%")
+                    ->orWhere('users.username', 'like', "%{$search}%");
+            });
+        }
+
+        $students = $studentsQuery->get();
+        $studentIds = $students->pluck('student_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $placements = $this->resolvePlacementMap($schoolId, $sessionId, $termId, $studentIds);
+
+        $paidTotals = SchoolFeePayment::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId)
+            ->where('status', 'success')
+            ->whereIn('student_id', $studentIds)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(amount_paid) as total_paid')
+            ->pluck('total_paid', 'student_id');
+
+        $plans = StudentFeePlan::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId)
+            ->whereIn('student_id', $studentIds)
+            ->get(['student_id', 'amount_due'])
+            ->keyBy('student_id');
+
+        $settings = SchoolFeeSetting::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId)
+            ->get();
+        $settingsByLevel = $settings
+            ->filter(fn ($row) => !empty($row->level))
+            ->keyBy(fn ($row) => strtolower(trim((string) $row->level)));
+        $legacy = $settings->first(fn ($row) => empty($row->level));
+
+        $rows = [];
+        foreach ($students as $student) {
+            $studentId = (int) $student->student_id;
+            $placement = $placements[$studentId] ?? [
+                'level' => strtolower(trim((string) ($student->student_level ?? ''))),
+                'class_name' => null,
+                'department_name' => null,
+            ];
+
+            $level = $placement['level'] ?: strtolower(trim((string) ($student->student_level ?? '')));
+            $customPlan = $plans->get($studentId);
+            if ($customPlan) {
+                $amountDue = (float) $customPlan->amount_due;
+            } else {
+                $amountDue = isset($settingsByLevel[$level])
+                    ? (float) $settingsByLevel[$level]->amount_due
+                    : (float) ($legacy?->amount_due ?? 0);
+            }
+
+            $amountPaid = (float) ($paidTotals[$studentId] ?? 0);
+            $amountOutstanding = max($amountDue - $amountPaid, 0);
+            if ($amountOutstanding <= 0.00001) {
+                continue;
+            }
+
+            $rows[] = [
+                'student' => [
+                    'id' => $studentId,
+                    'name' => (string) $student->student_name,
+                    'email' => (string) $student->student_email,
+                    'username' => (string) $student->student_username,
+                ],
+                'level' => $level ?: '-',
+                'class_name' => $placement['class_name'] ?: '-',
+                'department_name' => $placement['department_name'] ?: '-',
+                'amount_paid' => $amountPaid,
+                'amount_outstanding' => $amountOutstanding,
+            ];
+        }
+
+        return collect($rows)
+            ->sortBy(fn ($row) => strtolower((string) ($row['student']['name'] ?? '')))
+            ->values()
+            ->all();
+    }
+
+    private function extractFilterOptions(array $rows): array
+    {
+        $levels = collect($rows)->map(fn ($row) => strtolower(trim((string) ($row['level'] ?? ''))))
+            ->filter(fn ($v) => $v !== '' && $v !== '-')
+            ->unique()->sort()->values()->all();
+        $classes = collect($rows)->map(fn ($row) => trim((string) ($row['class_name'] ?? '')))
+            ->filter(fn ($v) => $v !== '' && $v !== '-')
+            ->unique()->sort()->values()->all();
+        $departments = collect($rows)->map(fn ($row) => trim((string) ($row['department_name'] ?? '')))
+            ->filter(fn ($v) => $v !== '' && $v !== '-')
+            ->unique()->sort()->values()->all();
+
+        return [
+            'levels' => $levels,
+            'classes' => $classes,
+            'departments' => $departments,
+        ];
+    }
+
+    private function applyCommonFilters(array $rows, string $level, string $class, string $department): array
+    {
+        $levelNeedle = strtolower(trim($level));
+        $classNeedle = strtolower(trim($class));
+        $departmentNeedle = strtolower(trim($department));
+
+        return collect($rows)->filter(function ($row) use ($levelNeedle, $classNeedle, $departmentNeedle) {
+            $rowLevel = strtolower(trim((string) ($row['level'] ?? '')));
+            $rowClass = strtolower(trim((string) ($row['class_name'] ?? '')));
+            $rowDepartment = strtolower(trim((string) ($row['department_name'] ?? '')));
+
+            if ($levelNeedle !== '' && $rowLevel !== $levelNeedle) {
+                return false;
+            }
+            if ($classNeedle !== '' && $rowClass !== $classNeedle) {
+                return false;
+            }
+            if ($departmentNeedle !== '' && $rowDepartment !== $departmentNeedle) {
+                return false;
+            }
+
+            return true;
+        })->values()->all();
+    }
+
+    private function resolvePlacementMap(int $schoolId, int $sessionId, int $termId, array $studentIds): array
+    {
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $map = [];
+
+        $enrollments = DB::table('enrollments')
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id')
+            ->whereIn('enrollments.student_id', $studentIds)
+            ->where('enrollments.term_id', $termId)
+            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($query) use ($schoolId) {
+                $query->where('enrollments.school_id', $schoolId);
+            })
+            ->where('classes.school_id', $schoolId)
+            ->orderByDesc('enrollments.id')
+            ->select([
+                'enrollments.student_id',
+                'classes.level as level',
+                'classes.name as class_name',
+                'class_departments.name as department_name',
+            ])
+            ->get();
+
+        foreach ($enrollments as $row) {
+            $sid = (int) $row->student_id;
+            if (isset($map[$sid])) {
+                continue;
+            }
+            $map[$sid] = [
+                'level' => strtolower(trim((string) ($row->level ?? ''))),
+                'class_name' => trim((string) ($row->class_name ?? '')),
+                'department_name' => trim((string) ($row->department_name ?? '')),
+            ];
+        }
+
+        $missingIds = array_values(array_diff($studentIds, array_keys($map)));
+        if (!empty($missingIds)) {
+            $classRows = DB::table('class_students')
+                ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                ->where('class_students.school_id', $schoolId)
+                ->where('class_students.academic_session_id', $sessionId)
+                ->whereIn('class_students.student_id', $missingIds)
+                ->orderByDesc('class_students.id')
+                ->select([
+                    'class_students.student_id',
+                    'classes.level as level',
+                    'classes.name as class_name',
+                ])
+                ->get();
+
+            foreach ($classRows as $row) {
+                $sid = (int) $row->student_id;
+                if (isset($map[$sid])) {
+                    continue;
+                }
+                $map[$sid] = [
+                    'level' => strtolower(trim((string) ($row->level ?? ''))),
+                    'class_name' => trim((string) ($row->class_name ?? '')),
+                    'department_name' => '',
+                ];
+            }
+        }
+
+        return $map;
+    }
+
+    private function paginateRows(array $rows, int $perPage, int $page): LengthAwarePaginator
+    {
+        $collection = collect($rows)->values();
+        $total = $collection->count();
+        $items = $collection->forPage($page, $perPage)->values()->all();
+
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
+    }
+
+    private function normalizeStatusFilter(string $status): string
+    {
+        $needle = strtolower(trim($status));
+        return match ($needle) {
+            'successful', 'success' => 'successful',
+            'unsuccessful', 'failed', 'failure' => 'unsuccessful',
+            default => 'all',
+        };
     }
 
     private function resolveCurrentSessionAndTerm(int $schoolId): array
