@@ -359,6 +359,14 @@ export default function ActiveUsers() {
                     >
                       {deletingId === u.id ? "Deleting..." : "Delete"}
                     </button>
+                    {role === "student" ? (
+                      <button
+                        style={{ marginLeft: 8 }}
+                        onClick={() => navigate(`/school/admin/users/student/${u.id}/set-payment`)}
+                      >
+                        Set Payment
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
                 );

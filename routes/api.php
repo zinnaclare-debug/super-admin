@@ -131,6 +131,10 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/payments', [SchoolAdminPaymentsController::class, 'index'])
         ->middleware('feature:school fees');
+    Route::get('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'studentPlan'])
+        ->middleware('feature:users');
+    Route::put('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'upsertStudentPlan'])
+        ->middleware('feature:users');
 
     Route::get('/school-admin/announcements', [SchoolAdminAnnouncementController::class, 'index'])
         ->middleware('feature:announcements');
@@ -430,6 +434,8 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::post('/student/school-fees/initialize', [StudentSchoolFeesController::class, 'initialize'])
         ->middleware('feature:school fees');
     Route::get('/student/school-fees/verify', [StudentSchoolFeesController::class, 'verify'])
+        ->middleware('feature:school fees');
+    Route::get('/student/school-fees/payments/{payment}/receipt', [StudentSchoolFeesController::class, 'receipt'])
         ->middleware('feature:school fees');
     Route::get('/student/results/classes', [StudentResultsController::class, 'classes']);
     Route::get('/student/results', [StudentResultsController::class, 'index']);

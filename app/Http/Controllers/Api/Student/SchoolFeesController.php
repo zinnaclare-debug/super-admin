@@ -8,13 +8,18 @@ use App\Models\School;
 use App\Models\SchoolFeePayment;
 use App\Models\SchoolFeeSetting;
 use App\Models\Student;
+use App\Models\StudentFeePlan;
 use App\Models\Term;
 use Carbon\Carbon;
 use App\Models\Enrollment;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SchoolFeesController extends Controller
@@ -41,14 +46,14 @@ class SchoolFeesController extends Controller
             (int) $session->id,
             (int) $term->id
         );
-        $setting = $this->resolveFeeSetting(
+        $feeSource = $this->resolveStudentFeeSource(
             $schoolId,
+            (int) $student->id,
             (int) $session->id,
             (int) $term->id,
             $studentLevel
         );
-
-        $amountDue = (float) ($setting?->amount_due ?? 0);
+        $amountDue = (float) $feeSource['amount_due'];
         $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
             ->where('student_id', $student->id)
             ->where('academic_session_id', $session->id)
@@ -72,6 +77,7 @@ class SchoolFeesController extends Controller
                     'status' => $p->status,
                     'paid_at' => optional($p->paid_at)?->toDateTimeString(),
                     'created_at' => optional($p->created_at)?->toDateTimeString(),
+                    'receipt_download_url' => '/api/student/school-fees/payments/' . $p->id . '/receipt',
                 ];
             })
             ->values();
@@ -89,11 +95,13 @@ class SchoolFeesController extends Controller
                 ],
                 'fee' => [
                     'student_level' => $studentLevel,
-                    'configured_level' => $setting?->level,
+                    'configured_level' => $feeSource['configured_level'],
                     'amount_due' => $amountDue,
                     'total_paid' => $totalPaid,
                     'outstanding' => $outstanding,
                     'is_fully_paid' => $outstanding <= 0.00001,
+                    'source' => $feeSource['source'],
+                    'line_items' => $feeSource['line_items'],
                 ],
                 'student' => [
                     'id' => $student->id,
@@ -128,14 +136,14 @@ class SchoolFeesController extends Controller
             (int) $session->id,
             (int) $term->id
         );
-        $setting = $this->resolveFeeSetting(
+        $feeSource = $this->resolveStudentFeeSource(
             $schoolId,
+            (int) $student->id,
             (int) $session->id,
             (int) $term->id,
             $studentLevel
         );
-
-        $amountDue = (float) ($setting?->amount_due ?? 0);
+        $amountDue = (float) $feeSource['amount_due'];
         if ($amountDue <= 0) {
             $message = $studentLevel
                 ? "School fees have not been configured for {$studentLevel} level yet."
@@ -230,6 +238,8 @@ class SchoolFeesController extends Controller
                 'student_name' => $user->name,
                 'student_email' => $user->email,
                 'student_username' => $user->username,
+                'fee_source' => $feeSource['source'],
+                'fee_line_items' => $feeSource['line_items'],
             ],
         ]);
 
@@ -345,6 +355,125 @@ class SchoolFeesController extends Controller
         ]);
     }
 
+    public function receipt(Request $request, SchoolFeePayment $payment)
+    {
+        $user = $request->user();
+        $schoolId = (int) $user->school_id;
+
+        $student = Student::query()
+            ->where('school_id', $schoolId)
+            ->where('user_id', (int) $user->id)
+            ->firstOrFail();
+
+        if (
+            (int) $payment->school_id !== $schoolId
+            || (int) $payment->student_id !== (int) $student->id
+            || (int) $payment->student_user_id !== (int) $user->id
+        ) {
+            return response()->json(['message' => 'Receipt not found.'], 404);
+        }
+
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $session = AcademicSession::query()->find((int) $payment->academic_session_id);
+        $term = Term::query()->find((int) $payment->term_id);
+
+        $studentLevel = $this->resolveStudentLevel(
+            $schoolId,
+            (int) $student->id,
+            (int) $payment->academic_session_id,
+            (int) $payment->term_id
+        );
+        $placement = $this->resolveStudentPlacement((int) $student->id, (int) $payment->term_id);
+
+        $meta = is_array($payment->meta) ? $payment->meta : [];
+        $lineItems = $this->normalizeLineItems((array) ($meta['fee_line_items'] ?? []));
+        if (empty($lineItems)) {
+            $feeSource = $this->resolveStudentFeeSource(
+                $schoolId,
+                (int) $student->id,
+                (int) $payment->academic_session_id,
+                (int) $payment->term_id,
+                $studentLevel
+            );
+            $lineItems = $feeSource['line_items'];
+            if (empty($lineItems)) {
+                $lineItems = [[
+                    'description' => 'School Fees',
+                    'amount' => (float) $payment->amount_due_snapshot,
+                ]];
+            }
+        }
+
+        $totalPaid = (float) SchoolFeePayment::query()
+            ->where('school_id', $schoolId)
+            ->where('student_id', (int) $student->id)
+            ->where('academic_session_id', (int) $payment->academic_session_id)
+            ->where('term_id', (int) $payment->term_id)
+            ->where('status', 'success')
+            ->sum('amount_paid');
+        $amountDue = (float) $payment->amount_due_snapshot;
+        $outstanding = max($amountDue - $totalPaid, 0);
+
+        $logoDataUri = $this->logoDataUri($school->logo_path);
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.school_fee_receipt', [
+                'school' => $school,
+                'logoDataUri' => $logoDataUri,
+                'studentUser' => $user,
+                'student' => $student,
+                'studentLevel' => $studentLevel,
+                'className' => $placement['class_name'],
+                'departmentName' => $placement['department_name'],
+                'session' => $session,
+                'term' => $term,
+                'payment' => $payment,
+                'lineItems' => $lineItems,
+                'amountDue' => $amountDue,
+                'totalPaid' => $totalPaid,
+                'outstanding' => $outstanding,
+                'generatedAt' => Date::now(),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $safeReference = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $payment->reference);
+            $filename = 'fee_receipt_' . ($safeReference ?: $payment->id) . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate receipt PDF.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function resolveCurrentSessionAndTerm(int $schoolId): array
     {
         $session = AcademicSession::where('school_id', $schoolId)
@@ -423,5 +552,114 @@ class SchoolFeesController extends Controller
 
         $normalized = strtolower(trim((string) $level));
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function resolveStudentFeeSource(
+        int $schoolId,
+        int $studentId,
+        int $sessionId,
+        int $termId,
+        ?string $studentLevel
+    ): array {
+        $plan = StudentFeePlan::query()
+            ->where('school_id', $schoolId)
+            ->where('student_id', $studentId)
+            ->where('academic_session_id', $sessionId)
+            ->where('term_id', $termId)
+            ->first();
+
+        if ($plan) {
+            $lineItems = $this->normalizeLineItems((array) ($plan->line_items ?? []));
+
+            return [
+                'source' => 'student_plan',
+                'amount_due' => (float) $plan->amount_due,
+                'configured_level' => $studentLevel,
+                'line_items' => $lineItems,
+            ];
+        }
+
+        $setting = $this->resolveFeeSetting($schoolId, $sessionId, $termId, $studentLevel);
+        $amountDue = (float) ($setting?->amount_due ?? 0);
+        $lineItems = $amountDue > 0 ? [[
+            'description' => 'School Fees',
+            'amount' => $amountDue,
+        ]] : [];
+
+        return [
+            'source' => 'level_setting',
+            'amount_due' => $amountDue,
+            'configured_level' => $setting?->level,
+            'line_items' => $lineItems,
+        ];
+    }
+
+    private function normalizeLineItems(array $items): array
+    {
+        return collect($items)
+            ->map(function ($item, $index) {
+                $description = trim((string) ($item['description'] ?? ''));
+                $amountRaw = $item['amount'] ?? null;
+                $amount = is_numeric($amountRaw) ? round((float) $amountRaw, 2) : null;
+
+                if ($description === '' && ($amount === null || $amount <= 0)) {
+                    return null;
+                }
+
+                if ($description === '') {
+                    $description = 'Fee Item ' . ((int) $index + 1);
+                }
+
+                return [
+                    'description' => $description,
+                    'amount' => max((float) ($amount ?? 0), 0),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function resolveStudentPlacement(int $studentId, int $termId): array
+    {
+        $placement = [
+            'class_name' => null,
+            'department_name' => null,
+        ];
+
+        $row = DB::table('enrollments')
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id')
+            ->where('enrollments.student_id', $studentId)
+            ->where('enrollments.term_id', $termId)
+            ->orderByDesc('enrollments.id')
+            ->select([
+                'classes.name as class_name',
+                'class_departments.name as department_name',
+            ])
+            ->first();
+
+        if ($row) {
+            $placement['class_name'] = $row->class_name ? (string) $row->class_name : null;
+            $placement['department_name'] = $row->department_name ? (string) $row->department_name : null;
+        }
+
+        return $placement;
+    }
+
+    private function logoDataUri(?string $logoPath): ?string
+    {
+        if (!$logoPath || !Storage::disk('public')->exists($logoPath)) {
+            return null;
+        }
+
+        $fullPath = Storage::disk('public')->path($logoPath);
+        $mime = @mime_content_type($fullPath) ?: 'image/png';
+        $data = @file_get_contents($fullPath);
+        if ($data === false) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($data);
     }
 }

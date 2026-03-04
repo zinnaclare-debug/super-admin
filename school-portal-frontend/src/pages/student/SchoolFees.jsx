@@ -10,6 +10,13 @@ function formatMoney(value) {
   return Number(value || 0).toFixed(2);
 }
 
+const parseFileName = (headers, fallback = "fee_receipt.pdf") => {
+  const contentDisposition = headers?.["content-disposition"] || "";
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!match?.[1]) return fallback;
+  return decodeURIComponent(match[1].replace(/"/g, "").trim());
+};
+
 export default function StudentSchoolFees() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -92,6 +99,25 @@ export default function StudentSchoolFees() {
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to initialize payment.");
       setPaying(false);
+    }
+  };
+
+  const downloadReceipt = async (paymentId, reference) => {
+    try {
+      const res = await api.get(`/api/student/school-fees/payments/${paymentId}/receipt`, {
+        responseType: "blob",
+      });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, `fee_receipt_${reference || paymentId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download receipt.");
     }
   };
 
@@ -206,6 +232,7 @@ export default function StudentSchoolFees() {
                       <th>Amount</th>
                       <th>Status</th>
                       <th>Date</th>
+                      <th>Receipt</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -218,11 +245,19 @@ export default function StudentSchoolFees() {
                         </td>
                         <td>{p.status}</td>
                         <td>{p.paid_at || p.created_at || "-"}</td>
+                        <td>
+                          <button
+                            onClick={() => downloadReceipt(p.id, p.reference)}
+                            disabled={p.status !== "success"}
+                          >
+                            Download
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {(summary?.payments || []).length === 0 ? (
                       <tr>
-                        <td colSpan="5">No payments yet.</td>
+                        <td colSpan="6">No payments yet.</td>
                       </tr>
                     ) : null}
                   </tbody>

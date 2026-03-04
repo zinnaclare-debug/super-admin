@@ -27,6 +27,7 @@ import UsersRoleHome from "./pages/school-admin/Users/UsersRoleHome";
 import ActiveUsers from "./pages/school-admin/Users/ActiveUsers";
 import InactiveUsers from "./pages/school-admin/Users/InactiveUsers";
 import LoginDetails from "./pages/school-admin/Users/LoginDetails";
+import StudentPaymentSetup from "./pages/school-admin/Users/StudentPaymentSetup";
 
 // School Admin - Academic Session feature
 import AcademicSessions from "./pages/school-admin/academics/AcademicSessions";
@@ -143,6 +144,7 @@ function App() {
         {/* Users */}
         <Route path="admin/users" element={<UsersHome />}>
           <Route path="login-details" element={<LoginDetails />} />
+          <Route path="student/:userId/set-payment" element={<StudentPaymentSetup />} />
           <Route path=":role" element={<UsersRoleHome />}>
             <Route path="active" element={<ActiveUsers />} />
             <Route path="inactive" element={<InactiveUsers />} />
