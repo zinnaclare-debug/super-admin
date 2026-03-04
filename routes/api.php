@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\TenantContextController;
+use App\Http\Controllers\Api\Payments\PaystackWebhookController;
 
 use App\Http\Controllers\Api\SuperAdmin\SchoolController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolFeatureController;
@@ -60,6 +61,7 @@ use App\Http\Controllers\Api\Student\AnnouncementController as StudentAnnounceme
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/tenant/context', [TenantContextController::class, 'show']);
+Route::post('/payments/paystack/webhook', [PaystackWebhookController::class, 'handle']);
 
 /*
 |--------------------------------------------------------------------------
