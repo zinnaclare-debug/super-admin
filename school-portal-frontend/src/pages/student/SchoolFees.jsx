@@ -248,12 +248,13 @@ export default function StudentSchoolFees() {
                         <td>{p.failure_reason || "-"}</td>
                         <td>{p.paid_at || p.created_at || "-"}</td>
                         <td>
-                          <button
-                            onClick={() => downloadReceipt(p.id, p.reference)}
-                            disabled={p.status !== "success"}
-                          >
-                            Download
-                          </button>
+                          {p.status === "success" ? (
+                            <button onClick={() => downloadReceipt(p.id, p.reference)}>
+                              Download
+                            </button>
+                          ) : (
+                            "-"
+                          )}
                         </td>
                       </tr>
                     ))}
