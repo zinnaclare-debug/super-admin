@@ -129,7 +129,7 @@ class ELibraryController extends Controller
       'title' => 'required|string|max:150',
       'author' => 'nullable|string|max:150',
       'description' => 'nullable|string|max:500',
-      'file' => 'required|file|mimes:pdf|max:20480',
+      'file' => 'required|file|mimes:pdf|max:150',
     ]);
 
     // ✅ enforce: term_subject belongs to same school AND assigned to this teacher

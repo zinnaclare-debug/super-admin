@@ -255,7 +255,7 @@ class UserManagementController extends Controller
             'guardian_relationship' => ['nullable', 'string', 'max:255'],
 
             'remove_photo' => ['nullable', 'boolean'],
-            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:150'],
         ];
 
         if ($user->role === 'student') {

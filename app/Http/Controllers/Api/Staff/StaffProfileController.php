@@ -94,7 +94,7 @@ class StaffProfileController extends Controller
         }
 
         $request->validate([
-            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:150',
         ]);
 
         $staffProfile = $user->staffProfile;

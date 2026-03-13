@@ -124,7 +124,7 @@ class RegistrationController extends Controller
             'department_id' => 'nullable|integer|exists:class_departments,id',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
         $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
@@ -172,7 +172,7 @@ class RegistrationController extends Controller
             'department_id' => 'nullable|integer|exists:class_departments,id',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
         $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
@@ -204,7 +204,7 @@ class RegistrationController extends Controller
             'department_id' => 'nullable|integer|exists:class_departments,id',
             'sex' => 'required_if:role,staff|nullable|in:M,F,male,female',
             'dob' => 'required_if:role,staff|nullable|date',
-            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
         $username = $this->generateUsername($school, (string) $request->name);
@@ -279,7 +279,7 @@ class RegistrationController extends Controller
     public function bulkPreview(Request $request)
     {
         $request->validate([
-            'csv' => 'required|file|mimes:csv,txt|max:10240',
+            'csv' => 'required|file|mimes:csv,txt|max:150',
         ]);
 
         $school = $request->user()->school;
@@ -359,7 +359,7 @@ class RegistrationController extends Controller
     public function bulkConfirm(Request $request)
     {
         $request->validate([
-            'csv' => 'required|file|mimes:csv,txt|max:10240',
+            'csv' => 'required|file|mimes:csv,txt|max:150',
         ]);
 
         $school = $request->user()->school;

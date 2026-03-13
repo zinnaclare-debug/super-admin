@@ -100,7 +100,7 @@ class TeacherTopicsController extends Controller
 
         $data = $request->validate([
             'title' => 'nullable|string|max:150',
-            'file'  => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'file'  => 'required|file|mimes:pdf,doc,docx|max:150',
         ]);
 
         $file = $request->file('file');

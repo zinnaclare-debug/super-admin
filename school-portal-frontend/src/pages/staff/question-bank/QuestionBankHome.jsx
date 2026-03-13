@@ -230,7 +230,7 @@ export default function QuestionBankHome() {
       const compressed = await compressBrandingImage(file, {
         maxWidth: 1600,
         maxHeight: 1600,
-        maxBytes: 400 * 1024,
+        maxBytes: 150 * 1024,
       });
       setDraft((prev) => ({ ...prev, media: compressed }));
     } catch (error) {

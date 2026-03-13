@@ -79,7 +79,7 @@ class DashboardController extends Controller
         }
 
         $request->validate([
-            'logo' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'logo' => 'required|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
         $file = $request->file('logo');

@@ -178,7 +178,7 @@ export default function SchoolInformation() {
       const compressed = await compressBrandingImage(
         file,
         kind === "signature"
-          ? { maxWidth: 1200, maxHeight: 400, maxBytes: 180 * 1024 }
+          ? { maxWidth: 1200, maxHeight: 400, maxBytes: 150 * 1024 }
           : { maxWidth: 1200, maxHeight: 1200, maxBytes: BRANDING_IMAGE_GUIDE.maxBytes }
       );
 

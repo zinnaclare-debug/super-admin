@@ -1,12 +1,12 @@
 const OUTPUT_SIZE = 512;
 const OUTPUT_TYPE = "image/jpeg";
 const OUTPUT_EXTENSION = "jpg";
-const MAX_OUTPUT_BYTES = 250 * 1024;
+const MAX_OUTPUT_BYTES = 150 * 1024;
 const MIN_QUALITY = 0.55;
 const INITIAL_QUALITY = 0.82;
 const DEFAULT_BRANDING_MAX_WIDTH = 1200;
 const DEFAULT_BRANDING_MAX_HEIGHT = 1200;
-const DEFAULT_BRANDING_MAX_BYTES = 350 * 1024;
+const DEFAULT_BRANDING_MAX_BYTES = 150 * 1024;
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {

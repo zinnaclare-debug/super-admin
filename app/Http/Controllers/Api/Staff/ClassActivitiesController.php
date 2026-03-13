@@ -155,7 +155,7 @@ class ClassActivitiesController extends Controller
       'term_subject_id' => 'required|integer',
       'title' => 'required|string|max:150',
       'description' => 'nullable|string|max:1000',
-      'file' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,jpg,jpeg,png|max:20480',
+      'file' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,jpg,jpeg,png|max:150',
     ]);
 
     $session = AcademicSession::where('school_id', $schoolId)

@@ -75,7 +75,7 @@ export default function ClassActivitiesHome() {
       const compressed = await compressBrandingImage(selected, {
         maxWidth: 1600,
         maxHeight: 1600,
-        maxBytes: 400 * 1024,
+        maxBytes: 150 * 1024,
       });
       setFile(compressed);
     } catch (error) {

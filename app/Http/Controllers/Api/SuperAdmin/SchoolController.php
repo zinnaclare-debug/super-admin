@@ -249,8 +249,8 @@ foreach ($defs as $def) {
                 'max:100',
                 'regex:/^[A-Za-z0-9_-]+$/',
             ],
-            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
+            'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
         $hasNameField = $request->has('head_of_school_name');

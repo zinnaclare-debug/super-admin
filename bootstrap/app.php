@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -29,5 +30,13 @@ return Application::configure(basePath: dirname(__DIR__))
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (PostTooLargeException $exception, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Too large. Upload files must not exceed 150 KB.',
+                ], 413);
+            }
+
+            return null;
+        });
     })->create();

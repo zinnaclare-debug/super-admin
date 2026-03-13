@@ -474,7 +474,7 @@ class QuestionBankController extends Controller
       'option_d' => 'nullable|string',
       'correct_option' => 'required|string|in:A,B,C,D',
       'explanation' => 'nullable|string',
-      'media' => 'nullable|file|mimes:jpg,jpeg,png,mp4,webm,pdf|max:20480',
+      'media' => 'nullable|file|mimes:jpg,jpeg,png,mp4,webm,pdf|max:150',
       'media_type' => 'nullable|string|in:image,video,formula',
       'source_type' => 'nullable|string|in:manual,ai',
     ]);
