@@ -4,6 +4,7 @@ import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import faqArt from "../../../assets/question-bank/faq.svg";
 import questionsArt from "../../../assets/question-bank/questions.svg";
 import searchingArt from "../../../assets/question-bank/searching.svg";
+import { compressBrandingImage } from "../../../utils/profileImage";
 import "./QuestionBankHome.css";
 
 const defaultQuestion = {
@@ -32,6 +33,7 @@ export default function QuestionBankHome() {
   const [aiCount, setAiCount] = useState(3);
   const [aiImport, setAiImport] = useState(true);
   const [aiFallbackMessage, setAiFallbackMessage] = useState("");
+  const [processingMedia, setProcessingMedia] = useState(false);
   const manualCreateRef = useRef(null);
   const questionTextRef = useRef(null);
 
@@ -209,6 +211,37 @@ export default function QuestionBankHome() {
   const cleanQuestionText = (text) =>
     String(text || "").replace(/^\s*(?:\(?\d+\)?[\).\-\:]*|[ivxlcdm]+[\).\-\:])\s*/i, "").trim();
 
+  const handleMediaPick = async (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setDraft((prev) => ({ ...prev, media: null }));
+      event.target.value = "";
+      return;
+    }
+
+    if (draft.media_type !== "image" || !String(file.type || "").startsWith("image/")) {
+      setDraft((prev) => ({ ...prev, media: file }));
+      event.target.value = "";
+      return;
+    }
+
+    setProcessingMedia(true);
+    try {
+      const compressed = await compressBrandingImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        maxBytes: 400 * 1024,
+      });
+      setDraft((prev) => ({ ...prev, media: compressed }));
+    } catch (error) {
+      alert(error?.message || "Failed to process image.");
+      setDraft((prev) => ({ ...prev, media: null }));
+    } finally {
+      setProcessingMedia(false);
+      event.target.value = "";
+    }
+  };
+
   return (
     <StaffFeatureLayout title="Question Bank (Staff)">
       <div className="qbx-page">
@@ -358,8 +391,15 @@ export default function QuestionBankHome() {
                 <option value="video">Video</option>
                 <option value="formula">Formula</option>
               </select>
-              <input className="qbx-field" type="file" onChange={(e) => setDraft({ ...draft, media: e.target.files?.[0] || null })} />
+              <input className="qbx-field" type="file" onChange={handleMediaPick} />
             </div>
+            <small className="qbx-state">
+              {processingMedia
+                ? "Processing media..."
+                : draft.media_type === "image"
+                  ? "Question images are auto-compressed before upload."
+                  : "Non-image media uploads are sent unchanged."}
+            </small>
             <textarea
               className="qbx-field"
               rows={2}
@@ -367,8 +407,8 @@ export default function QuestionBankHome() {
               onChange={(e) => setDraft({ ...draft, explanation: e.target.value })}
               placeholder="Explanation (optional)"
             />
-            <button className="qbx-btn" type="submit">
-              Save Question
+            <button className="qbx-btn" type="submit" disabled={processingMedia}>
+              {processingMedia ? "Processing..." : "Save Question"}
             </button>
           </form>
         </section>
