@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import "./SchoolInformation.css";
+import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profileImage";
 
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DEFAULT_EXAM_RECORD = {
   ca_maxes: [30, 0, 0, 0, 0],
@@ -108,6 +108,7 @@ export default function SchoolInformation() {
   const [logoPreview, setLogoPreview] = useState(null);
   const [signatureFile, setSignatureFile] = useState(null);
   const [signaturePreview, setSignaturePreview] = useState(null);
+  const [processingBrandingImage, setProcessingBrandingImage] = useState(false);
 
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
@@ -155,27 +156,52 @@ export default function SchoolInformation() {
     [examRecord]
   );
 
-  const pickFile = (event, kind) => {
+  const pickFile = async (event, kind) => {
     const file = event.target.files?.[0] || null;
+    const resetInput = () => {
+      event.target.value = "";
+    };
+
+    if (!file) {
+      resetInput();
+      return;
+    }
+
     if (file && !ALLOWED_TYPES.includes(file.type)) {
       alert("Image must be JPG, PNG, or WEBP.");
-      event.target.value = "";
-      return;
-    }
-    if (file && file.size > MAX_UPLOAD_BYTES) {
-      alert("Image is too large. Max size is 2MB.");
-      event.target.value = "";
+      resetInput();
       return;
     }
 
-    if (kind === "logo") {
-      setLogoFile(file);
-      setLogoPreview(file ? URL.createObjectURL(file) : null);
-      return;
-    }
+    setProcessingBrandingImage(true);
+    try {
+      const compressed = await compressBrandingImage(
+        file,
+        kind === "signature"
+          ? { maxWidth: 1200, maxHeight: 400, maxBytes: 180 * 1024 }
+          : { maxWidth: 1200, maxHeight: 1200, maxBytes: BRANDING_IMAGE_GUIDE.maxBytes }
+      );
 
-    setSignatureFile(file);
-    setSignaturePreview(file ? URL.createObjectURL(file) : null);
+      if (kind === "logo") {
+        setLogoFile(compressed);
+        setLogoPreview(URL.createObjectURL(compressed));
+      } else {
+        setSignatureFile(compressed);
+        setSignaturePreview(URL.createObjectURL(compressed));
+      }
+    } catch (error) {
+      alert(error?.message || "Failed to process image.");
+      if (kind === "logo") {
+        setLogoFile(null);
+        setLogoPreview(null);
+      } else {
+        setSignatureFile(null);
+        setSignaturePreview(null);
+      }
+    } finally {
+      setProcessingBrandingImage(false);
+      resetInput();
+    }
   };
 
   const saveBranding = async () => {
@@ -480,8 +506,11 @@ export default function SchoolInformation() {
                 style={{ display: "none" }}
               />
               <button type="button" onClick={() => logoInputRef.current?.click()}>
-                Select Logo
+                {processingBrandingImage ? "Processing..." : "Select Logo"}
               </button>
+              <small className="sai-note">
+                Auto-compressed before upload. Recommended max {BRANDING_IMAGE_GUIDE.maxWidth}x{BRANDING_IMAGE_GUIDE.maxHeight}px.
+              </small>
             </div>
           </div>
 
@@ -555,14 +584,15 @@ export default function SchoolInformation() {
                 style={{ display: "none" }}
               />
               <button type="button" onClick={() => signatureInputRef.current?.click()}>
-                Select Signature
+                {processingBrandingImage ? "Processing..." : "Select Signature"}
               </button>
+              <small className="sai-note">Signature is auto-compressed before upload.</small>
             </div>
           </div>
         </div>
 
         <div className="sai-actions">
-          <button type="button" onClick={saveBranding} disabled={savingBranding}>
+          <button type="button" onClick={saveBranding} disabled={savingBranding || processingBrandingImage}>
             {savingBranding ? "Saving..." : "Save Branding"}
           </button>
         </div>

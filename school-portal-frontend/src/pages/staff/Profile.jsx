@@ -3,6 +3,7 @@ import api from "../../services/api";
 import profileArt from "../../assets/profile/profile-card.svg";
 import proudArt from "../../assets/profile/proud-self.svg";
 import "../shared/ProfileShowcase.css";
+import { compressProfilePhoto, PROFILE_PHOTO_GUIDE } from "../../utils/profileImage";
 
 export default function StaffProfile() {
   const [me, setMe] = useState(null);
@@ -10,6 +11,7 @@ export default function StaffProfile() {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(0);
 
   const load = async () => {
@@ -117,6 +119,23 @@ export default function StaffProfile() {
     }
   };
 
+  const handlePhotoPick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessingPhoto(true);
+    try {
+      const compressed = await compressProfilePhoto(file);
+      setPhotoFile(compressed);
+    } catch (error) {
+      alert(error?.message || "Failed to process photo.");
+      setPhotoFile(null);
+    } finally {
+      setProcessingPhoto(false);
+      e.target.value = "";
+    }
+  };
+
   if (loading) {
     return (
       <div className="pf-page pf-page--staff">
@@ -187,12 +206,15 @@ export default function StaffProfile() {
                 className="pf-file-input"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+                onChange={handlePhotoPick}
               />
-              <button className="pf-btn" onClick={uploadPhoto} disabled={!photoFile || uploading}>
+              <button className="pf-btn" onClick={uploadPhoto} disabled={!photoFile || uploading || processingPhoto}>
                 {uploading ? "Uploading..." : "Upload Photo"}
               </button>
             </div>
+            <small className="pf-row-label">
+              Photos are auto-resized to {PROFILE_PHOTO_GUIDE.size}x{PROFILE_PHOTO_GUIDE.size}px and compressed before upload.
+            </small>
           </article>
 
           <article className="pf-card">
