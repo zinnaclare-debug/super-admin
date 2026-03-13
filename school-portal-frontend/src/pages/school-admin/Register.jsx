@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import { compressProfilePhoto, PROFILE_PHOTO_GUIDE } from "../../utils/profileImage";
 
 const prettyLevel = (value) =>
   String(value || "")
@@ -36,6 +37,7 @@ export default function Register() {
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [removePhoto, setRemovePhoto] = useState(false);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [educationLevels, setEducationLevels] = useState([]);
@@ -264,13 +266,24 @@ export default function Register() {
     });
   };
 
-  const onPickPhoto = (e) => {
+  const onPickPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setPhoto(file);
-    setPhotoPreview(URL.createObjectURL(file));
-    setRemovePhoto(false);
+    setProcessingPhoto(true);
+    try {
+      const compressed = await compressProfilePhoto(file);
+      setPhoto(compressed);
+      setPhotoPreview(URL.createObjectURL(compressed));
+      setRemovePhoto(false);
+    } catch (error) {
+      alert(error?.message || "Failed to process photo.");
+      setPhoto(null);
+      setPhotoPreview(null);
+    } finally {
+      setProcessingPhoto(false);
+      e.target.value = "";
+    }
   };
 
   const buildFormData = (extra = {}) => {
@@ -543,6 +556,9 @@ export default function Register() {
               </div>
             </div>
           )}
+          <p style={{ marginTop: 8, marginBottom: 0, opacity: 0.75 }}>
+            Photos are auto-resized to {PROFILE_PHOTO_GUIDE.size}x{PROFILE_PHOTO_GUIDE.size}px and compressed before upload.
+          </p>
 
           {isStudent && (
             <>
@@ -657,14 +673,16 @@ export default function Register() {
 
           <div style={{ marginTop: 14 }}>
             <button type="submit" disabled={submitting}>
-              {isEditMode ? (submitting ? "Saving..." : "Save Changes") : (submitting ? "Generating..." : "Generate Username")}
+              {isEditMode
+                ? (submitting || processingPhoto ? "Saving..." : "Save Changes")
+                : (submitting || processingPhoto ? "Generating..." : "Generate Username")}
             </button>
             {isEditMode && (
               <button
                 type="button"
                 style={{ marginLeft: 8 }}
                 onClick={() => navigate(returnTo)}
-                disabled={submitting}
+                disabled={submitting || processingPhoto}
               >
                 Cancel
               </button>
