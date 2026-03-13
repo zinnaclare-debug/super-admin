@@ -4,6 +4,7 @@ import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import workingTogetherArt from "../../../assets/class-activities/working-together.svg";
 import gradingPapersArt from "../../../assets/class-activities/grading-papers.svg";
 import learningSketchArt from "../../../assets/class-activities/learning-to-sketch.svg";
+import { compressBrandingImage } from "../../../utils/profileImage";
 import "../../student/class-activities/ClassActivitiesHome.css";
 
 function fileNameFromHeaders(headers, fallback) {
@@ -31,6 +32,7 @@ export default function ClassActivitiesHome() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [processingFile, setProcessingFile] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
 
@@ -53,6 +55,37 @@ export default function ClassActivitiesHome() {
   useEffect(() => {
     load();
   }, []);
+
+  const handleFilePick = async (event) => {
+    const selected = event.target.files?.[0] || null;
+    if (!selected) {
+      setFile(null);
+      event.target.value = "";
+      return;
+    }
+
+    if (!String(selected.type || "").startsWith("image/")) {
+      setFile(selected);
+      event.target.value = "";
+      return;
+    }
+
+    setProcessingFile(true);
+    try {
+      const compressed = await compressBrandingImage(selected, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        maxBytes: 400 * 1024,
+      });
+      setFile(compressed);
+    } catch (error) {
+      alert(error?.message || "Failed to process image.");
+      setFile(null);
+    } finally {
+      setProcessingFile(false);
+      event.target.value = "";
+    }
+  };
 
   const upload = async (e) => {
     e.preventDefault();
@@ -175,11 +208,16 @@ export default function ClassActivitiesHome() {
               className="sca-field"
               type="file"
               accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={handleFilePick}
             />
+            <small className="sca-state">
+              {processingFile
+                ? "Processing image..."
+                : "Image uploads are auto-compressed. Document uploads are sent unchanged."}
+            </small>
 
-            <button className="sca-btn" type="submit" disabled={uploading}>
-              {uploading ? "Uploading..." : "Upload Activity"}
+            <button className="sca-btn" type="submit" disabled={uploading || processingFile}>
+              {uploading ? "Uploading..." : processingFile ? "Processing..." : "Upload Activity"}
             </button>
           </form>
         </section>
