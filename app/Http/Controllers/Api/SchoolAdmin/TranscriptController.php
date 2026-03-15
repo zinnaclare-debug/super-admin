@@ -170,7 +170,7 @@ class TranscriptController extends Controller
             unset($entry['view_data']);
             return $entry;
         }, $entries);
-        $groupedEntries = $this->groupEntriesBySessionClass($termEntries);
+        $groupedEntries = $this->groupEntriesBySessionClass($termEntries, $schoolId);
 
         return response()->json([
             'data' => $groupedEntries,
@@ -333,11 +333,12 @@ class TranscriptController extends Controller
     private function renderTranscriptPdfFromEntries(array $entries): string
     {
         $entries = array_values($entries);
+        $firstViewData = $entries[0]['view_data'] ?? [];
+        $schoolId = (int) data_get($firstViewData, 'school.id', 0);
         $groups = $this->groupEntriesBySessionClass(array_map(function (array $entry) {
             unset($entry['view_data']);
             return $entry;
-        }, $entries));
-        $firstViewData = $entries[0]['view_data'] ?? [];
+        }, $entries), $schoolId);
         $lastViewData = $entries[count($entries) - 1]['view_data'] ?? $firstViewData;
 
         $html = view('pdf.transcript_sheet', [
@@ -379,12 +380,13 @@ class TranscriptController extends Controller
     private function renderSimpleTranscriptPdfFromEntries(array $entries): string
     {
         $entries = array_values($entries);
+        $firstViewData = $entries[0]['view_data'] ?? [];
+        $schoolId = (int) data_get($firstViewData, 'school.id', 0);
         $groups = $this->groupEntriesBySessionClass(array_map(function (array $entry) {
             unset($entry['view_data']);
             return $entry;
-        }, $entries));
+        }, $entries), $schoolId);
 
-        $firstViewData = $entries[0]['view_data'] ?? [];
         $lastViewData = $entries[count($entries) - 1]['view_data'] ?? $firstViewData;
         $schoolName = strtoupper((string) data_get($firstViewData, 'school.name', 'SCHOOL'));
         $schoolLocation = strtoupper((string) data_get($firstViewData, 'school.location', ''));
@@ -989,7 +991,7 @@ class TranscriptController extends Controller
         $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds);
 
         return $subjects
-            ->map(function ($r) use ($subjectStats, $studentId) {
+            ->map(function ($r) use ($subjectStats, $studentId, $schoolId) {
                 $ca = (int) ($r->ca ?? 0);
                 $exam = (int) ($r->exam ?? 0);
                 $total = $ca + $exam;
@@ -1042,7 +1044,7 @@ class TranscriptController extends Controller
         }));
     }
 
-    private function groupEntriesBySessionClass(array $entries): array
+    private function groupEntriesBySessionClass(array $entries, int $schoolId): array
     {
         $groups = [];
 
@@ -1361,3 +1363,5 @@ class TranscriptController extends Controller
         }
     }
 }
+
+
