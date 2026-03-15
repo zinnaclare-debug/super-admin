@@ -768,7 +768,7 @@ export default function Register() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bulkPreviewData.rows.slice(0, 30).map((row) => (
+                  {bulkPreviewData.rows.slice(0, 200).map((row) => (
                     <tr key={`${row.row_number}-${row.data?.username || row.data?.name || "row"}`}>
                       <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.row_number}</td>
                       <td
@@ -795,9 +795,9 @@ export default function Register() {
                   ))}
                 </tbody>
               </table>
-              {bulkPreviewData.rows.length > 30 && (
+              {bulkPreviewData.rows.length > 200 && (
                 <p style={{ marginTop: 6, opacity: 0.7 }}>
-                  Showing first 30 rows. Fix errors and re-preview before confirm.
+                  Showing first 200 rows. Fix errors and re-preview before confirm.
                 </p>
               )}
             </div>
@@ -835,3 +835,4 @@ export default function Register() {
     </div>
   );
 }
+
