@@ -120,60 +120,85 @@ class TeacherResultsController extends Controller
       ])
       ->first();
 
-    // students enrolled in the same class + term
-    $rowsQuery = Enrollment::query()
-      ->where('enrollments.class_id', $termSubject->class_id)
-      ->where('enrollments.term_id', $termSubject->term_id)
+    // Build the class list from current term enrollments first, then layer exclusions/results on top.
+    $studentQuery = Enrollment::query()
       ->join('students', 'students.id', '=', 'enrollments.student_id')
       ->join('users', 'users.id', '=', 'students.user_id')
-      ->leftJoin('results', function ($join) use ($termSubject) {
-        $join->on('results.student_id', '=', 'students.id')
-          ->where('results.term_subject_id', '=', $termSubject->id);
-      })
-      ->when($canUseExclusions, function ($query) use ($schoolId, $termSubject, $session) {
-        $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
-          $join->on('student_subject_exclusions.student_id', '=', 'students.id')
-            ->where('student_subject_exclusions.school_id', '=', $schoolId)
-            ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
-            ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
-            ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
-        })
-        ->whereNull('student_subject_exclusions.id');
-      })
+      ->where('enrollments.class_id', (int) $termSubject->class_id)
+      ->where('enrollments.term_id', (int) $termSubject->term_id)
+      ->where('students.school_id', $schoolId)
       ->select([
         'students.id as student_id',
         'users.name as student_name',
-        DB::raw('COALESCE(results.ca, 0) as ca'),
-        ...($hasCaBreakdown ? ['results.ca_breakdown'] : [DB::raw('NULL as ca_breakdown')]),
-        DB::raw('COALESCE(results.exam, 0) as exam'),
       ])
+      ->distinct()
       ->orderBy('users.name');
 
     if (Schema::hasColumn('enrollments', 'school_id')) {
-      $rowsQuery->where('enrollments.school_id', $schoolId);
+      $studentQuery->where('enrollments.school_id', $schoolId);
     }
 
-    $rows = $rowsQuery
-      ->get()
-      ->map(function ($r) use ($assessmentSchema) {
+    $students = $studentQuery->get();
+    $studentIds = $students->pluck('student_id')->map(fn ($id) => (int) $id)->all();
+
+    $excludedStudentIds = [];
+    if ($canUseExclusions && !empty($studentIds)) {
+      $excludedStudentIds = DB::table('student_subject_exclusions')
+        ->where('school_id', $schoolId)
+        ->where('academic_session_id', (int) $session->id)
+        ->where('class_id', (int) $termSubject->class_id)
+        ->where('subject_id', (int) $termSubject->subject_id)
+        ->whereIn('student_id', $studentIds)
+        ->pluck('student_id')
+        ->map(fn ($id) => (int) $id)
+        ->all();
+    }
+
+    $eligibleStudentIds = array_values(array_filter($studentIds, fn ($id) => !in_array((int) $id, $excludedStudentIds, true)));
+
+    $resultsByStudentId = [];
+    if (!empty($eligibleStudentIds)) {
+      $resultsQuery = Result::query()
+        ->where('results.school_id', $schoolId)
+        ->where('results.term_subject_id', (int) $termSubject->id)
+        ->whereIn('results.student_id', $eligibleStudentIds)
+        ->select([
+          'results.student_id',
+          'results.ca',
+          ...($hasCaBreakdown ? ['results.ca_breakdown'] : [DB::raw('NULL as ca_breakdown')]),
+          'results.exam',
+        ]);
+
+      $resultsByStudentId = $resultsQuery
+        ->get()
+        ->keyBy(fn ($row) => (int) $row->student_id)
+        ->all();
+    }
+
+    $rows = $students
+      ->filter(fn ($student) => !in_array((int) $student->student_id, $excludedStudentIds, true))
+      ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId) {
+        $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
         $caBreakdown = AssessmentSchema::normalizeBreakdown(
-          $r->ca_breakdown ?? null,
+          $resultRow->ca_breakdown ?? null,
           $assessmentSchema,
-          (int) ($r->ca ?? 0)
+          (int) ($resultRow->ca ?? 0)
         );
         $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
-        $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
+        $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($resultRow->exam ?? 0)));
         $total = $caTotal + $exam;
+
         return [
-          'student_id' => $r->student_id,
-          'student_name' => $r->student_name,
+          'student_id' => (int) $student->student_id,
+          'student_name' => (string) $student->student_name,
           'ca' => $caTotal,
           'ca_breakdown' => $caBreakdown,
           'exam' => $exam,
           'total' => $total,
           'grade' => $this->gradeFromTotal($schoolId, $total),
         ];
-      });
+      })
+      ->values();
 
     return response()->json([
       'data' => [
