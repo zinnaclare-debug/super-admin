@@ -212,6 +212,17 @@ class GradingSchema
 
     private static function extractRows(mixed $raw): array
     {
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $raw = $decoded;
+            }
+        }
+
+        if (is_object($raw)) {
+            $raw = json_decode(json_encode($raw), true);
+        }
+
         if (is_array($raw) && isset($raw['rows']) && is_array($raw['rows'])) {
             return array_values($raw['rows']);
         }
