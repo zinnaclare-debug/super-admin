@@ -18,6 +18,7 @@ class School extends Model
         'head_of_school_name',
         'head_signature_path',
         'assessment_schema',
+        'grading_schema',
         'department_templates',
         'class_templates',
         'slug',
@@ -30,6 +31,7 @@ class School extends Model
     protected $casts = [
         'results_published' => 'boolean',
         'assessment_schema' => 'array',
+        'grading_schema' => 'array',
         'department_templates' => 'array',
         'class_templates' => 'array',
     ];
@@ -61,3 +63,5 @@ public function admin()
 
 
 }
+
+

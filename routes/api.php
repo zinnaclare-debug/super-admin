@@ -92,6 +92,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/information', [SchoolController::class, 'information']);
     Route::post('/super-admin/schools/{school}/information/branding', [SchoolController::class, 'upsertInformationBranding']);
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
+    Route::put('/super-admin/schools/{school}/information/grading-schema', [SchoolController::class, 'updateInformationGradingSchema']);
     Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
 
     Route::post('/super-admin/schools/create-with-admin', [SchoolController::class, 'createWithAdmin']);
@@ -457,3 +458,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download']);
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
+
+
+

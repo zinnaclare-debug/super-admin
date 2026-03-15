@@ -11,6 +11,49 @@ const DEFAULT_EXAM_RECORD = {
   total_max: 100,
 };
 
+const MAX_GRADING_ROWS = 10;
+const EMPTY_GRADING_ROW = { from: "", to: "", grade: "", remark: "" };
+
+const sanitizeScore = (value) => {
+  if (value === "" || value === null || value === undefined) return "";
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : "";
+};
+
+const recomputeGradingRows = (rows) => {
+  const nextRows = Array.from({ length: MAX_GRADING_ROWS }, (_, index) => {
+    const row = rows[index] || EMPTY_GRADING_ROW;
+    return {
+      from: index === 0 ? 0 : "",
+      to: sanitizeScore(row.to),
+      grade: String(row.grade || ""),
+      remark: String(row.remark || ""),
+    };
+  });
+
+  for (let index = 1; index < nextRows.length; index += 1) {
+    const prev = nextRows[index - 1];
+    const prevTo = sanitizeScore(prev.to);
+    const prevReady = prev.grade.trim() !== "" && prevTo !== "" && prevTo >= prev.from && prevTo < 100;
+    nextRows[index].from = prevReady ? prevTo + 1 : "";
+  }
+
+  return nextRows;
+};
+
+const normalizeGradingRows = (rows) =>
+  recomputeGradingRows(
+    Array.from({ length: MAX_GRADING_ROWS }, (_, index) => {
+      const row = Array.isArray(rows) ? rows[index] || {} : {};
+      return {
+        from: index === 0 ? 0 : sanitizeScore(row.from),
+        to: sanitizeScore(row.to),
+        grade: String(row.grade || ""),
+        remark: String(row.remark || ""),
+      };
+    })
+  );
+
 const toAbsoluteUrl = (u) => {
   if (!u) return "";
   if (/^(https?:\/\/|blob:|data:)/i.test(u)) return u;
@@ -85,6 +128,7 @@ export default function SchoolInformation() {
   const [loading, setLoading] = useState(true);
   const [savingBranding, setSavingBranding] = useState(false);
   const [savingExamRecord, setSavingExamRecord] = useState(false);
+  const [savingGradingSchema, setSavingGradingSchema] = useState(false);
   const [savingClassTemplates, setSavingClassTemplates] = useState(false);
 
   const [school, setSchool] = useState(null);
@@ -114,6 +158,7 @@ export default function SchoolInformation() {
   const signatureInputRef = useRef(null);
 
   const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
+  const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows([]));
   const [classTemplates, setClassTemplates] = useState([]);
 
   useEffect(() => {
@@ -139,6 +184,7 @@ export default function SchoolInformation() {
         setContactPhone(brandingData.contact_phone ?? "");
         setPaystackSubaccountCode(brandingData.paystack_subaccount_code ?? "");
         setExamRecord(normalizeExamRecord(payload.exam_record));
+        setGradingRows(normalizeGradingRows(payload.grading_schema));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
       } catch (err) {
@@ -347,6 +393,93 @@ export default function SchoolInformation() {
     }
   };
 
+  const updateGradingRow = (index, field, value) => {
+    setGradingRows((prev) => {
+      const next = prev.map((row) => ({ ...row }));
+      next[index] = {
+        ...next[index],
+        [field]: field === "to" ? sanitizeScore(value) : value,
+      };
+      return recomputeGradingRows(next);
+    });
+  };
+
+  const saveGradingSchema = async () => {
+    const usedRows = [];
+    let blankEncountered = false;
+
+    for (let index = 0; index < gradingRows.length; index += 1) {
+      const row = gradingRows[index] || EMPTY_GRADING_ROW;
+      const grade = String(row.grade || "").trim();
+      const remark = String(row.remark || "").trim();
+      const toValue = sanitizeScore(row.to);
+      const isBlank = grade === "" && remark === "" && toValue === "";
+
+      if (isBlank) {
+        blankEncountered = true;
+        continue;
+      }
+
+      if (blankEncountered) {
+        alert(`Remove empty rows before row ${index + 1}.`);
+        return;
+      }
+
+      if (row.from === "" || row.from === null || row.from === undefined) {
+        alert(`Row ${index + 1} is waiting for the previous row to be completed.`);
+        return;
+      }
+
+      if (toValue === "") {
+        alert(`Enter a To score for row ${index + 1}.`);
+        return;
+      }
+
+      if (grade === "") {
+        alert(`Enter a grade for row ${index + 1}.`);
+        return;
+      }
+
+      if (toValue < Number(row.from)) {
+        alert(`Row ${index + 1} To score cannot be less than From.`);
+        return;
+      }
+
+      usedRows.push({
+        from: Number(row.from),
+        to: toValue,
+        grade,
+        remark,
+      });
+    }
+
+    if (usedRows.length === 0) {
+      alert("Add at least one grading row.");
+      return;
+    }
+
+    if (usedRows[usedRows.length - 1].to !== 100) {
+      alert("The final grading row must end at 100.");
+      return;
+    }
+
+    setSavingGradingSchema(true);
+    try {
+      const res = await api.put(`/api/super-admin/schools/${schoolId}/information/grading-schema`, {
+        grading_schema: usedRows,
+      });
+      setGradingRows(normalizeGradingRows(res.data?.data || usedRows));
+      alert("Grading system updated.");
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to save grading system.");
+    } finally {
+      setSavingGradingSchema(false);
+    }
+  };
   const updateSection = (index, next) => {
     setClassTemplates((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...next } : item)));
   };
@@ -633,6 +766,76 @@ export default function SchoolInformation() {
         <div className="sai-actions">
           <button type="button" onClick={saveExamRecord} disabled={savingExamRecord}>
             {savingExamRecord ? "Saving..." : "Save Exam Record"}
+          </button>
+        </div>
+      </section>
+
+      <section className="sai-card">
+        <h3>Grading System</h3>
+        <p className="sai-note">
+          Set each school&apos;s score range, grade label, and remark. Each next row starts automatically from
+          the previous row&apos;s To score + 1, and the final row must end at 100.
+        </p>
+
+        <div className="sai-grade-table-wrap">
+          <table className="sai-grade-table">
+            <thead>
+              <tr>
+                <th style={{ width: "70px" }}>Row</th>
+                <th style={{ width: "110px" }}>From</th>
+                <th style={{ width: "110px" }}>To</th>
+                <th style={{ width: "160px" }}>Grade</th>
+                <th>Remark</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gradingRows.map((row, index) => {
+                const rowEnabled = index === 0 || row.from !== "";
+                return (
+                  <tr key={`grading-row-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>
+                      <input type="number" value={row.from} readOnly disabled />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min={row.from === "" ? 0 : row.from}
+                        max="100"
+                        value={row.to}
+                        onChange={(e) => updateGradingRow(index, "to", e.target.value)}
+                        disabled={!rowEnabled}
+                        placeholder={rowEnabled ? "To" : "Complete previous row"}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={row.grade}
+                        onChange={(e) => updateGradingRow(index, "grade", e.target.value)}
+                        disabled={!rowEnabled}
+                        placeholder={rowEnabled ? "A1, B2, C3" : "Waiting"}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={row.remark}
+                        onChange={(e) => updateGradingRow(index, "remark", e.target.value)}
+                        disabled={!rowEnabled}
+                        placeholder={rowEnabled ? "Excellent, Credit, Pass" : "Waiting"}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="sai-actions">
+          <button type="button" onClick={saveGradingSchema} disabled={savingGradingSchema}>
+            {savingGradingSchema ? "Saving..." : "Save Grading System"}
           </button>
         </div>
       </section>

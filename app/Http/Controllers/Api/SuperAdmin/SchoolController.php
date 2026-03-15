@@ -19,6 +19,7 @@ use App\Models\Term;
 use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
+use App\Support\GradingSchema;
 use App\Support\UserCredentialStore;
 use Illuminate\Validation\ValidationException;
 
@@ -226,6 +227,7 @@ foreach ($defs as $def) {
                 'head_signature_url' => $this->storageUrl($school->head_signature_path),
             ],
             'exam_record' => AssessmentSchema::normalizeSchema($school->assessment_schema),
+            'grading_schema' => GradingSchema::normalize($school->grading_schema),
             'class_templates' => $this->attachDepartmentTemplatesToClassTemplates(
                 $normalizedClassTemplates,
                 $departmentTemplateMapByClass
@@ -235,7 +237,6 @@ foreach ($defs as $def) {
             'department_templates_by_level' => $departmentTemplateMapByLevel,
         ]);
     }
-
     public function upsertInformationBranding(Request $request, School $school)
     {
         $payload = $request->validate([
@@ -372,6 +373,27 @@ foreach ($defs as $def) {
         ]);
     }
 
+
+    public function updateInformationGradingSchema(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'grading_schema' => 'required|array|max:' . GradingSchema::MAX_ROWS,
+            'grading_schema.*.from' => 'nullable|integer|min:0|max:100',
+            'grading_schema.*.to' => 'nullable|integer|min:0|max:100',
+            'grading_schema.*.grade' => 'nullable|string|max:20',
+            'grading_schema.*.remark' => 'nullable|string|max:120',
+        ]);
+
+        $schema = GradingSchema::validateAndNormalize($payload['grading_schema'] ?? []);
+
+        $school->grading_schema = $schema;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Grading system updated successfully.',
+            'data' => $schema,
+        ]);
+    }
     public function updateInformationClassTemplates(Request $request, School $school)
     {
         $payload = $request->validate([
@@ -745,3 +767,8 @@ foreach ($defs as $def) {
         }
     }
 }
+
+
+
+
+

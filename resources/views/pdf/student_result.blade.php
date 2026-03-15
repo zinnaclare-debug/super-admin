@@ -317,12 +317,7 @@
 
         <div class="grades-key">
             <strong>GRADES:</strong>
-            A [70-100] |
-            B [60-69] |
-            C [50-59] |
-            D [40-49] |
-            E [30-39] |
-            F [0-29]
+            {{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}
         </div>
 
         @php

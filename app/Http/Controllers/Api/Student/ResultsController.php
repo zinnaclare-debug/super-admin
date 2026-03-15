@@ -15,6 +15,7 @@ use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
 use App\Support\AssessmentSchema;
+use App\Support\GradingSchema;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -357,7 +358,7 @@ class ResultsController extends Controller
             $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
 
             $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $summary = $this->summarizeRows($rows);
+            $summary = $this->summarizeRows($schoolId, $rows);
             $totalScore = $summary['total_score'];
             $averageScore = $summary['average_score'];
             $overallGrade = $summary['overall_grade'];
@@ -369,11 +370,11 @@ class ResultsController extends Controller
             }
             if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
-                    ? $this->defaultTeacherComment($overallGrade)
+                    ? $this->defaultTeacherComment((int) round($averageScore))
                     : 'No graded subject available yet.';
             }
             $schoolHeadComment = $overallGrade !== '-'
-                ? $this->defaultHeadComment($overallGrade)
+                ? $this->defaultHeadComment((int) round($averageScore))
                 : 'No graded subject available yet.';
 
             $behaviourTraits = [
@@ -641,7 +642,7 @@ class ResultsController extends Controller
 
         $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
         $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-        $summary = $this->summarizeRows($rows);
+        $summary = $this->summarizeRows($schoolId, $rows);
         $totalScore = $summary['total_score'];
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
@@ -840,7 +841,7 @@ class ResultsController extends Controller
             $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
             $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $summary = $this->summarizeRows($rows);
+            $summary = $this->summarizeRows($schoolId, $rows);
             $totalScore = $summary['total_score'];
             $averageScore = $summary['average_score'];
             $overallGrade = $summary['overall_grade'];
@@ -852,11 +853,11 @@ class ResultsController extends Controller
             }
             if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
-                    ? $this->defaultTeacherComment($overallGrade)
+                    ? $this->defaultTeacherComment((int) round($averageScore))
                     : 'No graded subject available yet.';
             }
             $schoolHeadComment = $overallGrade !== '-'
-                ? $this->defaultHeadComment($overallGrade)
+                ? $this->defaultHeadComment((int) round($averageScore))
                 : 'No graded subject available yet.';
 
             $behaviourTraits = [
@@ -1038,8 +1039,8 @@ class ResultsController extends Controller
                     $ca = AssessmentSchema::breakdownTotal($caBreakdown);
                     $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
                     $total = $ca + $exam;
-                    $grade = $this->gradeFromTotal($total);
-                    $remark = $this->remarkFromTotal($total);
+                    $grade = $this->gradeFromTotal($schoolId, $total);
+                    $remark = $this->remarkFromTotal($schoolId, $total);
                     $caBreakdownText = AssessmentSchema::formatBreakdown($caBreakdown, $assessmentSchema);
                 } else {
                     $caBreakdown = array_fill(0, 5, null);
@@ -1163,7 +1164,7 @@ class ResultsController extends Controller
         return $stats;
     }
 
-    private function summarizeRows(array $rows): array
+    private function summarizeRows(int $schoolId, array $rows): array
     {
         $gradedRows = collect($rows)
             ->filter(fn ($row) => (bool) ($row['is_graded'] ?? false))
@@ -1181,7 +1182,7 @@ class ResultsController extends Controller
             'average_score' => $averageScore,
             'average_display' => $gradedCount > 0 ? number_format($averageScore, 2) : '-',
             'overall_grade' => $gradedCount > 0
-                ? $this->gradeFromTotal((int) round($averageScore))
+                ? $this->gradeFromTotal($schoolId, (int) round($averageScore))
                 : '-',
         ];
     }
@@ -1227,27 +1228,28 @@ class ResultsController extends Controller
         return $cache[$schoolId];
     }
 
-    private function gradeFromTotal(int $total): string
+    private function gradingSchemaForSchool(int $schoolId): array
     {
-        return match (true) {
-            $total >= 70 => 'A',
-            $total >= 60 => 'B',
-            $total >= 50 => 'C',
-            $total >= 40 => 'D',
-            $total >= 30 => 'E',
-            default => 'F',
-        };
+        static $cache = [];
+
+        if (isset($cache[$schoolId])) {
+            return $cache[$schoolId];
+        }
+
+        $schema = School::where('id', $schoolId)->value('grading_schema');
+        $cache[$schoolId] = GradingSchema::normalize($schema);
+
+        return $cache[$schoolId];
     }
 
-    private function remarkFromTotal(int $total): string
+    private function gradeFromTotal(int $schoolId, int $total): string
     {
-        return match (true) {
-            $total >= 70 => 'EXCELLENT',
-            $total >= 60 => 'VERY GOOD',
-            $total >= 50 => 'GOOD',
-            $total >= 40 => 'FAIR',
-            default => 'NEEDS IMPROVEMENT',
-        };
+        return GradingSchema::gradeForTotal($this->gradingSchemaForSchool($schoolId), $total);
+    }
+
+    private function remarkFromTotal(int $schoolId, int $total): string
+    {
+        return GradingSchema::remarkForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }
 
     private function ordinalPosition(int $position): string
@@ -1269,26 +1271,26 @@ class ResultsController extends Controller
         };
     }
 
-    private function defaultTeacherComment(string $grade): string
+    private function defaultTeacherComment(int $score): string
     {
-        return match ($grade) {
-            'A' => 'Excellent performance. Keep maintaining this standard.',
-            'B' => 'Very good result. Keep pushing for excellence.',
-            'C' => 'Good effort. More consistency is needed.',
-            'D' => 'Fair performance. Needs more attention and practice.',
-            'E' => 'Below average performance. Improvement is required.',
+        return match (true) {
+            $score >= 70 => 'Excellent performance. Keep maintaining this standard.',
+            $score >= 60 => 'Very good result. Keep pushing for excellence.',
+            $score >= 50 => 'Good effort. More consistency is needed.',
+            $score >= 40 => 'Fair performance. Needs more attention and practice.',
+            $score >= 30 => 'Below average performance. Improvement is required.',
             default => 'Poor performance. Immediate intervention is advised.',
         };
     }
 
-    private function defaultHeadComment(string $grade): string
+    private function defaultHeadComment(int $score): string
     {
-        return match ($grade) {
-            'A' => 'Impressive performance. Keep aiming higher and stay focused.',
-            'B' => 'Very good result. With more effort, you can reach excellent level.',
-            'C' => 'Good progress. Stay consistent and improve in weaker subjects.',
-            'D' => 'You can do better. More reading and guidance are needed.',
-            'E' => 'Significant improvement is required. Parents and teachers should monitor closely.',
+        return match (true) {
+            $score >= 70 => 'Impressive performance. Keep aiming higher and stay focused.',
+            $score >= 60 => 'Very good result. With more effort, you can reach excellent level.',
+            $score >= 50 => 'Good progress. Stay consistent and improve in weaker subjects.',
+            $score >= 40 => 'You can do better. More reading and guidance are needed.',
+            $score >= 30 => 'Significant improvement is required. Parents and teachers should monitor closely.',
             default => 'Performance is below expectation. Immediate academic support is required.',
         };
     }
@@ -1497,7 +1499,7 @@ class ResultsController extends Controller
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
-            . '<td style="width:82%;">A [70-100] | B [60-69] | C [50-59] | D [40-49] | E [30-39] | F [0-29]</td></tr></table>'
+            . '<td style="width:82%;">' . e(GradingSchema::displayKey(data_get($viewData, 'school.grading_schema'))) . '</td></tr></table>'
             . '<table><thead><tr>' . $behaviourHeaderHtml . '</tr></thead><tbody>'
             . $behaviourRowsHtml
             . '</tbody></table>'

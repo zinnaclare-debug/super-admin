@@ -10,6 +10,7 @@ use App\Models\School;
 use App\Models\Term;
 use App\Models\TermSubject;
 use App\Support\AssessmentSchema;
+use App\Support\GradingSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -170,7 +171,7 @@ class TeacherResultsController extends Controller
           'ca_breakdown' => $caBreakdown,
           'exam' => $exam,
           'total' => $total,
-          'grade' => $this->gradeFromTotal($total),
+          'grade' => $this->gradeFromTotal($schoolId, $total),
         ];
       });
 
@@ -326,15 +327,9 @@ class TeacherResultsController extends Controller
     return response()->json(['message' => 'Scores saved successfully']);
   }
 
-  private function gradeFromTotal(int $total): string
+  private function gradeFromTotal(int $schoolId, int $total): string
   {
-    return match (true) {
-      $total >= 70 => 'A',
-      $total >= 60 => 'B',
-      $total >= 50 => 'C',
-      $total >= 40 => 'D',
-      $total >= 30 => 'E',
-      default => 'F',
-    };
+    $schema = School::where('id', $schoolId)->value('grading_schema');
+    return GradingSchema::gradeForTotal($schema, $total);
   }
 }

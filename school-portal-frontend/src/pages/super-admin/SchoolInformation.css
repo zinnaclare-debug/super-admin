@@ -130,6 +130,52 @@
   font-weight: 600;
 }
 
+
+.sai-grade-table-wrap {
+  margin-top: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.sai-grade-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.sai-grade-table th,
+.sai-grade-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.sai-grade-table th {
+  background: #eef4ff;
+  color: #1e293b;
+  font-size: 13px;
+}
+
+.sai-grade-table td {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.sai-grade-table input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 14px;
+}
+
+.sai-grade-table input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
 .sai-template-grid {
   margin-top: 12px;
   display: grid;

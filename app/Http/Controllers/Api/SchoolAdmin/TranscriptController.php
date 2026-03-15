@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
+use App\Models\School;
 use App\Models\Student;
 use App\Models\StudentAttendance;
 use App\Models\StudentBehaviourRating;
@@ -13,6 +14,7 @@ use App\Models\Term;
 use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
+use App\Support\GradingSchema;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -825,16 +827,16 @@ class TranscriptController extends Controller
             $totalScore = (int) collect($gradedRows)->sum('total');
             $subjectCount = max(1, count($gradedRows));
             $averageScore = (float) round($totalScore / $subjectCount, 2);
-            $overallGrade = $this->gradeFromTotal((int) round($averageScore));
+            $overallGrade = $this->gradeFromTotal($schoolId, (int) round($averageScore));
 
             $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             if ($teacherComment === '') {
                 $teacherComment = (string) ($attendance?->comment ?? '');
             }
             if ($teacherComment === '') {
-                $teacherComment = $this->defaultTeacherComment($overallGrade);
+                $teacherComment = $this->defaultTeacherComment((int) round($averageScore));
             }
-            $schoolHeadComment = $this->defaultHeadComment($overallGrade);
+            $schoolHeadComment = $this->defaultHeadComment((int) round($averageScore));
 
             $behaviourTraits = [
                 ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
@@ -1015,8 +1017,8 @@ class TranscriptController extends Controller
                     'class_average' => $hasResult ? ($stats['class_average'] ?? 0) : '-',
                     'position' => $hasResult ? $position : null,
                     'position_label' => ($position && $hasResult) ? $this->ordinalPosition($position) : '-',
-                    'grade' => $hasResult ? $this->gradeFromTotal($total) : '-',
-                    'remark' => $hasResult ? $this->remarkFromTotal($total) : '-',
+                    'grade' => $hasResult ? $this->gradeFromTotal($schoolId, $total) : '-',
+                    'remark' => $hasResult ? $this->remarkFromTotal($schoolId, $total) : '-',
                 ];
             })
             ->values()
@@ -1114,7 +1116,7 @@ class TranscriptController extends Controller
                     : null;
                 $row['annual_average'] = $annualAverage;
                 $row['annual_grade'] = $annualAverage !== null
-                    ? $this->gradeFromTotal((int) round($annualAverage))
+                    ? $this->gradeFromTotal($schoolId, (int) round($annualAverage))
                     : '-';
             }
             unset($row);
@@ -1251,27 +1253,28 @@ class TranscriptController extends Controller
         return $createdTs !== false && $updatedTs !== false && $updatedTs > $createdTs;
     }
 
-    private function gradeFromTotal(int $total): string
+    private function gradingSchemaForSchool(int $schoolId): array
     {
-        return match (true) {
-            $total >= 70 => 'A',
-            $total >= 60 => 'B',
-            $total >= 50 => 'C',
-            $total >= 40 => 'D',
-            $total >= 30 => 'E',
-            default => 'F',
-        };
+        static $cache = [];
+
+        if (isset($cache[$schoolId])) {
+            return $cache[$schoolId];
+        }
+
+        $schema = School::where('id', $schoolId)->value('grading_schema');
+        $cache[$schoolId] = GradingSchema::normalize($schema);
+
+        return $cache[$schoolId];
     }
 
-    private function remarkFromTotal(int $total): string
+    private function gradeFromTotal(int $schoolId, int $total): string
     {
-        return match (true) {
-            $total >= 70 => 'EXCELLENT',
-            $total >= 60 => 'VERY GOOD',
-            $total >= 50 => 'GOOD',
-            $total >= 40 => 'FAIR',
-            default => 'NEEDS IMPROVEMENT',
-        };
+        return GradingSchema::gradeForTotal($this->gradingSchemaForSchool($schoolId), $total);
+    }
+
+    private function remarkFromTotal(int $schoolId, int $total): string
+    {
+        return GradingSchema::remarkForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }
 
     private function ordinalPosition(int $position): string
@@ -1293,26 +1296,26 @@ class TranscriptController extends Controller
         };
     }
 
-    private function defaultTeacherComment(string $grade): string
+    private function defaultTeacherComment(int $score): string
     {
-        return match ($grade) {
-            'A' => 'Excellent performance. Keep maintaining this standard.',
-            'B' => 'Very good result. Keep pushing for excellence.',
-            'C' => 'Good effort. More consistency is needed.',
-            'D' => 'Fair performance. Needs more attention and practice.',
-            'E' => 'Below average performance. Improvement is required.',
+        return match (true) {
+            $score >= 70 => 'Excellent performance. Keep maintaining this standard.',
+            $score >= 60 => 'Very good result. Keep pushing for excellence.',
+            $score >= 50 => 'Good effort. More consistency is needed.',
+            $score >= 40 => 'Fair performance. Needs more attention and practice.',
+            $score >= 30 => 'Below average performance. Improvement is required.',
             default => 'Poor performance. Immediate intervention is advised.',
         };
     }
 
-    private function defaultHeadComment(string $grade): string
+    private function defaultHeadComment(int $score): string
     {
-        return match ($grade) {
-            'A' => 'Impressive performance. Keep aiming higher and stay focused.',
-            'B' => 'Very good result. With more effort, you can reach excellent level.',
-            'C' => 'Good progress. Stay consistent and improve in weaker subjects.',
-            'D' => 'You can do better. More reading and guidance are needed.',
-            'E' => 'Significant improvement is required. Parents and teachers should monitor closely.',
+        return match (true) {
+            $score >= 70 => 'Impressive performance. Keep aiming higher and stay focused.',
+            $score >= 60 => 'Very good result. With more effort, you can reach excellent level.',
+            $score >= 50 => 'Good progress. Stay consistent and improve in weaker subjects.',
+            $score >= 40 => 'You can do better. More reading and guidance are needed.',
+            $score >= 30 => 'Significant improvement is required. Parents and teachers should monitor closely.',
             default => 'Performance is below expectation. Immediate academic support is required.',
         };
     }
