@@ -330,13 +330,29 @@ class AcademicSessionController extends Controller
     }
 
 
-    private function copyPreviousSessionTeacherAssignments(int $schoolId, int $newSessionId): void
+
+    private function resolveSourceSessionForCarryOver(int $schoolId, int $newSessionId): ?AcademicSession
     {
-        $previousSession = AcademicSession::query()
+        $currentSession = AcademicSession::query()
             ->where('school_id', $schoolId)
             ->where('id', '!=', $newSessionId)
-            ->orderByDesc('created_at')
+            ->where('status', 'current')
+            ->latest('created_at')
             ->first();
+
+        if ($currentSession) {
+            return $currentSession;
+        }
+
+        return AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', '!=', $newSessionId)
+            ->latest('created_at')
+            ->first();
+    }
+    private function copyPreviousSessionTeacherAssignments(int $schoolId, int $newSessionId): void
+    {
+        $previousSession = $this->resolveSourceSessionForCarryOver($schoolId, $newSessionId);
 
         if (!$previousSession) {
             return;
@@ -407,11 +423,7 @@ class AcademicSessionController extends Controller
     }
     private function copyPreviousSessionSubjectMappings(int $schoolId, int $newSessionId): void
     {
-        $previousSession = AcademicSession::query()
-            ->where('school_id', $schoolId)
-            ->where('id', '!=', $newSessionId)
-            ->orderByDesc('created_at')
-            ->first();
+        $previousSession = $this->resolveSourceSessionForCarryOver($schoolId, $newSessionId);
 
         if (!$previousSession) {
             return;
