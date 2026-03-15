@@ -1018,7 +1018,7 @@ class ResultsController extends Controller
         $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds);
 
         return $subjects
-            ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema) {
+            ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema, $schoolId) {
                 $isGraded = $this->isResultRecordGraded(
                     $r->result_id ?? null,
                     $r->ca ?? null,
@@ -1544,3 +1544,4 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
