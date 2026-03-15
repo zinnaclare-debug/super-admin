@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\ClassDepartment;
 use App\Models\LevelDepartment;
 use App\Models\School;
 use App\Models\SchoolClass;
@@ -100,6 +101,7 @@ class AcademicSessionController extends Controller
                 ['by_class' => $departmentTemplateMap]
             );
 
+            $this->copyPreviousSessionTeacherAssignments($schoolId, (int) $session->id);
             $this->copyPreviousSessionSubjectMappings($schoolId, (int) $session->id);
 
             return response()->json(['data' => $session], 201);
@@ -327,6 +329,82 @@ class AcademicSessionController extends Controller
         return response()->json(['message' => 'Term deleted']);
     }
 
+
+    private function copyPreviousSessionTeacherAssignments(int $schoolId, int $newSessionId): void
+    {
+        $previousSession = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', '!=', $newSessionId)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$previousSession) {
+            return;
+        }
+
+        $previousClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $previousSession->id)
+            ->get(['id', 'level', 'name', 'class_teacher_user_id'])
+            ->keyBy(fn ($class) => strtolower((string) $class->level) . '|' . strtolower(trim((string) $class->name)));
+
+        $newClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $newSessionId)
+            ->get(['id', 'level', 'name', 'class_teacher_user_id']);
+
+        if ($previousClasses->isEmpty() || $newClasses->isEmpty()) {
+            return;
+        }
+
+        $canCopyDepartmentTeachers = Schema::hasTable('class_departments')
+            && Schema::hasColumn('class_departments', 'class_teacher_user_id');
+
+        foreach ($newClasses as $newClass) {
+            $classKey = strtolower((string) $newClass->level) . '|' . strtolower(trim((string) $newClass->name));
+            $previousClass = $previousClasses->get($classKey);
+
+            if (!$previousClass) {
+                continue;
+            }
+
+            if (!empty($previousClass->class_teacher_user_id)) {
+                $newClass->class_teacher_user_id = (int) $previousClass->class_teacher_user_id;
+                $newClass->save();
+            }
+
+            if (!$canCopyDepartmentTeachers) {
+                continue;
+            }
+
+            $previousDepartments = ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('class_id', (int) $previousClass->id)
+                ->get(['id', 'name', 'class_teacher_user_id'])
+                ->keyBy(fn ($department) => strtolower(trim((string) $department->name)));
+
+            if ($previousDepartments->isEmpty()) {
+                continue;
+            }
+
+            $newDepartments = ClassDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('class_id', (int) $newClass->id)
+                ->get(['id', 'name', 'class_teacher_user_id']);
+
+            foreach ($newDepartments as $newDepartment) {
+                $departmentKey = strtolower(trim((string) $newDepartment->name));
+                $previousDepartment = $previousDepartments->get($departmentKey);
+
+                if (!$previousDepartment || empty($previousDepartment->class_teacher_user_id)) {
+                    continue;
+                }
+
+                $newDepartment->class_teacher_user_id = (int) $previousDepartment->class_teacher_user_id;
+                $newDepartment->save();
+            }
+        }
+    }
     private function copyPreviousSessionSubjectMappings(int $schoolId, int $newSessionId): void
     {
         $previousSession = AcademicSession::query()
@@ -423,3 +501,5 @@ class AcademicSessionController extends Controller
         }
     }
 }
+
+
