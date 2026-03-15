@@ -7,7 +7,6 @@ export default function AcademicsHome() {
   const [data, setData] = useState(null);
   const [levelFilter, setLevelFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showDebug, setShowDebug] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -21,7 +20,9 @@ export default function AcademicsHome() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const activeLevels = data?.active_levels || [];
   const classes = data?.classes || [];
@@ -52,14 +53,10 @@ export default function AcademicsHome() {
             <option key={lvl} value={lvl}>{lvl.toUpperCase()}</option>
           ))}
         </select>
-        <button onClick={() => setShowDebug((s) => !s)} style={{ marginLeft: 12 }}>
-          {showDebug ? "Hide" : "Show"} Debug
-        </button>
       </div>
 
-      {/* Active levels chips */}
       <div style={{ marginTop: 8, opacity: 0.85 }}>
-        <small>Levels: {activeLevels.length} • Classes: {classes.length}</small>
+        <small>Levels: {activeLevels.length} - Classes: {classes.length}</small>
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         {activeLevels.map((lvl) => (
@@ -84,7 +81,6 @@ export default function AcademicsHome() {
         )}
       </div>
 
-      {/* Classes table */}
       <table border="1" cellPadding="10" width="100%" style={{ marginTop: 16 }}>
         <thead>
           <tr>
@@ -115,13 +111,6 @@ export default function AcademicsHome() {
           )}
         </tbody>
       </table>
-
-      {showDebug && (
-        <div style={{ marginTop: 12, border: "1px dashed #ddd", padding: 12, borderRadius: 8 }}>
-          <h4 style={{ marginTop: 0 }}>Debug Data</h4>
-          <pre style={{ maxHeight: 300, overflow: "auto" }}>{JSON.stringify(data, null, 2)}</pre>
-        </div>
-      )}
     </div>
   );
 }
