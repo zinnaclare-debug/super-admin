@@ -9,14 +9,14 @@ const DEFAULT_SCHEMA = {
   total_max: 100,
 };
 
-const gradeFromTotal = (total) => {
-  if (total >= 70) return "A";
-  if (total >= 60) return "B";
-  if (total >= 50) return "C";
-  if (total >= 40) return "D";
-  if (total >= 30) return "E";
-  return "F";
-};
+const DEFAULT_GRADING_SCHEMA = [
+  { from: 0, to: 29, grade: "F", remark: "FAIL" },
+  { from: 30, to: 39, grade: "E", remark: "POOR" },
+  { from: 40, to: 49, grade: "D", remark: "FAIR" },
+  { from: 50, to: 59, grade: "C", remark: "GOOD" },
+  { from: 60, to: 69, grade: "B", remark: "VERY GOOD" },
+  { from: 70, to: 100, grade: "A", remark: "EXCELLENT" },
+];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -37,6 +37,27 @@ const normalizeSchema = (schema) => {
   };
 };
 
+const normalizeGradingSchema = (rows) => {
+  const source = Array.isArray(rows) ? rows : [];
+  const normalized = source
+    .map((row) => ({
+      from: Number(row?.from),
+      to: Number(row?.to),
+      grade: String(row?.grade || "").trim(),
+      remark: String(row?.remark || "").trim(),
+    }))
+    .filter((row) => Number.isFinite(row.from) && Number.isFinite(row.to) && row.grade !== "")
+    .sort((a, b) => a.from - b.from);
+
+  return normalized.length ? normalized : DEFAULT_GRADING_SCHEMA;
+};
+
+const gradeFromTotal = (total, gradingSchema) => {
+  const score = clamp(Number(total || 0), 0, 100);
+  const match = gradingSchema.find((row) => score >= row.from && score <= row.to);
+  return match?.grade || "-";
+};
+
 const activeCaIndices = (schema) => {
   const out = [];
   schema.ca_maxes.forEach((max, idx) => {
@@ -45,7 +66,7 @@ const activeCaIndices = (schema) => {
   return out.length ? out : [0];
 };
 
-const normalizeRow = (row, schema) => {
+const normalizeRow = (row, schema, gradingSchema) => {
   const rawBreakdown = Array.isArray(row.ca_breakdown) ? row.ca_breakdown : [];
   const breakdown = Array.from({ length: 5 }, (_, idx) =>
     clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0)
@@ -60,7 +81,7 @@ const normalizeRow = (row, schema) => {
     ca,
     exam,
     total,
-    grade: gradeFromTotal(total),
+    grade: gradeFromTotal(total, gradingSchema),
   };
 };
 
@@ -68,6 +89,7 @@ export default function SubjectScores() {
   const { termSubjectId } = useParams();
 
   const [schema, setSchema] = useState(DEFAULT_SCHEMA);
+  const [gradingSchema, setGradingSchema] = useState(DEFAULT_GRADING_SCHEMA);
   const [rows, setRows] = useState([]);
   const [subjectName, setSubjectName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -86,9 +108,11 @@ export default function SubjectScores() {
     try {
       const res = await api.get(`/api/staff/results/subjects/${termSubjectId}/students`);
       const normalizedSchema = normalizeSchema(res.data?.data?.assessment_schema);
+      const normalizedGradingSchema = normalizeGradingSchema(res.data?.data?.grading_schema);
       setSchema(normalizedSchema);
+      setGradingSchema(normalizedGradingSchema);
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
-      setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema)));
+      setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
@@ -112,7 +136,7 @@ export default function SubjectScores() {
         const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
         const total = ca + exam;
 
-        return { ...row, ca_breakdown: breakdown, ca, exam, total, grade: gradeFromTotal(total) };
+        return { ...row, ca_breakdown: breakdown, ca, exam, total, grade: gradeFromTotal(total, gradingSchema) };
       })
     );
   };
@@ -124,7 +148,7 @@ export default function SubjectScores() {
         if (row.student_id !== studentId) return row;
         const ca = Number(row.ca || 0);
         const total = ca + exam;
-        return { ...row, exam, total, grade: gradeFromTotal(total) };
+        return { ...row, exam, total, grade: gradeFromTotal(total, gradingSchema) };
       })
     );
   };

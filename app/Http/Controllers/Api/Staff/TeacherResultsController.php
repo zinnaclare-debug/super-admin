@@ -208,6 +208,7 @@ class TeacherResultsController extends Controller
         'class_level' => (string) ($subjectSummary->class_level ?? ''),
         'term_name' => (string) ($subjectSummary->term_name ?? ''),
         'assessment_schema' => $assessmentSchema,
+        'grading_schema' => GradingSchema::normalize($school?->grading_schema),
         'students' => $rows,
       ]
     ]);
