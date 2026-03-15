@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class TermSubject extends Model
 {
-  protected $fillable = ['school_id', 'class_id', 'term_id', 'subject_id'];
+  protected $fillable = ['school_id', 'class_id', 'term_id', 'subject_id', 'teacher_user_id'];
 }
