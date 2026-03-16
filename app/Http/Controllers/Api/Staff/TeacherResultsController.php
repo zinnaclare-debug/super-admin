@@ -152,30 +152,26 @@ class TeacherResultsController extends Controller
       $studentQuery->where('enrollments.school_id', $schoolId);
     }
 
+    if ($canUseExclusions) {
+      $studentQuery->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $termSubject, $session) {
+        $join->on('student_subject_exclusions.student_id', '=', 'enrollments.student_id')
+          ->where('student_subject_exclusions.school_id', '=', $schoolId)
+          ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+          ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
+          ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
+      })
+      ->whereNull('student_subject_exclusions.id');
+    }
+
     $students = $studentQuery->get();
     $studentIds = $students->pluck('student_id')->map(fn ($id) => (int) $id)->all();
 
-    $excludedStudentIds = [];
-    if ($canUseExclusions && !empty($studentIds)) {
-      $excludedStudentIds = DB::table('student_subject_exclusions')
-        ->where('school_id', $schoolId)
-        ->where('academic_session_id', (int) $session->id)
-        ->where('class_id', (int) $termSubject->class_id)
-        ->where('subject_id', (int) $termSubject->subject_id)
-        ->whereIn('student_id', $studentIds)
-        ->pluck('student_id')
-        ->map(fn ($id) => (int) $id)
-        ->all();
-    }
-
-    $eligibleStudentIds = array_values(array_filter($studentIds, fn ($id) => !in_array((int) $id, $excludedStudentIds, true)));
-
     $resultsByStudentId = [];
-    if (!empty($eligibleStudentIds)) {
+    if (!empty($studentIds)) {
       $resultsQuery = Result::query()
         ->where('results.school_id', $schoolId)
         ->where('results.term_subject_id', (int) $termSubject->id)
-        ->whereIn('results.student_id', $eligibleStudentIds)
+        ->whereIn('results.student_id', $studentIds)
         ->select([
           'results.student_id',
           'results.ca',
@@ -190,7 +186,6 @@ class TeacherResultsController extends Controller
     }
 
     $rows = $students
-      ->filter(fn ($student) => !in_array((int) $student->student_id, $excludedStudentIds, true))
       ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId) {
         $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
         $caBreakdown = AssessmentSchema::normalizeBreakdown(
@@ -383,4 +378,5 @@ class TeacherResultsController extends Controller
     return GradingSchema::gradeForTotal($schema, $total);
   }
 }
+
 
