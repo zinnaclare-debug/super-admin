@@ -94,6 +94,7 @@ export default function SubjectScores() {
   const [saving, setSaving] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
+  const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
   const caIndices = useMemo(() => activeCaIndices(schema), [schema]);
   const caPattern = useMemo(
     () => caIndices.map((idx) => `CA${idx + 1}(${schema.ca_maxes[idx]})`).join(" | ") + ` | EXAM(${schema.exam_max})`,
@@ -122,11 +123,25 @@ export default function SubjectScores() {
   }, [rows, selectedDepartmentId]);
 
   useEffect(() => {
+    const savedDepartment = window.localStorage.getItem(departmentStorageKey);
+    setSelectedDepartmentId(savedDepartment || "all");
+  }, [departmentStorageKey]);
+
+  useEffect(() => {
     if (selectedDepartmentId === "all") return;
     if (!departmentOptions.some((option) => option.id === String(selectedDepartmentId))) {
       setSelectedDepartmentId("all");
     }
   }, [departmentOptions, selectedDepartmentId]);
+
+  useEffect(() => {
+    if (selectedDepartmentId === "all") {
+      window.localStorage.removeItem(departmentStorageKey);
+      return;
+    }
+
+    window.localStorage.setItem(departmentStorageKey, String(selectedDepartmentId));
+  }, [departmentStorageKey, selectedDepartmentId]);
 
   const load = async () => {
     setLoading(true);
@@ -138,7 +153,6 @@ export default function SubjectScores() {
       setGradingSchema(normalizedGradingSchema);
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
       setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
-      setSelectedDepartmentId("all");
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
