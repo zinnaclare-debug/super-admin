@@ -9,6 +9,14 @@ const formatSessionStatus = (status) => {
   return "Pending";
 };
 
+const panelStyle = {
+  marginTop: 16,
+  border: "1px solid #ddd",
+  padding: 16,
+  borderRadius: 10,
+  background: "#fff",
+};
+
 export default function AcademicSession() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,6 +72,12 @@ export default function AcademicSession() {
     setShowCreate(false);
   };
 
+  const closePanels = () => {
+    setShowCreate(false);
+    setShowEdit(false);
+    setEditing(null);
+  };
+
   const createSession = async (e) => {
     e.preventDefault();
     try {
@@ -71,7 +85,7 @@ export default function AcademicSession() {
         session_name: sessionName,
         academic_year: academicYear,
       });
-      setShowCreate(false);
+      closePanels();
       await load();
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to create session");
@@ -87,17 +101,51 @@ export default function AcademicSession() {
         session_name: sessionName,
         academic_year: academicYear,
       });
-      setShowEdit(false);
-      setEditing(null);
+      closePanels();
       await load();
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to update session");
     }
   };
 
+  const renderFormPanel = () => {
+    if (!showCreate && !showEdit) return null;
+
+    const isEdit = showEdit && editing;
+
+    return (
+      <div style={panelStyle}>
+        <h3 style={{ marginTop: 0 }}>{isEdit ? "Edit Academic Session" : "Create Academic Session"}</h3>
+        <form onSubmit={isEdit ? updateSession : createSession}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value)}
+              placeholder="e.g. 2026/2027"
+              style={{ width: 260, padding: 10 }}
+              required
+            />
+            <input
+              value={academicYear}
+              onChange={(e) => setAcademicYear(e.target.value)}
+              placeholder="e.g. 2026-2027"
+              style={{ width: 260, padding: 10 }}
+            />
+          </div>
+          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
+            <button type="submit">{isEdit ? "Save" : "Create"}</button>
+            <button type="button" onClick={closePanels}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <div>
           <p style={{ marginTop: 6, opacity: 0.75 }}>
             Manage academic sessions. Class structure now comes from Branding - Create Class.
@@ -107,6 +155,8 @@ export default function AcademicSession() {
           + Create Session
         </button>
       </div>
+
+      {renderFormPanel()}
 
       {loading ? (
         <p>Loading...</p>
@@ -158,67 +208,6 @@ export default function AcademicSession() {
           </tbody>
         </table>
       )}
-
-      {showCreate && (
-        <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 16, borderRadius: 10 }}>
-          <h3>Create Academic Session</h3>
-          <form onSubmit={createSession}>
-            <input
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              placeholder="e.g. 2026/2027"
-              style={{ width: 260, padding: 10 }}
-              required
-            />
-            <input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2026-2027"
-              style={{ width: 260, padding: 10, marginLeft: 10 }}
-            />
-            <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-              <button type="submit">Create</button>
-              <button type="button" onClick={() => setShowCreate(false)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showEdit && editing && (
-        <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 16, borderRadius: 10 }}>
-          <h3>Edit Academic Session</h3>
-          <form onSubmit={updateSession}>
-            <input
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              placeholder="e.g. 2026/2027"
-              style={{ width: 260, padding: 10 }}
-              required
-            />
-            <input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2026-2027"
-              style={{ width: 260, padding: 10, marginLeft: 10 }}
-            />
-            <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-              <button type="submit">Save</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowEdit(false);
-                  setEditing(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
-

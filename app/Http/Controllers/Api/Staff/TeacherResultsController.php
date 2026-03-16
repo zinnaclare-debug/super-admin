@@ -121,6 +121,9 @@ class TeacherResultsController extends Controller
       ->first();
 
     // Build the class list from current term enrollments first, then layer exclusions/results on top.
+    $canUseDepartments = Schema::hasTable('class_departments')
+      && Schema::hasColumn('enrollments', 'department_id');
+
     $studentQuery = Enrollment::query()
       ->join('students', 'students.id', '=', 'enrollments.student_id')
       ->join('users', 'users.id', '=', 'students.user_id')
@@ -130,9 +133,20 @@ class TeacherResultsController extends Controller
       ->select([
         'students.id as student_id',
         'users.name as student_name',
+        ...($canUseDepartments ? [
+          'class_departments.id as department_id',
+          'class_departments.name as department_name',
+        ] : [
+          DB::raw('NULL as department_id'),
+          DB::raw('NULL as department_name'),
+        ]),
       ])
       ->distinct()
       ->orderBy('users.name');
+
+    if ($canUseDepartments) {
+      $studentQuery->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id');
+    }
 
     if (Schema::hasColumn('enrollments', 'school_id')) {
       $studentQuery->where('enrollments.school_id', $schoolId);
@@ -191,6 +205,8 @@ class TeacherResultsController extends Controller
         return [
           'student_id' => (int) $student->student_id,
           'student_name' => (string) $student->student_name,
+          'department_id' => isset($student->department_id) ? (int) $student->department_id : null,
+          'department_name' => isset($student->department_name) ? (string) $student->department_name : '',
           'ca' => $caTotal,
           'ca_breakdown' => $caBreakdown,
           'exam' => $exam,
@@ -209,6 +225,14 @@ class TeacherResultsController extends Controller
         'term_name' => (string) ($subjectSummary->term_name ?? ''),
         'assessment_schema' => $assessmentSchema,
         'grading_schema' => GradingSchema::normalize($school?->grading_schema),
+        'departments' => $rows
+          ->map(fn ($row) => [
+            'id' => (int) ($row['department_id'] ?? 0),
+            'name' => trim((string) ($row['department_name'] ?? '')),
+          ])
+          ->filter(fn ($row) => $row['id'] > 0 && $row['name'] !== '')
+          ->unique(fn ($row) => $row['id'])
+          ->values(),
         'students' => $rows,
       ]
     ]);
@@ -359,3 +383,4 @@ class TeacherResultsController extends Controller
     return GradingSchema::gradeForTotal($schema, $total);
   }
 }
+

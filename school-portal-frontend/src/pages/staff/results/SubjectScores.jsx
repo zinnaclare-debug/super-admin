@@ -23,9 +23,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeSchema = (schema) => {
   const raw = schema || {};
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
-  const normalizedCa = Array.from({ length: 5 }, (_, idx) =>
-    clamp(Number(caMaxes[idx] || 0), 0, 100)
-  );
+  const normalizedCa = Array.from({ length: 5 }, (_, idx) => clamp(Number(caMaxes[idx] || 0), 0, 100));
   const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
   const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
   const examMax = caTotal + requestedExam === 100 ? clamp(requestedExam, 0, 100) : clamp(100 - caTotal, 0, 100);
@@ -68,15 +66,15 @@ const activeCaIndices = (schema) => {
 
 const normalizeRow = (row, schema, gradingSchema) => {
   const rawBreakdown = Array.isArray(row.ca_breakdown) ? row.ca_breakdown : [];
-  const breakdown = Array.from({ length: 5 }, (_, idx) =>
-    clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0)
-  );
+  const breakdown = Array.from({ length: 5 }, (_, idx) => clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0));
   const ca = breakdown.reduce((sum, score) => sum + score, 0);
   const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
   const total = ca + exam;
 
   return {
     ...row,
+    department_id: row?.department_id ? Number(row.department_id) : null,
+    department_name: String(row?.department_name || "").trim(),
     ca_breakdown: breakdown,
     ca,
     exam,
@@ -94,14 +92,41 @@ export default function SubjectScores() {
   const [subjectName, setSubjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
   const caIndices = useMemo(() => activeCaIndices(schema), [schema]);
   const caPattern = useMemo(
-    () =>
-      caIndices.map((idx) => `CA${idx + 1}(${schema.ca_maxes[idx]})`).join(" | ") +
-      ` | EXAM(${schema.exam_max})`,
+    () => caIndices.map((idx) => `CA${idx + 1}(${schema.ca_maxes[idx]})`).join(" | ") + ` | EXAM(${schema.exam_max})`,
     [caIndices, schema]
   );
+
+  const departmentOptions = useMemo(() => {
+    const map = new Map();
+    rows.forEach((row) => {
+      if (!row.department_id || !row.department_name) return;
+      if (!map.has(row.department_id)) {
+        map.set(row.department_id, {
+          id: String(row.department_id),
+          name: row.department_name,
+          count: 0,
+        });
+      }
+      map.get(row.department_id).count += 1;
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    if (selectedDepartmentId === "all") return rows;
+    return rows.filter((row) => String(row.department_id || "") === String(selectedDepartmentId));
+  }, [rows, selectedDepartmentId]);
+
+  useEffect(() => {
+    if (selectedDepartmentId === "all") return;
+    if (!departmentOptions.some((option) => option.id === String(selectedDepartmentId))) {
+      setSelectedDepartmentId("all");
+    }
+  }, [departmentOptions, selectedDepartmentId]);
 
   const load = async () => {
     setLoading(true);
@@ -113,6 +138,7 @@ export default function SubjectScores() {
       setGradingSchema(normalizedGradingSchema);
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
       setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
+      setSelectedDepartmentId("all");
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
@@ -177,9 +203,44 @@ export default function SubjectScores() {
         Assessment pattern: {caPattern}. Total max: 100.
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {departmentOptions.length > 0 && (
+        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setSelectedDepartmentId("all")}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid #cbd5e1",
+              background: selectedDepartmentId === "all" ? "#1d4ed8" : "#fff",
+              color: selectedDepartmentId === "all" ? "#fff" : "#0f172a",
+            }}
+          >
+            All Students ({rows.length})
+          </button>
+          {departmentOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setSelectedDepartmentId(option.id)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 999,
+                border: "1px solid #cbd5e1",
+                background: selectedDepartmentId === option.id ? "#1d4ed8" : "#fff",
+                color: selectedDepartmentId === option.id ? "#fff" : "#0f172a",
+              }}
+            >
+              {option.name} ({option.count})
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <strong>Students:</strong> {rows.length}
+          <strong>Students:</strong> {filteredRows.length}
+          {selectedDepartmentId !== "all" && <span style={{ opacity: 0.75 }}> filtered from {rows.length}</span>}
         </div>
         <button onClick={saveAll} disabled={saving || loading || rows.length === 0}>
           {saving ? "Saving..." : "Save Scores"}
@@ -206,10 +267,13 @@ export default function SubjectScores() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIndex) => (
+            {filteredRows.map((row, rowIndex) => (
               <tr key={row.student_id}>
                 <td>{rowIndex + 1}</td>
-                <td>{row.student_name}</td>
+                <td>
+                  <div>{row.student_name}</div>
+                  {row.department_name && <small style={{ opacity: 0.7 }}>{row.department_name}</small>}
+                </td>
                 {caIndices.map((idx) => (
                   <td key={`ca-input-${row.student_id}-${idx}`}>
                     <input
@@ -243,9 +307,13 @@ export default function SubjectScores() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={6 + caIndices.length}>No enrolled students found for this class and term.</td>
+                <td colSpan={6 + caIndices.length}>
+                  {rows.length === 0
+                    ? "No enrolled students found for this class and term."
+                    : "No students found for the selected subclass."}
+                </td>
               </tr>
             )}
           </tbody>
