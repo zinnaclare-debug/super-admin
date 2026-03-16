@@ -30,7 +30,6 @@ class TeacherResultsController extends Controller
     }
 
     $required = [
-      'id',
       'student_id',
       'school_id',
       'academic_session_id',
@@ -160,7 +159,7 @@ class TeacherResultsController extends Controller
           ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
           ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
       })
-      ->whereNull('student_subject_exclusions.id');
+      ->whereNull('student_subject_exclusions.student_id');
     }
 
     $students = $studentQuery->get();
@@ -282,7 +281,7 @@ class TeacherResultsController extends Controller
           ->where('student_subject_exclusions.class_id', '=', (int) $termSubject->class_id)
           ->where('student_subject_exclusions.subject_id', '=', (int) $termSubject->subject_id);
       })
-      ->whereNull('student_subject_exclusions.id');
+      ->whereNull('student_subject_exclusions.student_id');
     }
     $eligibleStudentIds = $eligibleStudentIdsQuery
       ->distinct()
@@ -378,5 +377,6 @@ class TeacherResultsController extends Controller
     return GradingSchema::gradeForTotal($schema, $total);
   }
 }
+
 
 
