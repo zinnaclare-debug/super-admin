@@ -19,6 +19,7 @@ export default function Promotion() {
   const [promotingStudentId, setPromotingStudentId] = useState(null);
   const [bulkPromoting, setBulkPromoting] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, name: "" });
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -114,12 +115,19 @@ export default function Promotion() {
     if (!window.confirm(`Promote ${selectedPromotableIds.length} selected student(s) to the next class?`)) return;
 
     setBulkPromoting(true);
+    setBulkProgress({ current: 0, total: selectedPromotableIds.length, name: "" });
     let promotedCount = 0;
     const failedNames = [];
 
     try {
-      for (const studentId of selectedPromotableIds) {
+      for (const [index, studentId] of selectedPromotableIds.entries()) {
         const row = students.find((item) => item.student_id === studentId);
+        setBulkProgress({
+          current: index + 1,
+          total: selectedPromotableIds.length,
+          name: row?.name || `Student ${studentId}`,
+        });
+
         try {
           await api.post(`/api/school-admin/promotion/classes/${selectedClass.id}/students/${studentId}/promote`);
           promotedCount += 1;
@@ -133,12 +141,11 @@ export default function Promotion() {
       if (failedNames.length === 0) {
         alert(`Promoted ${promotedCount} student(s) successfully.`);
       } else {
-        alert(
-          `Promoted ${promotedCount} student(s). Failed: ${failedNames.join(", ")}`
-        );
+        alert(`Promoted ${promotedCount} student(s). Failed: ${failedNames.join(", ")}`);
       }
     } finally {
       setBulkPromoting(false);
+      setBulkProgress({ current: 0, total: 0, name: "" });
       setSelectedStudentIds([]);
     }
   };
@@ -203,10 +210,20 @@ export default function Promotion() {
           {!loadingStudents && promotableStudents.length > 0 && (
             <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ opacity: 0.8 }}>
-                Selected: <strong>{selectedPromotableIds.length}</strong> of <strong>{promotableStudents.length}</strong> promotable student(s)
+                <div>
+                  Selected: <strong>{selectedPromotableIds.length}</strong> of <strong>{promotableStudents.length}</strong> promotable student(s)
+                </div>
+                {bulkPromoting && bulkProgress.total > 0 && (
+                  <small style={{ display: "block", marginTop: 4 }}>
+                    Promoting {bulkProgress.current} of {bulkProgress.total}
+                    {bulkProgress.name ? `: ${bulkProgress.name}` : ""}
+                  </small>
+                )}
               </div>
               <button onClick={bulkPromoteStudents} disabled={bulkPromoting || selectedPromotableIds.length === 0}>
-                {bulkPromoting ? "Promoting Selected..." : "Bulk Promote"}
+                {bulkPromoting && bulkProgress.total > 0
+                  ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...`
+                  : "Bulk Promote"}
               </button>
             </div>
           )}
