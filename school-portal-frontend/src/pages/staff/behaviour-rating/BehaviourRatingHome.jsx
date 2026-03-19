@@ -77,7 +77,6 @@ export default function BehaviourRatingHome() {
           punctuality: Number(s.punctuality || 0),
           teamwork: Number(s.teamwork || 0),
           self_control: Number(s.self_control || 0),
-          teacher_comment: (s.teacher_comment || "").trim(),
         })),
       });
       alert("Behaviour ratings saved");
@@ -97,7 +96,7 @@ export default function BehaviourRatingHome() {
             <span className="bvr-pill">Staff Behaviour Rating</span>
             <h2>Rate classroom behaviour with structure and speed</h2>
             <p className="bvr-subtitle">
-              Select class and term, score behaviour criteria on a 0-5 scale, and save comments for each student in one page.
+              Select class and term, score behaviour criteria on a 0-5 scale, and save ratings for each student in one page.
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
@@ -181,7 +180,6 @@ export default function BehaviourRatingHome() {
                     {cols.map(([, label]) => (
                       <th key={label}>{label}</th>
                     ))}
-                    <th style={{ minWidth: 260 }}>Teacher Comment</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -206,20 +204,7 @@ export default function BehaviourRatingHome() {
                           />
                         </td>
                       ))}
-                      <td>
-                        <input
-                          className="bvr-field"
-                          type="text"
-                          value={s.teacher_comment || ""}
-                          placeholder="Teacher comment"
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setStudents((prev) =>
-                              prev.map((x) => (x.student_id === s.student_id ? { ...x, teacher_comment: v } : x))
-                            );
-                          }}
-                        />
-                      </td>
+
                     </tr>
                   ))}
                   {!students.length && (
