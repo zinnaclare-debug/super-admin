@@ -364,9 +364,9 @@ class ResultsController extends Controller
             $overallGrade = $summary['overall_grade'];
             $averageDisplay = $summary['average_display'];
 
-            $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
+            $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
-                $teacherComment = (string) ($attendance?->comment ?? '');
+                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             }
             if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
@@ -847,9 +847,9 @@ class ResultsController extends Controller
             $overallGrade = $summary['overall_grade'];
             $averageDisplay = $summary['average_display'];
 
-            $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
+            $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
-                $teacherComment = (string) ($attendance?->comment ?? '');
+                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             }
             if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
@@ -1544,4 +1544,6 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
+
 

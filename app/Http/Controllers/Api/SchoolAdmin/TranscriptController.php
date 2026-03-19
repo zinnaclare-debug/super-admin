@@ -831,9 +831,9 @@ class TranscriptController extends Controller
             $averageScore = (float) round($totalScore / $subjectCount, 2);
             $overallGrade = $this->gradeFromTotal($schoolId, (int) round($averageScore));
 
-            $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
+            $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
-                $teacherComment = (string) ($attendance?->comment ?? '');
+                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
             }
             if ($teacherComment === '') {
                 $teacherComment = $this->defaultTeacherComment((int) round($averageScore));
@@ -1363,5 +1363,7 @@ class TranscriptController extends Controller
         }
     }
 }
+
+
 
 

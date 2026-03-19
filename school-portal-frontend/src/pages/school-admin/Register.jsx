@@ -65,7 +65,7 @@ export default function Register() {
 
     name: "",
     email: "",
-    password: "",
+    password: data.password || "",
     sex: "",
     religion: "",
     dob: "",
@@ -132,7 +132,7 @@ export default function Register() {
           education_level: data.education_level || "",
           name: data.name || "",
           email: data.email || "",
-          password: "",
+          password: data.password || "",
           sex: data.sex || "",
           religion: data.religion || "",
           dob: data.dob || "",
@@ -387,7 +387,7 @@ export default function Register() {
         education_level: "",
         name: "",
         email: "",
-        password: "",
+        password: data.password || "",
         sex: "",
         religion: "",
         dob: "",
@@ -835,4 +835,5 @@ export default function Register() {
     </div>
   );
 }
+
 

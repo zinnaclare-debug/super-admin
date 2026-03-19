@@ -189,6 +189,7 @@ class UserManagementController extends Controller
         }
 
         $photoPath = $student?->photo_path ?? $staff?->photo_path ?? $user->photo_path;
+        $credential = $user->loginCredential()->first();
 
         return response()->json([
             'data' => [
@@ -197,6 +198,7 @@ class UserManagementController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'username' => $user->username,
+                'password' => UserCredentialStore::reveal($credential?->password_encrypted) ?? '',
                 'education_level' => $student?->education_level ?? $staff?->education_level,
                 'sex' => $student?->sex ?? $staff?->sex,
                 'religion' => $student?->religion,
@@ -1229,3 +1231,5 @@ class UserManagementController extends Controller
         }
     }
 }
+
+
