@@ -1238,40 +1238,33 @@ class RegistrationController extends Controller
 
     private function usernameBaseFromName(string $fullName): string
     {
-        $parts = preg_split('/\s+/', trim($fullName)) ?: [];
-        $surname = '';
-        if (!empty($parts)) {
-            $lastPart = end($parts);
-            $surname = is_string($lastPart) ? $lastPart : '';
-        }
+        $lettersOnly = strtolower(preg_replace('/[^a-z]+/i', '', $fullName) ?? '');
+        $base = substr($lettersOnly, 0, 3);
 
-        $base = strtolower(preg_replace('/[^a-z0-9]+/i', '', $surname) ?? '');
         if ($base === '') {
-            $base = 'user';
+            $base = 'usr';
         }
 
-        return substr($base, 0, 20);
+        return $base;
     }
 
     private function generateUniqueUsernameCandidate(string $base, callable $isTaken): string
     {
         $base = trim(strtolower($base));
         if ($base === '') {
-            $base = 'user';
+            $base = 'usr';
         }
 
-        foreach ([2, 3, 4, 5] as $digits) {
-            for ($attempt = 0; $attempt < 240; $attempt++) {
-                $candidate = $base . $this->randomDigits($digits);
-                if (!$isTaken($candidate)) {
-                    return $candidate;
-                }
+        for ($attempt = 0; $attempt < 600; $attempt++) {
+            $candidate = $base . $this->randomDigits(4);
+            if (!$isTaken($candidate)) {
+                return $candidate;
             }
         }
 
-        $counter = 1;
+        $counter = 0;
         do {
-            $candidate = $base . str_pad((string) $counter, 6, '0', STR_PAD_LEFT);
+            $candidate = $base . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
             $counter++;
         } while ($isTaken($candidate));
 
@@ -1332,3 +1325,4 @@ class RegistrationController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+

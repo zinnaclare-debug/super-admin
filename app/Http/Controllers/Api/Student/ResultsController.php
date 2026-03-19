@@ -366,9 +366,6 @@ class ResultsController extends Controller
 
             $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
-                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
-            }
-            if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
                     ? $this->defaultTeacherComment((int) round($averageScore))
                     : 'No graded subject available yet.';
@@ -848,9 +845,6 @@ class ResultsController extends Controller
             $averageDisplay = $summary['average_display'];
 
             $teacherComment = (string) ($attendance?->comment ?? '');
-            if ($teacherComment === '') {
-                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
-            }
             if ($teacherComment === '') {
                 $teacherComment = $overallGrade !== '-'
                     ? $this->defaultTeacherComment((int) round($averageScore))
@@ -1544,6 +1538,8 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
+
 
 
 

@@ -833,9 +833,6 @@ class TranscriptController extends Controller
 
             $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
-                $teacherComment = (string) ($behaviour?->teacher_comment ?? '');
-            }
-            if ($teacherComment === '') {
                 $teacherComment = $this->defaultTeacherComment((int) round($averageScore));
             }
             $schoolHeadComment = $this->defaultHeadComment((int) round($averageScore));
@@ -1363,6 +1360,8 @@ class TranscriptController extends Controller
         }
     }
 }
+
+
 
 
 
