@@ -10,14 +10,41 @@ const parseFileName = (headers, fallback = "users_inactive.pdf") => {
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
 };
 
+const filterStorageKey = (role, status) => `school-admin-users-filters:${status}:${role || "all"}`;
+
+const readStoredFilters = (role, status) => {
+  if (typeof window === "undefined") {
+    return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(filterStorageKey(role, status));
+    if (!raw) {
+      return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      q: String(parsed?.q || ""),
+      levelFilter: String(parsed?.levelFilter || ""),
+      classFilter: String(parsed?.classFilter || ""),
+      departmentFilter: String(parsed?.departmentFilter || ""),
+    };
+  } catch {
+    return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
+  }
+};
+
 export default function InactiveUsers() {
   const { role } = useParams();
   const navigate = useNavigate();
+  const storageKey = filterStorageKey(role, "inactive");
+  const storedFilters = readStoredFilters(role, "inactive");
   const [rows, setRows] = useState([]);
-  const [q, setQ] = useState("");
-  const [levelFilter, setLevelFilter] = useState("");
-  const [classFilter, setClassFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [q, setQ] = useState(storedFilters.q);
+  const [levelFilter, setLevelFilter] = useState(storedFilters.levelFilter);
+  const [classFilter, setClassFilter] = useState(storedFilters.classFilter);
+  const [departmentFilter, setDepartmentFilter] = useState(storedFilters.departmentFilter);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -41,12 +68,22 @@ export default function InactiveUsers() {
 
   useEffect(() => {
     load();
+    const nextFilters = readStoredFilters(role, "inactive");
+    setQ(nextFilters.q);
+    setLevelFilter(nextFilters.levelFilter);
+    setClassFilter(nextFilters.classFilter);
+    setDepartmentFilter(nextFilters.departmentFilter);
     setSelectedIds(new Set());
-    setLevelFilter("");
-    setClassFilter("");
-    setDepartmentFilter("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ q, levelFilter, classFilter, departmentFilter })
+    );
+  }, [storageKey, q, levelFilter, classFilter, departmentFilter]);
 
   const levelOptions = useMemo(() => {
     return Array.from(
