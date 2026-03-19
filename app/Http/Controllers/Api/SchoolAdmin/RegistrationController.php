@@ -1238,11 +1238,11 @@ class RegistrationController extends Controller
 
     private function usernameBaseFromName(string $fullName): string
     {
-        $lettersOnly = strtolower(preg_replace('/[^a-z]+/i', '', $fullName) ?? '');
+        $lettersOnly = strtoupper(preg_replace('/[^a-z]+/i', '', $fullName) ?? '');
         $base = substr($lettersOnly, 0, 3);
 
         if ($base === '') {
-            $base = 'usr';
+            $base = 'USR';
         }
 
         return $base;
@@ -1250,9 +1250,9 @@ class RegistrationController extends Controller
 
     private function generateUniqueUsernameCandidate(string $base, callable $isTaken): string
     {
-        $base = trim(strtolower($base));
+        $base = trim(strtoupper($base));
         if ($base === '') {
-            $base = 'usr';
+            $base = 'USR';
         }
 
         for ($attempt = 0; $attempt < 600; $attempt++) {
