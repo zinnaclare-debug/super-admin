@@ -25,7 +25,6 @@ use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
-    private const SCHOOL_DELETE_CONFIRMATION_CODE = '4721';
 
     /**
      * Delete a school (DESTROY)
@@ -36,7 +35,9 @@ class SchoolController extends Controller
             'delete_code' => ['required', 'digits:4'],
         ]);
 
-        if (!hash_equals(self::SCHOOL_DELETE_CONFIRMATION_CODE, (string) $validated['delete_code'])) {
+        $expectedDeleteCode = (string) config('app.super_admin_school_delete_confirmation_code', '4721');
+
+        if (!hash_equals($expectedDeleteCode, (string) $validated['delete_code'])) {
             throw ValidationException::withMessages([
                 'delete_code' => ['Invalid delete confirmation code.'],
             ]);
@@ -779,6 +780,7 @@ foreach ($defs as $def) {
         }
     }
 }
+
 
 
 

@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'super_admin_school_delete_confirmation_code' => env('SUPER_ADMIN_SCHOOL_DELETE_CONFIRMATION_CODE', '4721'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
@@ -124,3 +126,4 @@ return [
     ],
 
 ];
+
