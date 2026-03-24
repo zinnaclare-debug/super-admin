@@ -132,9 +132,24 @@ function Schools() {
     loadSchools();
   };
 
-  const deleteSchool = async (id) => {
-    if (!window.confirm("Delete this school?")) return;
-    await api.delete(`/api/super-admin/schools/${id}`);
+  const deleteSchool = async (id, schoolName) => {
+    if (!window.confirm(`Delete ${schoolName || "this school"}? This action is permanent.`)) return;
+
+    const deleteCode = window.prompt(
+      `Enter your 4-digit delete code to permanently delete ${schoolName || "this school"}:`
+    );
+
+    if (deleteCode === null) return;
+
+    const normalizedCode = String(deleteCode).trim();
+    if (!/^\d{4}$/.test(normalizedCode)) {
+      alert("Enter a valid 4-digit delete code.");
+      return;
+    }
+
+    await api.delete(`/api/super-admin/schools/${id}`, {
+      data: { delete_code: normalizedCode },
+    });
     loadSchools();
   };
 
@@ -209,7 +224,7 @@ function Schools() {
           startEdit(school);
           break;
         case "delete":
-          await deleteSchool(school.id);
+          await deleteSchool(school.id, school.name);
           break;
         case "features":
           await openFeatureModal(school);

@@ -25,11 +25,23 @@ use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
+    private const SCHOOL_DELETE_CONFIRMATION_CODE = '4721';
+
     /**
      * Delete a school (DESTROY)
      */
-    public function destroy(School $school)
+    public function destroy(Request $request, School $school)
     {
+        $validated = $request->validate([
+            'delete_code' => ['required', 'digits:4'],
+        ]);
+
+        if (!hash_equals(self::SCHOOL_DELETE_CONFIRMATION_CODE, (string) $validated['delete_code'])) {
+            throw ValidationException::withMessages([
+                'delete_code' => ['Invalid delete confirmation code.'],
+            ]);
+        }
+
         DB::transaction(function () use ($school) {
             // Ensure school users are removed so their unique emails can be reused.
             User::where('school_id', $school->id)->delete();
