@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 import UserProfilePanel from "./UserProfilePanel";
+
+const PAGE_SIZE = 100;
 
 const parseFileName = (headers, fallback = "users_active.pdf") => {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -12,16 +14,14 @@ const parseFileName = (headers, fallback = "users_active.pdf") => {
 
 const filterStorageKey = (role, status) => `school-admin-users-filters:${status}:${role || "all"}`;
 
+const emptyFilters = { q: "", levelFilter: "", classFilter: "", departmentFilter: "", page: 1 };
+
 const readStoredFilters = (role, status) => {
-  if (typeof window === "undefined") {
-    return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
-  }
+  if (typeof window === "undefined") return emptyFilters;
 
   try {
     const raw = window.localStorage.getItem(filterStorageKey(role, status));
-    if (!raw) {
-      return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
-    }
+    if (!raw) return emptyFilters;
 
     const parsed = JSON.parse(raw);
     return {
@@ -29,22 +29,33 @@ const readStoredFilters = (role, status) => {
       levelFilter: String(parsed?.levelFilter || ""),
       classFilter: String(parsed?.classFilter || ""),
       departmentFilter: String(parsed?.departmentFilter || ""),
+      page: Math.max(1, Number(parsed?.page) || 1),
     };
   } catch {
-    return { q: "", levelFilter: "", classFilter: "", departmentFilter: "" };
+    return emptyFilters;
   }
 };
 
 export default function ActiveUsers() {
-  const { role } = useParams(); // staff | student
+  const { role } = useParams();
   const navigate = useNavigate();
   const storageKey = filterStorageKey(role, "active");
   const storedFilters = readStoredFilters(role, "active");
   const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState({
+    levels: [],
+    classes: [],
+    departments: [],
+    current_page: 1,
+    last_page: 1,
+    per_page: PAGE_SIZE,
+    total: 0,
+  });
   const [q, setQ] = useState(storedFilters.q);
   const [levelFilter, setLevelFilter] = useState(storedFilters.levelFilter);
   const [classFilter, setClassFilter] = useState(storedFilters.classFilter);
   const [departmentFilter, setDepartmentFilter] = useState(storedFilters.departmentFilter);
+  const [page, setPage] = useState(storedFilters.page);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -52,73 +63,67 @@ export default function ActiveUsers() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      // ✅ Adjust endpoint if yours is different.
-      // Recommended backend: GET /api/school-admin/users?role=staff&status=active
-      const res = await api.get("/api/school-admin/users", {
-        params: { role, status: "active" },
-      });
-      setRows(res.data.data || []);
-    } catch (e) {
-      alert("Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    load();
     const nextFilters = readStoredFilters(role, "active");
     setQ(nextFilters.q);
     setLevelFilter(nextFilters.levelFilter);
     setClassFilter(nextFilters.classFilter);
     setDepartmentFilter(nextFilters.departmentFilter);
+    setPage(nextFilters.page);
     setSelectedIds(new Set());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSelectedUserId(null);
   }, [role]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(
       storageKey,
-      JSON.stringify({ q, levelFilter, classFilter, departmentFilter })
+      JSON.stringify({ q, levelFilter, classFilter, departmentFilter, page })
     );
-  }, [storageKey, q, levelFilter, classFilter, departmentFilter]);
+  }, [storageKey, q, levelFilter, classFilter, departmentFilter, page]);
 
-  const levelOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        rows
-          .flatMap((u) => (Array.isArray(u.levels) ? u.levels : [u.education_level]))
-          .map((v) => String(v || "").trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  }, [rows]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { role, status: "active", page, per_page: PAGE_SIZE };
+      if (q) params.q = q;
+      if (levelFilter) params.level = levelFilter;
+      if (classFilter) params.class = classFilter;
+      if (departmentFilter) params.department = departmentFilter;
 
-  const classOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        rows
-          .flatMap((u) => (Array.isArray(u.classes) ? u.classes : [u.class_name]))
-          .map((v) => String(v || "").trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  }, [rows]);
+      const res = await api.get("/api/school-admin/users", { params });
+      const nextRows = Array.isArray(res.data?.data) ? res.data.data : [];
+      const nextMeta = res.data?.meta || {};
 
-  const departmentOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        rows
-          .flatMap((u) => (Array.isArray(u.departments) ? u.departments : [u.department_name]))
-          .map((v) => String(v || "").trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  }, [rows]);
+      setRows(nextRows);
+      setMeta({
+        levels: Array.isArray(nextMeta.levels) ? nextMeta.levels : [],
+        classes: Array.isArray(nextMeta.classes) ? nextMeta.classes : [],
+        departments: Array.isArray(nextMeta.departments) ? nextMeta.departments : [],
+        current_page: Number(nextMeta.current_page) || 1,
+        last_page: Number(nextMeta.last_page) || 1,
+        per_page: Number(nextMeta.per_page) || PAGE_SIZE,
+        total: Number(nextMeta.total) || 0,
+      });
+
+      const currentPage = Number(nextMeta.current_page) || 1;
+      if (currentPage !== page) setPage(currentPage);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to load users");
+      setRows([]);
+      setMeta({ levels: [], classes: [], departments: [], current_page: 1, last_page: 1, per_page: PAGE_SIZE, total: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, [classFilter, departmentFilter, levelFilter, page, q, role]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const levelOptions = useMemo(() => meta.levels || [], [meta.levels]);
+  const classOptions = useMemo(() => meta.classes || [], [meta.classes]);
+  const departmentOptions = useMemo(() => meta.departments || [], [meta.departments]);
 
   const removeUser = async (u) => {
     if (!u?.id) return;
@@ -127,9 +132,12 @@ export default function ActiveUsers() {
     setDeletingId(u.id);
     try {
       await api.delete(`/api/school-admin/users/${u.id}`);
-      if (selectedUserId === u.id) {
-        setSelectedUserId(null);
-      }
+      if (selectedUserId === u.id) setSelectedUserId(null);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(u.id);
+        return next;
+      });
       await load();
       alert("User deleted successfully");
     } catch (e) {
@@ -148,13 +156,9 @@ export default function ActiveUsers() {
       const res = await api.delete("/api/school-admin/users/bulk-delete", {
         data: { ids: Array.from(selectedIds) },
       });
-      const deletedIds = Array.isArray(res?.data?.data?.deleted_ids)
-        ? res.data.data.deleted_ids
-        : [];
+      const deletedIds = Array.isArray(res?.data?.data?.deleted_ids) ? res.data.data.deleted_ids : [];
 
-      if (selectedUserId && deletedIds.includes(selectedUserId)) {
-        setSelectedUserId(null);
-      }
+      if (selectedUserId && deletedIds.includes(selectedUserId)) setSelectedUserId(null);
 
       await load();
       setSelectedIds(new Set());
@@ -169,10 +173,7 @@ export default function ActiveUsers() {
   const downloadUsersPdf = async () => {
     setDownloadingPdf(true);
     try {
-      const params = {
-        status: "active",
-        role,
-      };
+      const params = { status: "active", role };
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
       if (departmentFilter) params.department = departmentFilter;
@@ -199,43 +200,7 @@ export default function ActiveUsers() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const level = levelFilter.trim().toLowerCase();
-    const className = classFilter.trim().toLowerCase();
-    const department = departmentFilter.trim().toLowerCase();
-
-    const textFiltered = rows.filter((u) => {
-      if (!s) return true;
-      const name = (u.name || "").toLowerCase();
-      const email = (u.email || "").toLowerCase();
-      const username = (u.username || "").toLowerCase();
-      return name.includes(s) || email.includes(s) || username.includes(s);
-    });
-
-    return textFiltered.filter((u) => {
-      const rowLevels = (Array.isArray(u.levels) ? u.levels : [u.education_level])
-        .map((v) => String(v || "").trim().toLowerCase())
-        .filter(Boolean);
-      const rowClasses = (Array.isArray(u.classes) ? u.classes : [u.class_name])
-        .map((v) => String(v || "").trim().toLowerCase())
-        .filter(Boolean);
-      const rowDepartments = (Array.isArray(u.departments) ? u.departments : [u.department_name])
-        .map((v) => String(v || "").trim().toLowerCase())
-        .filter(Boolean);
-
-      if (level && !rowLevels.includes(level)) return false;
-      if (className && !rowClasses.includes(className)) return false;
-      if (department && !rowDepartments.includes(department)) return false;
-      return true;
-    });
-  }, [rows, q, levelFilter, classFilter, departmentFilter]);
-
-  const visibleIds = useMemo(
-    () => filtered.map((u) => u.id),
-    [filtered]
-  );
-
+  const visibleIds = useMemo(() => rows.map((u) => u.id), [rows]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
   const toggleRow = (id) => {
@@ -259,40 +224,32 @@ export default function ActiveUsers() {
     });
   };
 
+  const pageStart = meta.total === 0 ? 0 : (meta.current_page - 1) * meta.per_page + 1;
+  const pageEnd = meta.total === 0 ? 0 : pageStart + rows.length - 1;
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <h4 style={{ margin: 0 }}>Active {role === "staff" ? "Staff" : "Students"}</h4>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+          <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
             <option value="">All Levels</option>
-            {levelOptions.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {levelOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+          <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
             <option value="">All Classes</option>
-            {classOptions.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {classOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} style={{ padding: 8, minWidth: 170 }}>
+          <select value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
             <option value="">All Departments</option>
-            {departmentOptions.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {departmentOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, email, username..."
-            style={{ padding: 8, width: 320 }}
-          />
+          <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, email, username..." style={{ padding: 8, width: 320 }} />
         </div>
       </div>
 
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <button
           onClick={bulkDeleteUsers}
           disabled={selectedIds.size === 0 || bulkDeleting}
@@ -308,6 +265,7 @@ export default function ActiveUsers() {
         <button onClick={downloadUsersPdf} disabled={downloadingPdf}>
           {downloadingPdf ? "Downloading..." : "Download PDF"}
         </button>
+        <span style={{ opacity: 0.75 }}>Showing {pageStart}-{pageEnd} of {meta.total}</span>
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -319,11 +277,7 @@ export default function ActiveUsers() {
               <tr>
                 <th>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleAllVisible}
-                    />
+                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                     <span>S/N</span>
                   </div>
                 </th>
@@ -337,79 +291,50 @@ export default function ActiveUsers() {
             </thead>
 
             <tbody>
-              {filtered.map((u, idx) => {
-                const levels = Array.isArray(u.levels) && u.levels.length > 0
-                  ? u.levels
-                  : (u.education_level ? [u.education_level] : []);
-                const classes = Array.isArray(u.classes) && u.classes.length > 0
-                  ? u.classes
-                  : (u.class_name ? [u.class_name] : []);
-                const departments = Array.isArray(u.departments) && u.departments.length > 0
-                  ? u.departments
-                  : (u.department_name ? [u.department_name] : []);
+              {rows.map((u) => {
+                const levels = Array.isArray(u.levels) && u.levels.length > 0 ? u.levels : (u.education_level ? [u.education_level] : []);
+                const classes = Array.isArray(u.classes) && u.classes.length > 0 ? u.classes : (u.class_name ? [u.class_name] : []);
+                const departments = Array.isArray(u.departments) && u.departments.length > 0 ? u.departments : (u.department_name ? [u.department_name] : []);
 
                 return (
-                <tr key={u.id}>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(u.id)}
-                        onChange={() => toggleRow(u.id)}
-                      />
-                      <span>{idx + 1}</span>
-                    </div>
-                  </td>
-                  <td>{u.name}</td>
-                  <td>{levels.length ? levels.join(", ") : "-"}</td>
-                  <td>{classes.length ? classes.join(", ") : "-"}</td>
-                  <td>{departments.length ? departments.join(", ") : "-"}</td>
-                  <td>
-                    <strong>{u.status || "active"}</strong>
-                  </td>
-                  <td>
-                    {/* Next step: "More" dropdown + profile fetch */}
-                    <button onClick={() => setSelectedUserId(u.id)}>
-                      More
-                    </button>
-                    <button
-                      style={{ marginLeft: 8 }}
-                      onClick={() =>
-                        navigate(
-                          `/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(
-                            `/school/admin/users/${role}/active`
-                          )}`
-                        )
-                      }
-                    >
-                      Edit
-                    </button>
-                    <button
-                      style={{
-                        marginLeft: 8,
-                        background: "#dc2626",
-                        border: "1px solid #b91c1c",
-                        color: "#fff",
-                      }}
-                      onClick={() => removeUser(u)}
-                      disabled={deletingId === u.id}
-                    >
-                      {deletingId === u.id ? "Deleting..." : "Delete"}
-                    </button>
-                    {role === "student" ? (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleRow(u.id)} />
+                        <span>{u.sn ?? "-"}</span>
+                      </div>
+                    </td>
+                    <td>{u.name}</td>
+                    <td>{levels.length ? levels.join(", ") : "-"}</td>
+                    <td>{classes.length ? classes.join(", ") : "-"}</td>
+                    <td>{departments.length ? departments.join(", ") : "-"}</td>
+                    <td><strong>{u.status || "active"}</strong></td>
+                    <td>
+                      <button onClick={() => setSelectedUserId(u.id)}>More</button>
                       <button
                         style={{ marginLeft: 8 }}
-                        onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}
+                        onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/active`)}`)}
                       >
-                        Set Payment
+                        Edit
                       </button>
-                    ) : null}
-                  </td>
-                </tr>
+                      <button
+                        style={{ marginLeft: 8, background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
+                        onClick={() => removeUser(u)}
+                        disabled={deletingId === u.id}
+                      >
+                        {deletingId === u.id ? "Deleting..." : "Delete"}
+                      </button>
+                      {role === "student" ? (
+                        <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
+                          Set Payment
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
                 );
               })}
 
-              {filtered.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
                   <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
                     No users found
@@ -419,14 +344,18 @@ export default function ActiveUsers() {
             </tbody>
           </table>
         )}
-              {/* Profile panel */}
-      {selectedUserId && (
-        <UserProfilePanel
-          userId={selectedUserId}
-          onClose={() => setSelectedUserId(null)}
-          onChanged={load}
-        />
-      )}
+
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={loading || meta.current_page <= 1}>
+            Previous
+          </button>
+          <span>Page {meta.current_page} of {meta.last_page}</span>
+          <button onClick={() => setPage((current) => Math.min(meta.last_page, current + 1))} disabled={loading || meta.current_page >= meta.last_page}>
+            Next
+          </button>
+        </div>
+
+        {selectedUserId && <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} onChanged={load} />}
       </div>
     </div>
   );

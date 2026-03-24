@@ -33,26 +33,89 @@ class UserManagementController extends Controller
     // GET /api/school-admin/users?status=active|inactive&role=staff|student
     public function index(Request $request)
     {
-        $schoolId = $request->user()->school_id;
+        $schoolId = (int) $request->user()->school_id;
+        $payload = $request->validate([
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'role' => ['nullable', Rule::in(['student', 'staff'])],
+            'level' => ['nullable', 'string', 'max:60'],
+            'class' => ['nullable', 'string', 'max:120'],
+            'department' => ['nullable', 'string', 'max:120'],
+            'q' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-        $status = $request->query('status', 'active'); // active or inactive
-        $role = $request->query('role'); // staff or student (optional)
+        $status = (string) ($payload['status'] ?? 'active');
+        $role = $payload['role'] ?? null;
         $isActive = $status === 'active';
+        $page = max(1, (int) ($payload['page'] ?? 1));
+        $perPage = max(1, min(100, (int) ($payload['per_page'] ?? 100)));
 
         $query = User::query()
             ->where('school_id', $schoolId)
-            ->whereIn('role', ['student', 'staff']) // don't include school_admin
+            ->whereIn('role', ['student', 'staff'])
             ->where('is_active', $isActive);
 
-        // Filter by role if provided
-        if ($role && in_array($role, ['student', 'staff'])) {
+        if ($role && in_array($role, ['student', 'staff'], true)) {
             $query->where('role', $role);
         }
 
         $users = $query->orderBy('name')->get(['id', 'name', 'email', 'username', 'role', 'is_active']);
-        $rows = $this->buildUserIndexRows((int) $schoolId, $users);
+        $allRows = $this->buildUserIndexRows($schoolId, $users);
+        $rows = $this->filterUserIndexRows(
+            $allRows,
+            $payload['level'] ?? null,
+            $payload['class'] ?? null,
+            $payload['department'] ?? null,
+            $payload['q'] ?? null
+        );
 
-        return response()->json(['data' => $rows]);
+        $levels = collect($allRows)
+            ->flatMap(fn (array $row) => array_filter(array_map('trim', array_map('strval', $row['levels'] ?? []))))
+            ->filter(fn ($value) => $value !== '')
+            ->unique(fn ($value) => strtolower($value))
+            ->sort(fn ($a, $b) => strcasecmp($a, $b))
+            ->values()
+            ->all();
+
+        $classes = collect($allRows)
+            ->flatMap(fn (array $row) => array_filter(array_map('trim', array_map('strval', $row['classes'] ?? []))))
+            ->filter(fn ($value) => $value !== '')
+            ->unique(fn ($value) => strtolower($value))
+            ->sort(fn ($a, $b) => strcasecmp($a, $b))
+            ->values()
+            ->all();
+
+        $departments = collect($allRows)
+            ->flatMap(fn (array $row) => array_filter(array_map('trim', array_map('strval', $row['departments'] ?? []))))
+            ->filter(fn ($value) => $value !== '')
+            ->unique(fn ($value) => strtolower($value))
+            ->sort(fn ($a, $b) => strcasecmp($a, $b))
+            ->values()
+            ->all();
+
+        $paginated = $this->paginateArrayRows($rows, $perPage, $page);
+
+        return response()->json([
+            'data' => $paginated['data'],
+            'meta' => [
+                'levels' => $levels,
+                'classes' => $classes,
+                'departments' => $departments,
+                'selected' => [
+                    'status' => $status,
+                    'role' => $role,
+                    'level' => $payload['level'] ?? null,
+                    'class' => $payload['class'] ?? null,
+                    'department' => $payload['department'] ?? null,
+                    'q' => $payload['q'] ?? null,
+                ],
+                'current_page' => $paginated['current_page'],
+                'last_page' => $paginated['last_page'],
+                'per_page' => $paginated['per_page'],
+                'total' => $paginated['total'],
+            ],
+        ]);
     }
 
     // GET /api/school-admin/users/download/pdf?status=active|inactive&role=staff|student&level=&class=&department=&q=
@@ -755,6 +818,28 @@ class UserManagementController extends Controller
             ->all();
     }
 
+    private function paginateArrayRows(array $rows, int $perPage, int $page): array
+    {
+        $total = count($rows);
+        $lastPage = max(1, (int) ceil($total / max(1, $perPage)));
+        $page = min(max(1, $page), $lastPage);
+        $offset = ($page - 1) * $perPage;
+        $items = array_slice(array_values($rows), $offset, $perPage);
+
+        $items = array_map(function (array $row, int $index) use ($offset) {
+            $row['sn'] = $offset + $index + 1;
+            return $row;
+        }, $items, array_keys($items));
+
+        return [
+            'data' => array_values($items),
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $total,
+        ];
+    }
+
     private function resolveStaffAssignmentsForUsers(int $schoolId, array $staffUserIds): array
     {
         $userIds = collect($staffUserIds)
@@ -1231,5 +1316,8 @@ class UserManagementController extends Controller
         }
     }
 }
+
+
+
 
 

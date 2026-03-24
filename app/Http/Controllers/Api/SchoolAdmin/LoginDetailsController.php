@@ -25,6 +25,9 @@ class LoginDetailsController extends Controller
             'level' => ['nullable', 'string', 'max:60'],
             'department' => ['nullable', 'string', 'max:80'],
             'class_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $result = $this->buildRows(
@@ -32,12 +35,22 @@ class LoginDetailsController extends Controller
             $payload['role'] ?? null,
             $payload['level'] ?? null,
             $payload['department'] ?? null,
-            isset($payload['class_id']) ? (int) $payload['class_id'] : null
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null,
+            $payload['q'] ?? null
         );
 
+        $page = max(1, (int) ($payload['page'] ?? 1));
+        $perPage = max(1, min(100, (int) ($payload['per_page'] ?? 100)));
+        $paginated = $this->paginateArrayRows($result['rows'], $perPage, $page);
+
         return response()->json([
-            'data' => $result['rows'],
-            'meta' => $result['meta'],
+            'data' => $paginated['data'],
+            'meta' => array_merge($result['meta'], [
+                'current_page' => $paginated['current_page'],
+                'last_page' => $paginated['last_page'],
+                'per_page' => $paginated['per_page'],
+                'total' => $paginated['total'],
+            ]),
         ]);
     }
 
@@ -49,6 +62,7 @@ class LoginDetailsController extends Controller
             'level' => ['nullable', 'string', 'max:60'],
             'department' => ['nullable', 'string', 'max:80'],
             'class_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:120'],
         ]);
 
         $result = $this->buildRows(
@@ -56,7 +70,8 @@ class LoginDetailsController extends Controller
             $payload['role'] ?? null,
             $payload['level'] ?? null,
             $payload['department'] ?? null,
-            isset($payload['class_id']) ? (int) $payload['class_id'] : null
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null,
+            $payload['q'] ?? null
         );
         $rows = $result['rows'];
         $lines = [];
@@ -104,6 +119,7 @@ class LoginDetailsController extends Controller
             'level' => ['nullable', 'string', 'max:60'],
             'department' => ['nullable', 'string', 'max:80'],
             'class_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:120'],
         ]);
 
         $result = $this->buildRows(
@@ -111,7 +127,8 @@ class LoginDetailsController extends Controller
             $payload['role'] ?? null,
             $payload['level'] ?? null,
             $payload['department'] ?? null,
-            isset($payload['class_id']) ? (int) $payload['class_id'] : null
+            isset($payload['class_id']) ? (int) $payload['class_id'] : null,
+            $payload['q'] ?? null
         );
         $rows = $result['rows'] ?? [];
         $school = School::query()->find($schoolId);
@@ -663,3 +680,7 @@ class LoginDetailsController extends Controller
         return $normalized;
     }
 }
+
+
+
+
