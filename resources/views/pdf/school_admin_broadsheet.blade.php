@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Annual Broadsheet</title>
+    <title>{{ strtoupper((string) ($reportScopeLabel ?? 'Annual')) }} Broadsheet</title>
     <style>
         @page { margin: 8px; }
         body {
@@ -86,17 +86,22 @@
     $levelLabel = strtoupper((string) ($level ?? '-'));
     $departmentLabel = strtoupper((string) ($department ?: 'ALL'));
     $classLabel = strtoupper((string) ($className ?: 'ALL'));
+    $reportScopeTitle = strtoupper((string) ($reportScopeLabel ?: 'Annual'));
+    $selectedTermTitle = strtoupper((string) ($selectedTermName ?: $reportScopeTitle));
     $nowLabel = now()->format('n/j/Y g:i A');
 @endphp
 
 <div class="meta-line">
     <div class="left">{{ $nowLabel }}</div>
-    <div class="right">ANNUAL BROADSHEET</div>
+    <div class="right">{{ $reportScopeTitle }} BROADSHEET</div>
 </div>
 
 <div class="title">
     <h1>{{ strtoupper((string) ($schoolName ?: 'SCHOOL NAME')) }}</h1>
-    <h2>ANNUAL BROADSHEET FOR {{ $levelLabel }} - {{ $sessionLabel }} SESSION</h2>
+    <h2>{{ $reportScopeTitle }} BROADSHEET FOR {{ $levelLabel }} - {{ $sessionLabel }} SESSION</h2>
+    @if($selectedTermTitle !== 'ANNUAL')
+        <h2>TERM: {{ $selectedTermTitle }}</h2>
+    @endif
     <h2>DEPARTMENT: {{ $departmentLabel }}</h2>
     <h2>CLASS: {{ $classLabel }}</h2>
 </div>

@@ -47,6 +47,7 @@ const downloadCsv = (rows, context) => {
     "E",
     "F",
     "Total",
+    "Teacher Comment",
   ];
 
   const lines = [
@@ -63,6 +64,7 @@ const downloadCsv = (rows, context) => {
         row.grades?.E ?? 0,
         row.grades?.F ?? 0,
         row.total_graded ?? 0,
+        row.teacher_comment || "",
       ]
         .map(toCsvCell)
         .join(",")
@@ -96,6 +98,7 @@ export default function TeacherReport() {
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [sessionConfigError, setSessionConfigError] = useState("");
+  const [teacherComments, setTeacherComments] = useState({});
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -130,6 +133,24 @@ export default function TeacherReport() {
   }, [termId]);
 
   const selectedTermValue = termId || String(context?.selected_term?.id || "");
+  const commentStorageKey = `school-admin-teacher-report-comments:${selectedTermValue || "default"}`;
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(commentStorageKey);
+      setTeacherComments(raw ? JSON.parse(raw) : {});
+    } catch {
+      setTeacherComments({});
+    }
+  }, [commentStorageKey]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(commentStorageKey, JSON.stringify(teacherComments));
+    } catch {
+      // Keep the report usable even if storage is unavailable.
+    }
+  }, [commentStorageKey, teacherComments]);
 
   const downloadPdf = async () => {
     if (rows.length === 0) return;
@@ -197,7 +218,15 @@ export default function TeacherReport() {
           ))}
         </select>
         <button
-          onClick={() => downloadCsv(rows, context)}
+          onClick={() =>
+            downloadCsv(
+              rows.map((row) => ({
+                ...row,
+                teacher_comment: teacherComments[String(row.teacher_user_id)] || "",
+              })),
+              context
+            )
+          }
           disabled={loading || rows.length === 0}
           style={{ marginLeft: 10 }}
         >
@@ -228,6 +257,7 @@ export default function TeacherReport() {
               <th>E</th>
               <th>F</th>
               <th>Total</th>
+              <th style={{ minWidth: 220 }}>Teacher Comment</th>
             </tr>
           </thead>
           <tbody>
@@ -243,11 +273,33 @@ export default function TeacherReport() {
                 <td>{row.grades?.E ?? 0}</td>
                 <td>{row.grades?.F ?? 0}</td>
                 <td>{row.total_graded ?? 0}</td>
+                <td>
+                  <textarea
+                    value={teacherComments[String(row.teacher_user_id)] || ""}
+                    onChange={(e) => {
+                      const value = e.target.value.slice(0, 160);
+                      setTeacherComments((prev) => ({
+                        ...prev,
+                        [String(row.teacher_user_id)]: value,
+                      }));
+                    }}
+                    placeholder="Add short teacher comment"
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      minWidth: 180,
+                      height: 44,
+                      resize: "none",
+                      boxSizing: "border-box",
+                      font: "inherit",
+                    }}
+                  />
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="10">No teacher grading data for this term.</td>
+                <td colSpan="11">No teacher grading data for this term.</td>
               </tr>
             )}
           </tbody>

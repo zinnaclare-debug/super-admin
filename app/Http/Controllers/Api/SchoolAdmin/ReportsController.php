@@ -61,6 +61,7 @@ class ReportsController extends Controller
         $requestedLevel = strtolower(trim((string) $request->query('level', '')));
         $requestedDepartment = trim((string) $request->query('department', ''));
         $requestedClassId = (int) $request->query('class_id', 0);
+        $reportScope = $this->normalizeBroadsheetReportScope((string) $request->query('report_scope', 'annual'));
         $sessions = AcademicSession::where('school_id', $schoolId)
             ->orderByDesc('id')
             ->get(['id', 'session_name', 'academic_year', 'status']);
@@ -83,6 +84,8 @@ class ReportsController extends Controller
                     'selected_department' => null,
                     'classes' => [],
                     'selected_class_id' => null,
+                    'report_scopes' => $this->broadsheetReportScopeOptions(),
+                    'selected_report_scope' => $reportScope,
                 ],
             ]);
         }
@@ -123,6 +126,8 @@ class ReportsController extends Controller
                 'selected_department' => $selectedDepartment,
                 'classes' => $classes,
                 'selected_class_id' => $selectedClassId,
+                'report_scopes' => $this->broadsheetReportScopeOptions(),
+                'selected_report_scope' => $reportScope,
             ],
         ]);
     }
@@ -135,6 +140,7 @@ class ReportsController extends Controller
             'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
             'class_id' => 'nullable|integer',
+            'report_scope' => 'nullable|string|in:annual,first_term,second_term,third_term',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -172,13 +178,15 @@ class ReportsController extends Controller
                 'message' => 'Invalid class selected for the chosen filters.',
             ], 422);
         }
+        $reportScope = $this->normalizeBroadsheetReportScope((string) ($payload['report_scope'] ?? 'annual'));
 
         $broadsheet = $this->buildBroadsheetData(
             $schoolId,
             (int) $session->id,
             $level,
             $selectedDepartment,
-            $selectedClassId
+            $selectedClassId,
+            $reportScope
         );
         $selectedClassName = collect($classes)
             ->firstWhere('id', $selectedClassId)['name'] ?? null;
@@ -199,6 +207,10 @@ class ReportsController extends Controller
                 'classes' => $classes,
                 'selected_class_id' => $selectedClassId,
                 'selected_class_name' => $selectedClassName,
+                'report_scopes' => $this->broadsheetReportScopeOptions(),
+                'selected_report_scope' => $reportScope,
+                'selected_report_scope_label' => $this->broadsheetReportScopeLabel($reportScope),
+                'selected_term_name' => $broadsheet['selected_term_name'] ?? null,
             ],
         ]);
     }
@@ -211,6 +223,7 @@ class ReportsController extends Controller
             'level' => 'nullable|string|max:60',
             'department' => 'nullable|string|max:100',
             'class_id' => 'nullable|integer',
+            'report_scope' => 'nullable|string|in:annual,first_term,second_term,third_term',
         ]);
 
         $schoolId = (int) $request->user()->school_id;
@@ -248,13 +261,15 @@ class ReportsController extends Controller
                 'message' => 'Invalid class selected for the chosen filters.',
             ], 422);
         }
+        $reportScope = $this->normalizeBroadsheetReportScope((string) ($payload['report_scope'] ?? 'annual'));
 
         $broadsheet = $this->buildBroadsheetData(
             $schoolId,
             (int) $session->id,
             $level,
             $selectedDepartment,
-            $selectedClassId
+            $selectedClassId,
+            $reportScope
         );
         if (empty($broadsheet['subjects']) || empty($broadsheet['rows'])) {
             return response()->json([
@@ -272,6 +287,9 @@ class ReportsController extends Controller
                 'level' => $level,
                 'department' => $selectedDepartment,
                 'className' => $selectedClassName,
+                'reportScope' => $reportScope,
+                'reportScopeLabel' => $this->broadsheetReportScopeLabel($reportScope),
+                'selectedTermName' => $broadsheet['selected_term_name'] ?? null,
                 'subjects' => $broadsheet['subjects'],
                 'rows' => $broadsheet['rows'],
             ])->render();
@@ -307,7 +325,8 @@ class ReportsController extends Controller
 
             $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
             $filename = sprintf(
-                'broadsheet_%s%s%s_%s.pdf',
+                'broadsheet_%s_%s%s%s_%s.pdf',
+                Str::slug($reportScope),
                 Str::slug($level),
                 $selectedDepartment ? ('_' . Str::slug($selectedDepartment)) : '',
                 $selectedClassName ? ('_' . Str::slug($selectedClassName)) : '',
@@ -325,6 +344,7 @@ class ReportsController extends Controller
                 'level' => $level,
                 'department' => $selectedDepartment,
                 'class_id' => $selectedClassId,
+                'report_scope' => $reportScope,
                 'error' => $e->getMessage(),
             ]);
 
@@ -755,7 +775,8 @@ class ReportsController extends Controller
         int $sessionId,
         string $level,
         ?string $departmentName = null,
-        ?int $classId = null
+        ?int $classId = null,
+        string $reportScope = 'annual'
     ): array
     {
         $classesQuery = DB::table('classes')
@@ -793,18 +814,15 @@ class ReportsController extends Controller
             $classOrderById[(int) $item['id']] = $index;
         }
 
-        $termIds = Term::where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->orderBy('id')
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $termSelection = $this->resolveBroadsheetTermSelection($schoolId, $sessionId, $reportScope);
+        $termIds = $termSelection['term_ids'];
 
         if (empty($termIds)) {
             return [
                 'classes' => $classList->all(),
                 'subjects' => [],
                 'rows' => [],
+                'selected_term_name' => $termSelection['selected_term_name'],
             ];
         }
 
@@ -827,6 +845,7 @@ class ReportsController extends Controller
                     'classes' => $classList->all(),
                     'subjects' => [],
                     'rows' => [],
+                    'selected_term_name' => $termSelection['selected_term_name'],
                 ];
             }
 
@@ -853,6 +872,7 @@ class ReportsController extends Controller
                 'classes' => $classList->all(),
                 'subjects' => [],
                 'rows' => [],
+                'selected_term_name' => $termSelection['selected_term_name'],
             ];
         }
 
@@ -1111,6 +1131,93 @@ class ReportsController extends Controller
             'classes' => $classList->all(),
             'subjects' => $subjects->values()->all(),
             'rows' => $rows,
+            'selected_term_name' => $termSelection['selected_term_name'],
+        ];
+    }
+
+    private function broadsheetReportScopeOptions(): array
+    {
+        return [
+            ['value' => 'annual', 'label' => 'Annual'],
+            ['value' => 'first_term', 'label' => 'First Term'],
+            ['value' => 'second_term', 'label' => 'Second Term'],
+            ['value' => 'third_term', 'label' => 'Third Term'],
+        ];
+    }
+
+    private function normalizeBroadsheetReportScope(string $scope): string
+    {
+        return match (strtolower(trim($scope))) {
+            'first_term' => 'first_term',
+            'second_term' => 'second_term',
+            'third_term' => 'third_term',
+            default => 'annual',
+        };
+    }
+
+    private function broadsheetReportScopeLabel(string $scope): string
+    {
+        return collect($this->broadsheetReportScopeOptions())
+            ->firstWhere('value', $this->normalizeBroadsheetReportScope($scope))['label'] ?? 'Annual';
+    }
+
+    private function resolveBroadsheetTermSelection(int $schoolId, int $sessionId, string $reportScope): array
+    {
+        $terms = Term::where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->orderBy('id')
+            ->get(['id', 'name']);
+
+        if ($terms->isEmpty()) {
+            return [
+                'term_ids' => [],
+                'selected_term_name' => null,
+            ];
+        }
+
+        $normalizedScope = $this->normalizeBroadsheetReportScope($reportScope);
+        if ($normalizedScope === 'annual') {
+            return [
+                'term_ids' => $terms->pluck('id')->map(fn ($id) => (int) $id)->all(),
+                'selected_term_name' => 'Annual',
+            ];
+        }
+
+        $scopeIndexMap = [
+            'first_term' => 0,
+            'second_term' => 1,
+            'third_term' => 2,
+        ];
+        $aliases = [
+            'first_term' => ['firstterm', 'first', '1stterm', 'term1'],
+            'second_term' => ['secondterm', 'second', '2ndterm', 'term2'],
+            'third_term' => ['thirdterm', 'third', '3rdterm', 'term3'],
+        ];
+
+        $matchedTerm = $terms->first(function ($term) use ($normalizedScope, $aliases) {
+            $normalizedName = strtolower(preg_replace('/[^a-z0-9]+/', '', (string) ($term->name ?? '')));
+            foreach ($aliases[$normalizedScope] ?? [] as $alias) {
+                if ($normalizedName === $alias) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        if (!$matchedTerm) {
+            $matchedTerm = $terms->values()->get($scopeIndexMap[$normalizedScope] ?? 0);
+        }
+
+        if (!$matchedTerm) {
+            return [
+                'term_ids' => [],
+                'selected_term_name' => $this->broadsheetReportScopeLabel($normalizedScope),
+            ];
+        }
+
+        return [
+            'term_ids' => [(int) $matchedTerm->id],
+            'selected_term_name' => (string) ($matchedTerm->name ?? $this->broadsheetReportScopeLabel($normalizedScope)),
         ];
     }
 
