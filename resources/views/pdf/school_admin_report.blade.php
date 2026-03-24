@@ -21,8 +21,10 @@
 </head>
 <body>
   @php
-    $isTeacherReport = strtolower((string) ($title ?? '')) === 'teacher report';
-    $emptyColspan = $isTeacherReport ? 12 : 10;
+    $normalizedTitle = strtolower((string) ($title ?? ''));
+    $isTeacherReport = $normalizedTitle === 'teacher report';
+    $isStudentReport = $normalizedTitle === 'student report';
+    $emptyColspan = 10 + ($isTeacherReport ? 1 : 0) + ($isStudentReport ? 1 : 0);
   @endphp
 
   <div class="head">
@@ -50,8 +52,10 @@
         <th class="small">F</th>
         <th class="total">Total</th>
         @if($isTeacherReport)
-          <th class="comment">Teacher Comment</th>
           <th class="summary">Summary</th>
+        @endif
+        @if($isStudentReport)
+          <th class="comment">Teacher Comment</th>
         @endif
       </tr>
     </thead>
@@ -69,8 +73,10 @@
           <td class="small">{{ $row['grades']['F'] ?? '-' }}</td>
           <td class="total">{{ $row['total_graded'] ?? '-' }}</td>
           @if($isTeacherReport)
-            <td class="comment">{{ $row['teacher_comment'] ?? '-' }}</td>
             <td class="summary">{{ $row['summary'] ?? 'Completed' }}</td>
+          @endif
+          @if($isStudentReport)
+            <td class="comment">{{ $row['teacher_comment'] ?? '-' }}</td>
           @endif
         </tr>
       @empty

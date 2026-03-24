@@ -42,6 +42,20 @@ const formatMaybeNumber = (value, digits = 2) => {
   return num.toFixed(digits);
 };
 
+const readOnlyBoxStyle = {
+  minWidth: 220,
+  minHeight: 44,
+  maxHeight: 52,
+  overflow: "auto",
+  padding: "6px 8px",
+  boxSizing: "border-box",
+  background: "#f8fafc",
+  border: "1px solid #cbd5e1",
+  borderRadius: 6,
+  lineHeight: 1.25,
+  whiteSpace: "normal",
+};
+
 const downloadCsv = (rows, context) => {
   if (!rows?.length) return;
 
@@ -56,6 +70,7 @@ const downloadCsv = (rows, context) => {
     "E",
     "F",
     "Total",
+    "Teacher Comment",
   ];
 
   const lines = [
@@ -72,6 +87,7 @@ const downloadCsv = (rows, context) => {
         asDash(row.grades?.E),
         asDash(row.grades?.F),
         asDash(row.total_graded),
+        row.teacher_comment || "-",
       ]
         .map(toCsvCell)
         .join(",")
@@ -542,6 +558,7 @@ export default function StudentReport() {
               <th>E</th>
               <th>F</th>
               <th>Total</th>
+              <th style={{ minWidth: 240 }}>Teacher Comment</th>
             </tr>
           </thead>
           <tbody>
@@ -557,11 +574,12 @@ export default function StudentReport() {
                 <td>{asDash(row.grades?.E)}</td>
                 <td>{asDash(row.grades?.F)}</td>
                 <td>{asDash(row.total_graded)}</td>
+                <td><div style={readOnlyBoxStyle}>{row.teacher_comment || "-"}</div></td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="10">No student grading data for this term.</td>
+                <td colSpan="11">No student grading data for this term.</td>
               </tr>
             )}
           </tbody>
@@ -570,3 +588,4 @@ export default function StudentReport() {
     </div>
   );
 }
+

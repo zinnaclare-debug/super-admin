@@ -47,7 +47,6 @@ const downloadCsv = (rows, context) => {
     "E",
     "F",
     "Total",
-    "Teacher Comment",
     "Summary",
   ];
 
@@ -65,7 +64,6 @@ const downloadCsv = (rows, context) => {
         row.grades?.E ?? 0,
         row.grades?.F ?? 0,
         row.total_graded ?? 0,
-        row.teacher_comment || "",
         row.summary || "",
       ]
         .map(toCsvCell)
@@ -94,7 +92,7 @@ const downloadCsv = (rows, context) => {
 };
 
 const readOnlyBoxStyle = {
-  minWidth: 180,
+  minWidth: 220,
   minHeight: 44,
   maxHeight: 52,
   overflow: "auto",
@@ -246,7 +244,6 @@ export default function TeacherReport() {
               <th>E</th>
               <th>F</th>
               <th>Total</th>
-              <th style={{ minWidth: 220 }}>Teacher Comment</th>
               <th style={{ minWidth: 260 }}>Summary</th>
             </tr>
           </thead>
@@ -263,13 +260,12 @@ export default function TeacherReport() {
                 <td>{row.grades?.E ?? 0}</td>
                 <td>{row.grades?.F ?? 0}</td>
                 <td>{row.total_graded ?? 0}</td>
-                <td><div style={readOnlyBoxStyle}>{row.teacher_comment || "-"}</div></td>
-                <td><div style={{ ...readOnlyBoxStyle, minWidth: 240 }}>{row.summary || "Completed"}</div></td>
+                <td><div style={readOnlyBoxStyle}>{row.summary || "Completed"}</div></td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="12">No teacher grading data for this term.</td>
+                <td colSpan="11">No teacher grading data for this term.</td>
               </tr>
             )}
           </tbody>

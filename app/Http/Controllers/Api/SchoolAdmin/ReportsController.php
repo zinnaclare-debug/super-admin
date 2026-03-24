@@ -1022,10 +1022,21 @@ class ReportsController extends Controller
             ->orderBy('users.name')
             ->get();
 
+        $commentMap = DB::table('student_attendances')
+            ->where('school_id', $schoolId)
+            ->where('term_id', $termId)
+            ->whereNotNull('comment')
+            ->select(['student_id', 'comment'])
+            ->get()
+            ->groupBy(fn ($row) => (int) $row->student_id)
+            ->map(fn ($rows) => $this->summarizeStoredComments($rows->pluck('comment')->all()))
+            ->all();
+
         $rows = $rawRows
             ->groupBy(fn ($row) => (int) $row->student_id)
-            ->map(function ($rows) {
+            ->map(function ($rows) use ($commentMap) {
                 $first = $rows->first();
+                $studentId = (int) ($first->student_id ?? 0);
                 $gradeCounts = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
                 $gradedCount = 0;
 
@@ -1046,9 +1057,10 @@ class ReportsController extends Controller
                 }
 
                 return [
-                    'student_id' => (int) ($first->student_id ?? 0),
+                    'student_id' => $studentId,
                     'name' => (string) ($first->student_name ?? '-'),
                     'email' => (string) ($first->student_email ?? '-'),
+                    'teacher_comment' => $commentMap[$studentId] ?? '-',
                     'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
                     'grades' => $gradedCount > 0
                         ? $gradeCounts
@@ -1856,3 +1868,4 @@ class ReportsController extends Controller
         return (bool) ($school?->results_published);
     }
 }
+
