@@ -96,6 +96,11 @@
   background: #fff;
 }
 
+.sai-preview--signature {
+  width: 140px;
+  height: 48px;
+}
+
 .sai-empty {
   color: #64748b;
   font-size: 13px;

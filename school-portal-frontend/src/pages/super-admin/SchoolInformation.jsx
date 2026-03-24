@@ -704,7 +704,7 @@ export default function SchoolInformation() {
                 <img
                   src={toAbsoluteUrl(signaturePreview || branding.head_signature_url)}
                   alt="Head signature preview"
-                  className="sai-preview"
+                  className="sai-preview sai-preview--signature"
                 />
               ) : (
                 <span className="sai-empty">No signature uploaded</span>
