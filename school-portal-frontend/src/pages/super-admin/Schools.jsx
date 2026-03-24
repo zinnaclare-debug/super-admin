@@ -147,10 +147,18 @@ function Schools() {
       return;
     }
 
-    await api.delete(`/api/super-admin/schools/${id}`, {
-      data: { delete_code: normalizedCode },
-    });
-    loadSchools();
+    try {
+      const res = await api.delete(`/api/super-admin/schools/${id}`, {
+        data: { delete_code: normalizedCode },
+      });
+      await loadSchools();
+      alert(res?.data?.message || "School deleted successfully.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || formatApiError(err) || "Failed to delete school.");
+    }
   };
 
   const resetAdminPassword = async (school) => {
