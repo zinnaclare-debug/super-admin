@@ -496,110 +496,507 @@ class ReportsController extends Controller
 
     private function teacherRows(int $schoolId, int $termId)
     {
-        $teacherRowsQuery = DB::table('results')
-            ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
-            ->join('users as teachers', 'teachers.id', '=', 'term_subjects.teacher_user_id')
-            ->where('results.school_id', $schoolId)
-            ->where('term_subjects.school_id', $schoolId)
-            ->where('term_subjects.term_id', $termId);
+        $term = Term::where('school_id', $schoolId)
+            ->where('id', $termId)
+            ->first(['id', 'academic_session_id']);
 
-        $selectColumns = [
-            'teachers.id as teacher_user_id',
-            'teachers.name as teacher_name',
-            'teachers.email as teacher_email',
-            'results.id as result_id',
-            'results.student_id',
-            'results.ca',
-            'results.exam',
-            'results.created_at as result_created_at',
-            'results.updated_at as result_updated_at',
-        ];
-
-        if (Schema::hasTable('student_attendances')) {
-            $teacherRowsQuery->leftJoin('student_attendances as attendance', function ($join) use ($schoolId) {
-                $join->on('attendance.student_id', '=', 'results.student_id')
-                    ->on('attendance.class_id', '=', 'term_subjects.class_id')
-                    ->on('attendance.term_id', '=', 'term_subjects.term_id');
-
-                if (Schema::hasColumn('student_attendances', 'school_id')) {
-                    $join->where('attendance.school_id', '=', $schoolId);
-                }
-            });
-            $selectColumns[] = 'attendance.comment as attendance_comment';
-        } else {
-            $selectColumns[] = DB::raw("'' as attendance_comment");
+        if (!$term) {
+            return collect();
         }
 
-        $rawRows = $teacherRowsQuery
-            ->select($selectColumns)
-            ->orderBy('teachers.name')
-            ->get();
+        $sessionId = (int) ($term->academic_session_id ?? 0);
+        $resultSnapshot = $this->teacherResultSnapshot($schoolId, $sessionId, $termId);
+        $classDutySnapshot = $this->teacherClassDutySnapshot($schoolId, $sessionId, $termId);
 
-        $grouped = $rawRows
-            ->groupBy(fn ($row) => (int) $row->teacher_user_id)
-            ->sortBy(fn ($rows) => strtolower((string) ($rows->first()->teacher_name ?? '')));
+        $teacherIds = collect(array_merge(
+            $resultSnapshot['teacher_ids'] ?? [],
+            $classDutySnapshot['teacher_ids'] ?? []
+        ))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
 
-        return $grouped
-            ->values()
-            ->map(function ($rows, $index) {
-                $first = $rows->first();
-                $gradeCounts = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
-                $gradedCount = 0;
+        if ($teacherIds->isEmpty()) {
+            return collect();
+        }
 
-                foreach ($rows as $row) {
-                    if (!$this->isResultRecordGraded(
-                        $row->result_id ?? null,
-                        $row->ca ?? null,
-                        $row->exam ?? null,
-                        $row->result_created_at ?? null,
-                        $row->result_updated_at ?? null
-                    )) {
-                        continue;
-                    }
+        $teachers = DB::table('users')
+            ->where('school_id', $schoolId)
+            ->whereIn('id', $teacherIds->all())
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->keyBy(fn ($row) => (int) $row->id);
 
-                    $gradedCount++;
-                    $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
-                    $gradeCounts[$band] = (int) ($gradeCounts[$band] ?? 0) + 1;
+        return $teacherIds
+            ->map(function ($teacherId) use ($teachers, $resultSnapshot, $classDutySnapshot) {
+                $teacher = $teachers->get((int) $teacherId);
+                if (!$teacher) {
+                    return null;
                 }
 
+                $gradeCounts = $resultSnapshot['grade_counts_by_teacher'][(int) $teacherId]
+                    ?? ['A' => '-', 'B' => '-', 'C' => '-', 'D' => '-', 'E' => '-', 'F' => '-'];
+                $gradedCount = $resultSnapshot['graded_count_by_teacher'][(int) $teacherId] ?? 0;
+
                 return [
-                    'sn' => $index + 1,
-                    'teacher_user_id' => (int) ($first->teacher_user_id ?? 0),
-                    'name' => (string) ($first->teacher_name ?? '-'),
-                    'email' => (string) ($first->teacher_email ?? '-'),
-                    'teacher_comment' => $this->summarizeTeacherComments($rows),
+                    'teacher_user_id' => (int) $teacher->id,
+                    'name' => (string) ($teacher->name ?? '-'),
+                    'email' => (string) ($teacher->email ?? '-'),
+                    'teacher_comment' => $classDutySnapshot['comment_preview_by_teacher'][(int) $teacherId] ?? '-',
+                    'summary' => $this->formatTeacherOutstandingSummary([
+                        'result' => $resultSnapshot['outstanding_result_classes'][(int) $teacherId] ?? [],
+                        'attendance' => $classDutySnapshot['outstanding_attendance_classes'][(int) $teacherId] ?? [],
+                        'comment' => $classDutySnapshot['outstanding_comment_classes'][(int) $teacherId] ?? [],
+                        'behaviour' => $classDutySnapshot['outstanding_behaviour_classes'][(int) $teacherId] ?? [],
+                    ]),
                     'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
                     'grades' => $gradedCount > 0
                         ? $gradeCounts
                         : ['A' => '-', 'B' => '-', 'C' => '-', 'D' => '-', 'E' => '-', 'F' => '-'],
                 ];
             })
+            ->filter()
+            ->values()
+            ->sortBy(fn ($row) => strtolower((string) ($row['name'] ?? '')))
+            ->values()
+            ->map(function (array $row, int $index) {
+                $row['sn'] = $index + 1;
+                return $row;
+            })
             ->values();
     }
 
-    private function summarizeTeacherComments($rows): string
+    private function teacherResultSnapshot(int $schoolId, int $sessionId, int $termId): array
     {
-        $comments = collect($rows)
-            ->pluck('attendance_comment')
+        $canUseExclusions = Schema::hasTable('student_subject_exclusions')
+            && Schema::hasColumn('student_subject_exclusions', 'student_id')
+            && Schema::hasColumn('student_subject_exclusions', 'school_id')
+            && Schema::hasColumn('student_subject_exclusions', 'academic_session_id')
+            && Schema::hasColumn('student_subject_exclusions', 'class_id')
+            && Schema::hasColumn('student_subject_exclusions', 'subject_id');
+
+        $query = DB::table('term_subjects')
+            ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+            ->leftJoin('enrollments', function ($join) use ($schoolId, $termId) {
+                $join->on('enrollments.class_id', '=', 'term_subjects.class_id')
+                    ->where('enrollments.term_id', '=', $termId);
+
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $join->where('enrollments.school_id', '=', $schoolId);
+                }
+            })
+            ->leftJoin('results', function ($join) use ($schoolId) {
+                $join->on('results.term_subject_id', '=', 'term_subjects.id')
+                    ->on('results.student_id', '=', 'enrollments.student_id')
+                    ->where('results.school_id', '=', $schoolId);
+            })
+            ->where('term_subjects.school_id', $schoolId)
+            ->where('term_subjects.term_id', $termId)
+            ->whereNotNull('term_subjects.teacher_user_id');
+
+        if ($canUseExclusions) {
+            $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $sessionId) {
+                $join->on('student_subject_exclusions.student_id', '=', 'enrollments.student_id')
+                    ->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                    ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                    ->where('student_subject_exclusions.school_id', '=', $schoolId)
+                    ->where('student_subject_exclusions.academic_session_id', '=', $sessionId);
+            });
+        }
+
+        $rows = $query
+            ->select([
+                'term_subjects.id as term_subject_id',
+                'term_subjects.teacher_user_id',
+                'classes.name as class_name',
+                'enrollments.student_id as enrolled_student_id',
+                ...($canUseExclusions
+                    ? ['student_subject_exclusions.student_id as excluded_student_id']
+                    : [DB::raw('NULL as excluded_student_id')]),
+                'results.id as result_id',
+                'results.ca',
+                'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
+            ])
+            ->orderBy('classes.name')
+            ->get();
+
+        $gradeCountsByTeacher = [];
+        $gradedCountByTeacher = [];
+        $teacherIds = [];
+        $assignmentStats = [];
+
+        foreach ($rows as $row) {
+            $teacherId = (int) ($row->teacher_user_id ?? 0);
+            if ($teacherId < 1) {
+                continue;
+            }
+
+            $teacherIds[$teacherId] = true;
+            $gradeCountsByTeacher[$teacherId] = $gradeCountsByTeacher[$teacherId]
+                ?? ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
+            $gradedCountByTeacher[$teacherId] = (int) ($gradedCountByTeacher[$teacherId] ?? 0);
+
+            $termSubjectId = (int) ($row->term_subject_id ?? 0);
+            if ($termSubjectId < 1) {
+                continue;
+            }
+
+            $assignmentStats[$termSubjectId] = $assignmentStats[$termSubjectId]
+                ?? [
+                    'teacher_id' => $teacherId,
+                    'class_name' => (string) ($row->class_name ?? '-'),
+                    'eligible' => 0,
+                    'graded' => 0,
+                ];
+
+            $studentId = isset($row->enrolled_student_id) ? (int) $row->enrolled_student_id : 0;
+            $excludedStudentId = isset($row->excluded_student_id) ? (int) $row->excluded_student_id : 0;
+            if ($studentId < 1 || $excludedStudentId > 0) {
+                continue;
+            }
+
+            $assignmentStats[$termSubjectId]['eligible']++;
+
+            if (!$this->isResultRecordGraded(
+                $row->result_id ?? null,
+                $row->ca ?? null,
+                $row->exam ?? null,
+                $row->result_created_at ?? null,
+                $row->result_updated_at ?? null
+            )) {
+                continue;
+            }
+
+            $assignmentStats[$termSubjectId]['graded']++;
+            $gradedCountByTeacher[$teacherId]++;
+            $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
+            $gradeCountsByTeacher[$teacherId][$band] = (int) ($gradeCountsByTeacher[$teacherId][$band] ?? 0) + 1;
+        }
+
+        $outstandingResultClasses = [];
+        foreach ($assignmentStats as $stats) {
+            if ((int) ($stats['eligible'] ?? 0) < 1) {
+                continue;
+            }
+            if ((int) ($stats['graded'] ?? 0) >= (int) ($stats['eligible'] ?? 0)) {
+                continue;
+            }
+
+            $teacherId = (int) ($stats['teacher_id'] ?? 0);
+            $className = (string) ($stats['class_name'] ?? '-');
+            $outstandingResultClasses[$teacherId] = $outstandingResultClasses[$teacherId] ?? [];
+            $outstandingResultClasses[$teacherId][$className] = $className;
+        }
+
+        return [
+            'teacher_ids' => array_map('intval', array_keys($teacherIds)),
+            'grade_counts_by_teacher' => $gradeCountsByTeacher,
+            'graded_count_by_teacher' => $gradedCountByTeacher,
+            'outstanding_result_classes' => array_map(fn ($labels) => array_values($labels), $outstandingResultClasses),
+        ];
+    }
+
+    private function teacherClassDutySnapshot(int $schoolId, int $sessionId, int $termId): array
+    {
+        $scopesByTeacher = [];
+
+        $directClassRows = DB::table('classes')
+            ->where('classes.school_id', $schoolId)
+            ->where('classes.academic_session_id', $sessionId)
+            ->whereNotNull('classes.class_teacher_user_id')
+            ->get(['classes.id', 'classes.name', 'classes.class_teacher_user_id']);
+
+        foreach ($directClassRows as $row) {
+            $teacherId = (int) ($row->class_teacher_user_id ?? 0);
+            $classId = (int) ($row->id ?? 0);
+            if ($teacherId < 1 || $classId < 1) {
+                continue;
+            }
+
+            $scopesByTeacher[$teacherId] = $scopesByTeacher[$teacherId] ?? [];
+            $scopesByTeacher[$teacherId][$classId] = [
+                'class_name' => (string) ($row->name ?? '-'),
+                'full_class' => true,
+                'department_ids' => [],
+            ];
+        }
+
+        if (
+            Schema::hasTable('class_departments')
+            && Schema::hasColumn('class_departments', 'class_teacher_user_id')
+        ) {
+            $departmentRows = DB::table('class_departments')
+                ->join('classes', 'classes.id', '=', 'class_departments.class_id')
+                ->where('class_departments.school_id', $schoolId)
+                ->where('classes.school_id', $schoolId)
+                ->where('classes.academic_session_id', $sessionId)
+                ->whereNotNull('class_departments.class_teacher_user_id')
+                ->get([
+                    'class_departments.class_id',
+                    'class_departments.id as department_id',
+                    'class_departments.class_teacher_user_id',
+                    'classes.name as class_name',
+                ]);
+
+            foreach ($departmentRows as $row) {
+                $teacherId = (int) ($row->class_teacher_user_id ?? 0);
+                $classId = (int) ($row->class_id ?? 0);
+                $departmentId = (int) ($row->department_id ?? 0);
+                if ($teacherId < 1 || $classId < 1 || $departmentId < 1) {
+                    continue;
+                }
+
+                $scopesByTeacher[$teacherId] = $scopesByTeacher[$teacherId] ?? [];
+                $existing = $scopesByTeacher[$teacherId][$classId] ?? [
+                    'class_name' => (string) ($row->class_name ?? '-'),
+                    'full_class' => false,
+                    'department_ids' => [],
+                ];
+
+                if (!$existing['full_class']) {
+                    $existing['department_ids'][] = $departmentId;
+                    $existing['department_ids'] = array_values(array_unique(array_map('intval', $existing['department_ids'])));
+                }
+
+                $scopesByTeacher[$teacherId][$classId] = $existing;
+            }
+        }
+
+        if (empty($scopesByTeacher)) {
+            return [
+                'teacher_ids' => [],
+                'comment_preview_by_teacher' => [],
+                'outstanding_attendance_classes' => [],
+                'outstanding_comment_classes' => [],
+                'outstanding_behaviour_classes' => [],
+            ];
+        }
+
+        $classIds = collect($scopesByTeacher)
+            ->flatMap(fn ($classes) => array_keys($classes))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $enrollmentRows = DB::table('enrollments')
+            ->where('term_id', $termId)
+            ->whereIn('class_id', $classIds)
+            ->when(Schema::hasColumn('enrollments', 'school_id'), function ($query) use ($schoolId) {
+                $query->where('school_id', $schoolId);
+            })
+            ->get(['class_id', 'student_id', 'department_id']);
+
+        $studentIdsByClass = [];
+        $studentIdsByClassDepartment = [];
+        foreach ($enrollmentRows as $row) {
+            $classId = (int) ($row->class_id ?? 0);
+            $studentId = (int) ($row->student_id ?? 0);
+            $departmentId = isset($row->department_id) ? (int) $row->department_id : 0;
+            if ($classId < 1 || $studentId < 1) {
+                continue;
+            }
+
+            $studentIdsByClass[$classId] = $studentIdsByClass[$classId] ?? [];
+            $studentIdsByClass[$classId][$studentId] = true;
+
+            if ($departmentId > 0) {
+                $studentIdsByClassDepartment[$classId] = $studentIdsByClassDepartment[$classId] ?? [];
+                $studentIdsByClassDepartment[$classId][$departmentId] = $studentIdsByClassDepartment[$classId][$departmentId] ?? [];
+                $studentIdsByClassDepartment[$classId][$departmentId][$studentId] = true;
+            }
+        }
+
+        $attendanceRows = Schema::hasTable('student_attendances')
+            ? DB::table('student_attendances')
+                ->where('school_id', $schoolId)
+                ->where('term_id', $termId)
+                ->whereIn('class_id', $classIds)
+                ->get(['class_id', 'student_id', 'comment'])
+            : collect();
+        $attendanceMap = [];
+        foreach ($attendanceRows as $row) {
+            $classId = (int) ($row->class_id ?? 0);
+            $studentId = (int) ($row->student_id ?? 0);
+            if ($classId < 1 || $studentId < 1) {
+                continue;
+            }
+            $attendanceMap[$classId] = $attendanceMap[$classId] ?? [];
+            $attendanceMap[$classId][$studentId] = trim((string) ($row->comment ?? ''));
+        }
+
+        $behaviourRows = Schema::hasTable('student_behaviour_ratings')
+            ? DB::table('student_behaviour_ratings')
+                ->where('school_id', $schoolId)
+                ->where('term_id', $termId)
+                ->whereIn('class_id', $classIds)
+                ->get(['class_id', 'student_id'])
+            : collect();
+        $behaviourMap = [];
+        foreach ($behaviourRows as $row) {
+            $classId = (int) ($row->class_id ?? 0);
+            $studentId = (int) ($row->student_id ?? 0);
+            if ($classId < 1 || $studentId < 1) {
+                continue;
+            }
+            $behaviourMap[$classId] = $behaviourMap[$classId] ?? [];
+            $behaviourMap[$classId][$studentId] = true;
+        }
+
+        $attendanceSettingClassIds = Schema::hasTable('term_attendance_settings')
+            ? DB::table('term_attendance_settings')
+                ->where('school_id', $schoolId)
+                ->where('term_id', $termId)
+                ->whereIn('class_id', $classIds)
+                ->pluck('class_id')
+                ->map(fn ($id) => (int) $id)
+                ->all()
+            : [];
+        $attendanceSettingLookup = array_fill_keys($attendanceSettingClassIds, true);
+
+        $teacherIds = [];
+        $commentPreviewByTeacher = [];
+        $outstandingAttendanceClasses = [];
+        $outstandingCommentClasses = [];
+        $outstandingBehaviourClasses = [];
+
+        foreach ($scopesByTeacher as $teacherId => $classScopes) {
+            $teacherId = (int) $teacherId;
+            if ($teacherId < 1) {
+                continue;
+            }
+            $teacherIds[$teacherId] = true;
+
+            $commentSamples = [];
+            foreach ($classScopes as $classId => $scope) {
+                $classId = (int) $classId;
+                $className = (string) ($scope['class_name'] ?? '-');
+                $eligibleStudentIds = $this->teacherScopeStudentIds(
+                    $classId,
+                    (bool) ($scope['full_class'] ?? false),
+                    (array) ($scope['department_ids'] ?? []),
+                    $studentIdsByClass,
+                    $studentIdsByClassDepartment
+                );
+
+                if (empty($eligibleStudentIds)) {
+                    continue;
+                }
+
+                $hasAttendanceSetting = !empty($attendanceSettingLookup[$classId]);
+                $missingAttendance = !$hasAttendanceSetting;
+                $missingComment = false;
+                $missingBehaviour = false;
+
+                foreach ($eligibleStudentIds as $studentId) {
+                    $attendanceComment = $attendanceMap[$classId][$studentId] ?? null;
+                    if ($attendanceComment === null) {
+                        $missingAttendance = true;
+                        $missingComment = true;
+                    } elseif ($attendanceComment !== '') {
+                        $commentSamples[] = $attendanceComment;
+                    } else {
+                        $missingComment = true;
+                    }
+
+                    if (empty($behaviourMap[$classId][$studentId])) {
+                        $missingBehaviour = true;
+                    }
+                }
+
+                if ($missingAttendance) {
+                    $outstandingAttendanceClasses[$teacherId] = $outstandingAttendanceClasses[$teacherId] ?? [];
+                    $outstandingAttendanceClasses[$teacherId][$className] = $className;
+                }
+                if ($missingComment) {
+                    $outstandingCommentClasses[$teacherId] = $outstandingCommentClasses[$teacherId] ?? [];
+                    $outstandingCommentClasses[$teacherId][$className] = $className;
+                }
+                if ($missingBehaviour) {
+                    $outstandingBehaviourClasses[$teacherId] = $outstandingBehaviourClasses[$teacherId] ?? [];
+                    $outstandingBehaviourClasses[$teacherId][$className] = $className;
+                }
+            }
+
+            $commentPreviewByTeacher[$teacherId] = $this->summarizeStoredComments($commentSamples);
+        }
+
+        return [
+            'teacher_ids' => array_map('intval', array_keys($teacherIds)),
+            'comment_preview_by_teacher' => $commentPreviewByTeacher,
+            'outstanding_attendance_classes' => array_map(fn ($labels) => array_values($labels), $outstandingAttendanceClasses),
+            'outstanding_comment_classes' => array_map(fn ($labels) => array_values($labels), $outstandingCommentClasses),
+            'outstanding_behaviour_classes' => array_map(fn ($labels) => array_values($labels), $outstandingBehaviourClasses),
+        ];
+    }
+
+    private function teacherScopeStudentIds(
+        int $classId,
+        bool $fullClass,
+        array $departmentIds,
+        array $studentIdsByClass,
+        array $studentIdsByClassDepartment
+    ): array {
+        if ($fullClass) {
+            return array_map('intval', array_keys($studentIdsByClass[$classId] ?? []));
+        }
+
+        $studentIds = [];
+        foreach ($departmentIds as $departmentId) {
+            foreach (array_keys($studentIdsByClassDepartment[$classId][(int) $departmentId] ?? []) as $studentId) {
+                $studentIds[(int) $studentId] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($studentIds));
+    }
+
+    private function summarizeStoredComments(array $comments): string
+    {
+        $uniqueComments = collect($comments)
             ->map(fn ($comment) => trim((string) $comment))
             ->filter()
             ->unique(fn ($comment) => strtolower($comment))
             ->values();
 
-        if ($comments->isEmpty()) {
+        if ($uniqueComments->isEmpty()) {
             return '-';
         }
 
-        $summary = $comments
+        $summary = $uniqueComments
             ->take(2)
             ->map(fn ($comment) => Str::limit($comment, 70, '...'))
             ->implode(' | ');
 
-        if ($comments->count() > 2) {
+        if ($uniqueComments->count() > 2) {
             $summary .= ' | ...';
         }
 
         return $summary;
+    }
+
+    private function formatTeacherOutstandingSummary(array $items): string
+    {
+        $labels = [];
+
+        foreach ((array) ($items['result'] ?? []) as $className) {
+            $labels[] = 'Result: ' . $className;
+        }
+        foreach ((array) ($items['attendance'] ?? []) as $className) {
+            $labels[] = 'Attendance: ' . $className;
+        }
+        foreach ((array) ($items['comment'] ?? []) as $className) {
+            $labels[] = 'Comment: ' . $className;
+        }
+        foreach ((array) ($items['behaviour'] ?? []) as $className) {
+            $labels[] = 'Behaviour: ' . $className;
+        }
+
+        return empty($labels) ? 'Completed' : implode(', ', $labels);
     }
 
     private function studentRows(int $schoolId, int $termId)

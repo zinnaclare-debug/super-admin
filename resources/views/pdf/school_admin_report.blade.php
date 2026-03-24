@@ -10,14 +10,21 @@
     .head h1 { margin: 0 0 4px; font-size: 16px; }
     .meta { margin: 0; font-size: 10px; color: #374151; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; }
+    th, td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; vertical-align: top; }
     th { background: #f1f5f9; font-size: 10px; }
     .num { text-align: center; width: 45px; }
     .small { width: 52px; text-align: center; }
     .total { width: 60px; text-align: center; }
+    .comment { width: 160px; font-size: 9px; line-height: 1.25; word-break: break-word; }
+    .summary { width: 180px; font-size: 9px; line-height: 1.25; word-break: break-word; }
   </style>
 </head>
 <body>
+  @php
+    $isTeacherReport = strtolower((string) ($title ?? '')) === 'teacher report';
+    $emptyColspan = $isTeacherReport ? 12 : 10;
+  @endphp
+
   <div class="head">
     <h1>{{ $title }}</h1>
     <p class="meta"><strong>School:</strong> {{ $schoolName }}</p>
@@ -42,6 +49,10 @@
         <th class="small">E</th>
         <th class="small">F</th>
         <th class="total">Total</th>
+        @if($isTeacherReport)
+          <th class="comment">Teacher Comment</th>
+          <th class="summary">Summary</th>
+        @endif
       </tr>
     </thead>
     <tbody>
@@ -57,10 +68,14 @@
           <td class="small">{{ $row['grades']['E'] ?? '-' }}</td>
           <td class="small">{{ $row['grades']['F'] ?? '-' }}</td>
           <td class="total">{{ $row['total_graded'] ?? '-' }}</td>
+          @if($isTeacherReport)
+            <td class="comment">{{ $row['teacher_comment'] ?? '-' }}</td>
+            <td class="summary">{{ $row['summary'] ?? 'Completed' }}</td>
+          @endif
         </tr>
       @empty
         <tr>
-          <td colspan="10">No records found for this term.</td>
+          <td colspan="{{ $emptyColspan }}">No records found for this term.</td>
         </tr>
       @endforelse
     </tbody>

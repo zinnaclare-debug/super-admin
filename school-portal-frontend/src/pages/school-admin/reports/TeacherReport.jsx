@@ -48,6 +48,7 @@ const downloadCsv = (rows, context) => {
     "F",
     "Total",
     "Teacher Comment",
+    "Summary",
   ];
 
   const lines = [
@@ -65,6 +66,7 @@ const downloadCsv = (rows, context) => {
         row.grades?.F ?? 0,
         row.total_graded ?? 0,
         row.teacher_comment || "",
+        row.summary || "",
       ]
         .map(toCsvCell)
         .join(",")
@@ -89,6 +91,20 @@ const downloadCsv = (rows, context) => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+};
+
+const readOnlyBoxStyle = {
+  minWidth: 180,
+  minHeight: 44,
+  maxHeight: 52,
+  overflow: "auto",
+  padding: "6px 8px",
+  boxSizing: "border-box",
+  background: "#f8fafc",
+  border: "1px solid #cbd5e1",
+  borderRadius: 6,
+  lineHeight: 1.25,
+  whiteSpace: "normal",
 };
 
 export default function TeacherReport() {
@@ -231,6 +247,7 @@ export default function TeacherReport() {
               <th>F</th>
               <th>Total</th>
               <th style={{ minWidth: 220 }}>Teacher Comment</th>
+              <th style={{ minWidth: 260 }}>Summary</th>
             </tr>
           </thead>
           <tbody>
@@ -246,30 +263,13 @@ export default function TeacherReport() {
                 <td>{row.grades?.E ?? 0}</td>
                 <td>{row.grades?.F ?? 0}</td>
                 <td>{row.total_graded ?? 0}</td>
-                <td>
-                  <div
-                    style={{
-                      minWidth: 180,
-                      minHeight: 44,
-                      maxHeight: 44,
-                      overflow: "auto",
-                      padding: "6px 8px",
-                      boxSizing: "border-box",
-                      background: "#f8fafc",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: 6,
-                      lineHeight: 1.25,
-                      whiteSpace: "normal",
-                    }}
-                  >
-                    {row.teacher_comment || "-"}
-                  </div>
-                </td>
+                <td><div style={readOnlyBoxStyle}>{row.teacher_comment || "-"}</div></td>
+                <td><div style={{ ...readOnlyBoxStyle, minWidth: 240 }}>{row.summary || "Completed"}</div></td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="11">No teacher grading data for this term.</td>
+                <td colSpan="12">No teacher grading data for this term.</td>
               </tr>
             )}
           </tbody>
