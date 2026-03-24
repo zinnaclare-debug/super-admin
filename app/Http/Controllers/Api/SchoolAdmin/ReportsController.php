@@ -496,22 +496,42 @@ class ReportsController extends Controller
 
     private function teacherRows(int $schoolId, int $termId)
     {
-        $rawRows = DB::table('results')
+        $teacherRowsQuery = DB::table('results')
             ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
             ->join('users as teachers', 'teachers.id', '=', 'term_subjects.teacher_user_id')
             ->where('results.school_id', $schoolId)
             ->where('term_subjects.school_id', $schoolId)
-            ->where('term_subjects.term_id', $termId)
-            ->select([
-                'teachers.id as teacher_user_id',
-                'teachers.name as teacher_name',
-                'teachers.email as teacher_email',
-                'results.id as result_id',
-                'results.ca',
-                'results.exam',
-                'results.created_at as result_created_at',
-                'results.updated_at as result_updated_at',
-            ])
+            ->where('term_subjects.term_id', $termId);
+
+        $selectColumns = [
+            'teachers.id as teacher_user_id',
+            'teachers.name as teacher_name',
+            'teachers.email as teacher_email',
+            'results.id as result_id',
+            'results.student_id',
+            'results.ca',
+            'results.exam',
+            'results.created_at as result_created_at',
+            'results.updated_at as result_updated_at',
+        ];
+
+        if (Schema::hasTable('student_attendances')) {
+            $teacherRowsQuery->leftJoin('student_attendances as attendance', function ($join) use ($schoolId) {
+                $join->on('attendance.student_id', '=', 'results.student_id')
+                    ->on('attendance.class_id', '=', 'term_subjects.class_id')
+                    ->on('attendance.term_id', '=', 'term_subjects.term_id');
+
+                if (Schema::hasColumn('student_attendances', 'school_id')) {
+                    $join->where('attendance.school_id', '=', $schoolId);
+                }
+            });
+            $selectColumns[] = 'attendance.comment as attendance_comment';
+        } else {
+            $selectColumns[] = DB::raw("'' as attendance_comment");
+        }
+
+        $rawRows = $teacherRowsQuery
+            ->select($selectColumns)
             ->orderBy('teachers.name')
             ->get();
 
@@ -547,6 +567,7 @@ class ReportsController extends Controller
                     'teacher_user_id' => (int) ($first->teacher_user_id ?? 0),
                     'name' => (string) ($first->teacher_name ?? '-'),
                     'email' => (string) ($first->teacher_email ?? '-'),
+                    'teacher_comment' => $this->summarizeTeacherComments($rows),
                     'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
                     'grades' => $gradedCount > 0
                         ? $gradeCounts
@@ -554,6 +575,31 @@ class ReportsController extends Controller
                 ];
             })
             ->values();
+    }
+
+    private function summarizeTeacherComments($rows): string
+    {
+        $comments = collect($rows)
+            ->pluck('attendance_comment')
+            ->map(fn ($comment) => trim((string) $comment))
+            ->filter()
+            ->unique(fn ($comment) => strtolower($comment))
+            ->values();
+
+        if ($comments->isEmpty()) {
+            return '-';
+        }
+
+        $summary = $comments
+            ->take(2)
+            ->map(fn ($comment) => Str::limit($comment, 70, '...'))
+            ->implode(' | ');
+
+        if ($comments->count() > 2) {
+            $summary .= ' | ...';
+        }
+
+        return $summary;
     }
 
     private function studentRows(int $schoolId, int $termId)

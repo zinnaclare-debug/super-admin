@@ -98,7 +98,6 @@ export default function TeacherReport() {
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [sessionConfigError, setSessionConfigError] = useState("");
-  const [teacherComments, setTeacherComments] = useState({});
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -133,24 +132,6 @@ export default function TeacherReport() {
   }, [termId]);
 
   const selectedTermValue = termId || String(context?.selected_term?.id || "");
-  const commentStorageKey = `school-admin-teacher-report-comments:${selectedTermValue || "default"}`;
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(commentStorageKey);
-      setTeacherComments(raw ? JSON.parse(raw) : {});
-    } catch {
-      setTeacherComments({});
-    }
-  }, [commentStorageKey]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(commentStorageKey, JSON.stringify(teacherComments));
-    } catch {
-      // Keep the report usable even if storage is unavailable.
-    }
-  }, [commentStorageKey, teacherComments]);
 
   const downloadPdf = async () => {
     if (rows.length === 0) return;
@@ -218,15 +199,7 @@ export default function TeacherReport() {
           ))}
         </select>
         <button
-          onClick={() =>
-            downloadCsv(
-              rows.map((row) => ({
-                ...row,
-                teacher_comment: teacherComments[String(row.teacher_user_id)] || "",
-              })),
-              context
-            )
-          }
+          onClick={() => downloadCsv(rows, context)}
           disabled={loading || rows.length === 0}
           style={{ marginLeft: 10 }}
         >
@@ -274,26 +247,23 @@ export default function TeacherReport() {
                 <td>{row.grades?.F ?? 0}</td>
                 <td>{row.total_graded ?? 0}</td>
                 <td>
-                  <textarea
-                    value={teacherComments[String(row.teacher_user_id)] || ""}
-                    onChange={(e) => {
-                      const value = e.target.value.slice(0, 160);
-                      setTeacherComments((prev) => ({
-                        ...prev,
-                        [String(row.teacher_user_id)]: value,
-                      }));
-                    }}
-                    placeholder="Add short teacher comment"
-                    rows={2}
+                  <div
                     style={{
-                      width: "100%",
                       minWidth: 180,
-                      height: 44,
-                      resize: "none",
+                      minHeight: 44,
+                      maxHeight: 44,
+                      overflow: "auto",
+                      padding: "6px 8px",
                       boxSizing: "border-box",
-                      font: "inherit",
+                      background: "#f8fafc",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 6,
+                      lineHeight: 1.25,
+                      whiteSpace: "normal",
                     }}
-                  />
+                  >
+                    {row.teacher_comment || "-"}
+                  </div>
                 </td>
               </tr>
             ))}
