@@ -45,7 +45,7 @@ const formatMaybeNumber = (value, digits = 2) => {
 const readOnlyBoxStyle = {
   minWidth: 220,
   minHeight: 44,
-  maxHeight: 52,
+  maxHeight: 64,
   overflow: "auto",
   padding: "6px 8px",
   boxSizing: "border-box",
@@ -54,6 +54,20 @@ const readOnlyBoxStyle = {
   borderRadius: 6,
   lineHeight: 1.25,
   whiteSpace: "normal",
+};
+
+const traitGridStyle = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+  marginTop: 10,
+};
+
+const traitCardStyle = {
+  border: "1px solid #dbeafe",
+  borderRadius: 8,
+  padding: "8px 10px",
+  background: "#f8fbff",
 };
 
 const downloadCsv = (rows, context) => {
@@ -71,6 +85,7 @@ const downloadCsv = (rows, context) => {
     "F",
     "Total",
     "Teacher Comment",
+    "Behaviour Rating",
   ];
 
   const lines = [
@@ -88,6 +103,7 @@ const downloadCsv = (rows, context) => {
         asDash(row.grades?.F),
         asDash(row.total_graded),
         row.teacher_comment || "-",
+        row.behaviour_rating || "-",
       ]
         .map(toCsvCell)
         .join(",")
@@ -137,10 +153,12 @@ export default function StudentReport() {
     const u = getStoredUser();
     return u?.school?.name || u?.school_name || "School";
   }, []);
+
   const selectedResultSession = useMemo(() => {
     if (resultSessions.length === 0) return null;
     return resultSessions.find((item) => String(item.id) === String(resultSessionId)) || resultSessions[0];
   }, [resultSessions, resultSessionId]);
+
   const selectedResultTerm = useMemo(() => {
     const terms = selectedResultSession?.terms || [];
     if (terms.length === 0) return null;
@@ -463,7 +481,37 @@ export default function StudentReport() {
               {formatMaybeNumber(resultEntry.summary?.average_score)} | Grade:{" "}
               {asDash(resultEntry.summary?.overall_grade)}
             </p>
-            <table border="1" cellPadding="8" cellSpacing="0" width="100%" style={{ marginTop: 8, minWidth: 860 }}>
+
+            <div
+              style={{
+                marginTop: 10,
+                display: "grid",
+                gap: 10,
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              }}
+            >
+              <div>
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>Teacher Comment</div>
+                <div style={readOnlyBoxStyle}>{resultEntry.teacher_comment || "-"}</div>
+              </div>
+              <div>
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>Behaviour Rating</div>
+                <div style={readOnlyBoxStyle}>{resultEntry.behaviour_summary || "-"}</div>
+              </div>
+            </div>
+
+            {(resultEntry.behaviour_traits || []).length > 0 ? (
+              <div style={traitGridStyle}>
+                {(resultEntry.behaviour_traits || []).map((trait) => (
+                  <div key={trait.label} style={traitCardStyle}>
+                    <div style={{ fontSize: 12, color: "#475569" }}>{trait.label}</div>
+                    <div style={{ marginTop: 4, fontWeight: 700, fontSize: 16 }}>{trait.value ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <table border="1" cellPadding="8" cellSpacing="0" width="100%" style={{ marginTop: 12, minWidth: 860 }}>
               <thead>
                 <tr>
                   <th>Subject</th>
@@ -559,6 +607,7 @@ export default function StudentReport() {
               <th>F</th>
               <th>Total</th>
               <th style={{ minWidth: 240 }}>Teacher Comment</th>
+              <th style={{ minWidth: 240 }}>Behaviour Rating</th>
             </tr>
           </thead>
           <tbody>
@@ -575,11 +624,12 @@ export default function StudentReport() {
                 <td>{asDash(row.grades?.F)}</td>
                 <td>{asDash(row.total_graded)}</td>
                 <td><div style={readOnlyBoxStyle}>{row.teacher_comment || "-"}</div></td>
+                <td><div style={readOnlyBoxStyle}>{row.behaviour_rating || "-"}</div></td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="11">No student grading data for this term.</td>
+                <td colSpan="12">No student grading data for this term.</td>
               </tr>
             )}
           </tbody>
@@ -588,4 +638,3 @@ export default function StudentReport() {
     </div>
   );
 }
-

@@ -1032,9 +1032,43 @@ class ReportsController extends Controller
             ->map(fn ($rows) => $this->summarizeStoredComments($rows->pluck('comment')->all()))
             ->all();
 
+        $behaviourMap = Schema::hasTable('student_behaviour_ratings')
+            ? DB::table('student_behaviour_ratings')
+                ->where('school_id', $schoolId)
+                ->where('term_id', $termId)
+                ->select([
+                    'student_id',
+                    'handwriting',
+                    'speech',
+                    'attitude',
+                    'reading',
+                    'punctuality',
+                    'teamwork',
+                    'self_control',
+                ])
+                ->get()
+                ->keyBy(fn ($row) => (int) $row->student_id)
+                ->map(function ($row) {
+                    $pairs = [
+                        'HW' => (int) ($row->handwriting ?? 0),
+                        'SP' => (int) ($row->speech ?? 0),
+                        'AT' => (int) ($row->attitude ?? 0),
+                        'RD' => (int) ($row->reading ?? 0),
+                        'PU' => (int) ($row->punctuality ?? 0),
+                        'TW' => (int) ($row->teamwork ?? 0),
+                        'SC' => (int) ($row->self_control ?? 0),
+                    ];
+
+                    return collect($pairs)
+                        ->map(fn ($value, $label) => $label . ':' . $value)
+                        ->implode(', ');
+                })
+                ->all()
+            : [];
+
         $rows = $rawRows
             ->groupBy(fn ($row) => (int) $row->student_id)
-            ->map(function ($rows) use ($commentMap) {
+            ->map(function ($rows) use ($commentMap, $behaviourMap) {
                 $first = $rows->first();
                 $studentId = (int) ($first->student_id ?? 0);
                 $gradeCounts = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'E' => 0, 'F' => 0];
@@ -1061,6 +1095,7 @@ class ReportsController extends Controller
                     'name' => (string) ($first->student_name ?? '-'),
                     'email' => (string) ($first->student_email ?? '-'),
                     'teacher_comment' => $commentMap[$studentId] ?? '-',
+                    'behaviour_rating' => $behaviourMap[$studentId] ?? '-',
                     'total_graded' => $gradedCount > 0 ? $gradedCount : '-',
                     'grades' => $gradedCount > 0
                         ? $gradeCounts
@@ -1868,4 +1903,5 @@ class ReportsController extends Controller
         return (bool) ($school?->results_published);
     }
 }
+
 

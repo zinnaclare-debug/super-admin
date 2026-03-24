@@ -24,6 +24,36 @@ async function messageFromBlobError(blob, fallback) {
   }
 }
 
+const asDash = (value) => (value == null || value === "" ? "-" : value);
+
+const formatMaybeNumber = (value, digits = 2) => {
+  if (value == null || value === "") return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(digits);
+};
+
+const infoBoxStyle = {
+  border: "1px solid #dbeafe",
+  borderRadius: 8,
+  padding: "10px 12px",
+  background: "#f8fbff",
+};
+
+const traitGridStyle = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+  marginTop: 12,
+};
+
+const traitCardStyle = {
+  border: "1px solid #dbeafe",
+  borderRadius: 8,
+  padding: "8px 10px",
+  background: "#f8fbff",
+};
+
 export default function StudentResult() {
   const [sessions, setSessions] = useState([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -265,13 +295,39 @@ export default function StudentResult() {
             <h3>{entry.term?.name || "Term Result"}</h3>
             <p>
               {entry.class?.name || "-"} | Average:{" "}
-              {entry.summary?.average_score === null || entry.summary?.average_score === undefined
-                ? "-"
-                : Number(entry.summary?.average_score || 0).toFixed(2)}{" "}
-              | Grade:{" "}
+              {formatMaybeNumber(entry.summary?.average_score)} | Grade:{" "}
               {entry.summary?.overall_grade || "-"}
             </p>
           </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              display: "grid",
+              gap: 10,
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            }}
+          >
+            <div style={infoBoxStyle}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Teacher Comment</div>
+              <div>{entry.teacher_comment || "-"}</div>
+            </div>
+            <div style={infoBoxStyle}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Behaviour Rating</div>
+              <div>{entry.behaviour_summary || "-"}</div>
+            </div>
+          </div>
+
+          {(entry.behaviour_traits || []).length > 0 ? (
+            <div style={traitGridStyle}>
+              {(entry.behaviour_traits || []).map((trait) => (
+                <div key={trait.label} style={traitCardStyle}>
+                  <div style={{ fontSize: 12, color: "#475569" }}>{trait.label}</div>
+                  <div style={{ marginTop: 4, fontWeight: 700, fontSize: 16 }}>{trait.value ?? 0}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="student-result-table-wrap">
             <table>
@@ -293,15 +349,15 @@ export default function StudentResult() {
                 {(entry.rows || []).map((row) => (
                   <tr key={row.term_subject_id}>
                     <td>{row.subject_name}</td>
-                    <td>{row.ca}</td>
-                    <td>{row.exam}</td>
-                    <td>{row.total}</td>
-                    <td>{row.min_score}</td>
-                    <td>{row.max_score}</td>
-                    <td>{Number(row.class_average || 0).toFixed(2)}</td>
+                    <td>{asDash(row.ca)}</td>
+                    <td>{asDash(row.exam)}</td>
+                    <td>{asDash(row.total)}</td>
+                    <td>{asDash(row.min_score)}</td>
+                    <td>{asDash(row.max_score)}</td>
+                    <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
                     <td>{row.position_label || "-"}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.remark}</td>
+                    <td>{asDash(row.grade)}</td>
+                    <td>{asDash(row.remark)}</td>
                   </tr>
                 ))}
                 {(entry.rows || []).length === 0 ? (

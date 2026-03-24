@@ -24,7 +24,7 @@
     $normalizedTitle = strtolower((string) ($title ?? ''));
     $isTeacherReport = $normalizedTitle === 'teacher report';
     $isStudentReport = $normalizedTitle === 'student report';
-    $emptyColspan = 10 + ($isTeacherReport ? 1 : 0) + ($isStudentReport ? 1 : 0);
+    $emptyColspan = 10 + ($isTeacherReport ? 1 : 0) + ($isStudentReport ? 2 : 0);
   @endphp
 
   <div class="head">
@@ -56,6 +56,7 @@
         @endif
         @if($isStudentReport)
           <th class="comment">Teacher Comment</th>
+          <th class="summary">Behaviour Rating</th>
         @endif
       </tr>
     </thead>
@@ -77,6 +78,7 @@
           @endif
           @if($isStudentReport)
             <td class="comment">{{ $row['teacher_comment'] ?? '-' }}</td>
+            <td class="summary">{{ $row['behaviour_rating'] ?? '-' }}</td>
           @endif
         </tr>
       @empty

@@ -644,6 +644,52 @@ class ResultsController extends Controller
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
 
+        $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
+            ->where('class_id', (int) $class->id)
+            ->where('term_id', (int) $term->id)
+            ->where('student_id', (int) $student->id)
+            ->first();
+
+        $attendance = StudentAttendance::where('school_id', $schoolId)
+            ->where('class_id', (int) $class->id)
+            ->where('term_id', (int) $term->id)
+            ->where('student_id', (int) $student->id)
+            ->first();
+
+        $teacherComment = (string) ($attendance?->comment ?? '');
+        if ($teacherComment === '') {
+            $teacherComment = $overallGrade !== '-'
+                ? $this->defaultTeacherComment((int) round($averageScore))
+                : 'No graded subject available yet.';
+        }
+
+        $behaviourTraits = [
+            ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
+            ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
+            ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
+            ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
+            ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
+            ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
+            ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
+        ];
+
+        $behaviourSummary = collect($behaviourTraits)
+            ->map(function (array $trait) {
+                $label = match ((string) ($trait['label'] ?? '')) {
+                    'Handwriting' => 'HW',
+                    'Speech' => 'SP',
+                    'Attitude' => 'AT',
+                    'Reading' => 'RD',
+                    'Punctuality' => 'PU',
+                    'Teamwork' => 'TW',
+                    'Self Control' => 'SC',
+                    default => strtoupper(substr((string) ($trait['label'] ?? ''), 0, 2)),
+                };
+
+                return $label . ':' . (int) ($trait['value'] ?? 0);
+            })
+            ->implode(', ');
+
         return response()->json([
             'data' => [[
                 'session' => [
@@ -668,6 +714,9 @@ class ResultsController extends Controller
                     'average_score' => $summary['graded_subjects_count'] > 0 ? $averageScore : null,
                     'overall_grade' => $overallGrade,
                 ],
+                'teacher_comment' => $teacherComment,
+                'behaviour_summary' => $behaviourSummary,
+                'behaviour_traits' => $behaviourTraits,
                 'rows' => $rows,
                 'assessment_schema' => $assessmentSchema,
             ]],
@@ -1538,6 +1587,7 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
 
 
 
