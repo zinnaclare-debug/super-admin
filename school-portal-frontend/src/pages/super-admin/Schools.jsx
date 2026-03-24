@@ -30,6 +30,7 @@ function Schools() {
   const [schoolFeatures, setSchoolFeatures] = useState([]);
   const [resettingAdminId, setResettingAdminId] = useState(null);
   const [actionValues, setActionValues] = useState({});
+  const [toast, setToast] = useState(null);
 
   const slugifySubdomain = (value) =>
     value
@@ -49,6 +50,10 @@ function Schools() {
 
   const getBaseDomain = () => TENANCY_BASE_DOMAIN;
 
+  const showToast = (message, type = "success") => {
+    setToast({ id: Date.now(), message, type });
+  };
+
   const schoolWebAddress = (subdomain) => {
     if (!subdomain) return "-";
     const baseDomain = getBaseDomain();
@@ -63,6 +68,12 @@ function Schools() {
   useEffect(() => {
     loadSchools();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const createSchoolWithAdmin = async (e) => {
     e.preventDefault();
@@ -143,7 +154,7 @@ function Schools() {
 
     const normalizedCode = String(deleteCode).trim();
     if (!/^\d{4}$/.test(normalizedCode)) {
-      alert("Enter a valid 4-digit delete code.");
+      showToast("Enter a valid 4-digit delete code.", "error");
       return;
     }
 
@@ -152,12 +163,12 @@ function Schools() {
         data: { delete_code: normalizedCode },
       });
       await loadSchools();
-      alert(res?.data?.message || "School deleted successfully.");
+      showToast(res?.data?.message || "School deleted successfully.", "success");
     } catch (err) {
       const firstValidationError = Object.values(err?.response?.data?.errors || {})
         .flat()
         .find(Boolean);
-      alert(firstValidationError || formatApiError(err) || "Failed to delete school.");
+      showToast(firstValidationError || formatApiError(err) || "Failed to delete school.", "error");
     }
   };
 
@@ -246,6 +257,11 @@ function Schools() {
         default:
           break;
       }
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      showToast(firstValidationError || formatApiError(err) || "School action failed.", "error");
     } finally {
       setActionValues((prev) => ({ ...prev, [school.id]: "" }));
     }
@@ -260,6 +276,30 @@ function Schools() {
 
   return (
     <div style={{ width: "100%", maxWidth: "100%" }}>
+      {toast ? (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 1000,
+            minWidth: 280,
+            maxWidth: 420,
+            padding: "12px 14px",
+            borderRadius: 12,
+            color: "#fff",
+            fontWeight: 600,
+            boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
+            background:
+              toast.type === "error"
+                ? "linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)"
+                : "linear-gradient(135deg, #0f766e 0%, #16a34a 100%)",
+          }}
+        >
+          {toast.message}
+        </div>
+      ) : null}
+
       <h1 style={{ marginTop: 0, fontSize: "clamp(1.7rem, 3vw, 2.4rem)" }}>Schools</h1>
 
       <form
