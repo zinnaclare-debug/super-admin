@@ -502,6 +502,28 @@ class LoginDetailsController extends Controller
         ];
     }
 
+    private function paginateArrayRows(array $rows, int $perPage, int $page): array
+    {
+        $total = count($rows);
+        $lastPage = max(1, (int) ceil($total / max(1, $perPage)));
+        $page = min(max(1, $page), $lastPage);
+        $offset = ($page - 1) * $perPage;
+        $items = array_slice(array_values($rows), $offset, $perPage);
+
+        $items = array_map(function (array $row, int $index) use ($offset) {
+            $row['sn'] = $offset + $index + 1;
+            return $row;
+        }, $items, array_keys($items));
+
+        return [
+            'data' => array_values($items),
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $total,
+        ];
+    }
+
     private function toCsvRow(array $columns): string
     {
         $escaped = array_map(function ($value) {
@@ -680,6 +702,7 @@ class LoginDetailsController extends Controller
         return $normalized;
     }
 }
+
 
 
 
