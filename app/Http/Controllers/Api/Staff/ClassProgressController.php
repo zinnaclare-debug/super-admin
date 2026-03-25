@@ -32,6 +32,8 @@ class ClassProgressController extends Controller
             ->values();
 
         $departmentScopeByClass = [];
+        $departmentNameScopeByClass = [];
+
         if (Schema::hasTable('class_departments') && Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
             $departmentRows = DB::table('class_departments')
                 ->join('classes', 'classes.id', '=', 'class_departments.class_id')
@@ -42,20 +44,36 @@ class ClassProgressController extends Controller
                 ->get([
                     'class_departments.class_id',
                     'class_departments.id as department_id',
+                    'class_departments.name as department_name',
                 ]);
 
             foreach ($departmentRows as $row) {
                 $cid = (int) $row->class_id;
                 $did = (int) $row->department_id;
+                $dname = trim((string) ($row->department_name ?? ''));
+
                 if ($cid < 1 || $did < 1) {
                     continue;
                 }
+
                 $departmentScopeByClass[$cid] = $departmentScopeByClass[$cid] ?? [];
                 $departmentScopeByClass[$cid][] = $did;
+
+                if ($dname !== '') {
+                    $departmentNameScopeByClass[$cid] = $departmentNameScopeByClass[$cid] ?? [];
+                    $departmentNameScopeByClass[$cid][] = $dname;
+                }
             }
 
             foreach ($departmentScopeByClass as $cid => $ids) {
                 $departmentScopeByClass[$cid] = array_values(array_unique(array_map('intval', $ids)));
+            }
+
+            foreach ($departmentNameScopeByClass as $cid => $names) {
+                $departmentNameScopeByClass[$cid] = array_values(array_unique(array_filter(array_map(
+                    fn ($name) => trim((string) $name),
+                    $names
+                ))));
             }
         }
 
@@ -95,6 +113,7 @@ class ClassProgressController extends Controller
             'terms' => $terms,
             'direct_class_ids' => $directClassIds->all(),
             'department_scope_by_class' => $departmentScopeByClass,
+            'department_name_scope_by_class' => $departmentNameScopeByClass,
         ];
     }
 
@@ -109,6 +128,30 @@ class ClassProgressController extends Controller
         $scopes = $ctx['department_scope_by_class'] ?? [];
         $raw = $scopes[$classId] ?? $scopes[(string) $classId] ?? [];
         return array_values(array_unique(array_map('intval', (array) $raw)));
+    }
+
+    private function departmentNamesForClass(array $ctx, int $classId): array
+    {
+        $scopes = $ctx['department_name_scope_by_class'] ?? [];
+        $raw = $scopes[$classId] ?? $scopes[(string) $classId] ?? [];
+        return array_values(array_unique(array_filter(array_map(
+            fn ($name) => trim((string) $name),
+            (array) $raw
+        ))));
+    }
+
+    private function scopeLabelForClass(array $ctx, int $classId): string
+    {
+        if ($this->hasDirectClassAccess($ctx, $classId)) {
+            return 'All students in class';
+        }
+
+        $departmentNames = $this->departmentNamesForClass($ctx, $classId);
+        if (!empty($departmentNames)) {
+            return 'Departments: ' . implode(', ', $departmentNames);
+        }
+
+        return 'Assigned students only';
     }
 
     public function status(Request $request)
@@ -156,6 +199,8 @@ class ClassProgressController extends Controller
             return response()->json(['data' => null, 'message' => 'No terms found for current session'], 422);
         }
 
+        $canUseDepartments = Schema::hasTable('class_departments');
+
         $enrollmentsQuery = Enrollment::query()
             ->where('class_id', $ctx['class']->id)
             ->where('term_id', $ctx['term']->id)
@@ -165,6 +210,15 @@ class ClassProgressController extends Controller
             ->join('students', 'students.id', '=', 'enrollments.student_id')
             ->join('users', 'users.id', '=', 'students.user_id')
             ->orderBy('users.name');
+
+        if ($canUseDepartments) {
+            $enrollmentsQuery->leftJoin('class_departments', function ($join) use ($schoolId) {
+                $join->on('class_departments.id', '=', 'enrollments.department_id');
+                if (Schema::hasColumn('class_departments', 'school_id')) {
+                    $join->where('class_departments.school_id', '=', $schoolId);
+                }
+            });
+        }
 
         if (
             !$this->hasDirectClassAccess($ctx, (int) $ctx['class']->id)
@@ -177,10 +231,15 @@ class ClassProgressController extends Controller
             $enrollmentsQuery->whereIn('enrollments.department_id', $departmentIds);
         }
 
-        $enrollments = $enrollmentsQuery->get([
+        $columns = [
             'students.id as student_id',
             'users.name as student_name',
-        ]);
+        ];
+        if ($canUseDepartments) {
+            $columns[] = 'class_departments.name as department_name';
+        }
+
+        $enrollments = $enrollmentsQuery->get($columns);
 
         $studentIds = $enrollments
             ->pluck('student_id')
@@ -232,11 +291,26 @@ class ClassProgressController extends Controller
                 'sn' => $index + 1,
                 'student_id' => $studentId,
                 'student_name' => (string) $row->student_name,
+                'department_name' => trim((string) ($row->department_name ?? '')),
                 'result_status' => $resultCompletionMap[$studentId] ?? 'incomplete',
                 'comment_status' => isset($commentCompletedLookup[$studentId]) ? 'completed' : 'incomplete',
                 'behaviour_status' => isset($behaviourCompletedLookup[$studentId]) ? 'completed' : 'incomplete',
             ];
         })->all();
+
+        $classOptions = $ctx['classes']->values()->map(function ($class) use ($ctx) {
+            $classId = (int) $class->id;
+            return [
+                'id' => $classId,
+                'name' => (string) $class->name,
+                'level' => (string) $class->level,
+                'academic_session_id' => (int) $class->academic_session_id,
+                'department_names' => $this->departmentNamesForClass($ctx, $classId),
+                'scope_label' => $this->scopeLabelForClass($ctx, $classId),
+            ];
+        })->all();
+
+        $selectedDepartmentNames = $this->departmentNamesForClass($ctx, (int) $ctx['class']->id);
 
         return response()->json([
             'data' => [
@@ -245,13 +319,15 @@ class ClassProgressController extends Controller
                     'session_name' => $ctx['session']->session_name,
                     'academic_year' => $ctx['session']->academic_year,
                 ],
-                'classes' => $ctx['classes'],
+                'classes' => $classOptions,
                 'terms' => $ctx['terms'],
                 'selected_class_id' => (int) $ctx['class']->id,
                 'selected_term_id' => (int) $ctx['term']->id,
                 'selected_class_name' => (string) $ctx['class']->name,
                 'selected_class_level' => (string) $ctx['class']->level,
                 'selected_term_name' => (string) $ctx['term']->name,
+                'selected_department_names' => $selectedDepartmentNames,
+                'selected_scope_label' => $this->scopeLabelForClass($ctx, (int) $ctx['class']->id),
                 'students' => $students,
                 'summary' => [
                     'student_count' => count($students),

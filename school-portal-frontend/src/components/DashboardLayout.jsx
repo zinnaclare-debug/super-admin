@@ -335,7 +335,14 @@ function DashboardLayout() {
                         {featureLabel(f.feature)}
                       </li>
                     ))}
-                  </ul>
+                    {user?.role === "staff" && canAccessClassTeacherFeatures ? (
+                    <li style={{ fontSize: 13, opacity: 0.85 }}>
+                      <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
+                        {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
+                      </NavLink>
+                    </li>
+                  ) : null}
+                </ul>
                 </div>
               )}
 
@@ -439,6 +446,13 @@ function DashboardLayout() {
                       )}
                     </li>
                   ))}
+                  {user?.role === "staff" && canAccessClassTeacherFeatures ? (
+                    <li style={{ fontSize: 13, opacity: 0.85 }}>
+                      <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
+                        {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
+                      </NavLink>
+                    </li>
+                  ) : null}
                 </ul>
               </div>
             </>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
-import personalNotebookArt from "../../../assets/attendance/personal-notebook.svg";
-import standOutArt from "../../../assets/behaviour-rating/stand-out.svg";
-import trueFriendsArt from "../../../assets/attendance/true-friends.svg";
+import onlineCalendarArt from "../../../assets/class-progress-online-calendar.svg";
+import sharingKnowledgeArt from "../../../assets/class-progress-sharing-knowledge.svg";
+import surveillanceArt from "../../../assets/class-progress-surveillance.svg";
 import "./ClassProgressHome.css";
 
 const labelizeStatus = (value) =>
@@ -11,6 +11,12 @@ const labelizeStatus = (value) =>
 
 const statusClass = (value) =>
   String(value || "").toLowerCase() === "completed" ? "is-complete" : "is-incomplete";
+
+const classOptionLabel = (item) => {
+  if (!item) return "";
+  const suffix = item?.scope_label && item.scope_label !== "All students in class" ? ` - ${item.scope_label}` : "";
+  return `${item.name} (${item.level})${suffix}`;
+};
 
 export default function ClassProgressHome() {
   const [loading, setLoading] = useState(true);
@@ -25,6 +31,8 @@ export default function ClassProgressHome() {
   const [selectedClassName, setSelectedClassName] = useState("");
   const [selectedClassLevel, setSelectedClassLevel] = useState("");
   const [selectedTermName, setSelectedTermName] = useState("");
+  const [selectedDepartmentNames, setSelectedDepartmentNames] = useState([]);
+  const [selectedScopeLabel, setSelectedScopeLabel] = useState("");
 
   const load = async (nextClassId = "", nextTermId = "") => {
     setLoading(true);
@@ -47,6 +55,8 @@ export default function ClassProgressHome() {
         setSelectedClassName("");
         setSelectedClassLevel("");
         setSelectedTermName("");
+        setSelectedDepartmentNames([]);
+        setSelectedScopeLabel("");
         setMessage(res.data?.message || "No class progress data found.");
         return;
       }
@@ -61,6 +71,8 @@ export default function ClassProgressHome() {
       setSelectedClassName(data.selected_class_name || "");
       setSelectedClassLevel(data.selected_class_level || "");
       setSelectedTermName(data.selected_term_name || "");
+      setSelectedDepartmentNames(Array.isArray(data.selected_department_names) ? data.selected_department_names : []);
+      setSelectedScopeLabel(data.selected_scope_label || "");
     } catch (err) {
       setClasses([]);
       setTerms([]);
@@ -70,6 +82,8 @@ export default function ClassProgressHome() {
       setSelectedClassName("");
       setSelectedClassLevel("");
       setSelectedTermName("");
+      setSelectedDepartmentNames([]);
+      setSelectedScopeLabel("");
       setMessage(err?.response?.data?.message || "Failed to load class progress.");
     } finally {
       setLoading(false);
@@ -111,13 +125,13 @@ export default function ClassProgressHome() {
 
           <div className="ctp-hero-art" aria-hidden="true">
             <div className="ctp-art ctp-art--main">
-              <img src={personalNotebookArt} alt="" />
+              <img src={sharingKnowledgeArt} alt="" />
             </div>
             <div className="ctp-art ctp-art--spotlight">
-              <img src={standOutArt} alt="" />
+              <img src={onlineCalendarArt} alt="" />
             </div>
             <div className="ctp-art ctp-art--students">
-              <img src={trueFriendsArt} alt="" />
+              <img src={surveillanceArt} alt="" />
             </div>
           </div>
         </section>
@@ -142,7 +156,7 @@ export default function ClassProgressHome() {
                 <option value="">Select class</option>
                 {classes.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} ({item.level})
+                    {classOptionLabel(item)}
                   </option>
                 ))}
               </select>
@@ -181,6 +195,12 @@ export default function ClassProgressHome() {
                   <span className="ctp-summary-tag">{selectedClassLevel || "Level pending"}</span>
                   <span className="ctp-summary-tag">{sessionLabel}</span>
                   <span className="ctp-summary-tag">{selectedTermName || "Current term"}</span>
+                  <span className="ctp-summary-tag">{selectedScopeLabel || "All students in class"}</span>
+                  {selectedDepartmentNames.map((departmentName) => (
+                    <span key={departmentName} className="ctp-summary-tag ctp-summary-tag--department">
+                      {departmentName}
+                    </span>
+                  ))}
                 </div>
               </div>
               <span className="ctp-summary-toggle">Open table</span>
@@ -204,7 +224,14 @@ export default function ClassProgressHome() {
                     {students.map((student, index) => (
                       <tr key={student.student_id || index}>
                         <td>{student.sn || index + 1}</td>
-                        <td>{student.student_name}</td>
+                        <td>
+                          <div className="ctp-student-cell">
+                            <span className="ctp-student-name">{student.student_name}</span>
+                            {student.department_name ? (
+                              <span className="ctp-student-meta">{student.department_name}</span>
+                            ) : null}
+                          </div>
+                        </td>
                         <td>
                           <span className={`ctp-status ${statusClass(student.result_status)}`}>
                             {labelizeStatus(student.result_status)}
