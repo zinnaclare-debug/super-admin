@@ -73,6 +73,7 @@ import TopicMaterials from "./pages/staff/topics/TopicMaterials";
 import ELibraryHome from "./pages/staff/e-library/ELibraryHome";
 import AttendanceHome from "./pages/staff/attendance/AttendanceHome";
 import BehaviourRatingHome from "./pages/staff/behaviour-rating/BehaviourRatingHome";
+import ClassProgressHome from "./pages/staff/class-progress/ClassProgressHome";
 import ClassActivitiesHome from "./pages/staff/class-activities/ClassActivitiesHome";
 import VirtualClassHome from "./pages/staff/virtual-class/VirtualClassHome";
 import QuestionBankHome from "./pages/staff/question-bank/QuestionBankHome";
@@ -221,6 +222,7 @@ function App() {
         <Route path=":featureKey" element={<FeaturePage />} />
         <Route path="attendance" element={<AttendanceHome />} />
         <Route path="behaviour-rating" element={<BehaviourRatingHome />} />
+        <Route path="class-progress" element={<ClassProgressHome />} />
         <Route path="topics" element={<TopicsHome />} />
         <Route path="topics/:termSubjectId" element={<TopicMaterials />} />
         <Route path="e-library" element={<ELibraryHome />} />

@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\Staff\CbtController as StaffCbtController;
 use App\Http\Controllers\Api\Staff\AttendanceController as StaffAttendanceController;
 use App\Http\Controllers\Api\Staff\BehaviourRatingController as StaffBehaviourRatingController;
 
+use App\Http\Controllers\Api\Staff\ClassProgressController as StaffClassProgressController;
 use App\Http\Controllers\Api\Staff\ClassActivitiesController as StaffClassActivitiesController;
 use App\Http\Controllers\Api\Student\ClassActivitiesController as StudentClassActivitiesController;
 use App\Http\Controllers\Api\Student\ResultsController as StudentResultsController;
@@ -376,6 +377,8 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/behaviour-rating/status', [StaffBehaviourRatingController::class, 'status']);
     Route::get('/staff/behaviour-rating', [StaffBehaviourRatingController::class, 'index']);
     Route::post('/staff/behaviour-rating', [StaffBehaviourRatingController::class, 'save']);
+    Route::get('/staff/class-progress/status', [StaffClassProgressController::class, 'status']);
+    Route::get('/staff/class-progress', [StaffClassProgressController::class, 'index']);
     
     Route::get('/staff/topics/subjects', [TeacherTopicsController::class, 'myAssignedSubjects']);
     Route::get('/staff/topics/subjects/{termSubject}/materials', [TeacherTopicsController::class, 'materials']);

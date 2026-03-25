@@ -21,6 +21,7 @@ export default function StaffDashboard() {
   const [error, setError] = useState("");
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
+  const [canAccessClassProgress, setCanAccessClassProgress] = useState(false);
 
   const toAbsoluteUrl = (url) => {
     if (!url) return null;
@@ -125,6 +126,25 @@ export default function StaffDashboard() {
     };
   }, []);
 
+
+  useEffect(() => {
+    let active = true;
+
+    api
+      .get("/api/staff/class-progress/status")
+      .then((res) => {
+        if (!active) return;
+        setCanAccessClassProgress(Boolean(res?.data?.data?.can_access));
+      })
+      .catch(() => {
+        if (!active) return;
+        setCanAccessClassProgress(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   const user = profile?.user || {};
   const staff = profile?.staff || {};
   const classes = profile?.classes || [];
@@ -139,6 +159,7 @@ export default function StaffDashboard() {
     storedUser?.school?.name ||
     "School";
   const isClassTeacher = classes.length > 0;
+  const showClassTeacherTools = isClassTeacher || canAccessClassProgress;
   const staffPhotoUrl = toAbsoluteUrl(
     staff.photo_url || (staff.photo_path ? `/storage/${staff.photo_path}` : "")
   );
@@ -257,29 +278,38 @@ export default function StaffDashboard() {
               </article>
             </div>
 
-            {isClassTeacher ? (
+            {showClassTeacherTools ? (
               <article className="stx-card stx-card--class">
                 <h3>Class Teacher Assignments</h3>
-                <p className="stx-class-subtext">You are assigned as class teacher to the class(es) below.</p>
-                <div className="stx-table-wrap">
-                  <table className="stx-table">
-                    <thead>
-                      <tr>
-                        <th>S/N</th>
-                        <th>Class</th>
-                        <th>Level</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {classes.map((c, idx) => (
-                        <tr key={c.id}>
-                          <td>{idx + 1}</td>
-                          <td>{c.name}</td>
-                          <td>{c.level}</td>
+                <p className="stx-class-subtext">Review the class assignments linked to your class-teacher role and open the class progress page for a full completion overview.</p>
+                {classes.length ? (
+                  <div className="stx-table-wrap">
+                    <table className="stx-table">
+                      <thead>
+                        <tr>
+                          <th>S/N</th>
+                          <th>Class</th>
+                          <th>Level</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {classes.map((c, idx) => (
+                          <tr key={c.id}>
+                            <td>{idx + 1}</td>
+                            <td>{c.name}</td>
+                            <td>{c.level}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="stx-class-subtext">Your class-teacher access is active. Open the progress page to review the current class details.</p>
+                )}
+                <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+                  <button className="stx-btn" onClick={() => navigate("/staff/class-progress")}>
+                    Open Class Progress
+                  </button>
                 </div>
               </article>
             ) : null}
