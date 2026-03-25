@@ -134,6 +134,7 @@ export default function StudentReport() {
   const [rows, setRows] = useState([]);
   const [context, setContext] = useState(null);
   const [termId, setTermId] = useState("");
+  const [classId, setClassId] = useState("");
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [sessionConfigError, setSessionConfigError] = useState("");
@@ -167,11 +168,12 @@ export default function StudentReport() {
       terms[0];
   }, [selectedResultSession, resultTermId]);
 
-  const load = async (selectedTermId = "") => {
+  const load = async (selectedTermId = "", selectedClassId = "") => {
     setLoading(true);
     try {
       const params = {};
       if (selectedTermId) params.term_id = selectedTermId;
+      if (selectedClassId) params.class_id = selectedClassId;
       const res = await api.get("/api/school-admin/reports/student", { params });
       setSessionConfigError("");
       setRows(res.data?.data || []);
@@ -221,8 +223,8 @@ export default function StudentReport() {
   };
 
   useEffect(() => {
-    load(termId);
-  }, [termId]);
+    load(termId, classId);
+  }, [termId, classId]);
 
   useEffect(() => {
     loadResultOptions();
@@ -246,6 +248,7 @@ export default function StudentReport() {
   }, [selectedResultSession, resultTermId]);
 
   const selectedTermValue = termId || String(context?.selected_term?.id || "");
+  const selectedClassValue = classId || String(context?.selected_class_id || "");
   const selectedResultTermValue = String(selectedResultTerm?.id || "");
 
   const resultParams = () => {
@@ -334,6 +337,7 @@ export default function StudentReport() {
     try {
       const params = {};
       if (selectedTermValue) params.term_id = selectedTermValue;
+      if (selectedClassValue) params.class_id = selectedClassValue;
 
       const res = await api.get("/api/school-admin/reports/student/download", {
         params,
@@ -561,7 +565,7 @@ export default function StudentReport() {
         {context?.current_session?.session_name || context?.current_session?.academic_year || "-"}
       </p>
 
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <label htmlFor="student-report-term">Term: </label>
         <select
           id="student-report-term"
@@ -574,17 +578,28 @@ export default function StudentReport() {
             </option>
           ))}
         </select>
+        <label htmlFor="student-report-class">Class: </label>
+        <select
+          id="student-report-class"
+          value={selectedClassValue}
+          onChange={(e) => setClassId(e.target.value)}
+        >
+          <option value="">All Classes</option>
+          {(context?.classes || []).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
         <button
           onClick={() => downloadCsv(rows, context)}
           disabled={loading || rows.length === 0}
-          style={{ marginLeft: 10 }}
         >
           Download CSV
         </button>
         <button
           onClick={downloadPdf}
           disabled={loading || downloadingPdf || rows.length === 0}
-          style={{ marginLeft: 10 }}
         >
           {downloadingPdf ? "Downloading PDF..." : "Download PDF"}
         </button>

@@ -386,11 +386,13 @@ class ReportsController extends Controller
             ], 422);
         }
 
-        $rows = $this->studentRows($schoolId, (int) $term->id);
+        $classOptions = $this->sessionReportClassOptions($schoolId, (int) $session->id);
+        $selectedClassId = $this->resolveClassFilter((int) $request->query('class_id', 0), $classOptions);
+        $rows = $this->studentRows($schoolId, (int) $term->id, $selectedClassId);
 
         return response()->json([
             'data' => $rows,
-            'context' => $this->contextPayload($session, $term, $terms),
+            'context' => $this->contextPayload($session, $term, $terms, $classOptions, $selectedClassId),
         ]);
     }
 
@@ -431,8 +433,10 @@ class ReportsController extends Controller
             ], 422);
         }
 
-        $rows = $this->studentRows($schoolId, (int) $term->id);
-        $context = $this->contextPayload($session, $term, $terms);
+        $classOptions = $this->sessionReportClassOptions($schoolId, (int) $session->id);
+        $selectedClassId = $this->resolveClassFilter((int) $request->query('class_id', 0), $classOptions);
+        $rows = $this->studentRows($schoolId, (int) $term->id, $selectedClassId);
+        $context = $this->contextPayload($session, $term, $terms, $classOptions, $selectedClassId);
         $schoolName = $request->user()?->school?->name ?? 'School';
 
         return $this->pdfResponse(
@@ -472,8 +476,18 @@ class ReportsController extends Controller
         return [$session, $term, $terms];
     }
 
-    private function contextPayload(AcademicSession $session, Term $term, $terms): array
+    private function contextPayload(
+        AcademicSession $session,
+        Term $term,
+        $terms,
+        array $classOptions = [],
+        ?int $selectedClassId = null
+    ): array
     {
+        $selectedClass = collect($classOptions)->first(
+            fn ($classOption) => (int) ($classOption['id'] ?? 0) === (int) $selectedClassId
+        );
+
         return [
             'current_session' => [
                 'id' => (int) $session->id,
@@ -491,6 +505,15 @@ class ReportsController extends Controller
                     'is_current' => (bool) $item->is_current,
                 ];
             })->values(),
+            'classes' => collect($classOptions)
+                ->map(fn ($item) => [
+                    'id' => (int) ($item['id'] ?? 0),
+                    'name' => (string) ($item['name'] ?? ''),
+                    'level' => (string) ($item['level'] ?? ''),
+                ])
+                ->values(),
+            'selected_class_id' => $selectedClass ? (int) ($selectedClass['id'] ?? 0) : null,
+            'selected_class_name' => $selectedClass['name'] ?? null,
         ];
     }
 
@@ -999,9 +1022,9 @@ class ReportsController extends Controller
         return empty($labels) ? 'Completed' : implode(', ', $labels);
     }
 
-    private function studentRows(int $schoolId, int $termId)
+    private function studentRows(int $schoolId, int $termId, ?int $classId = null)
     {
-        $rawRows = DB::table('results')
+        $query = DB::table('results')
             ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
             ->join('students', 'students.id', '=', 'results.student_id')
             ->join('users', 'users.id', '=', 'students.user_id')
@@ -1018,7 +1041,13 @@ class ReportsController extends Controller
                 'results.exam',
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
-            ])
+            ]);
+
+        if ($classId !== null && $classId > 0) {
+            $query->where('term_subjects.class_id', $classId);
+        }
+
+        $rawRows = $query
             ->orderBy('users.name')
             ->get();
 
@@ -1121,6 +1150,24 @@ class ReportsController extends Controller
 
         return collect($rows)->values();
     }
+    private function sessionReportClassOptions(int $schoolId, int $sessionId): array
+    {
+        return DB::table('classes')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->get(['id', 'name', 'level'])
+            ->map(function ($row) {
+                return [
+                    'id' => (int) $row->id,
+                    'name' => (string) $row->name,
+                    'level' => strtolower((string) ($row->level ?? '')) ,
+                ];
+            })
+            ->sortBy(fn ($item) => $this->classOrderIndex((string) ($item['name'] ?? '')))
+            ->values()
+            ->all();
+    }
+
 
     private function resolveBroadsheetSession(int $schoolId, int $requestedSessionId): ?AcademicSession
     {
