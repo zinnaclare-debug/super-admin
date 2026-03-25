@@ -489,21 +489,17 @@ export default function StudentReport() {
               {asDash(resultEntry.summary?.overall_grade)}
             </p>
 
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gap: 10,
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              }}
-            >
-              <div>
-                <div style={{ marginBottom: 6, fontWeight: 600 }}>Teacher Comment</div>
-                <div style={readOnlyBoxStyle}>{resultEntry.teacher_comment || "-"}</div>
-              </div>
-              <div>
-                <div style={{ marginBottom: 6, fontWeight: 600 }}>Behaviour Rating</div>
-                <div style={readOnlyBoxStyle}>{resultEntry.behaviour_summary || "-"}</div>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ marginBottom: 6, fontWeight: 600 }}>Teacher Comment</div>
+              <div
+                style={{
+                  ...readOnlyBoxStyle,
+                  maxWidth: "100%",
+                  minHeight: 84,
+                  maxHeight: "none",
+                }}
+              >
+                {resultEntry.teacher_comment || "-"}
               </div>
             </div>
 
@@ -658,4 +654,5 @@ export default function StudentReport() {
     </div>
   );
 }
+
 
