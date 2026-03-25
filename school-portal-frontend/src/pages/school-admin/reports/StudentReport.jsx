@@ -43,7 +43,9 @@ const formatMaybeNumber = (value, digits = 2) => {
 };
 
 const readOnlyBoxStyle = {
-  minWidth: 220,
+  width: "100%",
+  minWidth: 0,
+  maxWidth: 220,
   minHeight: 44,
   maxHeight: 64,
   overflow: "auto",
@@ -54,6 +56,7 @@ const readOnlyBoxStyle = {
   borderRadius: 6,
   lineHeight: 1.25,
   whiteSpace: "normal",
+  overflowWrap: "anywhere",
 };
 
 const traitGridStyle = {
@@ -608,7 +611,8 @@ export default function StudentReport() {
       {loading ? (
         <p style={{ marginTop: 12 }}>Loading report...</p>
       ) : (
-        <table border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, overflowX: "auto", maxWidth: "100%" }}>
+          <table border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ minWidth: 980 }}>
           <thead>
             <tr>
               <th style={{ width: 70 }}>S/N</th>
@@ -621,8 +625,8 @@ export default function StudentReport() {
               <th>E</th>
               <th>F</th>
               <th>Total</th>
-              <th style={{ minWidth: 240 }}>Teacher Comment</th>
-              <th style={{ minWidth: 240 }}>Behaviour Rating</th>
+              <th style={{ minWidth: 180 }}>Teacher Comment</th>
+              <th style={{ minWidth: 180 }}>Behaviour Rating</th>
             </tr>
           </thead>
           <tbody>
@@ -649,7 +653,9 @@ export default function StudentReport() {
             )}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
 }
+

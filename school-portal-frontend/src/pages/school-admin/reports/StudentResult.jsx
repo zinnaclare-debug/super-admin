@@ -312,10 +312,7 @@ export default function StudentResult() {
               <div style={{ fontWeight: 600, marginBottom: 6 }}>Teacher Comment</div>
               <div>{entry.teacher_comment || "-"}</div>
             </div>
-            <div style={infoBoxStyle}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Behaviour Rating</div>
-              <div>{entry.behaviour_summary || "-"}</div>
-            </div>
+
           </div>
 
           {(entry.behaviour_traits || []).length > 0 ? (
@@ -373,3 +370,4 @@ export default function StudentResult() {
     </div>
   );
 }
+

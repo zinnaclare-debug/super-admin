@@ -110,14 +110,14 @@
 
 .transcript-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow: visible;
   margin-top: 10px;
 }
 
 .transcript-table-wrap table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 560px;
+  table-layout: fixed;
 }
 
 .transcript-table-wrap th,
@@ -125,6 +125,8 @@
   border: 1px solid #e2e8f0;
   padding: 7px 8px;
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .transcript-table-wrap th {
@@ -143,3 +145,4 @@
     grid-template-columns: 1fr;
   }
 }
+
