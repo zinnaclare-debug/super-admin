@@ -407,12 +407,12 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::post('/staff/cbt/exams/{exam}/export-question-bank', [StaffCbtController::class, 'exportFromQuestionBank']);
     Route::delete('/staff/cbt/exams/{exam}', [StaffCbtController::class, 'destroy']);
 
-    Route::get('/staff/class-activities/subjects', [StaffClassActivitiesController::class, 'myAssignedSubjects']);
-    Route::get('/staff/class-activities/assigned-subjects', [StaffClassActivitiesController::class, 'assignedSubjects']);
-    Route::get('/staff/class-activities', [StaffClassActivitiesController::class, 'index']);
-    Route::post('/staff/class-activities', [StaffClassActivitiesController::class, 'upload']);
-    Route::delete('/staff/class-activities/{activity}', [StaffClassActivitiesController::class, 'destroy']);
-    Route::get('/staff/class-activities/{activity}/download', [StaffClassActivitiesController::class, 'download']);
+    Route::get('/staff/class-activities/subjects', [StaffClassActivitiesController::class, 'myAssignedSubjects'])->middleware('feature:class activities');
+    Route::get('/staff/class-activities/assigned-subjects', [StaffClassActivitiesController::class, 'assignedSubjects'])->middleware('feature:class activities');
+    Route::get('/staff/class-activities', [StaffClassActivitiesController::class, 'index'])->middleware('feature:class activities');
+    Route::post('/staff/class-activities', [StaffClassActivitiesController::class, 'upload'])->middleware('feature:class activities');
+    Route::delete('/staff/class-activities/{activity}', [StaffClassActivitiesController::class, 'destroy'])->middleware('feature:class activities');
+    Route::get('/staff/class-activities/{activity}/download', [StaffClassActivitiesController::class, 'download'])->middleware('feature:class activities');
 
 
 
@@ -456,9 +456,9 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/cbt/exams/{exam}/questions', [StudentCbtController::class, 'questions']);
     Route::get('/student/cbt/exams/{exam}/review', [StudentCbtController::class, 'review']);
     Route::post('/student/cbt/exams/{exam}/submit', [StudentCbtController::class, 'submit']);
-    Route::get('/student/class-activities/subjects', [StudentClassActivitiesController::class, 'mySubjects']);
-    Route::get('/student/class-activities', [StudentClassActivitiesController::class, 'index']);
-    Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download']);
+    Route::get('/student/class-activities/subjects', [StudentClassActivitiesController::class, 'mySubjects'])->middleware('feature:class activities');
+    Route::get('/student/class-activities', [StudentClassActivitiesController::class, 'index'])->middleware('feature:class activities');
+    Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
 

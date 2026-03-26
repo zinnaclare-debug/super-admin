@@ -99,11 +99,11 @@ class ClassProgressController extends Controller
         $terms = Term::where('school_id', $schoolId)
             ->where('academic_session_id', $session->id)
             ->orderBy('id')
-            ->get(['id', 'name', 'academic_session_id', 'is_current']);
+            ->get(['id', 'name', 'academic_session_id']);
 
         $selectedTerm = $termId
             ? $terms->firstWhere('id', $termId)
-            : ($terms->firstWhere('is_current', true) ?: $terms->first());
+            : $terms->first();
 
         return [
             'session' => $session,
