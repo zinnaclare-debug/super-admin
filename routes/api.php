@@ -124,7 +124,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'classTemplates']);
     Route::put('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'upsertClassTemplates']);
 
-    // ✅ School features (school admin only)
+    // âœ… School features (school admin only)
     Route::get('/schools/features', [SchoolFeatureController::class, 'index']);
 
     Route::get('/school-admin/payments/config', [SchoolAdminPaymentsController::class, 'config'])
@@ -149,7 +149,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::delete('/school-admin/announcements/{announcement}', [SchoolAdminAnnouncementController::class, 'destroy'])
         ->middleware('feature:announcements');
 
-    // ✅ Registration
+    // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
         ->middleware('feature:register');
 
@@ -168,7 +168,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
         ->middleware('feature:register');
 
-    // ✅ Users management
+    // âœ… Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
         ->middleware('feature:users');
 
@@ -200,7 +200,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::post('/school-admin/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])
         ->middleware('feature:users');
 
-    // ✅ Academic Sessions
+    // âœ… Academic Sessions
     Route::get('/school-admin/academic-sessions', [AcademicSessionController::class, 'index'])
         ->middleware('feature:academic_session');
 
@@ -211,9 +211,9 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:academic_session');
 
 
-    // ✅ Your controller uses setStatus() so keep this name
+    // âœ… Your controller uses setStatus() so keep this name
 
-    // ✅ Academic Structure (Details page + Departments per level)
+    // âœ… Academic Structure (Details page + Departments per level)
     Route::get('/school-admin/academic-sessions/{session}/details', [AcademicStructureController::class, 'details'])
         ->middleware('feature:academic_session');
 
@@ -224,7 +224,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::delete('/school-admin/academic-sessions/{session}/level-departments/{department}', [AcademicStructureController::class, 'deleteLevelDepartment'])
         ->middleware('feature:academic_session');
 
-    // ✅ Class Terms page
+    // âœ… Class Terms page
     Route::get('/school-admin/classes/{class}/terms', [AcademicStructureController::class, 'classTerms'])
         ->middleware('feature:academic_session');
 
@@ -330,7 +330,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::patch('/school-admin/cbt/exams/{exam}/publish', [AcademicsController::class, 'publishCbtExam'])
         ->middleware('feature:academics');
 
-    // ✅ Alias for termCourses (courses = subjects)
+    // âœ… Alias for termCourses (courses = subjects)
     Route::get('/school-admin/classes/{class}/terms/{term}/courses', [AcademicsController::class, 'termCourses'])
         ->middleware('feature:academics');
 
@@ -377,8 +377,8 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/behaviour-rating/status', [StaffBehaviourRatingController::class, 'status']);
     Route::get('/staff/behaviour-rating', [StaffBehaviourRatingController::class, 'index']);
     Route::post('/staff/behaviour-rating', [StaffBehaviourRatingController::class, 'save']);
-    Route::get('/staff/class-progress/status', [StaffClassProgressController::class, 'status']);
-    Route::get('/staff/class-progress', [StaffClassProgressController::class, 'index']);
+    Route::get('/staff/class-progress/status', [StaffClassProgressController::class, 'status'])->middleware('feature:class progress');
+    Route::get('/staff/class-progress', [StaffClassProgressController::class, 'index'])->middleware('feature:class progress');
     
     Route::get('/staff/topics/subjects', [TeacherTopicsController::class, 'myAssignedSubjects']);
     Route::get('/staff/topics/subjects/{termSubject}/materials', [TeacherTopicsController::class, 'materials']);

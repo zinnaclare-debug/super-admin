@@ -15,6 +15,7 @@ class SchoolObserver
         $defaultFeatures = [
             // GENERAL
             'attendance',
+            'class progress',
             'results',
             'profile',
             'topics',

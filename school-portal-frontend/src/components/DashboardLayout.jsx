@@ -170,6 +170,11 @@ function DashboardLayout() {
       ),
     [features]
   );
+  const classProgressEnabled = useMemo(
+    () => features.some((f) => String((f?.feature ?? f) || "").toLowerCase() === "class progress"),
+    [features]
+  );
+
   const studentSubjectsEnabled = useMemo(() => {
     if (user?.role !== "student") return false;
     return features.some((f) => String(f || "").toLowerCase() === "subjects");
@@ -247,7 +252,7 @@ function DashboardLayout() {
 
   const featureLabel = (value) => String(value || "").replaceAll("_", " ").toUpperCase();
   const sidebarFeatures =
-    user?.role === "student" ? features.filter((f) => f !== "subjects") : features;
+    user?.role === "student" ? features.filter((f) => f !== "subjects") : user?.role === "staff" ? features.filter((f) => String((f?.feature ?? f) || "").toLowerCase() !== "class progress") : features;
   const isAnnouncementFeature = (value) => String(value || "").toLowerCase() === "announcements";
 
   const handleOpenAnnouncements = () => {
@@ -335,7 +340,7 @@ function DashboardLayout() {
                         {featureLabel(f.feature)}
                       </li>
                     ))}
-                    {user?.role === "staff" && canAccessClassTeacherFeatures ? (
+                    {user?.role === "staff" && canAccessClassTeacherFeatures && classProgressEnabled ? (
                     <li style={{ fontSize: 13, opacity: 0.85 }}>
                       <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
                         {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
@@ -446,7 +451,7 @@ function DashboardLayout() {
                       )}
                     </li>
                   ))}
-                  {user?.role === "staff" && canAccessClassTeacherFeatures ? (
+                  {user?.role === "staff" && canAccessClassTeacherFeatures && classProgressEnabled ? (
                     <li style={{ fontSize: 13, opacity: 0.85 }}>
                       <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
                         {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}

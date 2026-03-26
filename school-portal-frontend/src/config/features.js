@@ -1,6 +1,7 @@
 export const FEATURE_DEFINITIONS = [
   // GENERAL FEATURES
   { key: "attendance", label: "Attendance", category: "general" },
+  { key: "class progress", label: "Class Progress", category: "general" },
   { key: "results", label: "Results", category: "general" },
   { key: "profile", label: "Profile", category: "general" },
   { key: "topics", label: "Topics", category: "general" },

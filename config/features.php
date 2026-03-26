@@ -4,6 +4,7 @@ return [
     'definitions' => [
         // GENERAL
         [ 'key' => 'attendance', 'label' => 'Attendance', 'category' => 'general' ],
+        [ 'key' => 'class progress', 'label' => 'Class Progress', 'category' => 'general' ],
         [ 'key' => 'results', 'label' => 'Results', 'category' => 'general' ],
         [ 'key' => 'profile', 'label' => 'Student Profiles', 'category' => 'general' ],
         [ 'key' => 'subjects', 'label' => 'Subjects', 'category' => 'general' ],

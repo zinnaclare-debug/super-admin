@@ -25,6 +25,7 @@ class SeedMissingSchoolFeatures extends Command
             ['key' => 'behaviour rating', 'description' => 'Student behaviour tracking'],
             ['key' => 'school fees', 'description' => 'Fees & payments'],
             ['key' => 'attendance', 'description' => 'Student attendance tracking'],
+            ['key' => 'class progress', 'description' => 'Class teacher progress overview'],
         ];
 
         $schools = School::all();
@@ -44,6 +45,6 @@ class SeedMissingSchoolFeatures extends Command
             }
         }
 
-        $this->info('✅ Missing features seeded successfully');
+        $this->info('âœ… Missing features seeded successfully');
     }
 }
