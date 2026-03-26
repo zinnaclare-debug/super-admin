@@ -37,7 +37,6 @@ class ClassProgressController extends Controller
         if (Schema::hasTable('class_departments') && Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
             $departmentRows = DB::table('class_departments')
                 ->join('classes', 'classes.id', '=', 'class_departments.class_id')
-                ->where('class_departments.school_id', $schoolId)
                 ->where('classes.school_id', $schoolId)
                 ->where('classes.academic_session_id', $session->id)
                 ->where('class_departments.class_teacher_user_id', $staffUserId)
@@ -202,10 +201,10 @@ class ClassProgressController extends Controller
         $canUseDepartments = Schema::hasTable('class_departments');
 
         $enrollmentsQuery = Enrollment::query()
-            ->where('class_id', $ctx['class']->id)
-            ->where('term_id', $ctx['term']->id)
+            ->where('enrollments.class_id', $ctx['class']->id)
+            ->where('enrollments.term_id', $ctx['term']->id)
             ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
-                $q->where('school_id', $schoolId);
+                $q->where('enrollments.school_id', $schoolId);
             })
             ->join('students', 'students.id', '=', 'enrollments.student_id')
             ->join('users', 'users.id', '=', 'students.user_id')
