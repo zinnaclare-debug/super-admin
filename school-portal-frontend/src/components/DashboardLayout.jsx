@@ -343,7 +343,7 @@ function DashboardLayout() {
                     {user?.role === "staff" && canAccessClassTeacherFeatures && classProgressEnabled ? (
                     <li style={{ fontSize: 13, opacity: 0.85 }}>
                       <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
-                        {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
+                        {"CLASS PROGRESS"}
                       </NavLink>
                     </li>
                   ) : null}
@@ -441,7 +441,7 @@ function DashboardLayout() {
                                 }}
                               >
                                 <span role="img" aria-label="new announcements">
-                                  🔔
+                                  ðŸ””
                                 </span>
                                 {announcementUnreadCount}
                               </span>
@@ -454,7 +454,7 @@ function DashboardLayout() {
                   {user?.role === "staff" && canAccessClassTeacherFeatures && classProgressEnabled ? (
                     <li style={{ fontSize: 13, opacity: 0.85 }}>
                       <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle}>
-                        {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
+                        {"CLASS PROGRESS"}
                       </NavLink>
                     </li>
                   ) : null}
