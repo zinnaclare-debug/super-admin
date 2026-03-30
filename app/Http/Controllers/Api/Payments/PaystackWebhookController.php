@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\Payments;
 
 use App\Http\Controllers\Controller;
+use App\Models\School;
 use App\Models\SchoolFeePayment;
+use App\Models\SchoolSubscriptionInvoice;
+use App\Support\SchoolSubscriptionBilling;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +14,6 @@ use Illuminate\Support\Facades\Log;
 
 class PaystackWebhookController extends Controller
 {
-    // POST /api/payments/paystack/webhook
     public function handle(Request $request)
     {
         $secret = (string) config('services.paystack.secret_key');
@@ -37,51 +39,84 @@ class PaystackWebhookController extends Controller
         $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
         $reference = trim((string) ($data['reference'] ?? ''));
 
-        // Always acknowledge unknown payloads to avoid noisy retries.
         if ($reference === '') {
             return response()->json(['message' => 'ok']);
         }
 
         DB::transaction(function () use ($reference, $event, $data, $payload) {
-            $payment = SchoolFeePayment::where('reference', $reference)
+            $feePayment = SchoolFeePayment::query()
+                ->where('reference', $reference)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$payment) {
-                Log::info('Paystack webhook: reference not found', [
-                    'reference' => $reference,
-                    'event' => $event,
-                ]);
+            if ($feePayment) {
+                $this->processSchoolFeePayment($feePayment, $event, $data, $payload);
                 return;
             }
 
-            if ($event === 'charge.success') {
-                $this->applySuccess($payment, $data, $event);
+            $subscriptionInvoice = SchoolSubscriptionInvoice::query()
+                ->where('reference', $reference)
+                ->lockForUpdate()
+                ->first();
+
+            if ($subscriptionInvoice) {
+                $this->processSubscriptionInvoice($subscriptionInvoice, $event, $data, $payload);
                 return;
             }
 
-            if (str_starts_with($event, 'charge.')) {
-                $this->applyFailure($payment, $data, $event);
-                return;
-            }
-
-            // Non-charge events are acknowledged but not processed.
-            $this->attachWebhookMeta($payment, [
-                'last_event' => $event,
-                'last_event_id' => data_get($payload, 'data.id'),
-                'last_event_received_at' => now()->toIso8601String(),
+            Log::info('Paystack webhook: reference not found', [
+                'reference' => $reference,
+                'event' => $event,
             ]);
-            $payment->save();
         });
 
         return response()->json(['message' => 'ok']);
     }
 
-    private function applySuccess(SchoolFeePayment $payment, array $data, string $event): void
+    private function processSchoolFeePayment(SchoolFeePayment $payment, string $event, array $data, array $payload): void
     {
-        // Keep success idempotent.
+        if ($event === 'charge.success') {
+            $this->applyFeeSuccess($payment, $data, $event);
+            return;
+        }
+
+        if (str_starts_with($event, 'charge.')) {
+            $this->applyFeeFailure($payment, $data, $event);
+            return;
+        }
+
+        $this->attachMeta($payment, [
+            'last_event' => $event,
+            'last_event_id' => data_get($payload, 'data.id'),
+            'last_event_received_at' => now()->toIso8601String(),
+        ]);
+        $payment->save();
+    }
+
+    private function processSubscriptionInvoice(SchoolSubscriptionInvoice $invoice, string $event, array $data, array $payload): void
+    {
+        if ($event === 'charge.success') {
+            $this->applySubscriptionSuccess($invoice, $data, $event);
+            return;
+        }
+
+        if (str_starts_with($event, 'charge.')) {
+            $this->applySubscriptionFailure($invoice, $data, $event);
+            return;
+        }
+
+        $this->attachMeta($invoice, [
+            'last_event' => $event,
+            'last_event_id' => data_get($payload, 'data.id'),
+            'last_event_received_at' => now()->toIso8601String(),
+        ]);
+        $invoice->save();
+    }
+
+    private function applyFeeSuccess(SchoolFeePayment $payment, array $data, string $event): void
+    {
         if ($payment->status === 'success') {
-            $this->attachWebhookMeta($payment, [
+            $this->attachMeta($payment, [
                 'last_event' => $event,
                 'last_event_id' => data_get($data, 'id'),
                 'last_event_received_at' => now()->toIso8601String(),
@@ -98,11 +133,10 @@ class PaystackWebhookController extends Controller
         $amountPaid = round(((int) data_get($data, 'amount', 0)) / 100, 2);
 
         if ($status !== 'success') {
-            $this->applyFailure($payment, $data, $event);
+            $this->applyFeeFailure($payment, $data, $event);
             return;
         }
 
-        // Protect against accidental/malicious mismatch.
         if (abs($amountPaid - (float) $payment->amount_paid) > 0.01) {
             Log::warning('Paystack webhook amount mismatch', [
                 'reference' => $payment->reference,
@@ -114,7 +148,7 @@ class PaystackWebhookController extends Controller
             $payment->paystack_status = $status;
             $payment->paystack_gateway_response = 'amount_mismatch';
             $payment->paystack_channel = $channel !== '' ? $channel : null;
-            $this->attachWebhookMeta($payment, [
+            $this->attachMeta($payment, [
                 'last_event' => $event,
                 'last_event_id' => data_get($data, 'id'),
                 'last_event_received_at' => now()->toIso8601String(),
@@ -127,16 +161,14 @@ class PaystackWebhookController extends Controller
             return;
         }
 
-        $paidAt = data_get($data, 'paid_at')
-            ? Carbon::parse((string) data_get($data, 'paid_at'))
-            : now();
-
         $payment->status = 'success';
         $payment->paystack_status = $status;
         $payment->paystack_gateway_response = $gatewayResponse !== '' ? $gatewayResponse : 'success';
         $payment->paystack_channel = $channel !== '' ? $channel : null;
-        $payment->paid_at = $paidAt;
-        $this->attachWebhookMeta($payment, [
+        $payment->paid_at = data_get($data, 'paid_at')
+            ? Carbon::parse((string) data_get($data, 'paid_at'))
+            : now();
+        $this->attachMeta($payment, [
             'last_event' => $event,
             'last_event_id' => data_get($data, 'id'),
             'last_event_received_at' => now()->toIso8601String(),
@@ -145,11 +177,10 @@ class PaystackWebhookController extends Controller
         $payment->save();
     }
 
-    private function applyFailure(SchoolFeePayment $payment, array $data, string $event): void
+    private function applyFeeFailure(SchoolFeePayment $payment, array $data, string $event): void
     {
-        // Never downgrade a successful payment.
         if ($payment->status === 'success') {
-            $this->attachWebhookMeta($payment, [
+            $this->attachMeta($payment, [
                 'last_event' => $event,
                 'last_event_id' => data_get($data, 'id'),
                 'last_event_received_at' => now()->toIso8601String(),
@@ -167,7 +198,7 @@ class PaystackWebhookController extends Controller
         $payment->paystack_status = $status !== '' ? $status : 'failed';
         $payment->paystack_gateway_response = $gatewayResponse !== '' ? $gatewayResponse : $event;
         $payment->paystack_channel = $channel !== '' ? $channel : null;
-        $this->attachWebhookMeta($payment, [
+        $this->attachMeta($payment, [
             'last_event' => $event,
             'last_event_id' => data_get($data, 'id'),
             'last_event_received_at' => now()->toIso8601String(),
@@ -175,14 +206,111 @@ class PaystackWebhookController extends Controller
         $payment->save();
     }
 
-    private function attachWebhookMeta(SchoolFeePayment $payment, array $values): void
+    private function applySubscriptionSuccess(SchoolSubscriptionInvoice $invoice, array $data, string $event): void
     {
-        $meta = is_array($payment->meta) ? $payment->meta : [];
+        if ($invoice->status === 'paid') {
+            $this->attachMeta($invoice, [
+                'last_event' => $event,
+                'last_event_id' => data_get($data, 'id'),
+                'last_event_received_at' => now()->toIso8601String(),
+                'idempotent' => true,
+            ]);
+            $invoice->save();
+            return;
+        }
+
+        $status = strtolower(trim((string) data_get($data, 'status', '')));
+        $gatewayResponse = (string) data_get($data, 'gateway_response', '');
+        $channel = (string) data_get($data, 'channel', '');
+        $amountPaid = round(((int) data_get($data, 'amount', 0)) / 100, 2);
+
+        if ($status !== 'success') {
+            $this->applySubscriptionFailure($invoice, $data, $event);
+            return;
+        }
+
+        if (abs($amountPaid - (float) $invoice->total_amount) > 0.01) {
+            Log::warning('Subscription webhook amount mismatch', [
+                'reference' => $invoice->reference,
+                'expected' => (float) $invoice->total_amount,
+                'received' => $amountPaid,
+            ]);
+
+            $invoice->status = 'failed';
+            $invoice->paystack_status = $status;
+            $invoice->paystack_gateway_response = 'amount_mismatch';
+            $invoice->paystack_channel = $channel !== '' ? $channel : null;
+            $this->attachMeta($invoice, [
+                'last_event' => $event,
+                'last_event_id' => data_get($data, 'id'),
+                'last_event_received_at' => now()->toIso8601String(),
+                'amount_mismatch' => [
+                    'expected' => (float) $invoice->total_amount,
+                    'received' => $amountPaid,
+                ],
+            ]);
+            $invoice->save();
+            return;
+        }
+
+        $invoice->status = 'paid';
+        $invoice->payment_channel = SchoolSubscriptionBilling::CHANNEL_PAYSTACK;
+        $invoice->paystack_status = $status;
+        $invoice->paystack_gateway_response = $gatewayResponse !== '' ? $gatewayResponse : 'success';
+        $invoice->paystack_channel = $channel !== '' ? $channel : null;
+        $invoice->paid_at = data_get($data, 'paid_at')
+            ? Carbon::parse((string) data_get($data, 'paid_at'))
+            : now();
+        $this->attachMeta($invoice, [
+            'last_event' => $event,
+            'last_event_id' => data_get($data, 'id'),
+            'last_event_received_at' => now()->toIso8601String(),
+        ]);
+        $invoice->save();
+
+        $school = School::query()->find((int) $invoice->school_id);
+        if ($school) {
+            $settings = SchoolSubscriptionBilling::getSettings($school);
+            SchoolSubscriptionBilling::clearPendingOverride($settings);
+        }
+    }
+
+    private function applySubscriptionFailure(SchoolSubscriptionInvoice $invoice, array $data, string $event): void
+    {
+        if ($invoice->status === 'paid') {
+            $this->attachMeta($invoice, [
+                'last_event' => $event,
+                'last_event_id' => data_get($data, 'id'),
+                'last_event_received_at' => now()->toIso8601String(),
+                'ignored' => 'already_paid',
+            ]);
+            $invoice->save();
+            return;
+        }
+
+        $status = strtolower(trim((string) data_get($data, 'status', 'failed')));
+        $gatewayResponse = (string) data_get($data, 'gateway_response', '');
+        $channel = (string) data_get($data, 'channel', '');
+
+        $invoice->status = 'failed';
+        $invoice->paystack_status = $status !== '' ? $status : 'failed';
+        $invoice->paystack_gateway_response = $gatewayResponse !== '' ? $gatewayResponse : $event;
+        $invoice->paystack_channel = $channel !== '' ? $channel : null;
+        $this->attachMeta($invoice, [
+            'last_event' => $event,
+            'last_event_id' => data_get($data, 'id'),
+            'last_event_received_at' => now()->toIso8601String(),
+        ]);
+        $invoice->save();
+    }
+
+    private function attachMeta(object $record, array $values): void
+    {
+        $meta = is_array($record->meta ?? null) ? $record->meta : [];
         $meta['paystack_webhook'] = array_merge(
             is_array($meta['paystack_webhook'] ?? null) ? $meta['paystack_webhook'] : [],
             $values
         );
-        $payment->meta = $meta;
+        $record->meta = $meta;
     }
 }
-

@@ -40,6 +40,7 @@ return [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
         'callback_url' => env('PAYSTACK_CALLBACK_URL'),
+        'school_subscription_callback_url' => env('PAYSTACK_SCHOOL_SUBSCRIPTION_CALLBACK_URL'),
     ],
 
     'ai' => [
@@ -53,3 +54,4 @@ return [
     ],
 
 ];
+

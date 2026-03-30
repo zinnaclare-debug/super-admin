@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import "./SchoolInformation.css";
 import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profileImage";
+import SchoolSubscriptionSection from "./SchoolSubscriptionSection";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DEFAULT_EXAM_RECORD = {
@@ -936,6 +937,9 @@ export default function SchoolInformation() {
           </button>
         </div>
       </section>
+
+      <SchoolSubscriptionSection schoolId={schoolId} />
     </div>
   );
 }
+

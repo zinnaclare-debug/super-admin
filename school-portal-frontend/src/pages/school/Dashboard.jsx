@@ -7,6 +7,7 @@ import cbtArt from "../../assets/dashboard/staff.svg";
 import resultsArt from "../../assets/dashboard/hero.svg";
 import classArt from "../../assets/dashboard/modules.svg";
 import brandingArt from "../../assets/dashboard/branding.svg";
+import SchoolSubscriptionStatus from "./SchoolSubscriptionStatus";
 
 const formatCount = (value) => {
   const n = Number(value || 0);
@@ -206,6 +207,7 @@ function SchoolDashboard() {
           <div className="sd-tags">
             <span className="sd-tag">{informationReady ? "Contact Ready" : "Contact Incomplete"}</span>
             <span className="sd-tag sd-tag--soft">{formatCount(stats.enabled_modules)} Enabled Modules</span>
+            <SchoolSubscriptionStatus />
           </div>
         </div>
 
@@ -340,3 +342,4 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
+

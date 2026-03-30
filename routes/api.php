@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\SuperAdmin\DashboardController;
 use App\Http\Controllers\Api\SuperAdmin\UserController;
 use App\Http\Controllers\Api\SuperAdmin\LoginDetailsController as SuperAdminLoginDetailsController;
 use App\Http\Controllers\Api\SuperAdmin\PaymentsController as SuperAdminPaymentsController;
+use App\Http\Controllers\Api\SuperAdmin\SchoolSubscriptionController as SuperAdminSchoolSubscriptionController;
 
 use App\Http\Controllers\Api\SchoolAdmin\RegistrationController;
 use App\Http\Controllers\Api\SchoolAdmin\UserManagementController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\SchoolAdmin\LoginDetailsController;
 use App\Http\Controllers\Api\SchoolAdmin\AcademicSessionController;
 use App\Http\Controllers\Api\SchoolAdmin\AcademicStructureController;
 use App\Http\Controllers\Api\SchoolAdmin\DashboardController as SchoolAdminDashboardController;
+use App\Http\Controllers\Api\SchoolAdmin\SchoolSubscriptionController as SchoolAdminSubscriptionController;
 use App\Http\Controllers\Api\School\FeatureAccessController;
 use App\Http\Controllers\Api\SchoolAdmin\ClassManagementController;
 use App\Http\Controllers\Api\SchoolAdmin\EnrollmentController;
@@ -95,6 +97,9 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
     Route::put('/super-admin/schools/{school}/information/grading-schema', [SchoolController::class, 'updateInformationGradingSchema']);
     Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
+    Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
+    Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
+    Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
 
     Route::post('/super-admin/schools/create-with-admin', [SchoolController::class, 'createWithAdmin']);
     Route::post('/super-admin/schools/{school}/assign-admin', [SchoolController::class, 'assignAdmin']);
@@ -135,6 +140,10 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/payments/download/pdf', [SchoolAdminPaymentsController::class, 'downloadPdf'])
         ->middleware('feature:school fees');
+    Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
+    Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
+    Route::post('/school-admin/subscription/bank-transfer', [SchoolAdminSubscriptionController::class, 'submitBankTransfer']);
+    Route::get('/school-admin/subscription/verify', [SchoolAdminSubscriptionController::class, 'verify']);
     Route::get('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'studentPlan'])
         ->middleware('feature:users');
     Route::put('/school-admin/payments/students/{user}/plan', [SchoolAdminPaymentsController::class, 'upsertStudentPlan'])
@@ -461,6 +470,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 
