@@ -249,32 +249,34 @@ export default function SchoolSubscriptionSection({ schoolId }) {
               </select>
             </div>
 
-            <div className="sai-field sai-check-stack">
+            <div className="sai-field sai-field--wide">
               <label>Payment Modes</label>
-              <label className="sai-check">
-                <input
-                  type="checkbox"
-                  checked={form.is_free_version}
-                  onChange={(e) => setForm((prev) => ({ ...prev, is_free_version: e.target.checked }))}
-                />
-                <span>Free Version</span>
-              </label>
-              <label className="sai-check">
-                <input
-                  type="checkbox"
-                  checked={form.allow_termly}
-                  onChange={(e) => setForm((prev) => ({ ...prev, allow_termly: e.target.checked }))}
-                />
-                <span>Allow Termly Payment</span>
-              </label>
-              <label className="sai-check">
-                <input
-                  type="checkbox"
-                  checked={form.allow_yearly}
-                  onChange={(e) => setForm((prev) => ({ ...prev, allow_yearly: e.target.checked }))}
-                />
-                <span>Allow Yearly Payment</span>
-              </label>
+              <div className="sai-payment-modes">
+                <label className="sai-check sai-check-card">
+                  <input
+                    type="checkbox"
+                    checked={form.is_free_version}
+                    onChange={(e) => setForm((prev) => ({ ...prev, is_free_version: e.target.checked }))}
+                  />
+                  <span>Free Version</span>
+                </label>
+                <label className="sai-check sai-check-card">
+                  <input
+                    type="checkbox"
+                    checked={form.allow_termly}
+                    onChange={(e) => setForm((prev) => ({ ...prev, allow_termly: e.target.checked }))}
+                  />
+                  <span>Allow Termly Payment</span>
+                </label>
+                <label className="sai-check sai-check-card">
+                  <input
+                    type="checkbox"
+                    checked={form.allow_yearly}
+                    onChange={(e) => setForm((prev) => ({ ...prev, allow_yearly: e.target.checked }))}
+                  />
+                  <span>Allow Yearly Payment</span>
+                </label>
+              </div>
             </div>
 
             <div className="sai-field">

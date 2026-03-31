@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import FeatureModal from "../../components/FeatureModal";
 import { clearAuthState, getStoredToken, getStoredUser } from "../../utils/authStorage";
+import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
 
 function SuperAdminSchools() {
   const [schools, setSchools] = useState([]);
@@ -82,6 +83,9 @@ function SuperAdminSchools() {
       return;
     }
 
+    const deleteCode = requestSuperAdminDeleteCode(`${admin.name}'s account`, "reset password");
+    if (!deleteCode) return;
+
     const password = window.prompt(`Enter new password for ${admin.name}:`);
     if (!password) return;
     if (password.length < 6) {
@@ -97,10 +101,13 @@ function SuperAdminSchools() {
 
     setResettingAdminId(admin.id);
     try {
-      await api.post(`/api/super-admin/users/${admin.id}/reset-password`, { password });
+      await api.post(`/api/super-admin/users/${admin.id}/reset-password`, { password, delete_code: deleteCode });
       alert("School admin password reset successfully.");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to reset school admin password.");
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err.response?.data?.message || "Failed to reset school admin password.");
     } finally {
       setResettingAdminId(null);
     }

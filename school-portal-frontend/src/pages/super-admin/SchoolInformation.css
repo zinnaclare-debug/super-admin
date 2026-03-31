@@ -393,6 +393,21 @@
   gap: 8px;
 }
 
+.sai-payment-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.sai-check-card {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  justify-content: flex-start;
+}
+
 .sai-field--wide {
   grid-column: 1 / -1;
 }

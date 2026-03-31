@@ -163,6 +163,9 @@ function Schools() {
       return;
     }
 
+    const deleteCode = requestSuperAdminDeleteCode(`${admin.name}'s account`, "reset password");
+    if (!deleteCode) return;
+
     const password = window.prompt(`Enter new password for ${admin.name}:`);
     if (!password) return;
     if (password.length < 6) {
@@ -178,10 +181,13 @@ function Schools() {
 
     setResettingAdminId(admin.id);
     try {
-      await api.post(`/api/super-admin/users/${admin.id}/reset-password`, { password });
+      await api.post(`/api/super-admin/users/${admin.id}/reset-password`, { password, delete_code: deleteCode });
       alert("School admin password reset successfully.");
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to reset school admin password.");
+      const firstValidationError = Object.values(e?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || e?.response?.data?.message || "Failed to reset school admin password.");
     } finally {
       setResettingAdminId(null);
     }

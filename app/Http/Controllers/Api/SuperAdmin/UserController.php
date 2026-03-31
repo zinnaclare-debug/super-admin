@@ -90,6 +90,8 @@ class UserController extends Controller
             ], 422);
         }
 
+        $this->validateDeleteCode($request);
+
         $payload = $request->validate([
             'password' => 'required|string|min:6',
         ]);
@@ -213,6 +215,23 @@ class UserController extends Controller
                 'students' => $students,
             ],
         ]);
+    }
+
+    private function validateDeleteCode(Request $request): void
+    {
+        $payload = $request->validate([
+            'delete_code' => 'required|digits:4',
+        ]);
+
+        $expectedCode = (string) config('app.super_admin_delete_confirmation_code', '4722');
+        if ((string) ($payload['delete_code'] ?? '') !== $expectedCode) {
+            abort(response()->json([
+                'message' => 'Invalid super admin delete confirmation code.',
+                'errors' => [
+                    'delete_code' => ['The delete confirmation code is incorrect.'],
+                ],
+            ], 422));
+        }
     }
 
     private function normalizeLevelValue(string $value): string
