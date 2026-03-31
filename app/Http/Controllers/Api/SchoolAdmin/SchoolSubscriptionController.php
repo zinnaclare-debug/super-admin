@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Models\SchoolSubscriptionInvoice;
 use App\Support\SchoolSubscriptionBilling;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -112,9 +113,12 @@ class SchoolSubscriptionController extends Controller
         ];
 
         try {
-            $response = Http::withToken($secret)
-                ->timeout(20)
-                ->post(rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/initialize', $initializePayload);
+            $response = $this->sendPaystackRequest(
+                $secret,
+                'post',
+                rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/initialize',
+                $initializePayload
+            );
         } catch (Throwable $e) {
             $invoice->status = 'failed';
             $invoice->paystack_gateway_response = 'initialize_exception';
@@ -278,9 +282,28 @@ class SchoolSubscriptionController extends Controller
             return response()->json(['message' => 'Paystack is not configured on the server.'], 500);
         }
 
-        $response = Http::withToken($secret)
-            ->timeout(20)
-            ->get(rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/verify/' . urlencode($invoice->reference));
+        try {
+            $response = $this->sendPaystackRequest(
+                $secret,
+                'get',
+                rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/verify/' . urlencode($invoice->reference)
+            );
+        } catch (Throwable $e) {
+            $invoice->status = 'failed';
+            $invoice->paystack_gateway_response = 'verification_exception';
+            $invoice->save();
+
+            Log::error('School subscription Paystack verification failed.', [
+                'school_id' => (int) $school->id,
+                'invoice_id' => (int) $invoice->id,
+                'reference' => $invoice->reference,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to verify payment.',
+            ], 502);
+        }
 
         $json = $response->json();
         if (!$response->successful() || !($json['status'] ?? false)) {
@@ -370,5 +393,44 @@ class SchoolSubscriptionController extends Controller
         }
 
         return rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/') . '/school/dashboard';
+    }
+
+    private function sendPaystackRequest(string $secret, string $method, string $url, array $payload = []): Response
+    {
+        $attempts = 3;
+        $sleepMs = 1500;
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                $request = Http::withToken($secret)
+                    ->connectTimeout(15)
+                    ->timeout(45)
+                    ->withOptions([
+                        'curl' => [
+                            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                        ],
+                    ]);
+
+                return $method === 'get'
+                    ? $request->get($url)
+                    : $request->post($url, $payload);
+            } catch (Throwable $e) {
+                $lastException = $e;
+
+                Log::warning('Paystack request attempt failed.', [
+                    'url' => $url,
+                    'method' => $method,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $attempts) {
+                    usleep($sleepMs * 1000);
+                }
+            }
+        }
+
+        throw $lastException ?? new \RuntimeException('Paystack request failed.');
     }
 }
