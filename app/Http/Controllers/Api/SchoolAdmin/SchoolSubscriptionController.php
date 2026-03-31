@@ -9,6 +9,8 @@ use App\Support\SchoolSubscriptionBilling;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SchoolSubscriptionController extends Controller
 {
@@ -68,14 +70,7 @@ class SchoolSubscriptionController extends Controller
         }
 
         $reference = SchoolSubscriptionBilling::createReference(SchoolSubscriptionBilling::CHANNEL_PAYSTACK, (int) $school->id);
-        $callbackUrl = (string) config('services.paystack.school_subscription_callback_url');
-        if ($callbackUrl === '') {
-            $origin = trim((string) $request->headers->get('origin', ''));
-            $callbackBase = $origin !== ''
-                ? rtrim($origin, '/')
-                : rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
-            $callbackUrl = $callbackBase . '/school/dashboard';
-        }
+        $callbackUrl = $this->resolveCallbackUrl($request);
 
         $invoice = SchoolSubscriptionInvoice::query()->create([
             'school_id' => (int) $school->id,
@@ -116,9 +111,27 @@ class SchoolSubscriptionController extends Controller
             ],
         ];
 
-        $response = Http::withToken($secret)
-            ->timeout(20)
-            ->post(rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/initialize', $initializePayload);
+        try {
+            $response = Http::withToken($secret)
+                ->timeout(20)
+                ->post(rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/') . '/transaction/initialize', $initializePayload);
+        } catch (Throwable $e) {
+            $invoice->status = 'failed';
+            $invoice->paystack_gateway_response = 'initialize_exception';
+            $invoice->save();
+
+            Log::error('School subscription Paystack initialize failed.', [
+                'school_id' => (int) $school->id,
+                'invoice_id' => (int) $invoice->id,
+                'reference' => $reference,
+                'callback_url' => $callbackUrl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to initialize payment with Paystack.',
+            ], 502);
+        }
 
         $json = $response->json();
         if (!$response->successful() || !($json['status'] ?? false)) {
@@ -331,5 +344,31 @@ class SchoolSubscriptionController extends Controller
             ],
         ]);
     }
-}
 
+    private function resolveCallbackUrl(Request $request): string
+    {
+        $origin = trim((string) $request->headers->get('origin', ''));
+        if ($origin !== '') {
+            return rtrim($origin, '/') . '/school/dashboard';
+        }
+
+        $referer = trim((string) $request->headers->get('referer', ''));
+        if ($referer !== '') {
+            $parts = parse_url($referer);
+            $scheme = (string) ($parts['scheme'] ?? '');
+            $host = (string) ($parts['host'] ?? '');
+            $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+
+            if ($scheme !== '' && $host !== '') {
+                return $scheme . '://' . $host . $port . '/school/dashboard';
+            }
+        }
+
+        $host = trim((string) $request->getSchemeAndHttpHost());
+        if ($host !== '') {
+            return rtrim($host, '/') . '/school/dashboard';
+        }
+
+        return rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/') . '/school/dashboard';
+    }
+}
