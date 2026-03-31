@@ -25,16 +25,11 @@ function badgeClass(audience) {
 }
 
 function AnnouncementMedia({ item }) {
-  if (!item?.media_url || !item?.media_type) return null;
+  if (!item?.media_url || item?.media_type !== "image") return null;
 
   return (
     <div className="announce-media-wrap">
-      {item.media_type === "image" ? (
-        <img className="announce-media" src={item.media_url} alt={item.title || "Announcement attachment"} />
-      ) : null}
-      {item.media_type === "video" ? (
-        <video className="announce-media" src={item.media_url} controls preload="metadata" />
-      ) : null}
+      <img className="announce-media" src={item.media_url} alt={item.title || "Announcement attachment"} />
     </div>
   );
 }

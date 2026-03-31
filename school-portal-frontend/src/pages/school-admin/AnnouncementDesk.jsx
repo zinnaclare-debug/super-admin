@@ -32,17 +32,6 @@ function renderAnnouncementMedia(item) {
     );
   }
 
-  if (item.media_type === "video") {
-    return (
-      <div style={{ margin: "10px 0 12px" }}>
-        <video
-          src={item.media_url}
-          controls
-          style={{ width: "100%", maxHeight: 360, borderRadius: 12, border: "1px solid #dbeafe", background: "#0f172a" }}
-        />
-      </div>
-    );
-  }
 
   return null;
 }
@@ -189,7 +178,7 @@ export default function AnnouncementDesk() {
       <section style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #d6e3ff" }}>
         <h3 style={{ marginTop: 0 }}>Announcement Desk</h3>
         <p style={{ marginTop: 0, color: "#475569" }}>
-          Post school-wide notices or target specific education levels. You can also attach an image or video.
+          Post school-wide notices or target specific education levels. You can also attach a photo.
         </p>
 
         <form onSubmit={onSubmit} style={{ display: "grid", gap: 8 }}>
@@ -222,15 +211,15 @@ export default function AnnouncementDesk() {
               gap: 8,
             }}
           >
-            <label style={{ fontWeight: 700, color: "#0f172a" }}>Upload Picture or Video</label>
+            <label style={{ fontWeight: 700, color: "#0f172a" }}>Upload Picture</label>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,video/*"
+              accept="image/*"
               onChange={onFileChange}
             />
             <small style={{ color: "#475569" }}>
-              Accepted: image or video. Large videos may still be blocked by server upload limits.
+              Accepted: JPG, JPEG, PNG, or WEBP only. Max size: 5MB.
             </small>
             {form.media ? (
               <div
@@ -329,3 +318,5 @@ export default function AnnouncementDesk() {
     </div>
   );
 }
+
+

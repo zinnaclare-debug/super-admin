@@ -59,7 +59,7 @@ class AnnouncementController extends Controller
             'message' => ['required', 'string', 'max:5000'],
             'level' => ['nullable', 'string', 'max:60'],
             'expires_at' => ['nullable', 'date'],
-            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov', 'max:51200'],
+            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $allowedLevels = $this->resolveAllowedLevels($schoolId);
@@ -112,7 +112,7 @@ class AnnouncementController extends Controller
             'is_active' => ['sometimes', 'boolean'],
             'expires_at' => ['sometimes', 'nullable', 'date'],
             'remove_media' => ['sometimes', 'boolean'],
-            'media' => ['sometimes', 'nullable', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov', 'max:51200'],
+            'media' => ['sometimes', 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $allowedLevels = $this->resolveAllowedLevels($schoolId);
@@ -210,9 +210,6 @@ class AnnouncementController extends Controller
             return 'image';
         }
 
-        if (str_starts_with($mimeType, 'video/')) {
-            return 'video';
-        }
 
         return null;
     }
@@ -272,3 +269,5 @@ class AnnouncementController extends Controller
             ->all();
     }
 }
+
+
