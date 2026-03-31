@@ -100,6 +100,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
+    Route::delete('/super-admin/schools/{school}/subscription/invoices/{invoice}', [SuperAdminSchoolSubscriptionController::class, 'destroyInvoice']);
 
     Route::post('/super-admin/schools/create-with-admin', [SchoolController::class, 'createWithAdmin']);
     Route::post('/super-admin/schools/{school}/assign-admin', [SchoolController::class, 'assignAdmin']);
@@ -470,6 +471,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 

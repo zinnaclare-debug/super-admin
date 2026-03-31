@@ -142,6 +142,25 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     }
   };
 
+  const deleteInvoice = async (invoiceId) => {
+    if (!window.confirm("Delete this subscription invoice permanently?")) {
+      return;
+    }
+
+    setActingInvoiceId(invoiceId);
+    try {
+      const res = await api.delete(`/api/super-admin/schools/${schoolId}/subscription/invoices/${invoiceId}`);
+      const nextSummary = res.data?.data?.summary || emptySummary;
+      setSummary(nextSummary);
+      setForm(buildForm(nextSummary));
+      alert(res.data?.message || "Invoice deleted successfully.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to delete invoice.");
+    } finally {
+      setActingInvoiceId(null);
+    }
+  };
+
   return (
     <section className="sai-card sai-subscription-card">
       <div className="sai-subscription-head">
@@ -173,7 +192,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             </div>
             <div className="sai-subscription-tile">
               <span>Status Reason</span>
-              <strong>{summary.status_reason || "No extra details yet."}</strong>
+              <strong>{summary.status_reason || ""}</strong>
             </div>
           </div>
 
@@ -366,6 +385,14 @@ export default function SchoolSubscriptionSection({ schoolId }) {
                           >
                             Move To Pending
                           </button>
+                          <button
+                            type="button"
+                            className="sai-action-secondary"
+                            onClick={() => deleteInvoice(invoice.id)}
+                            disabled={actingInvoiceId === invoice.id}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -379,3 +406,5 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     </section>
   );
 }
+
+

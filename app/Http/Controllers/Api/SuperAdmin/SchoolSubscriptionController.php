@@ -42,7 +42,7 @@ class SchoolSubscriptionController extends Controller
             return response()->json(['message' => 'Enter a per-student term amount before enabling paid subscription billing.'], 422);
         }
 
-        $settings = SchoolSubscriptionSetting::query()->updateOrCreate(
+        SchoolSubscriptionSetting::query()->updateOrCreate(
             ['school_id' => (int) $school->id],
             [
                 'amount_per_student_per_term' => array_key_exists('amount_per_student_per_term', $payload)
@@ -111,6 +111,24 @@ class SchoolSubscriptionController extends Controller
                 : 'Invoice moved back to pending review successfully.',
             'data' => [
                 'invoice' => SchoolSubscriptionBilling::invoicePayload($invoice),
+                'summary' => SchoolSubscriptionBilling::buildSummary($school),
+            ],
+        ]);
+    }
+
+    public function destroyInvoice(Request $request, School $school, SchoolSubscriptionInvoice $invoice)
+    {
+        if ((int) $invoice->school_id !== (int) $school->id) {
+            return response()->json(['message' => 'Invoice not found for this school.'], 404);
+        }
+
+        $reference = $invoice->reference;
+        $invoice->delete();
+
+        return response()->json([
+            'message' => 'Invoice deleted successfully.',
+            'data' => [
+                'deleted_reference' => $reference,
                 'summary' => SchoolSubscriptionBilling::buildSummary($school),
             ],
         ]);

@@ -366,7 +366,7 @@ class SchoolSubscriptionBilling
             self::STATUS_PENDING => $pendingInvoice && $pendingInvoice->status === 'pending_manual_review'
                 ? 'A bank transfer submission is waiting for Super Admin approval.'
                 : 'Payment is required before subscription access becomes active.',
-            default => 'This school is currently running on a free version.',
+            default => '',
         };
     }
 
@@ -391,3 +391,4 @@ class SchoolSubscriptionBilling
         return round((float) ($value ?? 0), 2);
     }
 }
+
