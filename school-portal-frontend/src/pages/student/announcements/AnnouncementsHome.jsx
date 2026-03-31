@@ -24,6 +24,21 @@ function badgeClass(audience) {
   return "announce-badge announce-badge--all";
 }
 
+function AnnouncementMedia({ item }) {
+  if (!item?.media_url || !item?.media_type) return null;
+
+  return (
+    <div className="announce-media-wrap">
+      {item.media_type === "image" ? (
+        <img className="announce-media" src={item.media_url} alt={item.title || "Announcement attachment"} />
+      ) : null}
+      {item.media_type === "video" ? (
+        <video className="announce-media" src={item.media_url} controls preload="metadata" />
+      ) : null}
+    </div>
+  );
+}
+
 export default function AnnouncementsHome() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +111,7 @@ export default function AnnouncementsHome() {
                 <span className={badgeClass(item.audience)}>{item.audience || "All"}</span>
               </div>
               <p className="announce-message">{item.message}</p>
+              <AnnouncementMedia item={item} />
               <div className="announce-meta">
                 <small>Posted: {formatDate(item.published_at)}</small>
                 <small>By: {item.author?.name || "School admin"}</small>

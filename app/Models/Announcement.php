@@ -12,6 +12,8 @@ class Announcement extends Model
         'created_by_user_id',
         'title',
         'message',
+        'media_path',
+        'media_type',
         'level',
         'is_active',
         'published_at',
@@ -34,4 +36,3 @@ class Announcement extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }
-

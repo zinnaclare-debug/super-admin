@@ -148,8 +148,10 @@ class SchoolController extends Controller
         });
     }
 
-    public function toggle(School $school)
+    public function toggle(Request $request, School $school)
     {
+        $this->validateDeleteCode($request);
+
         $school->status = $school->status === 'active'
             ? 'suspended'
             : 'active';
@@ -162,8 +164,10 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function toggleResultsPublish(School $school)
+    public function toggleResultsPublish(Request $request, School $school)
     {
+        $this->validateDeleteCode($request);
+
         $school->results_published = !$school->results_published;
         $school->save();
 

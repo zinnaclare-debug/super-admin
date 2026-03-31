@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AnnouncementController extends Controller
 {
@@ -39,6 +40,8 @@ class AnnouncementController extends Controller
             'id' => $item->id,
             'title' => $item->title,
             'message' => $item->message,
+            'media_type' => $item->media_type,
+            'media_url' => $this->mediaUrl($item->media_path),
             'level' => $item->level,
             'audience' => $item->level ? ucfirst($item->level) . ' only' : 'School-wide',
             'published_at' => optional($item->published_at)->toIso8601String(),
@@ -50,5 +53,17 @@ class AnnouncementController extends Controller
 
         return response()->json(['data' => $data]);
     }
-}
 
+    private function mediaUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+
+        return str_starts_with($relativeOrAbsolute, 'http://') || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
+    }
+}

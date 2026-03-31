@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
 
 const prettyLevel = (value) =>
@@ -15,6 +15,38 @@ function formatDate(value) {
   }
 }
 
+function renderAnnouncementMedia(item) {
+  if (!item?.media_url || !item?.media_type) {
+    return null;
+  }
+
+  if (item.media_type === "image") {
+    return (
+      <div style={{ margin: "10px 0 12px" }}>
+        <img
+          src={item.media_url}
+          alt={item.title || "Announcement attachment"}
+          style={{ width: "100%", maxHeight: 320, objectFit: "cover", borderRadius: 12, border: "1px solid #dbeafe" }}
+        />
+      </div>
+    );
+  }
+
+  if (item.media_type === "video") {
+    return (
+      <div style={{ margin: "10px 0 12px" }}>
+        <video
+          src={item.media_url}
+          controls
+          style={{ width: "100%", maxHeight: 360, borderRadius: 12, border: "1px solid #dbeafe", background: "#0f172a" }}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function AnnouncementDesk() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +60,9 @@ export default function AnnouncementDesk() {
     title: "",
     message: "",
     level: "",
+    media: null,
   });
+  const fileInputRef = useRef(null);
 
   const hasItems = useMemo(() => items.length > 0, [items]);
 
@@ -85,17 +119,39 @@ export default function AnnouncementDesk() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const onFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setForm((prev) => ({ ...prev, media: file }));
+  };
+
+  const clearForm = () => {
+    setForm({ title: "", message: "", level: "", media: null });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      await api.post("/api/school-admin/announcements", {
-        title: form.title,
-        message: form.message,
-        level: form.level || null,
+      const payload = new FormData();
+      payload.append("title", form.title);
+      payload.append("message", form.message);
+      if (form.level) {
+        payload.append("level", form.level);
+      }
+      if (form.media) {
+        payload.append("media", form.media);
+      }
+
+      await api.post("/api/school-admin/announcements", payload, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
-      setForm({ title: "", message: "", level: "" });
+      clearForm();
       await load(statusFilter);
     } catch (err) {
       const fieldError = err?.response?.data?.errors
@@ -133,7 +189,7 @@ export default function AnnouncementDesk() {
       <section style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #d6e3ff" }}>
         <h3 style={{ marginTop: 0 }}>Announcement Desk</h3>
         <p style={{ marginTop: 0, color: "#475569" }}>
-          Post school-wide notices or target specific education levels.
+          Post school-wide notices or target specific education levels. You can also attach an image or video.
         </p>
 
         <form onSubmit={onSubmit} style={{ display: "grid", gap: 8 }}>
@@ -156,6 +212,52 @@ export default function AnnouncementDesk() {
             maxLength={5000}
             style={{ padding: 10, resize: "vertical" }}
           />
+          <div
+            style={{
+              border: "1px dashed #cbd5e1",
+              borderRadius: 10,
+              padding: 12,
+              background: "#f8fafc",
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <label style={{ fontWeight: 700, color: "#0f172a" }}>Upload Picture or Video</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={onFileChange}
+            />
+            <small style={{ color: "#475569" }}>
+              Accepted: image or video. Max size: 50MB.
+            </small>
+            {form.media ? (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "fit-content",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  background: "#e0f2fe",
+                  color: "#0c4a6e",
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <span>{form.media.name}</span>
+                <button
+                  type="button"
+                  onClick={clearForm}
+                  style={{ border: 0, background: "transparent", color: "#0c4a6e", cursor: "pointer" }}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <select name="level" value={form.level} onChange={onChange} style={{ padding: 10 }}>
               {levelOptions.map((opt) => (
@@ -205,6 +307,7 @@ export default function AnnouncementDesk() {
                   </span>
                 </div>
                 <p style={{ marginBottom: 8, whiteSpace: "pre-wrap" }}>{item.message}</p>
+                {renderAnnouncementMedia(item)}
                 <div style={{ color: "#475569", fontSize: 13 }}>
                   <div>Audience: {item.audience}</div>
                   <div>Posted: {formatDate(item.published_at || item.created_at)}</div>

@@ -175,7 +175,7 @@ function SuperAdminSchools() {
 
                 <button
                   style={{ marginLeft: 10 }}
-                  onClick={() => toggleSchool(school.id)}
+                  onClick={() => toggleSchool(school)}
                 >
                   {school.status === "active" ? "Disable" : "Enable"}
                 </button>

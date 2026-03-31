@@ -1,5 +1,5 @@
 export function requestSuperAdminDeleteCode(subject = "this item", action = "delete") {
-  if (!window.confirm(`Are you sure you want to ${action} ${subject}? This action is permanent.`)) {
+  if (!window.confirm(`Are you sure you want to ${action} ${subject}? This action requires confirmation.`)) {
     return null;
   }
 

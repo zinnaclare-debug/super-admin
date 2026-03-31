@@ -8,6 +8,7 @@ use App\Models\School;
 use App\Models\SchoolClass;
 use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class AnnouncementController extends Controller
@@ -58,6 +59,7 @@ class AnnouncementController extends Controller
             'message' => ['required', 'string', 'max:5000'],
             'level' => ['nullable', 'string', 'max:60'],
             'expires_at' => ['nullable', 'date'],
+            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov', 'max:51200'],
         ]);
 
         $allowedLevels = $this->resolveAllowedLevels($schoolId);
@@ -66,11 +68,20 @@ class AnnouncementController extends Controller
             return response()->json(['message' => 'Invalid level selected.'], 422);
         }
 
+        $mediaPath = null;
+        $mediaType = null;
+        if ($request->hasFile('media')) {
+            $mediaPath = $request->file('media')->store("schools/{$schoolId}/announcements", 'public');
+            $mediaType = $this->mediaTypeFromFile($request->file('media'));
+        }
+
         $announcement = Announcement::create([
             'school_id' => $schoolId,
             'created_by_user_id' => $user->id,
             'title' => trim($payload['title']),
             'message' => trim($payload['message']),
+            'media_path' => $mediaPath,
+            'media_type' => $mediaType,
             'level' => $level,
             'is_active' => true,
             'published_at' => now(),
@@ -100,6 +111,8 @@ class AnnouncementController extends Controller
             'level' => ['sometimes', 'nullable', 'string', 'max:60'],
             'is_active' => ['sometimes', 'boolean'],
             'expires_at' => ['sometimes', 'nullable', 'date'],
+            'remove_media' => ['sometimes', 'boolean'],
+            'media' => ['sometimes', 'nullable', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov', 'max:51200'],
         ]);
 
         $allowedLevels = $this->resolveAllowedLevels($schoolId);
@@ -128,6 +141,18 @@ class AnnouncementController extends Controller
             $announcement->expires_at = $payload['expires_at'];
         }
 
+        if ((bool) ($payload['remove_media'] ?? false)) {
+            $this->deleteMedia($announcement->media_path);
+            $announcement->media_path = null;
+            $announcement->media_type = null;
+        }
+
+        if ($request->hasFile('media')) {
+            $this->deleteMedia($announcement->media_path);
+            $announcement->media_path = $request->file('media')->store("schools/{$schoolId}/announcements", 'public');
+            $announcement->media_type = $this->mediaTypeFromFile($request->file('media'));
+        }
+
         $announcement->save();
         $announcement->load('author:id,name');
 
@@ -146,6 +171,7 @@ class AnnouncementController extends Controller
             abort(404);
         }
 
+        $this->deleteMedia($announcement->media_path);
         $announcement->delete();
 
         return response()->json(['message' => 'Announcement deleted.']);
@@ -161,6 +187,8 @@ class AnnouncementController extends Controller
             'id' => $item->id,
             'title' => $item->title,
             'message' => $item->message,
+            'media_type' => $item->media_type,
+            'media_url' => $this->mediaUrl($item->media_path),
             'level' => $item->level,
             'audience' => $audience,
             'is_active' => (bool) $item->is_active,
@@ -173,6 +201,40 @@ class AnnouncementController extends Controller
             'created_at' => optional($item->created_at)->toIso8601String(),
             'updated_at' => optional($item->updated_at)->toIso8601String(),
         ];
+    }
+
+    private function mediaTypeFromFile($file): ?string
+    {
+        $mimeType = strtolower((string) $file->getMimeType());
+        if (str_starts_with($mimeType, 'image/')) {
+            return 'image';
+        }
+
+        if (str_starts_with($mimeType, 'video/')) {
+            return 'video';
+        }
+
+        return null;
+    }
+
+    private function mediaUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $relativeOrAbsolute = Storage::disk('public')->url($path);
+
+        return str_starts_with($relativeOrAbsolute, 'http://') || str_starts_with($relativeOrAbsolute, 'https://')
+            ? $relativeOrAbsolute
+            : url($relativeOrAbsolute);
+    }
+
+    private function deleteMedia(?string $path): void
+    {
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function normalizeLevel(mixed $value): ?string

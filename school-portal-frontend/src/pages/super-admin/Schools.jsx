@@ -109,13 +109,25 @@ function Schools() {
     }
   };
 
-  const toggleSchool = async (id) => {
-    await api.patch(`/api/super-admin/schools/${id}/toggle`);
+  const toggleSchool = async (school) => {
+    const action = school.status === "active" ? "suspend" : "activate";
+    const deleteCode = requestSuperAdminDeleteCode(school.name || "this school", action);
+    if (!deleteCode) return;
+
+    await api.patch(`/api/super-admin/schools/${school.id}/toggle`, {
+      delete_code: deleteCode,
+    });
     loadSchools();
   };
 
-  const toggleResultsPublish = async (id) => {
-    await api.patch(`/api/super-admin/schools/${id}/toggle-results`);
+  const toggleResultsPublish = async (school) => {
+    const action = school.results_published ? "unpublish results for" : "publish results for";
+    const deleteCode = requestSuperAdminDeleteCode(school.name || "this school", action);
+    if (!deleteCode) return;
+
+    await api.patch(`/api/super-admin/schools/${school.id}/toggle-results`, {
+      delete_code: deleteCode,
+    });
     loadSchools();
   };
 
@@ -227,7 +239,7 @@ function Schools() {
     try {
       switch (action) {
         case "toggle":
-          await toggleSchool(school.id);
+          await toggleSchool(school);
           break;
         case "edit":
           startEdit(school);
@@ -242,7 +254,7 @@ function Schools() {
           await resetAdminPassword(school);
           break;
         case "toggle_results":
-          await toggleResultsPublish(school.id);
+          await toggleResultsPublish(school);
           break;
         default:
           break;

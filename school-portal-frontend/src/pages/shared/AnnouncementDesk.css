@@ -221,6 +221,22 @@
   font-size: 13px;
 }
 
+.announce-media-wrap {
+  margin: 10px 0 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  background: #e2e8f0;
+}
+
+.announce-media {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  background: #0f172a;
+}
+
 @media (max-width: 900px) {
   .announce-hero {
     grid-template-columns: 1fr;
