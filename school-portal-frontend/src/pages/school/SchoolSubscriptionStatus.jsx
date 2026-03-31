@@ -196,7 +196,7 @@ export default function SchoolSubscriptionStatus() {
 
             {summary.status === "free" ? (
               <div className="sd-subscription-free">
-                <p>This school is currently on the free version. When Super Admin turns on paid billing, the payment options below will become the active billing path.</p>
+                <p>This school is currently on the free version.</p>
               </div>
             ) : null}
 
@@ -284,3 +284,4 @@ export default function SchoolSubscriptionStatus() {
     </>
   );
 }
+
