@@ -26,7 +26,7 @@ function renderAnnouncementMedia(item) {
         <img
           src={item.media_url}
           alt={item.title || "Announcement attachment"}
-          style={{ width: "100%", maxHeight: 320, objectFit: "cover", borderRadius: 12, border: "1px solid #dbeafe" }}
+          style={{ width: "100%", maxHeight: 280, objectFit: "contain", borderRadius: 12, border: "1px solid #dbeafe", background: "#f8fafc" }}
         />
       </div>
     );
@@ -230,7 +230,7 @@ export default function AnnouncementDesk() {
               onChange={onFileChange}
             />
             <small style={{ color: "#475569" }}>
-              Accepted: image or video. Max size: 50MB.
+              Accepted: image or video. Large videos may still be blocked by server upload limits.
             </small>
             {form.media ? (
               <div
