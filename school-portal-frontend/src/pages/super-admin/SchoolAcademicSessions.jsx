@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
+import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
 
 const formatSessionStatus = (status) => {
   const value = String(status || "").toLowerCase();
@@ -33,7 +34,6 @@ export default function SchoolAcademicSessions() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schoolId]);
 
   const updateStatus = async (sessionId, status) => {
@@ -52,16 +52,22 @@ export default function SchoolAcademicSessions() {
   };
 
   const deleteSession = async (sessionId) => {
-    if (!window.confirm("Delete this academic session? This will remove classes/terms tied to it.")) {
+    const deleteCode = requestSuperAdminDeleteCode("this academic session", "delete");
+    if (!deleteCode) {
       return;
     }
 
     setUpdatingId(sessionId);
     try {
-      await api.delete(`/api/super-admin/schools/${schoolId}/academic-sessions/${sessionId}`);
+      await api.delete(`/api/super-admin/schools/${schoolId}/academic-sessions/${sessionId}`, {
+        data: { delete_code: deleteCode },
+      });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete session.");
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err.response?.data?.message || "Failed to delete session.");
     } finally {
       setUpdatingId(null);
     }

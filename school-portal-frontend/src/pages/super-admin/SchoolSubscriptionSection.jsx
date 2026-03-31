@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
+import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
 
 const emptySummary = {
   status: "free",
@@ -143,19 +144,25 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   };
 
   const deleteInvoice = async (invoiceId) => {
-    if (!window.confirm("Delete this subscription invoice permanently?")) {
+    const deleteCode = requestSuperAdminDeleteCode("this subscription invoice", "delete");
+    if (!deleteCode) {
       return;
     }
 
     setActingInvoiceId(invoiceId);
     try {
-      const res = await api.delete(`/api/super-admin/schools/${schoolId}/subscription/invoices/${invoiceId}`);
+      const res = await api.delete(`/api/super-admin/schools/${schoolId}/subscription/invoices/${invoiceId}`, {
+        data: { delete_code: deleteCode },
+      });
       const nextSummary = res.data?.data?.summary || emptySummary;
       setSummary(nextSummary);
       setForm(buildForm(nextSummary));
       alert(res.data?.message || "Invoice deleted successfully.");
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to delete invoice.");
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to delete invoice.");
     } finally {
       setActingInvoiceId(null);
     }
@@ -406,5 +413,3 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     </section>
   );
 }
-
-

@@ -8,6 +8,7 @@ use App\Models\SchoolSubscriptionInvoice;
 use App\Models\SchoolSubscriptionSetting;
 use App\Support\SchoolSubscriptionBilling;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class SchoolSubscriptionController extends Controller
 {
@@ -122,6 +123,8 @@ class SchoolSubscriptionController extends Controller
             return response()->json(['message' => 'Invoice not found for this school.'], 404);
         }
 
+        $this->validateDeleteCode($request);
+
         $reference = $invoice->reference;
         $invoice->delete();
 
@@ -132,5 +135,20 @@ class SchoolSubscriptionController extends Controller
                 'summary' => SchoolSubscriptionBilling::buildSummary($school),
             ],
         ]);
+    }
+
+    private function validateDeleteCode(Request $request): void
+    {
+        $validated = $request->validate([
+            'delete_code' => ['required', 'digits:4'],
+        ]);
+
+        $expectedDeleteCode = (string) config('app.super_admin_delete_confirmation_code', '4722');
+
+        if (!hash_equals($expectedDeleteCode, (string) $validated['delete_code'])) {
+            throw ValidationException::withMessages([
+                'delete_code' => ['Invalid delete confirmation code.'],
+            ]);
+        }
     }
 }

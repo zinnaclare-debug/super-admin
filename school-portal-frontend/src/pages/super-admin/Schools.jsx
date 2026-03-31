@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import FeatureTable from "../../components/FeatureTable";
 import { FEATURE_DEFINITIONS } from "../../config/features";
+import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
 
 const TENANCY_BASE_DOMAIN = "lyt.com.ng";
 
 function Schools() {
   const [schools, setSchools] = useState([]);
-
-  // Create school + admin
   const [schoolName, setSchoolName] = useState("");
   const [schoolSubdomain, setSchoolSubdomain] = useState("");
   const [subdomainTouched, setSubdomainTouched] = useState(false);
@@ -18,13 +17,9 @@ function Schools() {
   const [generatedPassword, setGeneratedPassword] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
-
-  // Edit school
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-
-  // Features
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [featureSchool, setFeatureSchool] = useState(null);
   const [schoolFeatures, setSchoolFeatures] = useState([]);
@@ -143,24 +138,13 @@ function Schools() {
     loadSchools();
   };
 
-  const deleteSchool = async (id, schoolName) => {
-    if (!window.confirm(`Delete ${schoolName || "this school"}? This action is permanent.`)) return;
-
-    const deleteCode = window.prompt(
-      `Enter your 4-digit delete code to permanently delete ${schoolName || "this school"}:`
-    );
-
-    if (deleteCode === null) return;
-
-    const normalizedCode = String(deleteCode).trim();
-    if (!/^\d{4}$/.test(normalizedCode)) {
-      showToast("Enter a valid 4-digit delete code.", "error");
-      return;
-    }
+  const deleteSchool = async (id, schoolNameValue) => {
+    const deleteCode = requestSuperAdminDeleteCode(schoolNameValue || "this school", "delete");
+    if (!deleteCode) return;
 
     try {
       const res = await api.delete(`/api/super-admin/schools/${id}`, {
-        data: { delete_code: normalizedCode },
+        data: { delete_code: deleteCode },
       });
       await loadSchools();
       showToast(res?.data?.message || "School deleted successfully.", "success");

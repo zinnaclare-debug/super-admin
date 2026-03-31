@@ -31,25 +31,11 @@ class SchoolController extends Controller
      */
     public function destroy(Request $request, School $school)
     {
-        $validated = $request->validate([
-            'delete_code' => ['required', 'digits:4'],
-        ]);
-
-        $expectedDeleteCode = (string) config('app.super_admin_school_delete_confirmation_code', '4721');
-
-        if (!hash_equals($expectedDeleteCode, (string) $validated['delete_code'])) {
-            throw ValidationException::withMessages([
-                'delete_code' => ['Invalid delete confirmation code.'],
-            ]);
-        }
+        $this->validateDeleteCode($request);
 
         DB::transaction(function () use ($school) {
-            // Ensure school users are removed so their unique emails can be reused.
             User::where('school_id', $school->id)->delete();
-
-            // Clean up explicit school feature rows.
             SchoolFeature::where('school_id', $school->id)->delete();
-
             $school->delete();
         });
 
@@ -57,9 +43,7 @@ class SchoolController extends Controller
 
         return response()->json(['message' => 'School deleted successfully.']);
     }
-    /**
-     * ✅ LIST ALL SCHOOLS (USED BY OVERVIEW & SCHOOLS TABLE)
-     */
+
     public function index()
     {
         $schools = School::with([
@@ -74,9 +58,6 @@ class SchoolController extends Controller
         ]);
     }
 
-    /**
-     * ✅ STORE (Create school directly - includes username_prefix)
-     */
     public function store(Request $request)
     {
         $request->merge([
@@ -102,9 +83,6 @@ class SchoolController extends Controller
         ], 201);
     }
 
-    /**
-     * ✅ CREATE SCHOOL + ADMIN (MULTI-TENANT ENTRY POINT)
-     */
     public function createWithAdmin(Request $request)
     {
         $actorUserId = (int) ($request->user()->id ?? 0);
@@ -122,8 +100,6 @@ class SchoolController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $actorUserId) {
-
-            // 1️⃣ Create school (tenant)
             $school = School::create([
                 'name'             => $validated['school_name'],
                 'email'            => $validated['school_email'],
@@ -133,10 +109,8 @@ class SchoolController extends Controller
                 'status'           => 'active',
             ]);
 
-            // 2️⃣ Generate password (shown ONCE)
             $plainPassword = Str::random(10);
 
-            // 3️⃣ Create school admin
             $admin = User::create([
                 'name'      => $validated['admin_name'],
                 'email'     => $validated['admin_email'],
@@ -151,39 +125,29 @@ class SchoolController extends Controller
                 $actorUserId > 0 ? $actorUserId : null
             );
 
-            // 4️⃣ Seed features (use updateOrCreate to avoid duplicates if observer already created some)
-// 4️⃣ Seed features (GENERAL + ADMIN)
+            $defs = config('features.definitions');
 
-// 4️⃣ Seed features (GENERAL + ADMIN)
-$defs = config('features.definitions');
-
-foreach ($defs as $def) {
-    SchoolFeature::updateOrCreate(
-        [
-            'school_id' => $school->id,
-            'feature'   => $def['key'],
-        ],
-        [
-            'enabled'   => true, // super admin can later disable
-            'category'  => $def['category'] ?? 'general',
-        ]
-    );
-}
-
-
-
+            foreach ($defs as $def) {
+                SchoolFeature::updateOrCreate(
+                    [
+                        'school_id' => $school->id,
+                        'feature'   => $def['key'],
+                    ],
+                    [
+                        'enabled'   => true,
+                        'category'  => $def['category'] ?? 'general',
+                    ]
+                );
+            }
 
             return response()->json([
                 'school'   => $school,
                 'admin'    => $admin,
-                'password' => $plainPassword, // show ONCE
+                'password' => $plainPassword,
             ], 201);
         });
     }
 
-    /**
-     * ✅ ACTIVATE / SUSPEND SCHOOL
-     */
     public function toggle(School $school)
     {
         $school->status = $school->status === 'active'
@@ -198,9 +162,6 @@ foreach ($defs as $def) {
         ]);
     }
 
-    /**
-     * Toggle result publication for a school (student-side visibility gate)
-     */
     public function toggleResultsPublish(School $school)
     {
         $school->results_published = !$school->results_published;
@@ -250,6 +211,7 @@ foreach ($defs as $def) {
             'department_templates_by_level' => $departmentTemplateMapByLevel,
         ]);
     }
+
     public function upsertInformationBranding(Request $request, School $school)
     {
         $payload = $request->validate([
@@ -386,7 +348,6 @@ foreach ($defs as $def) {
         ]);
     }
 
-
     public function updateInformationGradingSchema(Request $request, School $school)
     {
         $payload = $request->validate([
@@ -407,6 +368,7 @@ foreach ($defs as $def) {
             'data' => $schema,
         ]);
     }
+
     public function updateInformationClassTemplates(Request $request, School $school)
     {
         $payload = $request->validate([
@@ -467,9 +429,6 @@ foreach ($defs as $def) {
         ]);
     }
 
-    /**
-     * List academic sessions for one school.
-     */
     public function academicSessions(School $school)
     {
         $sessions = AcademicSession::query()
@@ -487,9 +446,6 @@ foreach ($defs as $def) {
         ]);
     }
 
-    /**
-     * Super admin controls session lifecycle: pending -> current -> completed.
-     */
     public function updateAcademicSessionStatus(Request $request, School $school, AcademicSession $session)
     {
         if ((int) $session->school_id !== (int) $school->id) {
@@ -533,7 +489,6 @@ foreach ($defs as $def) {
                     }
                 }
             } else {
-                // Non-current sessions should not own a current term.
                 Term::query()
                     ->where('school_id', $school->id)
                     ->where('academic_session_id', $session->id)
@@ -546,20 +501,34 @@ foreach ($defs as $def) {
         });
     }
 
-    /**
-     * Delete a school's academic session.
-     */
-    public function destroyAcademicSession(School $school, AcademicSession $session)
+    public function destroyAcademicSession(Request $request, School $school, AcademicSession $session)
     {
         if ((int) $session->school_id !== (int) $school->id) {
             return response()->json(['message' => 'Session does not belong to this school.'], 422);
         }
+
+        $this->validateDeleteCode($request);
 
         $session->delete();
 
         return response()->json([
             'message' => 'Academic session deleted successfully.',
         ]);
+    }
+
+    private function validateDeleteCode(Request $request): void
+    {
+        $validated = $request->validate([
+            'delete_code' => ['required', 'digits:4'],
+        ]);
+
+        $expectedDeleteCode = (string) config('app.super_admin_delete_confirmation_code', '4722');
+
+        if (!hash_equals($expectedDeleteCode, (string) $validated['delete_code'])) {
+            throw ValidationException::withMessages([
+                'delete_code' => ['Invalid delete confirmation code.'],
+            ]);
+        }
     }
 
     private function normalizeSubdomain(?string $subdomain): string
@@ -780,9 +749,3 @@ foreach ($defs as $def) {
         }
     }
 }
-
-
-
-
-
-
