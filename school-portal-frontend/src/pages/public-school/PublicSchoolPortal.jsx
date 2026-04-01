@@ -1,0 +1,338 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
+import api from "../../services/api";
+import "./PublicSchoolPortal.css";
+
+function toAbsoluteUrl(url) {
+  if (!url) return "";
+  if (/^(https?:\/\/|blob:|data:)/i.test(url)) return url;
+  const base = (api.defaults.baseURL || "").replace(/\/$/, "");
+  const origin = base ? new URL(base).origin : window.location.origin;
+  return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
+  const [siteData, setSiteData] = useState(initialSiteData);
+  const [loading, setLoading] = useState(!initialSiteData);
+  const [error, setError] = useState("");
+  const [applyForm, setApplyForm] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    applying_for_class: "",
+  });
+  const [applyResult, setApplyResult] = useState(null);
+  const [lookupForm, setLookupForm] = useState({ application_number: "", email: "", phone: "" });
+  const [verifyForm, setVerifyForm] = useState({ application_number: "", email: "", phone: "" });
+  const [examData, setExamData] = useState(null);
+  const [examAnswers, setExamAnswers] = useState([]);
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [busyAction, setBusyAction] = useState("");
+
+  useEffect(() => {
+    if (initialSiteData) return;
+
+    let active = true;
+    setLoading(true);
+    api
+      .get("/api/public/school-site")
+      .then((res) => {
+        if (!active) return;
+        setSiteData(res.data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.response?.data?.message || "Failed to load school website.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialSiteData]);
+
+  const school = siteData?.school || null;
+  const website = school?.website_content || {};
+  const entranceExam = school?.entrance_exam || {};
+  const logoUrl = school?.logo_url ? toAbsoluteUrl(school.logo_url) : "";
+
+  const themeStyle = useMemo(
+    () => ({
+      "--school-primary": website.primary_color || "#0f172a",
+      "--school-accent": website.accent_color || "#0f766e",
+    }),
+    [website.primary_color, website.accent_color]
+  );
+
+  useEffect(() => {
+    if (Array.isArray(entranceExam.available_classes) && entranceExam.available_classes.length > 0 && !applyForm.applying_for_class) {
+      const firstEnabled = entranceExam.available_classes.find((item) => item.enabled) || entranceExam.available_classes[0];
+      setApplyForm((prev) => ({ ...prev, applying_for_class: firstEnabled?.class_name || "" }));
+    }
+  }, [entranceExam.available_classes, applyForm.applying_for_class]);
+
+  if (loading) {
+    return <div className="school-site-shell"><p>Loading school website...</p></div>;
+  }
+
+  if (!siteData?.is_tenant || !school) {
+    return <Navigate to="/" replace />;
+  }
+
+  const navItems = [
+    { key: "home", label: "Home", href: "/", visible: true },
+    { key: "apply", label: "Apply Now", href: "/apply-now", visible: Boolean(website.show_apply_now) },
+    { key: "exam", label: "Entrance Exam", href: "/entrance-exam", visible: Boolean(website.show_entrance_exam) },
+    { key: "verify", label: "Verify Score", href: "/verify-score", visible: Boolean(website.show_verify_score) },
+  ].filter((item) => item.visible);
+
+  const classOptions = Array.isArray(entranceExam.available_classes)
+    ? entranceExam.available_classes.filter((item) => item.enabled || page === "apply")
+    : [];
+
+  const handleApply = async (e) => {
+    e.preventDefault();
+    setBusyAction("apply");
+    setApplyResult(null);
+    try {
+      const res = await api.post("/api/public/apply-now", applyForm);
+      setApplyResult(res.data?.data || null);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to submit application.");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const handleExamLookup = async (e) => {
+    e.preventDefault();
+    setBusyAction("exam-lookup");
+    setExamData(null);
+    try {
+      const res = await api.post("/api/public/entrance-exam/lookup", lookupForm);
+      if (res.data?.already_submitted) {
+        setExamData({ completed: true, result: res.data.data });
+        setExamAnswers([]);
+      } else {
+        const payload = res.data?.data || null;
+        setExamData(payload);
+        setExamAnswers(Array(payload?.exam?.questions?.length || 0).fill(""));
+      }
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to load entrance exam.");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const handleExamSubmit = async (e) => {
+    e.preventDefault();
+    setBusyAction("exam-submit");
+    try {
+      const payload = { ...lookupForm, answers: examAnswers };
+      const res = await api.post("/api/public/entrance-exam/submit", payload);
+      setExamData({ completed: true, result: res.data?.data || null });
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to submit entrance exam.");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setBusyAction("verify");
+    setVerifyResult(null);
+    try {
+      const res = await api.post("/api/public/verify-score", verifyForm);
+      setVerifyResult(res.data?.data || null);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to verify score.");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  return (
+    <div className="school-site-shell" style={themeStyle}>
+      <header className="school-site-nav">
+        <div className="school-site-brand">
+          {logoUrl ? <img src={logoUrl} alt={`${school.name} logo`} /> : <div className="school-site-brand-mark">{school.name?.slice(0, 1) || "S"}</div>}
+          <div>
+            <strong>{school.name}</strong>
+            <span>{school.location || website.address || school.subdomain}</span>
+          </div>
+        </div>
+        <nav className="school-site-links">
+          {navItems.map((item) => (
+            <Link key={item.key} to={item.href} className={page === item.key ? "is-active" : ""}>
+              {item.label}
+            </Link>
+          ))}
+          <Link to="/login" className="school-site-login">Login</Link>
+        </nav>
+      </header>
+
+      {error ? <p className="school-site-state school-site-state--error">{error}</p> : null}
+
+      {page === "home" ? (
+        <main className="school-site-main">
+          <section className="school-site-hero">
+            <div>
+              <p className="school-site-kicker">Dedicated School Website</p>
+              <h1>{website.hero_title || `Welcome to ${school.name}`}</h1>
+              <p>{website.hero_subtitle}</p>
+              <div className="school-site-hero-actions">
+                {website.show_apply_now ? <Link to="/apply-now">Apply Now</Link> : null}
+                {website.show_entrance_exam ? <Link to="/entrance-exam">Entrance Exam</Link> : null}
+              </div>
+            </div>
+            <aside className="school-site-contact-card">
+              <h3>Contact</h3>
+              <p>{website.address || school.location || "Address coming soon"}</p>
+              <p>{website.contact_email || school.contact_email || "No public email yet"}</p>
+              <p>{website.contact_phone || school.contact_phone || "No public phone yet"}</p>
+            </aside>
+          </section>
+
+          <section className="school-site-section">
+            <h2>{website.about_title || "About Our School"}</h2>
+            <p>{website.about_text}</p>
+          </section>
+
+          <section className="school-site-section school-site-cards">
+            {website.show_apply_now ? (
+              <article>
+                <h3>Apply Now</h3>
+                <p>{website.admissions_intro}</p>
+                <Link to="/apply-now">Start Application</Link>
+              </article>
+            ) : null}
+            {website.show_entrance_exam ? (
+              <article>
+                <h3>Entrance Exam</h3>
+                <p>{entranceExam.exam_intro}</p>
+                <Link to="/entrance-exam">Open Entrance Exam</Link>
+              </article>
+            ) : null}
+            {website.show_verify_score ? (
+              <article>
+                <h3>Verify Score</h3>
+                <p>{entranceExam.verify_intro}</p>
+                <Link to="/verify-score">Check Score</Link>
+              </article>
+            ) : null}
+          </section>
+        </main>
+      ) : null}
+
+      {page === "apply" ? (
+        <main className="school-site-main school-site-form-page">
+          <section className="school-site-section">
+            <h1>Apply Now</h1>
+            <p>{entranceExam.apply_intro || website.admissions_intro}</p>
+            <form className="school-site-form" onSubmit={handleApply}>
+              <input placeholder="Applicant Name" value={applyForm.full_name} onChange={(e) => setApplyForm((prev) => ({ ...prev, full_name: e.target.value }))} required />
+              <input placeholder="Phone Number" value={applyForm.phone} onChange={(e) => setApplyForm((prev) => ({ ...prev, phone: e.target.value }))} required />
+              <input type="email" placeholder="Email Address" value={applyForm.email} onChange={(e) => setApplyForm((prev) => ({ ...prev, email: e.target.value }))} required />
+              <select value={applyForm.applying_for_class} onChange={(e) => setApplyForm((prev) => ({ ...prev, applying_for_class: e.target.value }))} required>
+                <option value="">Select Class</option>
+                {classOptions.map((item) => (
+                  <option key={item.class_name} value={item.class_name}>{item.class_name}</option>
+                ))}
+              </select>
+              <button type="submit" disabled={busyAction === "apply"}>{busyAction === "apply" ? "Submitting..." : "Submit Application"}</button>
+            </form>
+            {applyResult ? (
+              <div className="school-site-result-card">
+                <h3>Application Submitted</h3>
+                <p>Application Number: <strong>{applyResult.application_number}</strong></p>
+                <p>Keep this number for the entrance exam and score verification.</p>
+              </div>
+            ) : null}
+          </section>
+        </main>
+      ) : null}
+
+      {page === "exam" ? (
+        <main className="school-site-main school-site-form-page">
+          <section className="school-site-section">
+            <h1>Entrance Exam</h1>
+            <p>{entranceExam.exam_intro}</p>
+            {!examData ? (
+              <form className="school-site-form" onSubmit={handleExamLookup}>
+                <input placeholder="Application Number" value={lookupForm.application_number} onChange={(e) => setLookupForm((prev) => ({ ...prev, application_number: e.target.value }))} required />
+                <input type="email" placeholder="Email Address" value={lookupForm.email} onChange={(e) => setLookupForm((prev) => ({ ...prev, email: e.target.value }))} />
+                <input placeholder="Phone Number" value={lookupForm.phone} onChange={(e) => setLookupForm((prev) => ({ ...prev, phone: e.target.value }))} />
+                <button type="submit" disabled={busyAction === "exam-lookup"}>{busyAction === "exam-lookup" ? "Checking..." : "Load Exam"}</button>
+              </form>
+            ) : null}
+
+            {examData?.completed ? (
+              <div className="school-site-result-card">
+                <h3>Exam Already Submitted</h3>
+                <p><strong>{examData.result?.full_name}</strong></p>
+                <p>Score: {examData.result?.score ?? "-"}</p>
+                <p>Status: {examData.result?.result_status || examData.result?.exam_status}</p>
+              </div>
+            ) : null}
+
+            {examData?.exam ? (
+              <form className="school-site-form school-site-exam-form" onSubmit={handleExamSubmit}>
+                <div className="school-site-result-card">
+                  <p><strong>{examData.application?.full_name}</strong></p>
+                  <p>Class: {examData.application?.applying_for_class}</p>
+                  <p>Duration: {examData.exam.duration_minutes} minutes</p>
+                  <p>Pass Mark: {examData.exam.pass_mark}</p>
+                  <p>{examData.exam.instructions || "Answer all questions and submit once."}</p>
+                </div>
+                {examData.exam.questions.map((question, index) => (
+                  <div key={question.id} className="school-site-question-block">
+                    <h4>{index + 1}. {question.question}</h4>
+                    {["A", "B", "C", "D"].map((optionKey) => {
+                      const optionValue = question[`option_${optionKey.toLowerCase()}`];
+                      return (
+                        <label key={optionKey} className="school-site-option">
+                          <input type="radio" name={`question-${index}`} value={optionKey} checked={examAnswers[index] === optionKey} onChange={(e) => setExamAnswers((prev) => prev.map((item, answerIndex) => answerIndex === index ? e.target.value : item))} />
+                          <span>{optionKey}. {optionValue}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ))}
+                <button type="submit" disabled={busyAction === "exam-submit"}>{busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}</button>
+              </form>
+            ) : null}
+          </section>
+        </main>
+      ) : null}
+
+      {page === "verify" ? (
+        <main className="school-site-main school-site-form-page">
+          <section className="school-site-section">
+            <h1>Verify Score</h1>
+            <p>{entranceExam.verify_intro}</p>
+            <form className="school-site-form" onSubmit={handleVerify}>
+              <input placeholder="Application Number" value={verifyForm.application_number} onChange={(e) => setVerifyForm((prev) => ({ ...prev, application_number: e.target.value }))} required />
+              <input type="email" placeholder="Email Address" value={verifyForm.email} onChange={(e) => setVerifyForm((prev) => ({ ...prev, email: e.target.value }))} />
+              <input placeholder="Phone Number" value={verifyForm.phone} onChange={(e) => setVerifyForm((prev) => ({ ...prev, phone: e.target.value }))} />
+              <button type="submit" disabled={busyAction === "verify"}>{busyAction === "verify" ? "Checking..." : "Verify Score"}</button>
+            </form>
+            {verifyResult ? (
+              <div className="school-site-result-card">
+                <h3>{verifyResult.full_name}</h3>
+                <p>Application Number: {verifyResult.application_number}</p>
+                <p>Class: {verifyResult.applying_for_class}</p>
+                <p>Exam Status: {verifyResult.exam_status}</p>
+                <p>Score: {verifyResult.score ?? "Pending"}</p>
+                <p>Result: {verifyResult.result_status || "Awaiting Review"}</p>
+              </div>
+            ) : null}
+          </section>
+        </main>
+      ) : null}
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import api from "../../services/api";
 import "./SchoolInformation.css";
 import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profileImage";
 import SchoolSubscriptionSection from "./SchoolSubscriptionSection";
+import SchoolWebsiteSection from "./SchoolWebsiteSection";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DEFAULT_EXAM_RECORD = {
@@ -938,8 +939,12 @@ export default function SchoolInformation() {
         </div>
       </section>
 
+      <SchoolWebsiteSection schoolId={schoolId} classTemplates={classTemplates} />
+
       <SchoolSubscriptionSection schoolId={schoolId} />
     </div>
   );
 }
+
+
 

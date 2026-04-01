@@ -1,0 +1,246 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\School;
+
+class SchoolPublicWebsiteData
+{
+    public static function availableClasses(?School $school): array
+    {
+        if (! $school) {
+            return [];
+        }
+
+        $normalized = ClassTemplateSchema::normalize($school->class_templates);
+
+        return collect(ClassTemplateSchema::activeSections($normalized))
+            ->flatMap(fn (array $section) => ClassTemplateSchema::activeClassNames($section))
+            ->map(fn ($name) => trim((string) $name))
+            ->filter(fn ($name) => $name !== '')
+            ->unique(fn ($name) => strtolower($name))
+            ->values()
+            ->all();
+    }
+
+    public static function normalizeWebsiteContent(?array $value, ?School $school = null): array
+    {
+        $value = is_array($value) ? $value : [];
+        $schoolName = trim((string) ($school?->name ?? ''));
+        $contactEmail = trim((string) ($school?->contact_email ?? $school?->email ?? ''));
+        $contactPhone = trim((string) ($school?->contact_phone ?? ''));
+        $location = trim((string) ($school?->location ?? ''));
+
+        return [
+            'hero_title' => self::string($value['hero_title'] ?? null, $schoolName !== '' ? "Welcome to {$schoolName}" : 'Welcome to Our School', 160),
+            'hero_subtitle' => self::string($value['hero_subtitle'] ?? null, 'A dedicated school portal for admissions, entrance exams, score verification, and parent-friendly school information.', 600),
+            'about_title' => self::string($value['about_title'] ?? null, 'About Our School', 120),
+            'about_text' => self::string($value['about_text'] ?? null, $schoolName !== '' ? "Learn more about {$schoolName}, our values, and the learning experience we provide for every child." : 'Learn more about our values and learning experience.', 3000),
+            'admissions_intro' => self::string($value['admissions_intro'] ?? null, 'Complete the application form to begin admission processing for your child.', 1200),
+            'address' => self::string($value['address'] ?? null, $location, 255),
+            'contact_email' => self::string($value['contact_email'] ?? null, $contactEmail, 255),
+            'contact_phone' => self::string($value['contact_phone'] ?? null, $contactPhone, 40),
+            'primary_color' => self::color($value['primary_color'] ?? null, '#0f172a'),
+            'accent_color' => self::color($value['accent_color'] ?? null, '#0f766e'),
+            'show_apply_now' => self::bool($value['show_apply_now'] ?? true, true),
+            'show_entrance_exam' => self::bool($value['show_entrance_exam'] ?? true, true),
+            'show_verify_score' => self::bool($value['show_verify_score'] ?? true, true),
+        ];
+    }
+
+    public static function normalizeEntranceExamConfig(?array $value, array $availableClasses = []): array
+    {
+        $value = is_array($value) ? $value : [];
+        $classExamMap = [];
+
+        foreach ((array) ($value['class_exams'] ?? []) as $exam) {
+            $normalizedExam = self::normalizeClassExam($exam);
+            if ($normalizedExam['class_name'] === '') {
+                continue;
+            }
+
+            $classExamMap[strtolower($normalizedExam['class_name'])] = $normalizedExam;
+        }
+
+        $normalizedClassExams = [];
+        foreach ($availableClasses as $className) {
+            $key = strtolower(trim((string) $className));
+            $normalizedClassExams[] = $classExamMap[$key] ?? self::defaultClassExam($className);
+            unset($classExamMap[$key]);
+        }
+
+        foreach ($classExamMap as $extraExam) {
+            $normalizedClassExams[] = $extraExam;
+        }
+
+        return [
+            'enabled' => self::bool($value['enabled'] ?? false, false),
+            'application_open' => self::bool($value['application_open'] ?? true, true),
+            'verification_open' => self::bool($value['verification_open'] ?? true, true),
+            'apply_intro' => self::string($value['apply_intro'] ?? null, 'Fill the form below and keep your application number for the next admission steps.', 1500),
+            'exam_intro' => self::string($value['exam_intro'] ?? null, 'Enter your application details to take the entrance examination assigned to your selected class.', 1500),
+            'verify_intro' => self::string($value['verify_intro'] ?? null, 'Use your application number and contact details to verify your exam score.', 1500),
+            'class_exams' => $normalizedClassExams,
+        ];
+    }
+
+    public static function findClassExam(array $config, string $className): ?array
+    {
+        $normalizedName = strtolower(trim($className));
+        if ($normalizedName === '') {
+            return null;
+        }
+
+        foreach ((array) ($config['class_exams'] ?? []) as $exam) {
+            if (strtolower(trim((string) ($exam['class_name'] ?? ''))) === $normalizedName) {
+                return self::normalizeClassExam($exam);
+            }
+        }
+
+        return null;
+    }
+
+    public static function publicFacingClassExam(?array $classExam): ?array
+    {
+        if (! $classExam) {
+            return null;
+        }
+
+        return [
+            'class_name' => $classExam['class_name'],
+            'enabled' => (bool) $classExam['enabled'],
+            'duration_minutes' => (int) $classExam['duration_minutes'],
+            'pass_mark' => (int) $classExam['pass_mark'],
+            'instructions' => (string) $classExam['instructions'],
+            'question_count' => count((array) ($classExam['questions'] ?? [])),
+            'questions' => array_values(array_map(
+                static fn (array $question, int $index) => [
+                    'id' => $index + 1,
+                    'question' => $question['question'],
+                    'option_a' => $question['option_a'],
+                    'option_b' => $question['option_b'],
+                    'option_c' => $question['option_c'],
+                    'option_d' => $question['option_d'],
+                ],
+                (array) ($classExam['questions'] ?? []),
+                array_keys((array) ($classExam['questions'] ?? []))
+            )),
+        ];
+    }
+
+    private static function normalizeClassExam(mixed $exam): array
+    {
+        $exam = is_array($exam) ? $exam : [];
+        $className = self::string($exam['class_name'] ?? null, '', 80);
+
+        return [
+            'class_name' => $className,
+            'enabled' => self::bool($exam['enabled'] ?? false, false),
+            'duration_minutes' => self::integer($exam['duration_minutes'] ?? 30, 5, 180, 30),
+            'pass_mark' => self::integer($exam['pass_mark'] ?? 50, 0, 100, 50),
+            'instructions' => self::string($exam['instructions'] ?? null, '', 3000),
+            'questions' => self::normalizeQuestions($exam['questions'] ?? []),
+        ];
+    }
+
+    private static function defaultClassExam(string $className): array
+    {
+        return [
+            'class_name' => trim($className),
+            'enabled' => false,
+            'duration_minutes' => 30,
+            'pass_mark' => 50,
+            'instructions' => '',
+            'questions' => [],
+        ];
+    }
+
+    private static function normalizeQuestions(mixed $questions): array
+    {
+        $questions = is_array($questions) ? $questions : [];
+        $normalized = [];
+
+        foreach ($questions as $question) {
+            $question = is_array($question) ? $question : [];
+            $normalizedQuestion = [
+                'question' => self::string($question['question'] ?? null, '', 500),
+                'option_a' => self::string($question['option_a'] ?? null, '', 255),
+                'option_b' => self::string($question['option_b'] ?? null, '', 255),
+                'option_c' => self::string($question['option_c'] ?? null, '', 255),
+                'option_d' => self::string($question['option_d'] ?? null, '', 255),
+                'correct_option' => self::correctOption($question['correct_option'] ?? null),
+            ];
+
+            if (
+                $normalizedQuestion['question'] === ''
+                && $normalizedQuestion['option_a'] === ''
+                && $normalizedQuestion['option_b'] === ''
+                && $normalizedQuestion['option_c'] === ''
+                && $normalizedQuestion['option_d'] === ''
+            ) {
+                continue;
+            }
+
+            if (
+                $normalizedQuestion['question'] === ''
+                || $normalizedQuestion['option_a'] === ''
+                || $normalizedQuestion['option_b'] === ''
+                || $normalizedQuestion['option_c'] === ''
+                || $normalizedQuestion['option_d'] === ''
+                || $normalizedQuestion['correct_option'] === ''
+            ) {
+                continue;
+            }
+
+            $normalized[] = $normalizedQuestion;
+        }
+
+        return array_values($normalized);
+    }
+
+    private static function string(mixed $value, string $fallback = '', int $max = 255): string
+    {
+        $text = trim((string) ($value ?? ''));
+        if ($text === '') {
+            $text = $fallback;
+        }
+
+        return mb_substr($text, 0, $max);
+    }
+
+    private static function color(mixed $value, string $fallback): string
+    {
+        $color = trim((string) ($value ?? ''));
+        return preg_match('/^#[0-9a-fA-F]{6}$/', $color) ? strtolower($color) : $fallback;
+    }
+
+    private static function bool(mixed $value, bool $fallback): bool
+    {
+        if ($value === null) {
+            return $fallback;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $validated = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+        return $validated ?? (bool) $value;
+    }
+
+    private static function integer(mixed $value, int $min, int $max, int $fallback): int
+    {
+        $number = filter_var($value, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE);
+        if ($number === null) {
+            return $fallback;
+        }
+
+        return max($min, min($max, $number));
+    }
+
+    private static function correctOption(mixed $value): string
+    {
+        $option = strtoupper(trim((string) ($value ?? '')));
+        return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
+    }
+}

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class School extends Model
 {
@@ -21,6 +22,8 @@ class School extends Model
         'grading_schema',
         'department_templates',
         'class_templates',
+        'website_content',
+        'entrance_exam_config',
         'slug',
         'subdomain',
         'status',
@@ -34,6 +37,8 @@ class School extends Model
         'grading_schema' => 'array',
         'department_templates' => 'array',
         'class_templates' => 'array',
+        'website_content' => 'array',
+        'entrance_exam_config' => 'array',
     ];
 
     public function features(): HasMany
@@ -48,20 +53,19 @@ class School extends Model
             ->where('enabled', true)
             ->exists();
     }
-    public function users()
-{
-    return $this->hasMany(User::class);
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function admin(): HasOne
+    {
+        return $this->hasOne(User::class)->where('role', 'school_admin');
+    }
+
+    public function admissionApplications(): HasMany
+    {
+        return $this->hasMany(SchoolAdmissionApplication::class);
+    }
 }
-
-public function admin()
-{
-    return $this->hasOne(User::class)->where('role', 'school_admin');
-}
-
-
-
-
-
-}
-
-

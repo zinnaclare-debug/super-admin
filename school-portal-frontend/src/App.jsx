@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 // Public
 import Login from "./pages/Login";
 import Home from "./pages/Home";
+import PublicSchoolPortal from "./pages/public-school/PublicSchoolPortal";
 
 // Super Admin
 import Dashboard from "./pages/Dashboard";
@@ -271,3 +272,5 @@ function App() {
 export default App;
 
 // TPM1LRPnhO
+
+

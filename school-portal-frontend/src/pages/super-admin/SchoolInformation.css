@@ -479,3 +479,99 @@
 .sai-inline-actions .sai-action-secondary {
   background: linear-gradient(125deg, #0f172a 0%, #475569 100%);
 }
+
+.sai-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sai-subsection {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.sai-website-grid {
+  margin-top: 14px;
+}
+
+.sai-toggle-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sai-check-card--compact {
+  min-height: auto;
+  padding: 8px 12px;
+}
+
+.sai-meta-chip {
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sai-class-exam-list {
+  display: grid;
+  gap: 16px;
+}
+
+.sai-class-exam-card {
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 14px;
+  background: #f8fbff;
+}
+
+.sai-class-exam-head,
+.sai-question-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sai-class-exam-head h5 {
+  margin: 0;
+}
+
+.sai-question-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.sai-question-card {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: grid;
+  gap: 10px;
+}
+
+.sai-question-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.sai-link-btn {
+  border: 0;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.sai-app-table {
+  min-width: 920px;
+}

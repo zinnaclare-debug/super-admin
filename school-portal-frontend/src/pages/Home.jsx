@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import api from "../services/api";
+import PublicSchoolPortal from "./public-school/PublicSchoolPortal";
 import heroArt from "../assets/dashboard/branding.svg";
 import modulesArt from "../assets/dashboard/modules.svg";
 import flyerArt from "../assets/home/lytebridge-flyer.jpeg";
@@ -40,6 +43,39 @@ const CONTACT_LINES = [
 ];
 
 function Home() {
+  const [siteData, setSiteData] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    api
+      .get("/api/public/school-site")
+      .then((res) => {
+        if (!active) return;
+        setSiteData(res.data || null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSiteData(null);
+      })
+      .finally(() => {
+        if (active) setLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!loaded) {
+    return <div className="home-page"><p style={{ padding: 24 }}>Loading...</p></div>;
+  }
+
+  if (siteData?.is_tenant && siteData?.school) {
+    return <PublicSchoolPortal page="home" initialSiteData={siteData} />;
+  }
+
   return (
     <div className="home-page">
       <header className="home-nav">

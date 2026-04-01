@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\TenantContextController;
 use App\Http\Controllers\Api\Payments\PaystackWebhookController;
+use App\Http\Controllers\Api\PublicSchoolWebsiteController;
 
 use App\Http\Controllers\Api\SuperAdmin\SchoolController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolFeatureController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\SuperAdmin\UserController;
 use App\Http\Controllers\Api\SuperAdmin\LoginDetailsController as SuperAdminLoginDetailsController;
 use App\Http\Controllers\Api\SuperAdmin\PaymentsController as SuperAdminPaymentsController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolSubscriptionController as SuperAdminSchoolSubscriptionController;
+use App\Http\Controllers\Api\SuperAdmin\SchoolWebsiteController as SuperAdminSchoolWebsiteController;
 
 use App\Http\Controllers\Api\SchoolAdmin\RegistrationController;
 use App\Http\Controllers\Api\SchoolAdmin\UserManagementController;
@@ -64,6 +66,12 @@ use App\Http\Controllers\Api\Student\AnnouncementController as StudentAnnounceme
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/tenant/context', [TenantContextController::class, 'show']);
+Route::get('/public/school-site', [PublicSchoolWebsiteController::class, 'show']);
+Route::post('/public/apply-now', [PublicSchoolWebsiteController::class, 'applyNow']);
+Route::post('/public/entrance-exam/lookup', [PublicSchoolWebsiteController::class, 'lookupEntranceExam']);
+Route::post('/public/entrance-exam/submit', [PublicSchoolWebsiteController::class, 'submitEntranceExam']);
+Route::post('/public/verify-score', [PublicSchoolWebsiteController::class, 'verifyScore']);
+
 Route::post('/payments/paystack/webhook', [PaystackWebhookController::class, 'handle']);
 
 /*
@@ -97,6 +105,9 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
     Route::put('/super-admin/schools/{school}/information/grading-schema', [SchoolController::class, 'updateInformationGradingSchema']);
     Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
+    Route::get('/super-admin/schools/{school}/information/website', [SuperAdminSchoolWebsiteController::class, 'show']);
+    Route::put('/super-admin/schools/{school}/information/website', [SuperAdminSchoolWebsiteController::class, 'upsert']);
+    Route::get('/super-admin/schools/{school}/information/website/applications', [SuperAdminSchoolWebsiteController::class, 'applications']);
     Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
@@ -471,6 +482,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 
