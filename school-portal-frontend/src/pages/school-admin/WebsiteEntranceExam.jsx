@@ -220,12 +220,12 @@ export default function WebsiteEntranceExam() {
       <section style={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 14, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <h2 style={{ margin: 0 }}>Website & Entrance Exam</h2>
+            <h2 style={{ margin: 0 }}>School Website Content</h2>
             <p style={{ marginTop: 8, color: "#475569" }}>
-              Manage your school subdomain homepage, admission form, entrance exam, and score verification flow.
+              Manage your school subdomain homepage, public content, contact details, and admissions experience.
             </p>
           </div>
-          <button onClick={saveAll} disabled={saving}>{saving ? "Saving..." : "Save Website Content"}</button>
+          <button onClick={saveAll} disabled={saving}>{saving ? "Saving..." : "Save School Website Content"}</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginTop: 18 }}>
@@ -420,4 +420,5 @@ export default function WebsiteEntranceExam() {
     </div>
   );
 }
+
 

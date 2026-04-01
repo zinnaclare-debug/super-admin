@@ -277,11 +277,11 @@ function SchoolDashboard() {
 
       <section className="sd-card">
         <div className="sd-section-head">
-          <h2>School Website & Entrance Exam</h2>
-          <p>Manage your public school homepage, Apply Now page, entrance exam, and score verification flow.</p>
+          <h2>School Website Content</h2>
+          <p>Manage your public school homepage, About Us content, contact details, and admissions experience.</p>
         </div>
         <div className="sd-actions">
-          <Link to="/school/admin/website" className="sd-link-button">Open Website & Entrance Exam</Link>
+          <Link to="/school/admin/website" className="sd-link-button">Open School Website Content</Link>
         </div>
       </section>
       <section className="sd-card sd-branding">
@@ -379,6 +379,7 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
+
 
 
 
