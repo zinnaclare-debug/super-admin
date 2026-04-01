@@ -40,8 +40,10 @@ const blankQuestion = {
 };
 
 const emptyContentForm = {
+  id: null,
   heading: "",
   content: "",
+  existingImages: [],
   photos: [],
 };
 
@@ -114,6 +116,16 @@ function formatDate(value) {
   });
 }
 
+function mapExistingImages(item = {}) {
+  const paths = Array.isArray(item.image_paths) ? item.image_paths : [];
+  const urls = Array.isArray(item.image_urls) ? item.image_urls : [];
+
+  return paths.map((path, index) => ({
+    path,
+    url: urls[index] || "",
+  }));
+}
+
 export default function WebsiteEntranceExam() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -126,6 +138,8 @@ export default function WebsiteEntranceExam() {
   const [contents, setContents] = useState([]);
   const [showCreateContent, setShowCreateContent] = useState(false);
   const [contentForm, setContentForm] = useState(emptyContentForm);
+
+  const isEditingContent = Boolean(contentForm.id);
 
   const loadWebsite = async () => {
     const websiteRes = await api.get("/api/school-admin/website");
@@ -156,13 +170,44 @@ export default function WebsiteEntranceExam() {
     }
   };
 
+  const clearCreateContentFlag = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("createContent");
+      return next;
+    });
+  };
+
+  const resetContentEditor = () => {
+    setContentForm(emptyContentForm);
+    setShowCreateContent(false);
+    clearCreateContentFlag();
+  };
+
+  const startCreateContent = () => {
+    setContentForm(emptyContentForm);
+    setShowCreateContent(true);
+  };
+
+  const startEditContent = (item) => {
+    setContentForm({
+      id: item.id,
+      heading: item.heading || "",
+      content: item.content || "",
+      existingImages: mapExistingImages(item),
+      photos: [],
+    });
+    setShowCreateContent(true);
+    clearCreateContentFlag();
+  };
+
   useEffect(() => {
     load();
   }, []);
 
   useEffect(() => {
     if (searchParams.get("createContent") === "1") {
-      setShowCreateContent(true);
+      startCreateContent();
     }
   }, [searchParams]);
 
@@ -175,6 +220,8 @@ export default function WebsiteEntranceExam() {
     () => contentForm.photos.map((file) => file.name),
     [contentForm.photos]
   );
+
+  const totalSelectedImages = contentForm.existingImages.length + contentForm.photos.length;
 
   const updateWebsiteContent = (field, value) => {
     setWebsiteContent((prev) => ({ ...prev, [field]: value }));
@@ -255,12 +302,22 @@ export default function WebsiteEntranceExam() {
     }
   };
 
-  const clearCreateContentFlag = () => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("createContent");
-      return next;
-    });
+  const handlePhotoChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    const allowedCount = Math.max(0, 5 - contentForm.existingImages.length);
+    const nextFiles = files.slice(0, allowedCount);
+
+    setContentForm((prev) => ({
+      ...prev,
+      photos: nextFiles,
+    }));
+  };
+
+  const removeExistingImage = (imagePath) => {
+    setContentForm((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((image) => image.path !== imagePath),
+    }));
   };
 
   const saveContent = async () => {
@@ -268,7 +325,7 @@ export default function WebsiteEntranceExam() {
       return alert("Heading and content are required.");
     }
 
-    if (contentForm.photos.length > 5) {
+    if (totalSelectedImages > 5) {
       return alert("You can upload a maximum of 5 photos.");
     }
 
@@ -277,29 +334,49 @@ export default function WebsiteEntranceExam() {
       const formData = new FormData();
       formData.append("heading", contentForm.heading.trim());
       formData.append("content", contentForm.content.trim());
+      contentForm.existingImages.forEach((image) => formData.append("keep_image_paths[]", image.path));
       contentForm.photos.forEach((file) => formData.append("photos[]", file));
 
-      await api.post("/api/school-admin/website/contents", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      if (isEditingContent) {
+        formData.append("_method", "PATCH");
+        await api.post(`/api/school-admin/website/contents/${contentForm.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        alert("School content updated successfully.");
+      } else {
+        await api.post("/api/school-admin/website/contents", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        alert("School content created successfully.");
+      }
 
-      alert("School content created successfully.");
-      setContentForm(emptyContentForm);
-      setShowCreateContent(false);
-      clearCreateContentFlag();
+      resetContentEditor();
       await loadContents();
     } catch (err) {
       const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
-      alert(validationError || err?.response?.data?.message || "Failed to create school content.");
+      alert(validationError || err?.response?.data?.message || "Failed to save school content.");
     } finally {
       setSavingContent(false);
     }
   };
 
+  const deleteContent = async (contentId) => {
+    if (!window.confirm("Delete this school content?")) return;
+
+    try {
+      await api.delete(`/api/school-admin/website/contents/${contentId}`);
+      alert("School content deleted successfully.");
+      if (contentForm.id === contentId) {
+        resetContentEditor();
+      }
+      await loadContents();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to delete school content.");
+    }
+  };
+
   const cancelCreateContent = () => {
-    setShowCreateContent(false);
-    clearCreateContentFlag();
-    setContentForm(emptyContentForm);
+    resetContentEditor();
   };
 
   if (loading) return <p>Loading website and entrance exam settings...</p>;
@@ -383,11 +460,17 @@ export default function WebsiteEntranceExam() {
               Create school content blocks with heading, automatic date, written content, and up to 5 photos.
             </p>
           </div>
-          <button type="button" onClick={() => setShowCreateContent(true)}>Create Content</button>
+          <button type="button" onClick={startCreateContent}>Create Content</button>
         </div>
 
         {showCreateContent ? (
           <div style={{ marginTop: 16, border: "1px solid #dbeafe", borderRadius: 12, padding: 16, background: "#f8fbff", display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <strong>{isEditingContent ? "Edit Content" : "Create Content"}</strong>
+              <span style={{ color: "#64748b", fontSize: 13 }}>
+                {totalSelectedImages}/5 images selected
+              </span>
+            </div>
             <div>
               <label>Heading</label>
               <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.heading} onChange={(e) => setContentForm((prev) => ({ ...prev, heading: e.target.value }))} placeholder="Enter content heading" />
@@ -396,12 +479,32 @@ export default function WebsiteEntranceExam() {
               <label>Date</label>
               <input style={{ width: "100%", padding: 10, marginTop: 6, background: "#e2e8f0" }} value={formatDate(new Date().toISOString())} readOnly />
             </div>
+            {contentForm.existingImages.length > 0 ? (
+              <div>
+                <label>Existing Photos</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginTop: 8 }}>
+                  {contentForm.existingImages.map((image) => (
+                    <div key={image.path} style={{ border: "1px solid #dbe3ef", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+                      {image.url ? (
+                        <img src={image.url} alt={contentForm.heading || "School content"} style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
+                      ) : (
+                        <div style={{ height: 100, display: "grid", placeItems: "center", color: "#64748b", fontSize: 12 }}>Image</div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(image.path)}
+                        style={{ width: "100%", border: 0, borderTop: "1px solid #dbe3ef", padding: "8px 10px", background: "#fff5f5", color: "#b91c1c", fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div>
               <label>Photos (Maximum 5)</label>
-              <input type="file" accept="image/*" multiple style={{ width: "100%", marginTop: 6 }} onChange={(e) => {
-                const files = Array.from(e.target.files || []).slice(0, 5);
-                setContentForm((prev) => ({ ...prev, photos: files }));
-              }} />
+              <input type="file" accept="image/*" multiple style={{ width: "100%", marginTop: 6 }} onChange={handlePhotoChange} />
               {selectedPhotoNames.length > 0 ? (
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {selectedPhotoNames.map((name) => (
@@ -415,7 +518,7 @@ export default function WebsiteEntranceExam() {
               <textarea rows="6" style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.content} onChange={(e) => setContentForm((prev) => ({ ...prev, content: e.target.value }))} placeholder="Write the school content here" />
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="button" onClick={saveContent} disabled={savingContent}>{savingContent ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={saveContent} disabled={savingContent}>{savingContent ? "Saving..." : isEditingContent ? "Update" : "Save"}</button>
               <button type="button" onClick={cancelCreateContent} disabled={savingContent}>Cancel</button>
             </div>
           </div>
@@ -425,8 +528,14 @@ export default function WebsiteEntranceExam() {
           {contents.map((item) => (
             <article key={item.id} style={{ border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "#fff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
-                <h3 style={{ margin: 0 }}>{item.heading}</h3>
-                <span style={{ color: "#64748b", fontSize: 13 }}>{item.display_date || formatDate(item.created_at)}</span>
+                <div>
+                  <h3 style={{ margin: 0 }}>{item.heading}</h3>
+                  <span style={{ color: "#64748b", fontSize: 13 }}>{item.display_date || formatDate(item.created_at)}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" onClick={() => startEditContent(item)}>Edit</button>
+                  <button type="button" onClick={() => deleteContent(item.id)} style={{ background: "#fff5f5", color: "#b91c1c", border: "1px solid #fecaca" }}>Delete</button>
+                </div>
               </div>
               <p style={{ color: "#334155", marginTop: 10, whiteSpace: "pre-wrap" }}>{item.content}</p>
               {item.image_urls?.length ? (

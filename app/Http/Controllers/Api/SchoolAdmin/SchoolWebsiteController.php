@@ -166,6 +166,69 @@ class SchoolWebsiteController extends Controller
         ], 201);
     }
 
+    public function updateContent(Request $request, SchoolWebsiteContent $content)
+    {
+        $school = $this->schoolFromRequest($request);
+        abort_if((int) $content->school_id !== (int) $school->id, 404, 'Content not found.');
+
+        $payload = $request->validate([
+            'heading' => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string', 'max:10000'],
+            'keep_image_paths' => ['nullable', 'array'],
+            'keep_image_paths.*' => ['string'],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $existingPaths = collect($content->image_paths ?? [])->filter()->values();
+        $keptPaths = collect($payload['keep_image_paths'] ?? [])
+            ->map(fn ($path) => trim((string) $path))
+            ->filter(fn ($path) => $path !== '' && $existingPaths->contains($path))
+            ->values();
+
+        $newPhotos = $request->file('photos', []);
+        $totalImages = $keptPaths->count() + count($newPhotos);
+        if ($totalImages > 5) {
+            return response()->json(['message' => 'A content entry can only have up to 5 photos.'], 422);
+        }
+
+        $removedPaths = $existingPaths->diff($keptPaths)->values();
+        foreach ($removedPaths as $removedPath) {
+            Storage::disk('public')->delete($removedPath);
+        }
+
+        $newPaths = [];
+        foreach ($newPhotos as $photo) {
+            $newPaths[] = $photo->store("schools/{$school->id}/website-contents", 'public');
+        }
+
+        $content->heading = trim((string) $payload['heading']);
+        $content->content = trim((string) $payload['content']);
+        $content->image_paths = $keptPaths->concat($newPaths)->values()->all();
+        $content->save();
+
+        return response()->json([
+            'message' => 'School content updated successfully.',
+            'data' => $this->contentPayload($content->fresh()),
+        ]);
+    }
+
+    public function destroyContent(Request $request, SchoolWebsiteContent $content)
+    {
+        $school = $this->schoolFromRequest($request);
+        abort_if((int) $content->school_id !== (int) $school->id, 404, 'Content not found.');
+
+        foreach ((array) ($content->image_paths ?? []) as $path) {
+            Storage::disk('public')->delete($path);
+        }
+
+        $content->delete();
+
+        return response()->json([
+            'message' => 'School content deleted successfully.',
+        ]);
+    }
+
     private function schoolFromRequest(Request $request): School
     {
         $schoolId = (int) $request->user()->school_id;
@@ -174,11 +237,14 @@ class SchoolWebsiteController extends Controller
 
     private function contentPayload(SchoolWebsiteContent $content): array
     {
+        $paths = collect($content->image_paths ?? [])->filter()->values();
+
         return [
             'id' => $content->id,
             'heading' => $content->heading,
             'content' => $content->content,
-            'image_urls' => collect($content->image_paths ?? [])
+            'image_paths' => $paths->all(),
+            'image_urls' => $paths
                 ->map(fn ($path) => $this->storageUrl($path))
                 ->filter()
                 ->values()

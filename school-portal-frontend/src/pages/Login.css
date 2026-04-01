@@ -315,12 +315,30 @@
   padding: 0;
 }
 
+.login-back-link {
+  margin-top: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #0f5b76;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.login-back-link:hover {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
 .login-form {
   display: grid;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 10px;
 }
-
 .login-form label {
   color: #1e293b;
   font-weight: 700;
@@ -501,3 +519,4 @@
 .login-page--compact .login-mark img {
   max-height: 140px;
 }
+

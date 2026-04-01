@@ -69,6 +69,9 @@ function Login() {
     setLogoLoadError(false);
   }, [tenantLogoUrl]);
 
+  const goBackToSchoolWebsite = () => {
+    navigate("/");
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -169,6 +172,12 @@ function Login() {
             </div>
           </div>
 
+          {tenantSchool && !isLytCentralDomain ? (
+            <button type="button" className="login-back-link" onClick={goBackToSchoolWebsite}>
+              Back to School Website
+            </button>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="login-form">
             <label htmlFor="login-email">Email</label>
             <input
@@ -232,3 +241,4 @@ function Login() {
 }
 
 export default Login;
+

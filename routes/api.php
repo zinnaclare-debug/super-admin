@@ -158,6 +158,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::put('/school-admin/website', [SchoolAdminWebsiteController::class, 'upsert']);
     Route::get('/school-admin/website/contents', [SchoolAdminWebsiteController::class, 'contents']);
     Route::post('/school-admin/website/contents', [SchoolAdminWebsiteController::class, 'storeContent']);
+    Route::patch('/school-admin/website/contents/{content}', [SchoolAdminWebsiteController::class, 'updateContent']);
+    Route::delete('/school-admin/website/contents/{content}', [SchoolAdminWebsiteController::class, 'destroyContent']);
     Route::get('/school-admin/website/applications', [SchoolAdminWebsiteController::class, 'applications']);
     Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
     Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
@@ -489,6 +491,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 
