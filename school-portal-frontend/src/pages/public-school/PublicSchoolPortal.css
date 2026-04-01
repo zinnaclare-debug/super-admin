@@ -19,24 +19,33 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 20px 0;
+  gap: 18px;
+  padding: 20px 22px;
+  margin-top: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(14px);
 }
 
 .school-site-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  min-width: 0;
 }
 
 .school-site-brand img,
 .school-site-brand-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  object-fit: cover;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  object-fit: contain;
+  padding: 6px;
   background: #fff;
-  border: 1px solid #dbeafe;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.08);
 }
 
 .school-site-brand-mark {
@@ -48,13 +57,16 @@
 
 .school-site-brand strong {
   display: block;
-  font-size: 1rem;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  color: var(--school-primary);
 }
 
 .school-site-links {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
 }
 
@@ -63,12 +75,14 @@
   color: #0f172a;
   padding: 10px 14px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 700;
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
 .school-site-links a.is-active,
 .school-site-links a:hover {
   background: #ffffff;
+  color: var(--school-primary);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
 }
 
@@ -239,6 +253,11 @@
 
   .school-site-nav {
     justify-content: stretch;
+    padding: 18px;
+  }
+
+  .school-site-brand {
+    width: 100%;
   }
 
   .school-site-links {
@@ -249,3 +268,4 @@
     grid-template-columns: 1fr;
   }
 }
+
