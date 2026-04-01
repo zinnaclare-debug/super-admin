@@ -26,6 +26,32 @@ function mapsLink(address) {
   return value ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}` : "";
 }
 
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s6-5.6 6-11a6 6 0 1 0-12 0c0 5.4 6 11 6 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.3 19.3 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7l.5 3.4a2 2 0 0 1-.6 1.8l-1.4 1.4a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 1.8-.6l3.4.5A2 2 0 0 1 22 16.9Z" />
+    </svg>
+  );
+}
+
 function ContactWidget({ icon, title, value, children }) {
   return (
     <article className="school-site-contact-widget">
@@ -34,7 +60,7 @@ function ContactWidget({ icon, title, value, children }) {
         <h3>{title}</h3>
         <p>{value}</p>
       </div>
-      {children}
+      <div className="school-site-contact-footer">{children}</div>
     </article>
   );
 }
@@ -255,7 +281,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           </section>
 
           <section className="school-site-contact-row">
-            <ContactWidget icon={"\u2316"} title="Visit the Campus" value={contactAddress || "Address coming soon"}>
+            <ContactWidget icon={<PinIcon />} title="Visit the Campus" value={contactAddress || "Address coming soon"}>
               {mapHref ? (
                 <a className="school-site-contact-link" href={mapHref} target="_blank" rel="noreferrer">
                   Open Map
@@ -263,7 +289,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               ) : null}
             </ContactWidget>
 
-            <ContactWidget icon={"\u2709"} title="Send an Email" value={contactEmail || "No public email yet"}>
+            <ContactWidget icon={<MailIcon />} title="Send an Email" value={contactEmail || "No public email yet"}>
               {contactEmail ? (
                 <a className="school-site-contact-link" href={`mailto:${contactEmail}`}>
                   Mail School
@@ -271,7 +297,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               ) : null}
             </ContactWidget>
 
-            <ContactWidget icon={"\u260E"} title="Speak With the School" value={contactPhone || "No public phone yet"}>
+            <ContactWidget icon={<PhoneIcon />} title="Speak With the School" value={contactPhone || "No public phone yet"}>
               <div className="school-site-contact-actions">
                 {phoneHref ? (
                   <a className="school-site-contact-link" href={`tel:${phoneHref}`}>
