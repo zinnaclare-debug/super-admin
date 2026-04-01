@@ -138,3 +138,4 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+

@@ -57,6 +57,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const website = school?.website_content || {};
   const entranceExam = school?.entrance_exam || {};
   const logoUrl = school?.logo_url ? toAbsoluteUrl(school.logo_url) : "";
+  const currentYear = new Date().getFullYear();
 
   const themeStyle = useMemo(
     () => ({
@@ -86,6 +87,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     { key: "apply", label: "Apply Now", href: "/apply-now", visible: Boolean(website.show_apply_now) },
     { key: "exam", label: "Entrance Exam", href: "/entrance-exam", visible: Boolean(website.show_entrance_exam) },
     { key: "verify", label: "Verify Score", href: "/verify-score", visible: Boolean(website.show_verify_score) },
+    { key: "login", label: "Login", href: "/login", visible: true },
   ].filter((item) => item.visible);
 
   const classOptions = Array.isArray(entranceExam.available_classes)
@@ -162,7 +164,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           {logoUrl ? <img src={logoUrl} alt={`${school.name} logo`} /> : <div className="school-site-brand-mark">{school.name?.slice(0, 1) || "S"}</div>}
           <div>
             <strong>{school.name}</strong>
-            <span>{school.location || website.address || school.subdomain}</span>
           </div>
         </div>
         <nav className="school-site-links">
@@ -171,7 +172,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               {item.label}
             </Link>
           ))}
-          <Link to="/login" className="school-site-login">Login</Link>
         </nav>
       </header>
 
@@ -181,25 +181,34 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         <main className="school-site-main">
           <section className="school-site-hero">
             <div>
-              <p className="school-site-kicker">Dedicated School Website</p>
               <h1>{website.hero_title || `Welcome to ${school.name}`}</h1>
-              <p>{website.hero_subtitle}</p>
+              {website.motto ? <div className="school-site-motto-box">{website.motto}</div> : null}
+              {website.hero_subtitle ? <p>{website.hero_subtitle}</p> : null}
               <div className="school-site-hero-actions">
                 {website.show_apply_now ? <Link to="/apply-now">Apply Now</Link> : null}
                 {website.show_entrance_exam ? <Link to="/entrance-exam">Entrance Exam</Link> : null}
               </div>
             </div>
-            <aside className="school-site-contact-card">
-              <h3>Contact</h3>
-              <p>{website.address || school.location || "Address coming soon"}</p>
-              <p>{website.contact_email || school.contact_email || "No public email yet"}</p>
-              <p>{website.contact_phone || school.contact_phone || "No public phone yet"}</p>
-            </aside>
           </section>
 
           <section className="school-site-section">
             <h2>{website.about_title || "About Our School"}</h2>
             <p>{website.about_text}</p>
+          </section>
+
+          <section className="school-site-contact-row">
+            <article className="school-site-contact-card">
+              <h3>Contact Address</h3>
+              <p>{website.address || school.location || "Address coming soon"}</p>
+            </article>
+            <article className="school-site-contact-card">
+              <h3>Email</h3>
+              <p>{website.contact_email || school.contact_email || "No public email yet"}</p>
+            </article>
+            <article className="school-site-contact-card">
+              <h3>Phone</h3>
+              <p>{website.contact_phone || school.contact_phone || "No public phone yet"}</p>
+            </article>
           </section>
 
           <section className="school-site-section school-site-cards">
@@ -333,6 +342,14 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           </section>
         </main>
       ) : null}
+
+      <footer className="school-site-footer">
+        <div className="school-site-footer-mark">
+          <span className="school-site-footer-c">©</span>
+          <span>{currentYear}</span>
+        </div>
+        <p>DESIGNED BY LYTE BRIDGE</p>
+      </footer>
     </div>
   );
 }

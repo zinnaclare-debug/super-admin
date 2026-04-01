@@ -33,7 +33,8 @@ class SchoolPublicWebsiteData
 
         return [
             'hero_title' => self::string($value['hero_title'] ?? null, $schoolName !== '' ? "Welcome to {$schoolName}" : 'Welcome to Our School', 160),
-            'hero_subtitle' => self::string($value['hero_subtitle'] ?? null, 'A dedicated school portal for admissions, entrance exams, score verification, and parent-friendly school information.', 600),
+            'hero_subtitle' => self::string($value['hero_subtitle'] ?? null, '', 600),
+            'motto' => self::string($value['motto'] ?? null, '', 255),
             'about_title' => self::string($value['about_title'] ?? null, 'About Our School', 120),
             'about_text' => self::string($value['about_text'] ?? null, $schoolName !== '' ? "Learn more about {$schoolName}, our values, and the learning experience we provide for every child." : 'Learn more about our values and learning experience.', 3000),
             'admissions_intro' => self::string($value['admissions_intro'] ?? null, 'Complete the application form to begin admission processing for your child.', 1200),
@@ -244,3 +245,4 @@ class SchoolPublicWebsiteData
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
+

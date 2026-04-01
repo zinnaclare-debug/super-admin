@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
+use App\Support\SchoolPublicWebsiteData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -47,6 +48,8 @@ class DashboardController extends Controller
             ->where('enabled', true)
             ->count();
 
+        $websiteContent = SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
+
         return response()->json([
             'school_name' => $school?->name,
             'school_location' => $school?->location,
@@ -56,6 +59,7 @@ class DashboardController extends Controller
             'school_logo_url' => $this->storageUrl($school?->logo_path),
             'head_of_school_name' => $school?->head_of_school_name,
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
+            'school_motto' => $websiteContent['motto'] ?? '',
             'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
             'department_templates' => $this->resolveDepartmentTemplates($school),
             'class_templates' => ClassTemplateSchema::normalize($school?->class_templates),
@@ -119,6 +123,7 @@ class DashboardController extends Controller
             'school_location' => 'nullable|string|max:255',
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:30',
+            'school_motto' => 'nullable|string|max:255',
             'paystack_subaccount_code' => [
                 'nullable',
                 'string',
@@ -130,16 +135,18 @@ class DashboardController extends Controller
         $hasLocationField = $request->has('school_location');
         $hasContactEmailField = $request->has('contact_email');
         $hasContactPhoneField = $request->has('contact_phone');
+        $hasSchoolMottoField = $request->has('school_motto');
         $hasPaystackSubaccountField = $request->has('paystack_subaccount_code');
 
         if (
             ! $hasLocationField
             && !$hasContactEmailField
             && !$hasContactPhoneField
+            && !$hasSchoolMottoField
             && !$hasPaystackSubaccountField
         ) {
             return response()->json([
-                'message' => 'Provide school_location, contact_email, contact_phone, or paystack_subaccount_code.',
+                'message' => 'Provide school_location, contact_email, contact_phone, school_motto, or paystack_subaccount_code.',
             ], 422);
         }
 
@@ -157,6 +164,11 @@ class DashboardController extends Controller
             $contactPhone = trim((string) ($payload['contact_phone'] ?? ''));
             $school->contact_phone = $contactPhone !== '' ? $contactPhone : null;
         }
+        if ($hasSchoolMottoField) {
+            $websiteContent = is_array($school->website_content) ? $school->website_content : [];
+            $websiteContent['motto'] = trim((string) ($payload['school_motto'] ?? ''));
+            $school->website_content = SchoolPublicWebsiteData::normalizeWebsiteContent($websiteContent, $school);
+        }
         if ($hasPaystackSubaccountField) {
             $subaccountCode = trim((string) ($payload['paystack_subaccount_code'] ?? ''));
             $school->paystack_subaccount_code = $subaccountCode !== '' ? $subaccountCode : null;
@@ -171,6 +183,7 @@ class DashboardController extends Controller
                 'school_location' => $school->location,
                 'contact_email' => $school->contact_email,
                 'contact_phone' => $school->contact_phone,
+                'school_motto' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school)['motto'] ?? '',
                 'paystack_subaccount_code' => $school->paystack_subaccount_code,
                 'school_logo_url' => $this->storageUrl($school->logo_path),
                 'head_of_school_name' => $school->head_of_school_name,
@@ -502,3 +515,6 @@ class DashboardController extends Controller
         ];
     }
 }
+
+
+
