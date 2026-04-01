@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 
 const emptyWebsiteContent = {
@@ -36,6 +37,12 @@ const blankQuestion = {
   option_c: "",
   option_d: "",
   correct_option: "A",
+};
+
+const emptyContentForm = {
+  heading: "",
+  content: "",
+  photos: [],
 };
 
 function normalizeQuestion(question = {}) {
@@ -96,27 +103,52 @@ function coerceExamConfig(config, availableClasses) {
   };
 }
 
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function WebsiteEntranceExam() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingContent, setSavingContent] = useState(false);
   const [websiteContent, setWebsiteContent] = useState(emptyWebsiteContent);
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
   const [availableClasses, setAvailableClasses] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [contents, setContents] = useState([]);
+  const [showCreateContent, setShowCreateContent] = useState(false);
+  const [contentForm, setContentForm] = useState(emptyContentForm);
+
+  const loadWebsite = async () => {
+    const websiteRes = await api.get("/api/school-admin/website");
+    const normalized = normalizeData(websiteRes.data || {});
+    setAvailableClasses(normalized.availableClasses);
+    setWebsiteContent(normalized.websiteContent);
+    setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
+  };
+
+  const loadApplications = async () => {
+    const applicationsRes = await api.get("/api/school-admin/website/applications");
+    setApplications(Array.isArray(applicationsRes.data?.data) ? applicationsRes.data.data : []);
+  };
+
+  const loadContents = async () => {
+    const contentsRes = await api.get("/api/school-admin/website/contents");
+    setContents(Array.isArray(contentsRes.data?.data) ? contentsRes.data.data : []);
+  };
 
   const load = async () => {
     setLoading(true);
     try {
-      const [websiteRes, applicationsRes] = await Promise.all([
-        api.get("/api/school-admin/website"),
-        api.get("/api/school-admin/website/applications"),
-      ]);
-
-      const normalized = normalizeData(websiteRes.data || {});
-      setAvailableClasses(normalized.availableClasses);
-      setWebsiteContent(normalized.websiteContent);
-      setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
-      setApplications(Array.isArray(applicationsRes.data?.data) ? applicationsRes.data.data : []);
+      await Promise.all([loadWebsite(), loadApplications(), loadContents()]);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load website and entrance exam settings.");
     } finally {
@@ -128,9 +160,20 @@ export default function WebsiteEntranceExam() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (searchParams.get("createContent") === "1") {
+      setShowCreateContent(true);
+    }
+  }, [searchParams]);
+
   const questionCount = useMemo(
     () => examConfig.class_exams.reduce((sum, exam) => sum + (Array.isArray(exam.questions) ? exam.questions.length : 0), 0),
     [examConfig.class_exams]
+  );
+
+  const selectedPhotoNames = useMemo(
+    () => contentForm.photos.map((file) => file.name),
+    [contentForm.photos]
   );
 
   const updateWebsiteContent = (field, value) => {
@@ -204,13 +247,59 @@ export default function WebsiteEntranceExam() {
       setWebsiteContent(normalized.websiteContent);
       setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
       alert("Website and entrance exam settings saved.");
-      await load();
     } catch (err) {
       const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
       alert(validationError || err?.response?.data?.message || "Failed to save website and entrance exam settings.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const clearCreateContentFlag = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("createContent");
+      return next;
+    });
+  };
+
+  const saveContent = async () => {
+    if (!contentForm.heading.trim() || !contentForm.content.trim()) {
+      return alert("Heading and content are required.");
+    }
+
+    if (contentForm.photos.length > 5) {
+      return alert("You can upload a maximum of 5 photos.");
+    }
+
+    setSavingContent(true);
+    try {
+      const formData = new FormData();
+      formData.append("heading", contentForm.heading.trim());
+      formData.append("content", contentForm.content.trim());
+      contentForm.photos.forEach((file) => formData.append("photos[]", file));
+
+      await api.post("/api/school-admin/website/contents", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      alert("School content created successfully.");
+      setContentForm(emptyContentForm);
+      setShowCreateContent(false);
+      clearCreateContentFlag();
+      await loadContents();
+    } catch (err) {
+      const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
+      alert(validationError || err?.response?.data?.message || "Failed to create school content.");
+    } finally {
+      setSavingContent(false);
+    }
+  };
+
+  const cancelCreateContent = () => {
+    setShowCreateContent(false);
+    clearCreateContentFlag();
+    setContentForm(emptyContentForm);
   };
 
   if (loading) return <p>Loading website and entrance exam settings...</p>;
@@ -241,7 +330,6 @@ export default function WebsiteEntranceExam() {
             <label>Hero Subtitle</label>
             <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.hero_subtitle} onChange={(e) => updateWebsiteContent("hero_subtitle", e.target.value)} />
           </div>
-
           <div style={{ gridColumn: "1 / -1" }}>
             <label>Apply Now Intro</label>
             <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.admissions_intro} onChange={(e) => updateWebsiteContent("admissions_intro", e.target.value)} />
@@ -284,6 +372,77 @@ export default function WebsiteEntranceExam() {
           <label><input type="checkbox" checked={websiteContent.show_apply_now} onChange={(e) => updateWebsiteContent("show_apply_now", e.target.checked)} /> Show Apply Now</label>
           <label><input type="checkbox" checked={websiteContent.show_entrance_exam} onChange={(e) => updateWebsiteContent("show_entrance_exam", e.target.checked)} /> Show Entrance Exam</label>
           <label><input type="checkbox" checked={websiteContent.show_verify_score} onChange={(e) => updateWebsiteContent("show_verify_score", e.target.checked)} /> Show Verify Score</label>
+        </div>
+      </section>
+
+      <section style={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 14, padding: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>School Contents</h2>
+            <p style={{ marginTop: 8, color: "#475569" }}>
+              Create school content blocks with heading, automatic date, written content, and up to 5 photos.
+            </p>
+          </div>
+          <button type="button" onClick={() => setShowCreateContent(true)}>Create Content</button>
+        </div>
+
+        {showCreateContent ? (
+          <div style={{ marginTop: 16, border: "1px solid #dbeafe", borderRadius: 12, padding: 16, background: "#f8fbff", display: "grid", gap: 12 }}>
+            <div>
+              <label>Heading</label>
+              <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.heading} onChange={(e) => setContentForm((prev) => ({ ...prev, heading: e.target.value }))} placeholder="Enter content heading" />
+            </div>
+            <div>
+              <label>Date</label>
+              <input style={{ width: "100%", padding: 10, marginTop: 6, background: "#e2e8f0" }} value={formatDate(new Date().toISOString())} readOnly />
+            </div>
+            <div>
+              <label>Photos (Maximum 5)</label>
+              <input type="file" accept="image/*" multiple style={{ width: "100%", marginTop: 6 }} onChange={(e) => {
+                const files = Array.from(e.target.files || []).slice(0, 5);
+                setContentForm((prev) => ({ ...prev, photos: files }));
+              }} />
+              {selectedPhotoNames.length > 0 ? (
+                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {selectedPhotoNames.map((name) => (
+                    <span key={name} style={{ padding: "6px 10px", borderRadius: 999, background: "#eff6ff", color: "#1d4ed8", fontSize: 12, fontWeight: 600 }}>{name}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <label>Content</label>
+              <textarea rows="6" style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.content} onChange={(e) => setContentForm((prev) => ({ ...prev, content: e.target.value }))} placeholder="Write the school content here" />
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={saveContent} disabled={savingContent}>{savingContent ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={cancelCreateContent} disabled={savingContent}>Cancel</button>
+            </div>
+          </div>
+        ) : null}
+
+        <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+          {contents.map((item) => (
+            <article key={item.id} style={{ border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "#fff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                <h3 style={{ margin: 0 }}>{item.heading}</h3>
+                <span style={{ color: "#64748b", fontSize: 13 }}>{item.display_date || formatDate(item.created_at)}</span>
+              </div>
+              <p style={{ color: "#334155", marginTop: 10, whiteSpace: "pre-wrap" }}>{item.content}</p>
+              {item.image_urls?.length ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginTop: 12 }}>
+                  {item.image_urls.map((url) => (
+                    <img key={url} src={url} alt={item.heading} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10, border: "1px solid #dbe3ef" }} />
+                  ))}
+                </div>
+              ) : null}
+            </article>
+          ))}
+          {contents.length === 0 ? (
+            <div style={{ border: "1px dashed #cbd5e1", borderRadius: 12, padding: 18, textAlign: "center", color: "#64748b" }}>
+              No school content created yet.
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -420,5 +579,3 @@ export default function WebsiteEntranceExam() {
     </div>
   );
 }
-
-

@@ -68,6 +68,7 @@ Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/tenant/context', [TenantContextController::class, 'show']);
 Route::get('/public/school-site', [PublicSchoolWebsiteController::class, 'show']);
+Route::get('/public/school-contents', [PublicSchoolWebsiteController::class, 'contents']);
 Route::post('/public/apply-now', [PublicSchoolWebsiteController::class, 'applyNow']);
 Route::post('/public/entrance-exam/lookup', [PublicSchoolWebsiteController::class, 'lookupEntranceExam']);
 Route::post('/public/entrance-exam/submit', [PublicSchoolWebsiteController::class, 'submitEntranceExam']);
@@ -155,6 +156,8 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/website', [SchoolAdminWebsiteController::class, 'show']);
     Route::put('/school-admin/website', [SchoolAdminWebsiteController::class, 'upsert']);
+    Route::get('/school-admin/website/contents', [SchoolAdminWebsiteController::class, 'contents']);
+    Route::post('/school-admin/website/contents', [SchoolAdminWebsiteController::class, 'storeContent']);
     Route::get('/school-admin/website/applications', [SchoolAdminWebsiteController::class, 'applications']);
     Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
     Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
@@ -486,6 +489,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 

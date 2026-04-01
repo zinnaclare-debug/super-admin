@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\SchoolAdmissionApplication;
+use App\Models\SchoolWebsiteContent;
 use App\Support\SchoolPublicWebsiteData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -38,6 +39,7 @@ class PublicSchoolWebsiteController extends Controller
                 'contact_email' => $school->contact_email,
                 'contact_phone' => $school->contact_phone,
                 'website_content' => $websiteContent,
+                'content_feed' => $this->contentFeedPayload($school, 1),
                 'entrance_exam' => [
                     'enabled' => (bool) $entranceExamConfig['enabled'],
                     'application_open' => (bool) $entranceExamConfig['application_open'],
@@ -58,6 +60,14 @@ class PublicSchoolWebsiteController extends Controller
                 ],
             ],
         ]);
+    }
+
+    public function contents(Request $request)
+    {
+        $school = $this->tenantSchoolOrFail($request);
+        $page = max(1, (int) $request->query('page', 1));
+
+        return response()->json($this->contentFeedPayload($school, $page));
     }
 
     public function applyNow(Request $request)
@@ -292,6 +302,43 @@ class PublicSchoolWebsiteController extends Controller
             'result_status' => $application->result_status,
             'submitted_at' => optional($application->exam_submitted_at)->toIso8601String(),
             'exam_result' => $application->exam_result,
+        ];
+    }
+
+    private function contentFeedPayload(School $school, int $page = 1): array
+    {
+        $paginator = SchoolWebsiteContent::query()
+            ->where('school_id', $school->id)
+            ->latest()
+            ->paginate(1, ['*'], 'page', max(1, $page));
+
+        return [
+            'data' => collect($paginator->items())
+                ->map(fn (SchoolWebsiteContent $content) => $this->contentPayload($content))
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    private function contentPayload(SchoolWebsiteContent $content): array
+    {
+        return [
+            'id' => $content->id,
+            'heading' => $content->heading,
+            'content' => $content->content,
+            'image_urls' => collect($content->image_paths ?? [])
+                ->map(fn ($path) => $this->storageUrl($path))
+                ->filter()
+                ->values()
+                ->all(),
+            'created_at' => optional($content->created_at)->toIso8601String(),
+            'display_date' => optional($content->created_at)->format('F j, Y'),
         ];
     }
 

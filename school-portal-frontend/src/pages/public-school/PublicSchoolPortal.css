@@ -345,3 +345,133 @@
 
 
 
+
+.school-site-content-section {
+  margin-top: 24px;
+}
+
+.school-site-content-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.school-site-content-head h2 {
+  margin: 0;
+}
+
+.school-site-content-head p {
+  margin: 8px 0 0;
+  color: #475569;
+}
+
+.school-site-content-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.school-site-content-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+}
+
+.school-site-content-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.school-site-content-meta h3 {
+  margin: 0;
+  color: var(--school-primary);
+}
+
+.school-site-content-meta span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.school-site-content-copy p {
+  margin: 12px 0 0;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.school-site-content-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.school-site-content-gallery img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.school-site-content-empty {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+}
+
+.school-site-content-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.school-site-content-pagination button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  background: linear-gradient(125deg, var(--school-primary) 0%, var(--school-accent) 100%);
+  color: #fff;
+  cursor: pointer;
+}
+
+.school-site-content-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.school-site-content-pagination span {
+  color: #475569;
+  font-weight: 600;
+}
+
+@media (max-width: 820px) {
+  .school-site-content-head,
+  .school-site-content-meta,
+  .school-site-content-pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

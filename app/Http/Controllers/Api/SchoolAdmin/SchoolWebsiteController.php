@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\SchoolAdmissionApplication;
+use App\Models\SchoolWebsiteContent;
 use App\Support\SchoolPublicWebsiteData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +34,8 @@ class SchoolWebsiteController extends Controller
             'website_content.hero_subtitle' => ['nullable', 'string', 'max:600'],
             'website_content.about_title' => ['nullable', 'string', 'max:120'],
             'website_content.about_text' => ['nullable', 'string', 'max:3000'],
+            'website_content.core_values_text' => ['nullable', 'string', 'max:3000'],
+            'website_content.mission_text' => ['nullable', 'string', 'max:3000'],
             'website_content.admissions_intro' => ['nullable', 'string', 'max:1200'],
             'website_content.address' => ['nullable', 'string', 'max:255'],
             'website_content.contact_email' => ['nullable', 'email', 'max:255'],
@@ -120,10 +123,69 @@ class SchoolWebsiteController extends Controller
         return response()->json(['data' => $applications]);
     }
 
+    public function contents(Request $request)
+    {
+        $school = $this->schoolFromRequest($request);
+
+        $contents = SchoolWebsiteContent::query()
+            ->where('school_id', $school->id)
+            ->latest()
+            ->get()
+            ->map(fn (SchoolWebsiteContent $content) => $this->contentPayload($content))
+            ->values();
+
+        return response()->json(['data' => $contents]);
+    }
+
+    public function storeContent(Request $request)
+    {
+        $school = $this->schoolFromRequest($request);
+
+        $payload = $request->validate([
+            'heading' => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string', 'max:10000'],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $imagePaths = [];
+        foreach ($request->file('photos', []) as $photo) {
+            $imagePaths[] = $photo->store("schools/{$school->id}/website-contents", 'public');
+        }
+
+        $content = SchoolWebsiteContent::create([
+            'school_id' => $school->id,
+            'heading' => trim((string) $payload['heading']),
+            'content' => trim((string) $payload['content']),
+            'image_paths' => $imagePaths,
+        ]);
+
+        return response()->json([
+            'message' => 'School content created successfully.',
+            'data' => $this->contentPayload($content),
+        ], 201);
+    }
+
     private function schoolFromRequest(Request $request): School
     {
         $schoolId = (int) $request->user()->school_id;
         return School::query()->findOrFail($schoolId);
+    }
+
+    private function contentPayload(SchoolWebsiteContent $content): array
+    {
+        return [
+            'id' => $content->id,
+            'heading' => $content->heading,
+            'content' => $content->content,
+            'image_urls' => collect($content->image_paths ?? [])
+                ->map(fn ($path) => $this->storageUrl($path))
+                ->filter()
+                ->values()
+                ->all(),
+            'created_at' => optional($content->created_at)->toIso8601String(),
+            'display_date' => optional($content->created_at)->format('F j, Y'),
+        ];
     }
 
     private function storageUrl(?string $path): ?string
@@ -139,4 +201,3 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
-

@@ -282,6 +282,7 @@ function SchoolDashboard() {
         </div>
         <div className="sd-actions">
           <Link to="/school/admin/website" className="sd-link-button">Open School Website Content</Link>
+          <Link to="/school/admin/website?createContent=1" className="sd-link-button">Create Contents</Link>
         </div>
       </section>
       <section className="sd-card sd-branding">
@@ -379,6 +380,7 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
+
 
 
 

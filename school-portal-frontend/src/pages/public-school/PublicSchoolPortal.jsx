@@ -26,6 +26,17 @@ function mapsLink(address) {
   return value ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}` : "";
 }
 
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function PinIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -69,6 +80,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [siteData, setSiteData] = useState(initialSiteData);
   const [loading, setLoading] = useState(!initialSiteData);
   const [error, setError] = useState("");
+  const [contentFeed, setContentFeed] = useState(initialSiteData?.school?.content_feed || { data: [], meta: { current_page: 1, last_page: 1, total: 0 } });
+  const [contentLoading, setContentLoading] = useState(false);
   const [applyForm, setApplyForm] = useState({
     full_name: "",
     phone: "",
@@ -84,7 +97,10 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [busyAction, setBusyAction] = useState("");
 
   useEffect(() => {
-    if (initialSiteData) return;
+    if (initialSiteData) {
+      setContentFeed(initialSiteData?.school?.content_feed || { data: [], meta: { current_page: 1, last_page: 1, total: 0 } });
+      return;
+    }
 
     let active = true;
     setLoading(true);
@@ -93,6 +109,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       .then((res) => {
         if (!active) return;
         setSiteData(res.data);
+        setContentFeed(res.data?.school?.content_feed || { data: [], meta: { current_page: 1, last_page: 1, total: 0 } });
       })
       .catch((err) => {
         if (!active) return;
@@ -134,6 +151,22 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     }
   }, [entranceExam.available_classes, applyForm.applying_for_class]);
 
+  const loadContentPage = async (pageNumber) => {
+    if (pageNumber < 1) return;
+    setContentLoading(true);
+    try {
+      const res = await api.get("/api/public/school-contents", { params: { page: pageNumber } });
+      setContentFeed({
+        data: Array.isArray(res.data?.data) ? res.data.data : [],
+        meta: res.data?.meta || { current_page: 1, last_page: 1, total: 0 },
+      });
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to load school contents.");
+    } finally {
+      setContentLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="school-site-shell"><p>Loading school website...</p></div>;
   }
@@ -153,6 +186,9 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const classOptions = Array.isArray(entranceExam.available_classes)
     ? entranceExam.available_classes.filter((item) => item.enabled || page === "apply")
     : [];
+
+  const contentItems = Array.isArray(contentFeed?.data) ? contentFeed.data : [];
+  const contentMeta = contentFeed?.meta || { current_page: 1, last_page: 1, total: 0 };
 
   const handleApply = async (e) => {
     e.preventDefault();
@@ -256,8 +292,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             </div>
           </section>
 
-
-
           <section className="school-site-section school-site-cards">
             <article>
               <h3>About Us</h3>
@@ -271,6 +305,55 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               <h3>Mission</h3>
               <p>{website.mission_text}</p>
             </article>
+          </section>
+
+          <section className="school-site-content-section school-site-section">
+            <div className="school-site-content-head">
+              <div>
+                <h2>School Contents</h2>
+                <p>Highlights, updates, and important stories from the school community.</p>
+              </div>
+              {contentMeta.total > 0 ? (
+                <span className="school-site-content-counter">{contentMeta.current_page} / {contentMeta.last_page}</span>
+              ) : null}
+            </div>
+
+            {contentLoading ? <p className="school-site-content-empty">Loading school contents...</p> : null}
+
+            {!contentLoading && contentItems.length > 0 ? contentItems.map((item) => (
+              <article key={item.id} className="school-site-content-card">
+                <div className="school-site-content-copy">
+                  <div className="school-site-content-meta">
+                    <h3>{item.heading}</h3>
+                    <span>{item.display_date || formatDate(item.created_at)}</span>
+                  </div>
+                  <p>{item.content}</p>
+                </div>
+                {item.image_urls?.length ? (
+                  <div className="school-site-content-gallery">
+                    {item.image_urls.map((url, index) => (
+                      <img key={`${item.id}-${index}`} src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            )) : null}
+
+            {!contentLoading && contentItems.length === 0 ? (
+              <div className="school-site-content-empty">No school content has been published yet.</div>
+            ) : null}
+
+            {contentMeta.total > 1 ? (
+              <div className="school-site-content-pagination">
+                <button type="button" onClick={() => loadContentPage(contentMeta.current_page - 1)} disabled={contentLoading || contentMeta.current_page <= 1}>
+                  Previous
+                </button>
+                <span>Page {contentMeta.current_page} of {contentMeta.last_page}</span>
+                <button type="button" onClick={() => loadContentPage(contentMeta.current_page + 1)} disabled={contentLoading || contentMeta.current_page >= contentMeta.last_page}>
+                  Next
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <section className="school-site-contact-row">
@@ -424,5 +507,3 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
-
-
