@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\SchoolAdmin\AcademicSessionController;
 use App\Http\Controllers\Api\SchoolAdmin\AcademicStructureController;
 use App\Http\Controllers\Api\SchoolAdmin\DashboardController as SchoolAdminDashboardController;
 use App\Http\Controllers\Api\SchoolAdmin\SchoolSubscriptionController as SchoolAdminSubscriptionController;
+use App\Http\Controllers\Api\SchoolAdmin\SchoolWebsiteController as SchoolAdminWebsiteController;
 use App\Http\Controllers\Api\School\FeatureAccessController;
 use App\Http\Controllers\Api\SchoolAdmin\ClassManagementController;
 use App\Http\Controllers\Api\SchoolAdmin\EnrollmentController;
@@ -152,6 +153,9 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/school-admin/payments/download/pdf', [SchoolAdminPaymentsController::class, 'downloadPdf'])
         ->middleware('feature:school fees');
+    Route::get('/school-admin/website', [SchoolAdminWebsiteController::class, 'show']);
+    Route::put('/school-admin/website', [SchoolAdminWebsiteController::class, 'upsert']);
+    Route::get('/school-admin/website/applications', [SchoolAdminWebsiteController::class, 'applications']);
     Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
     Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
     Route::post('/school-admin/subscription/bank-transfer', [SchoolAdminSubscriptionController::class, 'submitBankTransfer']);
@@ -482,6 +486,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 

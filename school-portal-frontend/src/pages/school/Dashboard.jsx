@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
 import "./Dashboard.css";
 
@@ -257,6 +258,15 @@ function SchoolDashboard() {
         )}
       </section>
 
+      <section className="sd-card">
+        <div className="sd-section-head">
+          <h2>School Website & Entrance Exam</h2>
+          <p>Manage your public school homepage, Apply Now page, entrance exam, and score verification flow.</p>
+        </div>
+        <div className="sd-actions">
+          <Link to="/school/admin/website" className="sd-link-button">Open Website & Entrance Exam</Link>
+        </div>
+      </section>
       <section className="sd-card sd-branding">
         <div className="sd-branding__form">
           <div className="sd-section-head">
@@ -342,4 +352,6 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
+
+
 
