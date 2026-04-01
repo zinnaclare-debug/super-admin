@@ -320,6 +320,12 @@ function DashboardLayout() {
               <NavLink to="/school/dashboard" title="Dashboard" style={linkStyle}>
                 {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
               </NavLink>
+              <NavLink to="/school/admin/website" title="Website" style={linkStyle}>
+                {isCompactSidebar ? "WEBSITE" : "Website"}
+              </NavLink>
+              <NavLink to="/school/admin/entrance-exam" title="Entrance Exam" style={linkStyle}>
+                {isCompactSidebar ? "ENTRANCE EXAM" : "Entrance Exam"}
+              </NavLink>
               {schoolAdminPaymentsEnabled ? (
                 <NavLink to="/school/admin/payments" title="Payments" style={linkStyle}>
                   {isCompactSidebar ? "PAYMENTS" : "Payments"}
@@ -500,3 +506,4 @@ function DashboardLayout() {
 }
 
 export default DashboardLayout;
+

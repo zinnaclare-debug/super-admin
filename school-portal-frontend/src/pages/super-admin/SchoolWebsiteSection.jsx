@@ -214,7 +214,7 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
   if (loading) {
     return (
       <section className="sai-card">
-        <h3>Website & Entrance Exam</h3>
+        <h3>Website</h3>
         <p>Loading website content...</p>
       </section>
     );
@@ -224,7 +224,7 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
     <section className="sai-card">
       <div className="sai-section-head">
         <div>
-          <h3>Website & Entrance Exam</h3>
+          <h3>Website</h3>
           <p className="sai-note">
             Manage what each school subdomain shows on its public home page, admissions form, entrance exam, and score verification page.
           </p>
@@ -447,3 +447,4 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
     </section>
   );
 }
+

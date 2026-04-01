@@ -54,6 +54,7 @@ import Broadsheet from "./pages/school-admin/reports/Broadsheet";
 import Transcript from "./pages/school-admin/reports/Transcript";
 import AnnouncementDesk from "./pages/school-admin/AnnouncementDesk";
 import WebsiteEntranceExam from "./pages/school-admin/WebsiteEntranceExam";
+import EntranceExamAdmin from "./pages/school-admin/EntranceExamAdmin";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
 
@@ -207,6 +208,7 @@ function App() {
         <Route path="admin/student_result" element={<StudentResult />} />
         <Route path="admin/announcements" element={<AnnouncementDesk />} />
         <Route path="admin/website" element={<WebsiteEntranceExam />} />
+        <Route path="admin/entrance-exam" element={<EntranceExamAdmin />} />
         </Route>
 
       </Route>
@@ -277,6 +279,8 @@ function App() {
 export default App;
 
 // TPM1LRPnhO
+
+
 
 
 

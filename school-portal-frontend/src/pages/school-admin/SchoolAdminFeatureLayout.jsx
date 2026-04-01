@@ -14,6 +14,7 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/student_report",
   "/school/admin/student_result",
   "/school/admin/website",
+  "/school/admin/entrance-exam",
 ]);
 
 function titleFromPath(pathname) {
@@ -31,7 +32,8 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/student_report")) return "Student Report";
   if (pathname.startsWith("/school/admin/student_result")) return "Student Result";
   if (pathname.startsWith("/school/admin/announcements")) return "Announcement Desk";
-  if (pathname.startsWith("/school/admin/website")) return "Website & Entrance Exam";
+  if (pathname.startsWith("/school/admin/website")) return "Website";
+  if (pathname.startsWith("/school/admin/entrance-exam")) return "Entrance Exam";
   if (pathname.startsWith("/school/admin/register")) return "Register";
   return "School Admin";
 }
@@ -46,5 +48,3 @@ export default function SchoolAdminFeatureLayout() {
     </FeatureShell>
   );
 }
-
-
