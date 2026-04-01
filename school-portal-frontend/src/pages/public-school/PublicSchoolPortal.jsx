@@ -11,6 +11,21 @@ function toAbsoluteUrl(url) {
   return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
+function normalizePhoneNumber(phone) {
+  return String(phone || "").replace(/[^\d+]/g, "");
+}
+
+function whatsappLink(phone) {
+  const normalized = normalizePhoneNumber(phone);
+  const digitsOnly = normalized.replace(/^\+/, "");
+  return digitsOnly ? `https://wa.me/${digitsOnly}` : "";
+}
+
+function mapsLink(address) {
+  const value = String(address || "").trim();
+  return value ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}` : "";
+}
+
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
   const [siteData, setSiteData] = useState(initialSiteData);
   const [loading, setLoading] = useState(!initialSiteData);
@@ -58,6 +73,12 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const entranceExam = school?.entrance_exam || {};
   const logoUrl = school?.logo_url ? toAbsoluteUrl(school.logo_url) : "";
   const currentYear = new Date().getFullYear();
+  const contactAddress = website.address || school?.location || "";
+  const contactEmail = website.contact_email || school?.contact_email || "";
+  const contactPhone = website.contact_phone || school?.contact_phone || "";
+  const phoneHref = normalizePhoneNumber(contactPhone);
+  const whatsappHref = whatsappLink(contactPhone);
+  const mapHref = mapsLink(contactAddress);
 
   const themeStyle = useMemo(
     () => ({
@@ -196,21 +217,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             <p>{website.about_text}</p>
           </section>
 
-          <section className="school-site-contact-row">
-            <article className="school-site-contact-card">
-              <h3>Contact Address</h3>
-              <p>{website.address || school.location || "Address coming soon"}</p>
-            </article>
-            <article className="school-site-contact-card">
-              <h3>Email</h3>
-              <p>{website.contact_email || school.contact_email || "No public email yet"}</p>
-            </article>
-            <article className="school-site-contact-card">
-              <h3>Phone</h3>
-              <p>{website.contact_phone || school.contact_phone || "No public phone yet"}</p>
-            </article>
-          </section>
-
           <section className="school-site-section school-site-cards">
             {website.show_apply_now ? (
               <article>
@@ -233,6 +239,54 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                 <Link to="/verify-score">Check Score</Link>
               </article>
             ) : null}
+          </section>
+
+          <section className="school-site-contact-row">
+            <article className="school-site-contact-widget">
+              <span className="school-site-contact-badge">A</span>
+              <div className="school-site-contact-copy">
+                <h3>Visit the Campus</h3>
+                <p>{contactAddress || "Address coming soon"}</p>
+              </div>
+              {mapHref ? (
+                <a className="school-site-contact-link" href={mapHref} target="_blank" rel="noreferrer">
+                  Open Map
+                </a>
+              ) : null}
+            </article>
+
+            <article className="school-site-contact-widget">
+              <span className="school-site-contact-badge">@</span>
+              <div className="school-site-contact-copy">
+                <h3>Send an Email</h3>
+                <p>{contactEmail || "No public email yet"}</p>
+              </div>
+              {contactEmail ? (
+                <a className="school-site-contact-link" href={`mailto:${contactEmail}`}>
+                  Mail School
+                </a>
+              ) : null}
+            </article>
+
+            <article className="school-site-contact-widget">
+              <span className="school-site-contact-badge">P</span>
+              <div className="school-site-contact-copy">
+                <h3>Speak With the School</h3>
+                <p>{contactPhone || "No public phone yet"}</p>
+              </div>
+              <div className="school-site-contact-actions">
+                {phoneHref ? (
+                  <a className="school-site-contact-link" href={`tel:${phoneHref}`}>
+                    Call Now
+                  </a>
+                ) : null}
+                {whatsappHref ? (
+                  <a className="school-site-contact-link school-site-contact-link--alt" href={whatsappHref} target="_blank" rel="noreferrer">
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
+            </article>
           </section>
         </main>
       ) : null}
@@ -345,7 +399,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
       <footer className="school-site-footer">
         <div className="school-site-footer-mark">
-          <span className="school-site-footer-c">©</span>
+          <span className="school-site-footer-c">C</span>
           <span>{currentYear}</span>
         </div>
         <p>DESIGNED BY LYTE BRIDGE</p>

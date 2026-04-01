@@ -149,11 +149,11 @@
   justify-content: center;
 }
 
-.school-site-contact-card,
 .school-site-section,
 .school-site-cards article,
 .school-site-result-card,
-.school-site-question-block {
+.school-site-question-block,
+.school-site-contact-widget {
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
@@ -165,11 +165,58 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 24px;
+  margin: 24px 0 0;
 }
 
-.school-site-contact-card h3 {
+.school-site-contact-widget {
+  display: grid;
+  gap: 14px;
+}
+
+.school-site-contact-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-accent) 100%);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.school-site-contact-copy h3 {
   margin: 0 0 8px;
+  color: var(--school-primary);
+}
+
+.school-site-contact-copy p {
+  margin: 0;
+}
+
+.school-site-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.school-site-contact-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 700;
+  background: linear-gradient(125deg, var(--school-primary) 0%, var(--school-accent) 100%);
+  color: #fff;
+}
+
+.school-site-contact-link--alt {
+  background: #ecfeff;
+  color: var(--school-primary);
+  border: 1px solid rgba(15, 118, 110, 0.18);
 }
 
 .school-site-cards {
@@ -266,5 +313,6 @@
     grid-template-columns: 1fr;
   }
 }
+
 
 
