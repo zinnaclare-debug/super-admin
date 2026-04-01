@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, NavLink, Navigate } from "react-router-dom";
 import api from "../../services/api";
 import "./PublicSchoolPortal.css";
 
@@ -228,9 +228,14 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         </div>
         <nav className="school-site-links">
           {navItems.map((item) => (
-            <Link key={item.key} to={item.href} className={page === item.key ? "is-active" : ""}>
+            <NavLink
+              key={item.key}
+              to={item.href}
+              end={item.key === "home"}
+              className={({ isActive }) => (isActive ? "is-active" : "")}
+            >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
       </header>
@@ -419,4 +424,5 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
 
