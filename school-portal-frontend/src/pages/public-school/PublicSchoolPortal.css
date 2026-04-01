@@ -2,9 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--school-accent) 24%, transparent), transparent 38%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  background: #ffffff;
   color: #0f172a;
 }
 
@@ -268,4 +266,5 @@
     grid-template-columns: 1fr;
   }
 }
+
 
