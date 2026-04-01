@@ -26,6 +26,19 @@ function mapsLink(address) {
   return value ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}` : "";
 }
 
+function ContactWidget({ icon, title, value, children }) {
+  return (
+    <article className="school-site-contact-widget">
+      <span className="school-site-contact-badge" aria-hidden="true">{icon}</span>
+      <div className="school-site-contact-copy">
+        <h3>{title}</h3>
+        <p>{value}</p>
+      </div>
+      {children}
+    </article>
+  );
+}
+
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
   const [siteData, setSiteData] = useState(initialSiteData);
   const [loading, setLoading] = useState(!initialSiteData);
@@ -242,38 +255,23 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           </section>
 
           <section className="school-site-contact-row">
-            <article className="school-site-contact-widget">
-              <span className="school-site-contact-badge">A</span>
-              <div className="school-site-contact-copy">
-                <h3>Visit the Campus</h3>
-                <p>{contactAddress || "Address coming soon"}</p>
-              </div>
+            <ContactWidget icon={"\u2316"} title="Visit the Campus" value={contactAddress || "Address coming soon"}>
               {mapHref ? (
                 <a className="school-site-contact-link" href={mapHref} target="_blank" rel="noreferrer">
                   Open Map
                 </a>
               ) : null}
-            </article>
+            </ContactWidget>
 
-            <article className="school-site-contact-widget">
-              <span className="school-site-contact-badge">@</span>
-              <div className="school-site-contact-copy">
-                <h3>Send an Email</h3>
-                <p>{contactEmail || "No public email yet"}</p>
-              </div>
+            <ContactWidget icon={"\u2709"} title="Send an Email" value={contactEmail || "No public email yet"}>
               {contactEmail ? (
                 <a className="school-site-contact-link" href={`mailto:${contactEmail}`}>
                   Mail School
                 </a>
               ) : null}
-            </article>
+            </ContactWidget>
 
-            <article className="school-site-contact-widget">
-              <span className="school-site-contact-badge">P</span>
-              <div className="school-site-contact-copy">
-                <h3>Speak With the School</h3>
-                <p>{contactPhone || "No public phone yet"}</p>
-              </div>
+            <ContactWidget icon={"\u260E"} title="Speak With the School" value={contactPhone || "No public phone yet"}>
               <div className="school-site-contact-actions">
                 {phoneHref ? (
                   <a className="school-site-contact-link" href={`tel:${phoneHref}`}>
@@ -286,7 +284,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                   </a>
                 ) : null}
               </div>
-            </article>
+            </ContactWidget>
           </section>
         </main>
       ) : null}
@@ -399,7 +397,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
       <footer className="school-site-footer">
         <div className="school-site-footer-mark">
-          <span className="school-site-footer-c">C</span>
+          <span className="school-site-footer-c">{"\u00A9"}</span>
           <span>{currentYear}</span>
         </div>
         <p>DESIGNED BY LYTE BRIDGE</p>
