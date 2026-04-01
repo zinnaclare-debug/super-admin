@@ -6,6 +6,8 @@ const emptyWebsiteContent = {
   hero_subtitle: "",
   about_title: "",
   about_text: "",
+  core_values_text: "",
+  mission_text: "",
   admissions_intro: "",
   address: "",
   contact_email: "",
@@ -239,10 +241,7 @@ export default function WebsiteEntranceExam() {
             <label>Hero Subtitle</label>
             <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.hero_subtitle} onChange={(e) => updateWebsiteContent("hero_subtitle", e.target.value)} />
           </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>About Text</label>
-            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} />
-          </div>
+
           <div style={{ gridColumn: "1 / -1" }}>
             <label>Apply Now Intro</label>
             <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.admissions_intro} onChange={(e) => updateWebsiteContent("admissions_intro", e.target.value)} />
@@ -266,6 +265,18 @@ export default function WebsiteEntranceExam() {
           <div>
             <label>Accent Color</label>
             <input type="color" style={{ width: "100%", height: 44, marginTop: 6 }} value={websiteContent.accent_color} onChange={(e) => updateWebsiteContent("accent_color", e.target.value)} />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label>About Us</label>
+            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} placeholder="Tell visitors about your school" />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label>Core Values</label>
+            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.core_values_text} onChange={(e) => updateWebsiteContent("core_values_text", e.target.value)} placeholder="Enter the school's core values" />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label>Mission</label>
+            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.mission_text} onChange={(e) => updateWebsiteContent("mission_text", e.target.value)} placeholder="Enter the school's mission" />
           </div>
         </div>
 
@@ -409,3 +420,4 @@ export default function WebsiteEntranceExam() {
     </div>
   );
 }
+

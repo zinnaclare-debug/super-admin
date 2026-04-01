@@ -251,33 +251,21 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             </div>
           </section>
 
-          <section className="school-site-section">
-            <h2>{website.about_title || "About Our School"}</h2>
-            <p>{website.about_text}</p>
-          </section>
+
 
           <section className="school-site-section school-site-cards">
-            {website.show_apply_now ? (
-              <article>
-                <h3>Apply Now</h3>
-                <p>{website.admissions_intro}</p>
-                <Link to="/apply-now">Start Application</Link>
-              </article>
-            ) : null}
-            {website.show_entrance_exam ? (
-              <article>
-                <h3>Entrance Exam</h3>
-                <p>{entranceExam.exam_intro}</p>
-                <Link to="/entrance-exam">Open Entrance Exam</Link>
-              </article>
-            ) : null}
-            {website.show_verify_score ? (
-              <article>
-                <h3>Verify Score</h3>
-                <p>{entranceExam.verify_intro}</p>
-                <Link to="/verify-score">Check Score</Link>
-              </article>
-            ) : null}
+            <article>
+              <h3>About Us</h3>
+              <p>{website.about_text}</p>
+            </article>
+            <article>
+              <h3>Core Values</h3>
+              <p>{website.core_values_text}</p>
+            </article>
+            <article>
+              <h3>Mission</h3>
+              <p>{website.mission_text}</p>
+            </article>
           </section>
 
           <section className="school-site-contact-row">
@@ -431,3 +419,4 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
