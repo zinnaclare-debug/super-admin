@@ -105,6 +105,9 @@ function App() {
     <Routes>
       {/* PUBLIC */}
       <Route path="/" element={<Home />} />
+      <Route path="/apply-now" element={<PublicSchoolPortal page="apply" />} />
+      <Route path="/entrance-exam" element={<PublicSchoolPortal page="exam" />} />
+      <Route path="/verify-score" element={<PublicSchoolPortal page="verify" />} />
       <Route path="/login" element={<Login />} />
 
       {/* SUPER ADMIN */}
