@@ -29,6 +29,8 @@ return [
         [ 'key' => 'student_report', 'label' => 'Student Report', 'category' => 'admin' ],
         [ 'key' => 'student_result', 'label' => 'Student Result', 'category' => 'admin' ],
         [ 'key' => 'announcements', 'label' => 'Announcement Desk', 'category' => 'admin' ],
+        [ 'key' => 'website', 'label' => 'Website', 'category' => 'admin' ],
+        [ 'key' => 'entrance_exam', 'label' => 'Entrance Exam', 'category' => 'admin' ],
     ],
 
     // Legacy synonyms (map legacy key => canonical key)
@@ -42,3 +44,4 @@ return [
         'exams' => 'results',
     ],
 ];
+

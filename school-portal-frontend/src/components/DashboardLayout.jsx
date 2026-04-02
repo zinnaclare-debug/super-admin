@@ -246,6 +246,8 @@ function DashboardLayout() {
       student_result: "student_result",
       announcements: "announcements",
       "announcement desk": "announcements",
+      website: "website",
+      entrance_exam: "entrance-exam",
     };
     return `/school/admin/${map[normalized] || encodeURIComponent(normalized)}`;
   };
@@ -319,12 +321,6 @@ function DashboardLayout() {
             <>
               <NavLink to="/school/dashboard" title="Dashboard" style={linkStyle}>
                 {isCompactSidebar ? "DASHBOARD" : "Dashboard"}
-              </NavLink>
-              <NavLink to="/school/admin/website" title="Website" style={linkStyle}>
-                {isCompactSidebar ? "WEBSITE" : "Website"}
-              </NavLink>
-              <NavLink to="/school/admin/entrance-exam" title="Entrance Exam" style={linkStyle}>
-                {isCompactSidebar ? "ENTRANCE EXAM" : "Entrance Exam"}
               </NavLink>
               {schoolAdminPaymentsEnabled ? (
                 <NavLink to="/school/admin/payments" title="Payments" style={linkStyle}>
@@ -506,4 +502,6 @@ function DashboardLayout() {
 }
 
 export default DashboardLayout;
+
+
 

@@ -53,7 +53,7 @@ import StudentResult from "./pages/school-admin/reports/StudentResult";
 import Broadsheet from "./pages/school-admin/reports/Broadsheet";
 import Transcript from "./pages/school-admin/reports/Transcript";
 import AnnouncementDesk from "./pages/school-admin/AnnouncementDesk";
-import WebsiteEntranceExam from "./pages/school-admin/WebsiteEntranceExam";
+import WebsiteAdmin from "./pages/school-admin/WebsiteAdmin";
 import EntranceExamAdmin from "./pages/school-admin/EntranceExamAdmin";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
@@ -207,8 +207,8 @@ function App() {
         <Route path="admin/student_report" element={<StudentReport />} />
         <Route path="admin/student_result" element={<StudentResult />} />
         <Route path="admin/announcements" element={<AnnouncementDesk />} />
-        <Route path="admin/website" element={<WebsiteEntranceExam />} />
-        <Route path="admin/entrance-exam" element={<EntranceExamAdmin />} />
+        <Route path="admin/website" element={<RequireFeature feature="website"><WebsiteAdmin /></RequireFeature>} />
+        <Route path="admin/entrance-exam" element={<RequireFeature feature="entrance_exam"><EntranceExamAdmin /></RequireFeature>} />
         </Route>
 
       </Route>
@@ -279,6 +279,7 @@ function App() {
 export default App;
 
 // TPM1LRPnhO
+
 
 
 

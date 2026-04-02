@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { getStoredFeatures } from "../../utils/authStorage";
 import "./Dashboard.css";
 
 import heroArt from "../../assets/dashboard/features.svg";
@@ -37,12 +38,16 @@ function SchoolDashboard() {
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [departmentTemplates, setDepartmentTemplates] = useState([]);
+  const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await api.get("/api/school-admin/stats");
+        const [res, featuresRes] = await Promise.all([
+          api.get("/api/school-admin/stats"),
+          api.get("/api/schools/features").catch(() => null),
+        ]);
         setStats({
           school_name: res.data?.school_name ?? "",
           school_location: res.data?.school_location ?? "",
@@ -64,6 +69,7 @@ function SchoolDashboard() {
         setPaystackSubaccountCode(res.data?.paystack_subaccount_code ?? "");
 
         const departmentsFromStats = Array.isArray(res.data?.department_templates) ? res.data.department_templates : [];
+        setEnabledFeatures(Array.isArray(featuresRes?.data?.data) ? featuresRes.data.data : []);
         setDepartmentTemplates(Array.from(new Set(departmentsFromStats.map((x) => String(x).trim()).filter(Boolean))));
       } catch {
         setStats({
@@ -86,6 +92,7 @@ function SchoolDashboard() {
         setSchoolMotto("");
         setPaystackSubaccountCode("");
         setDepartmentTemplates([]);
+        setEnabledFeatures([]);
       } finally {
         setLoading(false);
       }
@@ -207,6 +214,9 @@ function SchoolDashboard() {
     { key: "staff", label: "Total Staff", value: stats.staff },
   ];
 
+  const websiteEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "website" && Boolean(item?.enabled));
+  const entranceExamEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "entrance_exam" && Boolean(item?.enabled));
+
   const informationReady =
     Boolean((schoolLocation || stats.school_location || "").trim()) &&
     Boolean((contactEmail || stats.contact_email || "").trim()) &&
@@ -273,19 +283,19 @@ function SchoolDashboard() {
             {formatCount(stats.unspecified_students)} student record(s) do not have gender set yet.
           </p>
         )}
-      </section>
-
-      <section className="sd-card">
-        <div className="sd-section-head">
-          <h2>Website</h2>
-          <p>Manage your public school homepage, About Us content, contact details, and school contents.</p>
-        </div>
-        <div className="sd-actions">
-          <Link to="/school/admin/website" className="sd-link-button">Open Website</Link>
-          <Link to="/school/admin/website?createContent=1" className="sd-link-button">Create Contents</Link>
-          <Link to="/school/admin/entrance-exam" className="sd-link-button">Open Entrance Exam</Link>
-        </div>
-      </section>
+      </section>      {websiteEnabled || entranceExamEnabled ? (
+        <section className="sd-card">
+          <div className="sd-section-head">
+            <h2>Website</h2>
+            <p>Manage your public school homepage, About Us content, contact details, school contents, and entrance exam setup.</p>
+          </div>
+          <div className="sd-actions">
+            {websiteEnabled ? <Link to="/school/admin/website" className="sd-link-button">Open Website</Link> : null}
+            {websiteEnabled ? <Link to="/school/admin/website?createContent=1" className="sd-link-button">Create Contents</Link> : null}
+            {entranceExamEnabled ? <Link to="/school/admin/entrance-exam" className="sd-link-button">Open Entrance Exam</Link> : null}
+          </div>
+        </section>
+      ) : null}
       <section className="sd-card sd-branding">
         <div className="sd-branding__form">
           <div className="sd-section-head">
@@ -381,6 +391,9 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
+
+
+
 
 
 

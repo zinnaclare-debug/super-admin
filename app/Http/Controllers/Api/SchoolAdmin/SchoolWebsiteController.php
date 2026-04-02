@@ -12,24 +12,21 @@ use Illuminate\Support\Facades\Storage;
 
 class SchoolWebsiteController extends Controller
 {
-    public function show(Request $request)
+    public function showWebsite(Request $request)
     {
         $school = $this->schoolFromRequest($request);
-        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
 
         return response()->json([
-            'available_classes' => $availableClasses,
             'website_content' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school),
-            'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
         ]);
     }
 
-    public function upsert(Request $request)
+    public function updateWebsite(Request $request)
     {
         $school = $this->schoolFromRequest($request);
 
         $payload = $request->validate([
-            'website_content' => ['sometimes', 'array'],
+            'website_content' => ['required', 'array'],
             'website_content.hero_title' => ['nullable', 'string', 'max:160'],
             'website_content.hero_subtitle' => ['nullable', 'string', 'max:600'],
             'website_content.about_title' => ['nullable', 'string', 'max:120'],
@@ -45,7 +42,37 @@ class SchoolWebsiteController extends Controller
             'website_content.show_apply_now' => ['nullable', 'boolean'],
             'website_content.show_entrance_exam' => ['nullable', 'boolean'],
             'website_content.show_verify_score' => ['nullable', 'boolean'],
-            'entrance_exam_config' => ['sometimes', 'array'],
+        ]);
+
+        $school->website_content = SchoolPublicWebsiteData::normalizeWebsiteContent($payload['website_content'] ?? [], $school);
+        $school->save();
+
+        return response()->json([
+            'message' => 'Website updated successfully.',
+            'data' => [
+                'website_content' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school),
+            ],
+        ]);
+    }
+
+    public function showEntranceExam(Request $request)
+    {
+        $school = $this->schoolFromRequest($request);
+        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
+
+        return response()->json([
+            'available_classes' => $availableClasses,
+            'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
+        ]);
+    }
+
+    public function updateEntranceExam(Request $request)
+    {
+        $school = $this->schoolFromRequest($request);
+        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
+
+        $payload = $request->validate([
+            'entrance_exam_config' => ['required', 'array'],
             'entrance_exam_config.enabled' => ['nullable', 'boolean'],
             'entrance_exam_config.application_open' => ['nullable', 'boolean'],
             'entrance_exam_config.verification_open' => ['nullable', 'boolean'],
@@ -67,28 +94,17 @@ class SchoolWebsiteController extends Controller
             'entrance_exam_config.class_exams.*.questions.*.correct_option' => ['nullable', 'in:A,B,C,D'],
         ]);
 
-        if (! $request->has('website_content') && ! $request->has('entrance_exam_config')) {
-            return response()->json(['message' => 'Provide website_content or entrance_exam_config.'], 422);
-        }
-
-        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
-
-        $school->website_content = $request->has('website_content')
-            ? SchoolPublicWebsiteData::normalizeWebsiteContent($payload['website_content'] ?? [], $school)
-            : SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school);
-
-        $school->entrance_exam_config = $request->has('entrance_exam_config')
-            ? SchoolPublicWebsiteData::normalizeEntranceExamConfig($payload['entrance_exam_config'] ?? [], $availableClasses)
-            : SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
-
+        $school->entrance_exam_config = SchoolPublicWebsiteData::normalizeEntranceExamConfig(
+            $payload['entrance_exam_config'] ?? [],
+            $availableClasses
+        );
         $school->save();
 
         return response()->json([
-            'message' => 'School website content updated successfully.',
+            'message' => 'Entrance exam settings updated successfully.',
             'data' => [
-                'website_content' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school),
-                'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
                 'available_classes' => $availableClasses,
+                'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
             ],
         ]);
     }

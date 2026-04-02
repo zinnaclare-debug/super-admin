@@ -55,7 +55,7 @@ function mapExistingImages(item = {}) {
   }));
 }
 
-export default function WebsiteEntranceExam() {
+export default function WebsiteAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -402,3 +402,4 @@ export default function WebsiteEntranceExam() {
     </div>
   );
 }
+

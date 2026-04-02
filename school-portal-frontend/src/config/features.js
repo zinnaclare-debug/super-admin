@@ -21,12 +21,16 @@ export const FEATURE_DEFINITIONS = [
   { key: "student_report", label: "Student Report", category: "admin" },
   { key: "student_result", label: "Student Result", category: "admin" },
   { key: "announcements", label: "Announcement Desk", category: "admin" },
+  { key: "website", label: "Website", category: "admin" },
+  { key: "entrance_exam", label: "Entrance Exam", category: "admin" },
 
   { key: "users", label: "Users", category: "admin" },
   { key: "academics", label: "Academics", category: "admin" },
   { key: "academic_session", label: "Academic Session", category: "admin" },
   { key: "promotion", label: "Promotion", category: "admin" },
 ];
+
+
 
 
 

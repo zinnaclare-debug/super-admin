@@ -85,14 +85,14 @@ export default function EntranceExamAdmin() {
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
 
   const loadWebsite = async () => {
-    const websiteRes = await api.get("/api/school-admin/website");
+    const websiteRes = await api.get("/api/school-admin/entrance-exam");
     const normalized = normalizeData(websiteRes.data || {});
     setAvailableClasses(normalized.availableClasses);
     setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
   };
 
   const loadApplications = async () => {
-    const applicationsRes = await api.get("/api/school-admin/website/applications");
+    const applicationsRes = await api.get("/api/school-admin/entrance-exam/applications");
     setApplications(Array.isArray(applicationsRes.data?.data) ? applicationsRes.data.data : []);
   };
 
@@ -173,7 +173,7 @@ export default function EntranceExamAdmin() {
   const saveExamConfig = async () => {
     setSaving(true);
     try {
-      const res = await api.put("/api/school-admin/website", {
+      const res = await api.put("/api/school-admin/entrance-exam", {
         entrance_exam_config: examConfig,
       });
       const normalized = normalizeData(res.data?.data || {});
@@ -330,3 +330,4 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+
