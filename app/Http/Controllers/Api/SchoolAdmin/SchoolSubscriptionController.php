@@ -9,6 +9,7 @@ use App\Support\SchoolSubscriptionBilling;
 use Carbon\Carbon;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -177,8 +178,7 @@ class SchoolSubscriptionController extends Controller
     {
         $payload = $request->validate([
             'billing_cycle' => 'required|in:termly,yearly',
-            'transfer_reference' => 'nullable|string|max:120',
-            'note' => 'nullable|string|max:1000',
+            'receipt' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
         $school = School::query()->find((int) $request->user()->school_id);
@@ -205,6 +205,10 @@ class SchoolSubscriptionController extends Controller
             return response()->json(['message' => 'Subscription billing has not been configured for this payment option yet.'], 422);
         }
 
+        /** @var UploadedFile $receipt */
+        $receipt = $payload['receipt'];
+        $receiptPath = $receipt->store('school-subscription-receipts/' . (int) $school->id, 'public');
+
         $invoice = SchoolSubscriptionInvoice::query()->create([
             'school_id' => (int) $school->id,
             'academic_session_id' => (int) $session->id,
@@ -221,21 +225,23 @@ class SchoolSubscriptionController extends Controller
             'total_amount' => (float) $quote['total_amount'],
             'currency' => (string) $quote['currency'],
             'submitted_by_user_id' => (int) $request->user()->id,
+            'bank_receipt_path' => $receiptPath,
+            'bank_receipt_name' => $receipt->getClientOriginalName(),
+            'bank_receipt_mime_type' => $receipt->getClientMimeType() ?: $receipt->getMimeType(),
+            'bank_receipt_uploaded_at' => now(),
             'meta' => [
                 'type' => 'school_subscription',
                 'session_name' => $session->session_name,
                 'term_name' => $term->name,
                 'school_name' => $school->name,
                 'bank_transfer' => [
-                    'transfer_reference' => trim((string) ($payload['transfer_reference'] ?? '')) ?: null,
-                    'note' => trim((string) ($payload['note'] ?? '')) ?: null,
                     'submitted_at' => now()->toDateTimeString(),
                 ],
             ],
         ]);
 
         return response()->json([
-            'message' => 'Bank transfer submitted for Super Admin review.',
+            'message' => 'Bank transfer receipt submitted for Super Admin review.',
             'data' => [
                 'invoice' => SchoolSubscriptionBilling::invoicePayload($invoice),
                 'bank_details' => [

@@ -84,7 +84,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     loadBilling();
   }, [schoolId]);
 
-  const invoiceRows = useMemo(() => Array.isArray(summary.recent_invoices) ? summary.recent_invoices : [], [summary]);
+  const invoiceRows = useMemo(() => (Array.isArray(summary.recent_invoices) ? summary.recent_invoices : []), [summary]);
 
   const saveSettings = async () => {
     setSaving(true);
@@ -344,7 +344,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             <div className="sai-subscription-head">
               <div>
                 <h4>Recent Subscription Invoices</h4>
-                <p className="sai-note">Use the action buttons below for bank-transfer reviews and manual active/pending control.</p>
+                <p className="sai-note">Review online payments and bank-transfer receipts for the current school here.</p>
               </div>
             </div>
 
@@ -356,14 +356,17 @@ export default function SchoolSubscriptionSection({ schoolId }) {
                     <th>Cycle</th>
                     <th>Status</th>
                     <th>Channel</th>
+                    <th>Session</th>
+                    <th>Term</th>
                     <th>Total</th>
+                    <th>Receipt</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoiceRows.length === 0 ? (
                     <tr>
-                      <td colSpan="6">No subscription invoice yet.</td>
+                      <td colSpan="9">No subscription invoice yet.</td>
                     </tr>
                   ) : invoiceRows.map((invoice) => (
                     <tr key={invoice.id}>
@@ -376,7 +379,16 @@ export default function SchoolSubscriptionSection({ schoolId }) {
                       <td>{invoice.billing_cycle_label}</td>
                       <td>{invoice.status_label}</td>
                       <td>{invoice.payment_channel || "-"}</td>
+                      <td>{invoice.session_name || "-"}</td>
+                      <td>{invoice.term_name || (invoice.billing_cycle === "yearly" ? "All Terms" : "-")}</td>
                       <td>{formatMoney(invoice.total_amount, invoice.currency)}</td>
+                      <td>
+                        {invoice.bank_receipt_url ? (
+                          <a href={invoice.bank_receipt_url} target="_blank" rel="noreferrer" className="sai-action-link">
+                            {invoice.bank_receipt_name || "View Receipt"}
+                          </a>
+                        ) : "-"}
+                      </td>
                       <td>
                         <div className="sai-inline-actions">
                           <button

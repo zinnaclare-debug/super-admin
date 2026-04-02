@@ -460,6 +460,15 @@
   color: #64748b;
 }
 
+.sai-action-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sai-action-link:hover {
+  text-decoration: underline;
+}
 .sai-inline-actions {
   display: flex;
   gap: 8px;
@@ -575,3 +584,4 @@
 .sai-app-table {
   min-width: 920px;
 }
+

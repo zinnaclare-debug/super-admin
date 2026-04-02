@@ -30,6 +30,10 @@ class SchoolSubscriptionInvoice extends Model
         'submitted_by_user_id',
         'approved_by_user_id',
         'paid_at',
+        'bank_receipt_path',
+        'bank_receipt_name',
+        'bank_receipt_mime_type',
+        'bank_receipt_uploaded_at',
         'meta',
     ];
 
@@ -40,6 +44,7 @@ class SchoolSubscriptionInvoice extends Model
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'paid_at' => 'datetime',
+        'bank_receipt_uploaded_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -68,3 +73,4 @@ class SchoolSubscriptionInvoice extends Model
         return $this->belongsTo(User::class, 'approved_by_user_id');
     }
 }
+

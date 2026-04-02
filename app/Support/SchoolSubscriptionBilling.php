@@ -9,6 +9,7 @@ use App\Models\SchoolSubscriptionSetting;
 use App\Models\Term;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SchoolSubscriptionBilling
@@ -326,12 +327,18 @@ class SchoolSubscriptionBilling
             'paystack_gateway_response' => $invoice->paystack_gateway_response,
             'academic_session_id' => $invoice->academic_session_id ? (int) $invoice->academic_session_id : null,
             'term_id' => $invoice->term_id ? (int) $invoice->term_id : null,
+            'session_name' => data_get($meta, 'session_name'),
+            'term_name' => data_get($meta, 'term_name'),
+            'school_name' => data_get($meta, 'school_name'),
             'paid_at' => $invoice->paid_at?->toDateTimeString(),
             'created_at' => $invoice->created_at?->toDateTimeString(),
+            'bank_receipt_name' => $invoice->bank_receipt_name,
+            'bank_receipt_mime_type' => $invoice->bank_receipt_mime_type,
+            'bank_receipt_uploaded_at' => $invoice->bank_receipt_uploaded_at?->toDateTimeString(),
+            'bank_receipt_url' => $invoice->bank_receipt_path ? Storage::disk('public')->url($invoice->bank_receipt_path) : null,
             'meta' => $meta,
         ];
     }
-
     private static function deriveStatus(SchoolSubscriptionSetting $settings, ?SchoolSubscriptionInvoice $activeInvoice): string
     {
         if (in_array($settings->manual_status_override, [self::STATUS_FREE, self::STATUS_PENDING, self::STATUS_ACTIVE], true)) {
@@ -391,4 +398,7 @@ class SchoolSubscriptionBilling
         return round((float) ($value ?? 0), 2);
     }
 }
+
+
+
 

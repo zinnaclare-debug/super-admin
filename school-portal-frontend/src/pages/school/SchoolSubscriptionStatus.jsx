@@ -103,35 +103,53 @@ export default function SchoolSubscriptionStatus() {
   };
 
   const submitBankTransfer = async (cycle) => {
+    const receipt = bankForms[cycle]?.receipt || null;
+    if (!receipt) {
+      alert("Upload the bank transfer receipt before submitting.");
+      return;
+    }
+
     setBusyCycle(cycle);
     try {
-      const res = await api.post("/api/school-admin/subscription/bank-transfer", {
-        billing_cycle: cycle,
-        transfer_reference: bankForms[cycle]?.transfer_reference || "",
-        note: bankForms[cycle]?.note || "",
+      const formData = new FormData();
+      formData.append("billing_cycle", cycle);
+      formData.append("receipt", receipt);
+
+      const res = await api.post("/api/school-admin/subscription/bank-transfer", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
       setSummary(res.data?.data?.summary || emptySummary);
       setBankCycle(cycle);
-      alert(res.data?.message || "Bank transfer submitted for review.");
+      setBankForms((prev) => ({
+        ...prev,
+        [cycle]: { receipt: null },
+      }));
+      alert(res.data?.message || "Bank transfer receipt submitted for review.");
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to submit bank transfer.");
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to submit bank transfer receipt.");
     } finally {
       setBusyCycle("");
     }
   };
 
-  const updateBankForm = (cycle, field, value) => {
+  const updateBankReceipt = (cycle, file) => {
     setBankForms((prev) => ({
       ...prev,
       [cycle]: {
         ...(prev[cycle] || {}),
-        [field]: value,
+        receipt: file || null,
       },
     }));
   };
 
   const quoteCards = [summary?.quotes?.termly, summary?.quotes?.yearly].filter(Boolean);
   const buttonLabel = loading ? "LOADING..." : (summary.status_label || "FREE VERSION");
+  const latestPendingBankInvoice = summary.latest_pending_invoice?.payment_channel === "bank"
+    ? summary.latest_pending_invoice
+    : null;
 
   return (
     <>
@@ -191,6 +209,11 @@ export default function SchoolSubscriptionStatus() {
                 <p>
                   {summary.latest_pending_invoice.reference} is currently {summary.latest_pending_invoice.status_label.toLowerCase()}.
                 </p>
+                {latestPendingBankInvoice?.bank_receipt_url ? (
+                  <p>
+                    Receipt uploaded: <a href={latestPendingBankInvoice.bank_receipt_url} target="_blank" rel="noreferrer">{latestPendingBankInvoice.bank_receipt_name || "View receipt"}</a>
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -205,7 +228,7 @@ export default function SchoolSubscriptionStatus() {
                 <p className="sd-note">Subscription billing has not been configured yet.</p>
               ) : quoteCards.map((quote) => {
                 const cycle = quote.billing_cycle;
-                const bankForm = bankForms[cycle] || { transfer_reference: "", note: "" };
+                const receiptName = bankForms[cycle]?.receipt?.name || "";
                 const showBankDetails = bankCycle === cycle;
 
                 return (
@@ -250,27 +273,18 @@ export default function SchoolSubscriptionStatus() {
                         <p>{summary.settings?.bank_account_name || "LYTEBRIDGE PROFESSIONAL SERVICE LTD"}</p>
 
                         <label>
-                          Transfer Reference
+                          Upload Receipt (PDF, JPG, JPEG, PNG)
                           <input
-                            type="text"
-                            value={bankForm.transfer_reference || ""}
-                            onChange={(e) => updateBankForm(cycle, "transfer_reference", e.target.value)}
-                            placeholder="Bank transfer reference"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf"
+                            onChange={(e) => updateBankReceipt(cycle, e.target.files?.[0] || null)}
                           />
                         </label>
 
-                        <label>
-                          Note
-                          <textarea
-                            rows="3"
-                            value={bankForm.note || ""}
-                            onChange={(e) => updateBankForm(cycle, "note", e.target.value)}
-                            placeholder="Optional note for Super Admin"
-                          />
-                        </label>
+                        {receiptName ? <p className="sd-note">Selected file: {receiptName}</p> : null}
 
                         <button type="button" onClick={() => submitBankTransfer(cycle)} disabled={busyCycle === cycle}>
-                          {busyCycle === cycle ? "Submitting..." : "Submit Bank Payment Notice"}
+                          {busyCycle === cycle ? "Submitting..." : "Submit Bank Receipt"}
                         </button>
                       </div>
                     ) : null}
@@ -284,4 +298,3 @@ export default function SchoolSubscriptionStatus() {
     </>
   );
 }
-

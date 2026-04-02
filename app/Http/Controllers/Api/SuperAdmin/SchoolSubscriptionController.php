@@ -8,6 +8,7 @@ use App\Models\SchoolSubscriptionInvoice;
 use App\Models\SchoolSubscriptionSetting;
 use App\Support\SchoolSubscriptionBilling;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class SchoolSubscriptionController extends Controller
@@ -126,6 +127,9 @@ class SchoolSubscriptionController extends Controller
         $this->validateDeleteCode($request);
 
         $reference = $invoice->reference;
+        if ($invoice->bank_receipt_path) {
+            Storage::disk('public')->delete($invoice->bank_receipt_path);
+        }
         $invoice->delete();
 
         return response()->json([
