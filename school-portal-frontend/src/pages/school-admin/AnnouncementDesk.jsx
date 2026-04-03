@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
+import remoteWorkerArt from "../../assets/announcements/remote-worker.svg";
+import groupChatArt from "../../assets/announcements/group-chat.svg";
+import onlineInfoArt from "../../assets/announcements/online-information.svg";
+import "../shared/AnnouncementDesk.css";
 
 const prettyLevel = (value) =>
   String(value || "")
@@ -15,25 +19,22 @@ function formatDate(value) {
   }
 }
 
-function renderAnnouncementMedia(item) {
-  if (!item?.media_url || !item?.media_type) {
-    return null;
-  }
+function badgeClass(audience) {
+  const value = String(audience || "").toLowerCase();
+  if (value.includes("staff")) return "announce-badge announce-badge--staff";
+  if (value.includes("student")) return "announce-badge announce-badge--student";
+  if (value.includes("level")) return "announce-badge announce-badge--level";
+  return "announce-badge announce-badge--all";
+}
 
-  if (item.media_type === "image") {
-    return (
-      <div style={{ margin: "10px 0 12px" }}>
-        <img
-          src={item.media_url}
-          alt={item.title || "Announcement attachment"}
-          style={{ width: "100%", maxHeight: 280, objectFit: "contain", borderRadius: 12, border: "1px solid #dbeafe", background: "#f8fafc" }}
-        />
-      </div>
-    );
-  }
+function AnnouncementMedia({ item }) {
+  if (!item?.media_url || item?.media_type !== "image") return null;
 
-
-  return null;
+  return (
+    <div className="announce-media-wrap">
+      <img className="announce-media" src={item.media_url} alt={item.title || "Announcement attachment"} />
+    </div>
+  );
 }
 
 export default function AnnouncementDesk() {
@@ -113,6 +114,13 @@ export default function AnnouncementDesk() {
     setForm((prev) => ({ ...prev, media: file }));
   };
 
+  const clearFile = () => {
+    setForm((prev) => ({ ...prev, media: null }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const clearForm = () => {
     setForm({ title: "", message: "", level: "", media: null });
     if (fileInputRef.current) {
@@ -174,149 +182,137 @@ export default function AnnouncementDesk() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <section style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #d6e3ff" }}>
-        <h3 style={{ marginTop: 0 }}>Announcement Desk</h3>
-        <p style={{ marginTop: 0, color: "#475569" }}>
-          Post school-wide notices or target specific education levels. You can also attach a photo.
-        </p>
+    <div className="announce-page">
+      <section className="announce-hero">
+        <div>
+          <span className="announce-pill">School Admin Announcement Desk</span>
+          <h2>Post updates with the same clarity students and staff already see.</h2>
+          <p className="announce-subtitle">
+            Publish school-wide or level-specific notices, attach photos, and manage active announcements from one bright notice desk.
+          </p>
+          <div className="announce-metrics">
+            <span>{loading ? "Syncing..." : `${items.length} announcement${items.length === 1 ? "" : "s"}`}</span>
+            <span>{statusFilter === "all" ? "All statuses" : `${prettyLevel(statusFilter)} filter`}</span>
+          </div>
+        </div>
 
-        <form onSubmit={onSubmit} style={{ display: "grid", gap: 8 }}>
-          <input
-            name="title"
-            placeholder="Announcement title"
-            value={form.title}
-            onChange={onChange}
-            required
-            maxLength={160}
-            style={{ padding: 10 }}
-          />
-          <textarea
-            name="message"
-            placeholder="Write announcement details..."
-            value={form.message}
-            onChange={onChange}
-            required
-            rows={5}
-            maxLength={5000}
-            style={{ padding: 10, resize: "vertical" }}
-          />
-          <div
-            style={{
-              border: "1px dashed #cbd5e1",
-              borderRadius: 10,
-              padding: 12,
-              background: "#f8fafc",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <label style={{ fontWeight: 700, color: "#0f172a" }}>Upload Picture</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onFileChange}
-            />
-            <small style={{ color: "#475569" }}>
-              Accepted: JPG, JPEG, PNG, or WEBP only. Max size: 5MB.
-            </small>
-            {form.media ? (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  width: "fit-content",
-                  borderRadius: 999,
-                  padding: "6px 10px",
-                  background: "#e0f2fe",
-                  color: "#0c4a6e",
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                <span>{form.media.name}</span>
-                <button
-                  type="button"
-                  onClick={clearForm}
-                  style={{ border: 0, background: "transparent", color: "#0c4a6e", cursor: "pointer" }}
-                >
-                  Remove
-                </button>
-              </div>
-            ) : null}
+        <div className="announce-hero-art" aria-hidden="true">
+          <div className="announce-art-card announce-art-card--main">
+            <img src={remoteWorkerArt} alt="" />
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <select name="level" value={form.level} onChange={onChange} style={{ padding: 10 }}>
-              {levelOptions.map((opt) => (
-                <option key={opt.value || "all"} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <button type="submit" disabled={saving}>
-              {saving ? "Posting..." : "Post Announcement"}
-            </button>
+          <div className="announce-art-card announce-art-card--chat">
+            <img src={groupChatArt} alt="" />
           </div>
-        </form>
+          <div className="announce-art-card announce-art-card--info">
+            <img src={onlineInfoArt} alt="" />
+          </div>
+        </div>
       </section>
 
-      <section style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #d6e3ff" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+      <section className="announce-panel">
+        <div className="announce-card" style={{ marginBottom: 12 }}>
+          <div className="announce-card-header">
+            <h3>Create Announcement</h3>
+            <span className="announce-badge announce-badge--all">Publish</span>
+          </div>
+          <p className="announce-message" style={{ marginTop: 8 }}>
+            Post school-wide notices or target specific education levels. You can also attach a photo.
+          </p>
+
+          <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+            <input
+              name="title"
+              placeholder="Announcement title"
+              value={form.title}
+              onChange={onChange}
+              required
+              maxLength={160}
+              style={{ padding: 10, borderRadius: 10, border: "1px solid #cbd5e1" }}
+            />
+            <textarea
+              name="message"
+              placeholder="Write announcement details..."
+              value={form.message}
+              onChange={onChange}
+              required
+              rows={5}
+              maxLength={5000}
+              style={{ padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", resize: "vertical" }}
+            />
+
+            <div className="announce-card" style={{ background: "#f8fafc" }}>
+              <div className="announce-card-header">
+                <h3 style={{ fontSize: 15 }}>Upload Picture</h3>
+                <span className="announce-badge announce-badge--level">Optional</span>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChange} />
+              <div className="announce-meta" style={{ marginTop: 8 }}>
+                <small>Accepted: JPG, JPEG, PNG, or WEBP only.</small>
+                <small>Max size: 5MB.</small>
+              </div>
+              {form.media ? (
+                <div className="announce-metrics" style={{ marginTop: 10 }}>
+                  <span>{form.media.name}</span>
+                  <button type="button" onClick={clearFile}>Remove</button>
+                </div>
+              ) : null}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <select name="level" value={form.level} onChange={onChange} style={{ padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", minWidth: 220 }}>
+                {levelOptions.map((opt) => (
+                  <option key={opt.value || "all"} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={saving}>
+                {saving ? "Posting..." : "Post Announcement"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="announce-card-header" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Posted Announcements</h3>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: 8 }}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: 8, borderRadius: 10, border: "1px solid #cbd5e1" }}>
             <option value="all">All</option>
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
           </select>
         </div>
 
-        {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
-        {loading && <p>Loading announcements...</p>}
-        {!loading && !hasItems && <p>No announcements yet.</p>}
+        {error && <p className="announce-state announce-state--error">{error}</p>}
+        {loading && <p className="announce-state announce-state--loading">Loading announcements...</p>}
+        {!loading && !hasItems && <p className="announce-state announce-state--empty">No announcements yet.</p>}
 
-        {!loading && hasItems && (
-          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-            {items.map((item) => (
-              <article key={item.id} style={{ border: "1px solid #dbeafe", borderRadius: 10, padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <h4 style={{ margin: 0 }}>{item.title}</h4>
-                  <span
-                    style={{
-                      borderRadius: 999,
-                      padding: "2px 8px",
-                      background: item.is_active ? "#dcfce7" : "#fee2e2",
-                      color: item.is_active ? "#166534" : "#991b1b",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {item.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
-                <p style={{ marginBottom: 8, whiteSpace: "pre-wrap" }}>{item.message}</p>
-                {renderAnnouncementMedia(item)}
-                <div style={{ color: "#475569", fontSize: 13 }}>
-                  <div>Audience: {item.audience}</div>
-                  <div>Posted: {formatDate(item.published_at || item.created_at)}</div>
-                  <div>By: {item.author?.name || "School admin"}</div>
-                </div>
-                <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => toggleActive(item)}>
-                    {item.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button onClick={() => remove(item)} style={{ background: "#fee2e2", borderColor: "#fecaca" }}>
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="announce-list">
+          {!loading && hasItems && items.map((item) => (
+            <article key={item.id} className="announce-card">
+              <div className="announce-card-header">
+                <h3>{item.title}</h3>
+                <span className={badgeClass(item.audience)}>{item.audience || "All"}</span>
+              </div>
+              <p className="announce-message">{item.message}</p>
+              <AnnouncementMedia item={item} />
+              <div className="announce-meta">
+                <small>Posted: {formatDate(item.published_at || item.created_at)}</small>
+                <small>By: {item.author?.name || "School admin"}</small>
+                <small>Status: {item.is_active ? "Active" : "Inactive"}</small>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                <button type="button" onClick={() => toggleActive(item)}>
+                  {item.is_active ? "Deactivate" : "Activate"}
+                </button>
+                <button type="button" onClick={() => remove(item)} style={{ background: "#fff1f2", color: "#b91c1c", border: "1px solid #fecdd3" }}>
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
     </div>
   );
 }
-
 

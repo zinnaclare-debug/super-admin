@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
-import "./StudentResult.css";
+import examPrepArt from "../../../assets/results/exam-prep.svg";
+import onlineSurveyArt from "../../../assets/results/online-survey.svg";
+import certificateArt from "../../../assets/results/certificate.svg";
+import "../../shared/ResultsShowcase.css";
 
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -33,27 +36,6 @@ const formatMaybeNumber = (value, digits = 2) => {
   return num.toFixed(digits);
 };
 
-const infoBoxStyle = {
-  border: "1px solid #dbeafe",
-  borderRadius: 8,
-  padding: "10px 12px",
-  background: "#f8fbff",
-};
-
-const traitGridStyle = {
-  display: "grid",
-  gap: 8,
-  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-  marginTop: 12,
-};
-
-const traitCardStyle = {
-  border: "1px solid #dbeafe",
-  borderRadius: 8,
-  padding: "8px 10px",
-  background: "#f8fbff",
-};
-
 export default function StudentResult() {
   const [sessions, setSessions] = useState([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -75,9 +57,7 @@ export default function StudentResult() {
   const selectedTerm = useMemo(() => {
     const terms = selectedSession?.terms || [];
     if (terms.length === 0) return null;
-    return terms.find((item) => String(item.id) === String(termId)) ||
-      terms.find((item) => item.is_current) ||
-      terms[0];
+    return terms.find((item) => String(item.id) === String(termId)) || terms.find((item) => item.is_current) || terms[0];
   }, [selectedSession, termId]);
 
   const canDownload = studentSearch.trim().length > 0 && selectedSession && selectedTerm;
@@ -98,11 +78,9 @@ export default function StudentResult() {
       }
 
       const preferredSessionId = payload.selected_session_id || loadedSessions[0].id;
-      const preferredSession =
-        loadedSessions.find((item) => item.id === preferredSessionId) || loadedSessions[0];
+      const preferredSession = loadedSessions.find((item) => item.id === preferredSessionId) || loadedSessions[0];
       setSessionId(String(preferredSession.id));
-      const preferredTerm = (preferredSession.terms || []).find((item) => item.is_current) ||
-        (preferredSession.terms || [])[0];
+      const preferredTerm = (preferredSession.terms || []).find((item) => item.is_current) || (preferredSession.terms || [])[0];
       setTermId(preferredTerm ? String(preferredTerm.id) : "");
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load student result filters.");
@@ -138,9 +116,7 @@ export default function StudentResult() {
   }, [selectedSession, termId]);
 
   const requestParams = () => {
-    const params = {
-      student: studentSearch.trim(),
-    };
+    const params = { student: studentSearch.trim() };
     if (selectedSession?.id) params.academic_session_id = selectedSession.id;
     if (selectedTerm?.id) params.term_id = selectedTerm.id;
     return params;
@@ -209,24 +185,49 @@ export default function StudentResult() {
   };
 
   return (
-    <div className="student-result-page">
-      <div className="student-result-card">
-        <div className="student-result-grid">
-          <div className="student-result-field">
-            <label htmlFor="student-result-email">Student Email or Name</label>
+    <div className="rs-page rs-page--staff">
+      <section className="rs-hero">
+        <div>
+          <span className="rs-pill">School Admin Results Desk</span>
+          <h2 className="rs-title">Search a student once, then review or download the result cleanly.</h2>
+          <p className="rs-subtitle">
+            Use the same polished results workspace style already familiar on the student and staff sides.
+          </p>
+          <div className="rs-meta">
+            <span>{loadingOptions ? "Loading filters..." : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`}</span>
+            <span>{selectedTerm?.name || "Select a term"}</span>
+          </div>
+        </div>
+
+        <div className="rs-hero-art" aria-hidden="true">
+          <div className="rs-art rs-art--main">
+            <img src={examPrepArt} alt="" />
+          </div>
+          <div className="rs-art rs-art--survey">
+            <img src={onlineSurveyArt} alt="" />
+          </div>
+          <div className="rs-art rs-art--cert">
+            <img src={certificateArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="rs-panel">
+        <div className="rs-cards" style={{ marginBottom: 14 }}>
+          <div className="rs-card-btn" style={{ cursor: "default" }}>
+            <h3 className="rs-card-title">Student Email or Name</h3>
             <input
-              id="student-result-email"
               type="text"
               placeholder="student@example.com or full name"
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
+              style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", boxSizing: "border-box" }}
             />
           </div>
 
-          <div className="student-result-field">
-            <label htmlFor="student-result-session">Academic Session</label>
+          <div className="rs-card-btn" style={{ cursor: "default" }}>
+            <h3 className="rs-card-title">Academic Session</h3>
             <select
-              id="student-result-session"
               value={sessionId}
               onChange={(e) => {
                 const value = e.target.value;
@@ -236,6 +237,7 @@ export default function StudentResult() {
                 setTermId(preferred ? String(preferred.id) : "");
               }}
               disabled={loadingOptions}
+              style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", boxSizing: "border-box" }}
             >
               {(sessions || []).map((item) => (
                 <option key={item.id} value={item.id}>
@@ -246,13 +248,13 @@ export default function StudentResult() {
             </select>
           </div>
 
-          <div className="student-result-field">
-            <label htmlFor="student-result-term">Term</label>
+          <div className="rs-card-btn" style={{ cursor: "default" }}>
+            <h3 className="rs-card-title">Term</h3>
             <select
-              id="student-result-term"
               value={String(selectedTerm?.id || "")}
               onChange={(e) => setTermId(e.target.value)}
               disabled={loadingOptions}
+              style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", boxSizing: "border-box" }}
             >
               {(selectedSession?.terms || []).map((item) => (
                 <option key={item.id} value={item.id}>
@@ -264,110 +266,102 @@ export default function StudentResult() {
           </div>
         </div>
 
-        <div className="student-result-actions">
-          <button onClick={searchResult} disabled={!canDownload || searching || loadingOptions}>
-            {searching ? "Searching..." : "Search"}
-          </button>
-          <button className="secondary" onClick={downloadPdf} disabled={!canDownload || downloading || loadingOptions}>
-            {downloading ? "Downloading..." : "Download Result"}
-          </button>
-        </div>
-
-        {error ? <p className="student-result-error">{error}</p> : null}
-        {message ? <p className="student-result-message">{message}</p> : null}
-      </div>
-
-      {context?.student ? (
-        <div className="student-result-meta">
-          <p>
-            <strong>Student:</strong> {context.student.name} ({context.student.email})
-          </p>
-          <p>
-            <strong>Session:</strong>{" "}
-            {context.selected_session?.session_name || context.selected_session?.academic_year || "-"}
-          </p>
-        </div>
-      ) : null}
-
-      {entry ? (
-        <div className="student-result-entry">
-          <div className="student-result-entry-head">
-            <h3>{entry.term?.name || "Term Result"}</h3>
-            <p>
-              {entry.class?.name || "-"} | Average:{" "}
-              {formatMaybeNumber(entry.summary?.average_score)} | Grade:{" "}
-              {entry.summary?.overall_grade || "-"}
-            </p>
+        <div className="rs-results-head" style={{ marginTop: 0 }}>
+          <h3 className="rs-results-title">Student Result Search</h3>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button className="rs-btn" onClick={searchResult} disabled={!canDownload || searching || loadingOptions}>
+              {searching ? "Searching..." : "Search"}
+            </button>
+            <button className="rs-btn" onClick={downloadPdf} disabled={!canDownload || downloading || loadingOptions}>
+              {downloading ? "Downloading..." : "Download Result"}
+            </button>
           </div>
+        </div>
 
-          <div
-            style={{
-              marginTop: 12,
-              display: "grid",
-              gap: 10,
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            }}
-          >
-            <div style={infoBoxStyle}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Teacher Comment</div>
-              <div>{entry.teacher_comment || "-"}</div>
+        {loadingOptions ? <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading filters...</p> : null}
+        {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
+        {message ? <p className="rs-state rs-state--empty" style={{ marginTop: 10 }}>{message}</p> : null}
+
+        {context?.student ? (
+          <div className="rs-cards" style={{ marginTop: 16 }}>
+            <div className="rs-card-btn" style={{ cursor: "default" }}>
+              <h3 className="rs-card-title">Student</h3>
+              <p className="rs-card-meta">{context.student.name} ({context.student.email})</p>
+            </div>
+            <div className="rs-card-btn" style={{ cursor: "default" }}>
+              <h3 className="rs-card-title">Session</h3>
+              <p className="rs-card-meta">{context.selected_session?.session_name || context.selected_session?.academic_year || "-"}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {entry ? (
+          <>
+            <div className="rs-results-head">
+              <h3 className="rs-results-title">{entry.term?.name || "Term Result"}</h3>
+              <span className="rs-meta" style={{ marginTop: 0 }}>
+                <span>{entry.class?.name || "-"}</span>
+                <span>Average: {formatMaybeNumber(entry.summary?.average_score)}</span>
+                <span>Grade: {entry.summary?.overall_grade || "-"}</span>
+              </span>
             </div>
 
-          </div>
+            <div className="rs-cards" style={{ marginBottom: 14 }}>
+              <div className="rs-card-btn" style={{ cursor: "default" }}>
+                <h3 className="rs-card-title">Teacher Comment</h3>
+                <p className="rs-card-meta">{entry.teacher_comment || "-"}</p>
+              </div>
 
-          {(entry.behaviour_traits || []).length > 0 ? (
-            <div style={traitGridStyle}>
               {(entry.behaviour_traits || []).map((trait) => (
-                <div key={trait.label} style={traitCardStyle}>
-                  <div style={{ fontSize: 12, color: "#475569" }}>{trait.label}</div>
-                  <div style={{ marginTop: 4, fontWeight: 700, fontSize: 16 }}>{trait.value ?? 0}</div>
+                <div key={trait.label} className="rs-card-btn" style={{ cursor: "default" }}>
+                  <h3 className="rs-card-title">{trait.label}</h3>
+                  <p className="rs-card-meta">{trait.value ?? 0}</p>
                 </div>
               ))}
             </div>
-          ) : null}
 
-          <div className="student-result-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>CA</th>
-                  <th>Exam</th>
-                  <th>Total</th>
-                  <th>Min</th>
-                  <th>Max</th>
-                  <th>Class Ave</th>
-                  <th>Position</th>
-                  <th>Grade</th>
-                  <th>Remark</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(entry.rows || []).map((row) => (
-                  <tr key={row.term_subject_id}>
-                    <td>{row.subject_name}</td>
-                    <td>{asDash(row.ca)}</td>
-                    <td>{asDash(row.exam)}</td>
-                    <td>{asDash(row.total)}</td>
-                    <td>{asDash(row.min_score)}</td>
-                    <td>{asDash(row.max_score)}</td>
-                    <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
-                    <td>{row.position_label || "-"}</td>
-                    <td>{asDash(row.grade)}</td>
-                    <td>{asDash(row.remark)}</td>
-                  </tr>
-                ))}
-                {(entry.rows || []).length === 0 ? (
+            <div className="rs-table-wrap">
+              <table className="rs-table">
+                <thead>
                   <tr>
-                    <td colSpan="10">No records found for this student and term.</td>
+                    <th>Subject</th>
+                    <th>CA</th>
+                    <th>Exam</th>
+                    <th>Total</th>
+                    <th>Min</th>
+                    <th>Max</th>
+                    <th>Class Ave</th>
+                    <th>Position</th>
+                    <th>Grade</th>
+                    <th>Remark</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
+                </thead>
+                <tbody>
+                  {(entry.rows || []).map((row) => (
+                    <tr key={row.term_subject_id}>
+                      <td>{row.subject_name}</td>
+                      <td>{asDash(row.ca)}</td>
+                      <td>{asDash(row.exam)}</td>
+                      <td>{asDash(row.total)}</td>
+                      <td>{asDash(row.min_score)}</td>
+                      <td>{asDash(row.max_score)}</td>
+                      <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
+                      <td>{row.position_label || "-"}</td>
+                      <td>{asDash(row.grade)}</td>
+                      <td>{asDash(row.remark)}</td>
+                    </tr>
+                  ))}
+                  {(entry.rows || []).length === 0 ? (
+                    <tr>
+                      <td colSpan="10">No records found for this student and term.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }
-
