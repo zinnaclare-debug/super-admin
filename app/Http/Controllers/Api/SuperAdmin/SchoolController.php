@@ -83,6 +83,23 @@ class SchoolController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:schools,email,' . $school->id,
+        ]);
+
+        $school->name = $payload['name'];
+        $school->email = $payload['email'];
+        $school->slug = Str::slug($payload['name']);
+        $school->save();
+
+        return response()->json([
+            'message' => 'School updated successfully',
+            'data' => $school,
+        ]);
+    }
     public function createWithAdmin(Request $request)
     {
         $actorUserId = (int) ($request->user()->id ?? 0);
@@ -753,3 +770,4 @@ class SchoolController extends Controller
         }
     }
 }
+

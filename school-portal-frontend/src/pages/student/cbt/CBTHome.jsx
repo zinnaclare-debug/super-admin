@@ -336,6 +336,9 @@ export default function StudentCBTHome() {
       ) : selectedExam ? (
         <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
           <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
+          <div style={{ marginBottom: 12, fontWeight: 700, color: "#0f172a" }}>
+            Answered {attemptedCount} / {totalCount}
+          </div>
 
           {loadingQuestions ? (
             <p className="cbx-state cbx-state--loading">Loading questions...</p>
@@ -482,3 +485,4 @@ export default function StudentCBTHome() {
     </div>
   );
 }
+

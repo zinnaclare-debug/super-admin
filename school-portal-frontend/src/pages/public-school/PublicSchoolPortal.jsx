@@ -200,7 +200,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
   const contentItems = Array.isArray(contentFeed?.data) ? contentFeed.data : [];
   const contentMeta = contentFeed?.meta || { current_page: 1, last_page: 1, total: 0 };
-
+  const examQuestionTotal = examData?.exam?.questions?.length || 0;
+  const answeredCount = examAnswers.filter((answer) => ["A", "B", "C", "D"].includes(String(answer))).length;
   const handleApply = async (e) => {
     e.preventDefault();
     setBusyAction("apply");
@@ -471,6 +472,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                   <p>Class: {examData.application?.applying_for_class}</p>
                   <p>Duration: {examData.exam.duration_minutes} minutes</p>
                   <p>Pass Mark: {examData.exam.pass_mark}</p>
+                  <p className="school-site-exam-progress">Answered: {answeredCount} / {examQuestionTotal}</p>
                   <p>{examData.exam.instructions || "Answer all questions and submit once."}</p>
                 </div>
                 {examData.exam.questions.map((question, index) => (
@@ -531,6 +533,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
+
 
 
 

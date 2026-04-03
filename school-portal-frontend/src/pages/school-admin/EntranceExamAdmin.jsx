@@ -273,18 +273,24 @@ export default function EntranceExamAdmin() {
         </div>
 
         <div className="examadmin-levels">
-          {classGroups.map((group) => (
-            <div key={group.key} className="examadmin-level-card">
-              <div className="examadmin-level-head">
-                <div>
-                  <h4>{group.label}</h4>
-                  <p>{group.exams.length} class{group.exams.length === 1 ? "" : "es"} in this level</p>
+          {classGroups.map((group) => {
+            const levelQuestionTotal = group.exams.reduce(
+              (sum, exam) => sum + examQuestionCount(exam),
+              0
+            );
+            return (
+              <div key={group.key} className="examadmin-level-card">
+                <div className="examadmin-level-head">
+                  <div>
+                    <h4>{group.label}</h4>
+                    <p>{group.exams.length} class{group.exams.length === 1 ? "" : "es"} in this level</p>
+                    <p className="examadmin-level-total">Level total questions: {levelQuestionTotal}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="examadmin-class-grid">
-                {group.exams.map((exam) => (
-                  <article key={exam.class_name} className="examadmin-class-card">
+                <div className="examadmin-class-grid">
+                  {group.exams.map((exam) => (
+                    <article key={exam.class_name} className="examadmin-class-card">
                     <div className="examadmin-class-head">
                       <div>
                         <h5>{exam.class_name}</h5>
@@ -354,7 +360,8 @@ export default function EntranceExamAdmin() {
                 ))}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </section>
 
@@ -403,5 +410,21 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
