@@ -353,7 +353,9 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                   {item.image_urls?.length ? (
                     <div className="school-site-content-gallery">
                       {item.image_urls.map((url, index) => (
-                        <img key={`${item.id}-${index}`} src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
+                        <div key={`${item.id}-${index}`} className="school-site-content-media-frame">
+                          <img src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
+                        </div>
                       ))}
                     </div>
                   ) : null}
@@ -531,4 +533,5 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
 
