@@ -523,188 +523,224 @@ export default function Register() {
 
       {step === 1 && (
         <form onSubmit={preview}>
-          <h3>User Type</h3>
-          <select name="role" value={form.role} onChange={handleChange} disabled={isEditMode}>
-            <option value="">Select Role</option>
-            <option value="student">Student</option>
-            <option value="staff">Staff</option>
-          </select>
+          <div className="reg-section-card reg-section-card--compact">
+            <div className="reg-section-head">
+              <h3>Account Setup</h3>
+              <p>Choose the role and placement level before entering profile details.</p>
+            </div>
 
-          {/* Education Level (one place only) */}
-          <h3 style={{ marginTop: 14 }}>
-            Education Level {isStaff ? "(required for staff assignment)" : ""}
-          </h3>
-          <select name="education_level" value={form.education_level} onChange={handleChange}>
-            <option value="">Select Level</option>
-            {educationLevels.map((level) => (
-              <option key={level} value={level}>
-                {prettyLevel(level)}
-              </option>
-            ))}
-            {form.education_level && !educationLevels.includes(form.education_level) && (
-              <option value={form.education_level}>{prettyLevel(form.education_level)}</option>
-            )}
-          </select>
-
-          <h3 style={{ marginTop: 14 }}>Basic Info</h3>
-          <input name="name" placeholder="Full Name" value={form.name} onChange={handleChange} />
-          <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-          <input
-            type="password"
-            name="password"
-            placeholder={isEditMode ? "New Password (optional)" : "Password"}
-            value={form.password}
-            onChange={handleChange}
-          />
-          <input name="address" placeholder="Address" value={form.address} onChange={handleChange} />
-
-          {/* Photo Widget */}
-          <h3 style={{ marginTop: 14 }}>Photo (optional)</h3>
-          <input type="file" accept="image/*" onChange={onPickPhoto} />
-          {photoPreview && (
-            <div style={{ marginTop: 10 }}>
-              <img
-                src={toAbsoluteUrl(photoPreview)}
-                alt="preview"
-                style={{
-                  width: 110,
-                  height: 110,
-                  borderRadius: 12,
-                  objectFit: "cover",
-                  border: "1px solid #ddd",
-                }}
-              />
+            <div className="reg-field-grid reg-field-grid--two">
               <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhoto(null);
-                    setPhotoPreview(null);
-                    if (isEditMode) setRemovePhoto(true);
-                  }}
-                  style={{ marginTop: 8 }}
-                >
-                  Remove Photo
-                </button>
+                <label className="reg-label">User Type</label>
+                <select name="role" value={form.role} onChange={handleChange} disabled={isEditMode}>
+                  <option value="">Select Role</option>
+                  <option value="student">Student</option>
+                  <option value="staff">Staff</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="reg-label">
+                  Education Level {isStaff ? "(required for staff assignment)" : ""}
+                </label>
+                <select name="education_level" value={form.education_level} onChange={handleChange}>
+                  <option value="">Select Level</option>
+                  {educationLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {prettyLevel(level)}
+                    </option>
+                  ))}
+                  {form.education_level && !educationLevels.includes(form.education_level) && (
+                    <option value={form.education_level}>{prettyLevel(form.education_level)}</option>
+                  )}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="reg-section-card">
+            <div className="reg-section-head">
+              <h3>Basic Info</h3>
+              <p>Capture the main profile details and optional passport photo in one place.</p>
+            </div>
+
+            <div className="reg-field-grid reg-field-grid--two">
+              <input name="name" placeholder="Full Name" value={form.name} onChange={handleChange} />
+              <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
+              <input
+                type="password"
+                name="password"
+                placeholder={isEditMode ? "New Password (optional)" : "Password"}
+                value={form.password}
+                onChange={handleChange}
+              />
+              <input name="address" placeholder="Address" value={form.address} onChange={handleChange} />
+            </div>
+
+            <div className="reg-photo-block">
+              <div className="reg-section-head reg-section-head--mini">
+                <h4>Photo (optional)</h4>
+                <p>
+                  Photos are auto-resized to {PROFILE_PHOTO_GUIDE.size}x{PROFILE_PHOTO_GUIDE.size}px and compressed before upload.
+                </p>
+              </div>
+
+              <input type="file" accept="image/*" onChange={onPickPhoto} />
+
+              {photoPreview && (
+                <div className="reg-photo-preview">
+                  <img src={toAbsoluteUrl(photoPreview)} alt="preview" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto(null);
+                      setPhotoPreview(null);
+                      if (isEditMode) setRemovePhoto(true);
+                    }}
+                  >
+                    Remove Photo
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>          {isStudent && (
+            <>
+              <div className="reg-section-card reg-section-card--compact">
+                <div className="reg-section-head">
+                  <h3>Enrollment During Registration</h3>
+                  <p>Assign the learner to the correct class and department immediately.</p>
+                </div>
+
+                <div className="reg-field-grid reg-field-grid--two">
+                  <select name="class_id" value={form.class_id} onChange={handleChange}>
+                    <option value="">
+                      {loadingEnrollmentContext ? "Loading classes..." : "Select Class"}
+                    </option>
+                    {isEditMode &&
+                      form.class_id &&
+                      !studentClasses.some((schoolClass) => String(schoolClass.id) === String(form.class_id)) && (
+                        <option value={form.class_id}>
+                          {editPlacement.class_name || "Current Class"}
+                        </option>
+                      )}
+                    {studentClasses.map((schoolClass) => (
+                      <option key={schoolClass.id} value={schoolClass.id}>
+                        {schoolClass.name} ({prettyLevel(schoolClass.level)})
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    name="department_id"
+                    value={form.department_id}
+                    onChange={handleChange}
+                    disabled={!form.class_id || selectedDepartments.length === 0}
+                  >
+                    <option value="">
+                      {!form.class_id
+                        ? "Select class first"
+                        : selectedDepartments.length === 0
+                          ? "No department configured"
+                          : "Select Department"}
+                    </option>
+                    {isEditMode &&
+                      form.department_id &&
+                      !selectedDepartments.some(
+                        (department) => String(department.id) === String(form.department_id)
+                      ) && (
+                        <option value={form.department_id}>
+                          {editPlacement.department_name || "Current Department"}
+                        </option>
+                      )}
+                    {selectedDepartments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {enrollmentContext?.current_term ? (
+                  <p className="reg-helper-text">
+                    Enrollment will be applied across all terms in{" "}
+                    {enrollmentContext?.current_session?.session_name ||
+                      enrollmentContext?.current_session?.academic_year ||
+                      "current session"}
+                    . Current term: {enrollmentContext.current_term.name}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="reg-section-card">
+                <div className="reg-section-head">
+                  <h3>Student Details</h3>
+                  <p>Store the student-specific details used across admissions and records.</p>
+                </div>
+
+                <div className="reg-field-grid reg-field-grid--two">
+                  <select name="sex" value={form.sex} onChange={handleChange}>
+                    <option value="">Sex</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                  </select>
+
+                  <input name="religion" placeholder="Religion" value={form.religion} onChange={handleChange} />
+                  <input type="date" name="dob" value={form.dob} onChange={handleChange} />
+                </div>
+              </div>
+
+              <div className="reg-section-card">
+                <div className="reg-section-head">
+                  <h3>Guardian</h3>
+                  <p>Capture the guardian record clearly for communication and follow-up.</p>
+                </div>
+
+                <div className="reg-field-grid reg-field-grid--two">
+                  <input name="guardian_name" placeholder="Name" value={form.guardian_name} onChange={handleChange} />
+                  <input name="guardian_email" placeholder="Email" value={form.guardian_email} onChange={handleChange} />
+                  <input name="guardian_mobile" placeholder="Mobile" value={form.guardian_mobile} onChange={handleChange} />
+                  <input name="guardian_location" placeholder="Location" value={form.guardian_location} onChange={handleChange} />
+                  <input
+                    name="guardian_state_of_origin"
+                    placeholder="State of Origin"
+                    value={form.guardian_state_of_origin}
+                    onChange={handleChange}
+                  />
+                  <input
+                    name="guardian_occupation"
+                    placeholder="Occupation"
+                    value={form.guardian_occupation}
+                    onChange={handleChange}
+                  />
+                  <select name="guardian_relationship" value={form.guardian_relationship} onChange={handleChange}>
+                    <option value="">Relationship</option>
+                    <option value="father">Father</option>
+                    <option value="mother">Mother</option>
+                    <option value="guardian">Guardian</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          )}          {isStaff && (
+            <div className="reg-section-card reg-section-card--compact">
+              <div className="reg-section-head">
+                <h3>Staff Details</h3>
+                <p>Keep core staff identity and role information grouped together.</p>
+              </div>
+
+              <div className="reg-field-grid reg-field-grid--two">
+                <select name="sex" value={form.sex} onChange={handleChange}>
+                  <option value="">Sex</option>
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                </select>
+                <input type="date" name="dob" value={form.dob} onChange={handleChange} />
+                <input name="staff_position" placeholder="Position" value={form.staff_position} onChange={handleChange} />
               </div>
             </div>
           )}
-          <p style={{ marginTop: 8, marginBottom: 0, opacity: 0.75 }}>
-            Photos are auto-resized to {PROFILE_PHOTO_GUIDE.size}x{PROFILE_PHOTO_GUIDE.size}px and compressed before upload.
-          </p>
 
-          {isStudent && (
-            <>
-              <h3 style={{ marginTop: 14 }}>Enrollment During Registration</h3>
-              <select name="class_id" value={form.class_id} onChange={handleChange}>
-                <option value="">
-                  {loadingEnrollmentContext ? "Loading classes..." : "Select Class"}
-                </option>
-                {isEditMode &&
-                  form.class_id &&
-                  !studentClasses.some((schoolClass) => String(schoolClass.id) === String(form.class_id)) && (
-                    <option value={form.class_id}>
-                      {editPlacement.class_name || "Current Class"}
-                    </option>
-                  )}
-                {studentClasses.map((schoolClass) => (
-                  <option key={schoolClass.id} value={schoolClass.id}>
-                    {schoolClass.name} ({prettyLevel(schoolClass.level)})
-                  </option>
-                ))}
-              </select>
-
-              <select
-                name="department_id"
-                value={form.department_id}
-                onChange={handleChange}
-                disabled={!form.class_id || selectedDepartments.length === 0}
-              >
-                <option value="">
-                  {!form.class_id
-                    ? "Select class first"
-                    : selectedDepartments.length === 0
-                      ? "No department configured"
-                      : "Select Department"}
-                </option>
-                {isEditMode &&
-                  form.department_id &&
-                  !selectedDepartments.some(
-                    (department) => String(department.id) === String(form.department_id)
-                  ) && (
-                    <option value={form.department_id}>
-                      {editPlacement.department_name || "Current Department"}
-                    </option>
-                  )}
-                {selectedDepartments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-
-              {enrollmentContext?.current_term ? (
-                <p style={{ marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
-                  Enrollment will be applied across all terms in{" "}
-                  {enrollmentContext?.current_session?.session_name ||
-                    enrollmentContext?.current_session?.academic_year ||
-                    "current session"}
-                  . Current term: {enrollmentContext.current_term.name}
-                </p>
-              ) : null}
-
-              <h3 style={{ marginTop: 14 }}>Student Details</h3>
-
-              <select name="sex" value={form.sex} onChange={handleChange}>
-                <option value="">Sex</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-              </select>
-
-              <input name="religion" placeholder="Religion" value={form.religion} onChange={handleChange} />
-              <input type="date" name="dob" value={form.dob} onChange={handleChange} />
-
-              <h3 style={{ marginTop: 14 }}>Guardian</h3>
-              <input name="guardian_name" placeholder="Name" value={form.guardian_name} onChange={handleChange} />
-              <input name="guardian_email" placeholder="Email" value={form.guardian_email} onChange={handleChange} />
-              <input name="guardian_mobile" placeholder="Mobile" value={form.guardian_mobile} onChange={handleChange} />
-              <input name="guardian_location" placeholder="Location" value={form.guardian_location} onChange={handleChange} />
-              <input
-                name="guardian_state_of_origin"
-                placeholder="State of Origin"
-                value={form.guardian_state_of_origin}
-                onChange={handleChange}
-              />
-              <input
-                name="guardian_occupation"
-                placeholder="Occupation"
-                value={form.guardian_occupation}
-                onChange={handleChange}
-              />
-
-              <select name="guardian_relationship" value={form.guardian_relationship} onChange={handleChange}>
-                <option value="">Relationship</option>
-                <option value="father">Father</option>
-                <option value="mother">Mother</option>
-                <option value="guardian">Guardian</option>
-              </select>
-            </>
-          )}
-
-          {isStaff && (
-            <>
-              <h3 style={{ marginTop: 14 }}>Staff</h3>
-              <select name="sex" value={form.sex} onChange={handleChange}>
-                <option value="">Sex</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-              </select>
-              <input type="date" name="dob" value={form.dob} onChange={handleChange} />
-              <input name="staff_position" placeholder="Position" value={form.staff_position} onChange={handleChange} />
-            </>
-          )}
-
-          <div style={{ marginTop: 14 }}>
+          <div className="reg-actions-row">
             <button type="submit" disabled={submitting}>
               {isEditMode
                 ? (submitting || processingPhoto ? "Saving..." : "Save Changes")
@@ -730,7 +766,7 @@ export default function Register() {
 
           <input value={username} onChange={(e) => setUsername(e.target.value)} />
 
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+          <div className="reg-actions-row reg-actions-row--compact">
             <button onClick={confirm} disabled={submitting}>
               {submitting ? "Saving..." : "Confirm"}
             </button>
@@ -870,6 +906,8 @@ export default function Register() {
     </div>
   );
 }
+
+
 
 
 
