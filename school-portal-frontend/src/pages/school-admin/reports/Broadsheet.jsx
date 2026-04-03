@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import photocopyArt from "../../../assets/broadsheet/photocopy.svg";
+import dataAtWorkArt from "../../../assets/broadsheet/data-at-work.svg";
+import spreadsheetsArt from "../../../assets/broadsheet/spreadsheets.svg";
+import "../../shared/PaymentsShowcase.css";
 import "./Broadsheet.css";
 
 function fileNameFromHeaders(headers, fallback) {
@@ -244,193 +248,224 @@ export default function Broadsheet() {
   };
 
   return (
-    <div className="broadsheet-page">
-      <div className="broadsheet-card">
-        <div className="broadsheet-grid">
-          <div className="broadsheet-field">
-            <label htmlFor="broadsheet-session">Academic Session</label>
-            <select
-              id="broadsheet-session"
-              value={sessionId}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSessionId(value);
-                setDepartment("");
-                setClassId("");
-                loadOptions({ nextSessionId: value, nextReportScope: reportScope });
-              }}
-              disabled={loadingOptions}
-            >
-              {(sessions || []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.session_name || item.academic_year}
-                  {item.is_current ? " (Current)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="broadsheet-field">
-            <label htmlFor="broadsheet-level">Level</label>
-            <select
-              id="broadsheet-level"
-              value={level}
-              onChange={(e) => {
-                const nextLevel = e.target.value;
-                setLevel(nextLevel);
-                setDepartment("");
-                setClassId("");
-                loadOptions({
-                  nextSessionId: sessionId || selectedSession?.id || "",
-                  nextLevel,
-                  nextReportScope: reportScope,
-                });
-              }}
-              disabled={loadingOptions}
-            >
-              {(levelOptions || []).map((value) => (
-                <option key={value} value={value}>
-                  {levelLabel(value)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="broadsheet-field">
-            <label htmlFor="broadsheet-department">Department</label>
-            <select
-              id="broadsheet-department"
-              value={department}
-              onChange={(e) => {
-                const nextDepartment = e.target.value;
-                setDepartment(nextDepartment);
-                setClassId("");
-                loadOptions({
-                  nextSessionId: sessionId || selectedSession?.id || "",
-                  nextLevel: level,
-                  nextDepartment,
-                  nextReportScope: reportScope,
-                });
-              }}
-              disabled={loadingOptions}
-            >
-              <option value="">All Departments</option>
-              {(departmentOptions || []).map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="broadsheet-field">
-            <label htmlFor="broadsheet-class">Class</label>
-            <select
-              id="broadsheet-class"
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              disabled={loadingOptions}
-            >
-              <option value="">All Classes</option>
-              {(classOptions || []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="broadsheet-field">
-            <label htmlFor="broadsheet-report-scope">Report Scope</label>
-            <select
-              id="broadsheet-report-scope"
-              value={reportScope}
-              onChange={(e) => {
-                const nextReportScope = e.target.value;
-                setReportScope(nextReportScope);
-                loadOptions({
-                  nextSessionId: sessionId || selectedSession?.id || "",
-                  nextLevel: level,
-                  nextDepartment: department,
-                  nextClassId: classId,
-                  nextReportScope,
-                });
-              }}
-              disabled={loadingOptions}
-            >
-              {reportScopeOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="broadsheet-actions">
-          <button onClick={searchBroadsheet} disabled={!canSearch || searching || loadingOptions}>
-            {searching ? "Searching..." : "Search"}
-          </button>
-          <button className="tertiary" onClick={previewBroadsheetPdf} disabled={!canSearch || previewing}>
-            {previewing ? "Opening Preview..." : "Preview PDF"}
-          </button>
-          <button className="secondary" onClick={downloadBroadsheet} disabled={!canSearch || downloading}>
-            {downloading ? "Downloading..." : "Download Broadsheet"}
-          </button>
-        </div>
-
-        {context?.session ? (
-          <p className="broadsheet-meta">
-            Session: {context.session.session_name || context.session.academic_year || "-"} | Scope:{" "}
-            {context.selected_report_scope_label || reportScopeLabel(reportScope)} | Level: {levelLabel(context.level)} |
-            Department: {context.selected_department || "All"} | Class: {context.selected_class_name || "All"}
+    <div className="payx-page payx-page--admin broadsheet-page">
+      <section className="payx-hero broadsheet-hero">
+        <div>
+          <span className="payx-pill">School Admin Broadsheet</span>
+          <h2 className="payx-title">Review class-wide performance with a clearer broadsheet workspace.</h2>
+          <p className="payx-subtitle">
+            Filter by session, level, department, class, and report scope, then preview or download the full broadsheet from one polished page.
           </p>
-        ) : null}
+          <div className="payx-meta">
+            <span>{selectedSession?.session_name || selectedSession?.academic_year || "Session -"}</span>
+            <span>{levelLabel(level)}</span>
+            <span>{reportScopeLabel(reportScope)}</span>
+          </div>
+        </div>
 
-        {error ? <p className="broadsheet-error">{error}</p> : null}
-        {message ? <p className="broadsheet-message">{message}</p> : null}
-      </div>
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main broadsheet-art--main">
+            <img src={photocopyArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card broadsheet-art--card">
+            <img src={dataAtWorkArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online broadsheet-art--online">
+            <img src={spreadsheetsArt} alt="" />
+          </div>
+        </div>
+      </section>
 
-      <div className="broadsheet-table-wrap">
-        <table className="broadsheet-table">
-          <thead>
-            <tr>
-              <th>S/N</th>
-              <th className="broadsheet-student-head">Student Name</th>
-              <th className="broadsheet-class-head">Class</th>
-              {(subjects || []).map((subject) => (
-                <th key={subject.id} className="broadsheet-subject-head-horizontal">
-                  {subject.header_name || subject.name || subject.short_code || subject.code || "-"}
-                </th>
-              ))}
-              <th className="broadsheet-summary-head">Total</th>
-              <th className="broadsheet-summary-head">Average</th>
-              <th className="broadsheet-summary-head">Position</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(rows || []).map((row, index) => (
-              <tr key={row.student_id}>
-                <td>{index + 1}</td>
-                <td>{row.name}</td>
-                <td>{row.class_name || "-"}</td>
-                {(subjects || []).map((subject) => {
-                  const value = row.scores?.[String(subject.id)] ?? null;
-                  return <td key={`${row.student_id}-${subject.id}`}>{formatNumber(value)}</td>;
-                })}
-                <td>{formatNumber(row.total)}</td>
-                <td>{formatNumber(row.average)}</td>
-                <td>{row.position_label || "-"}</td>
-              </tr>
-            ))}
-            {(rows || []).length === 0 ? (
-              <tr>
-                <td colSpan={(subjects || []).length + 6}>No broadsheet data found.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <section className="payx-panel broadsheet-panel">
+        <div className="payx-card broadsheet-card">
+          <div className="broadsheet-grid">
+            <div className="broadsheet-field">
+              <label htmlFor="broadsheet-session">Academic Session</label>
+              <select
+                id="broadsheet-session"
+                value={sessionId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSessionId(value);
+                  setDepartment("");
+                  setClassId("");
+                  loadOptions({ nextSessionId: value, nextReportScope: reportScope });
+                }}
+                disabled={loadingOptions}
+              >
+                {(sessions || []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.session_name || item.academic_year}
+                    {item.is_current ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="broadsheet-field">
+              <label htmlFor="broadsheet-level">Level</label>
+              <select
+                id="broadsheet-level"
+                value={level}
+                onChange={(e) => {
+                  const nextLevel = e.target.value;
+                  setLevel(nextLevel);
+                  setDepartment("");
+                  setClassId("");
+                  loadOptions({
+                    nextSessionId: sessionId || selectedSession?.id || "",
+                    nextLevel,
+                    nextReportScope: reportScope,
+                  });
+                }}
+                disabled={loadingOptions}
+              >
+                {(levelOptions || []).map((value) => (
+                  <option key={value} value={value}>
+                    {levelLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="broadsheet-field">
+              <label htmlFor="broadsheet-department">Department</label>
+              <select
+                id="broadsheet-department"
+                value={department}
+                onChange={(e) => {
+                  const nextDepartment = e.target.value;
+                  setDepartment(nextDepartment);
+                  setClassId("");
+                  loadOptions({
+                    nextSessionId: sessionId || selectedSession?.id || "",
+                    nextLevel: level,
+                    nextDepartment,
+                    nextReportScope: reportScope,
+                  });
+                }}
+                disabled={loadingOptions}
+              >
+                <option value="">All Departments</option>
+                {(departmentOptions || []).map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="broadsheet-field">
+              <label htmlFor="broadsheet-class">Class</label>
+              <select
+                id="broadsheet-class"
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+                disabled={loadingOptions}
+              >
+                <option value="">All Classes</option>
+                {(classOptions || []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="broadsheet-field">
+              <label htmlFor="broadsheet-report-scope">Report Scope</label>
+              <select
+                id="broadsheet-report-scope"
+                value={reportScope}
+                onChange={(e) => {
+                  const nextReportScope = e.target.value;
+                  setReportScope(nextReportScope);
+                  loadOptions({
+                    nextSessionId: sessionId || selectedSession?.id || "",
+                    nextLevel: level,
+                    nextDepartment: department,
+                    nextClassId: classId,
+                    nextReportScope,
+                  });
+                }}
+                disabled={loadingOptions}
+              >
+                {reportScopeOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="broadsheet-actions">
+            <button className="payx-btn" onClick={searchBroadsheet} disabled={!canSearch || searching || loadingOptions}>
+              {searching ? "Searching..." : "Search"}
+            </button>
+            <button className="payx-btn payx-btn--soft" onClick={previewBroadsheetPdf} disabled={!canSearch || previewing}>
+              {previewing ? "Opening Preview..." : "Preview PDF"}
+            </button>
+            <button className="payx-btn broadsheet-download-btn" onClick={downloadBroadsheet} disabled={!canSearch || downloading}>
+              {downloading ? "Downloading..." : "Download Broadsheet"}
+            </button>
+          </div>
+
+          {context?.session ? (
+            <p className="broadsheet-meta">
+              Session: {context.session.session_name || context.session.academic_year || "-"} | Scope:{" "}
+              {context.selected_report_scope_label || reportScopeLabel(reportScope)} | Level: {levelLabel(context.level)} |
+              Department: {context.selected_department || "All"} | Class: {context.selected_class_name || "All"}
+            </p>
+          ) : null}
+
+          {error ? <p className="broadsheet-error">{error}</p> : null}
+          {message ? <p className="broadsheet-message">{message}</p> : null}
+        </div>
+
+        <div className="payx-card broadsheet-table-card">
+          <div className="broadsheet-table-wrap">
+            <table className="broadsheet-table">
+              <thead>
+                <tr>
+                  <th>S/N</th>
+                  <th className="broadsheet-student-head">Student Name</th>
+                  <th className="broadsheet-class-head">Class</th>
+                  {(subjects || []).map((subject) => (
+                    <th key={subject.id} className="broadsheet-subject-head-horizontal">
+                      {subject.header_name || subject.name || subject.short_code || subject.code || "-"}
+                    </th>
+                  ))}
+                  <th className="broadsheet-summary-head">Total</th>
+                  <th className="broadsheet-summary-head">Average</th>
+                  <th className="broadsheet-summary-head">Position</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rows || []).map((row, index) => (
+                  <tr key={row.student_id}>
+                    <td>{index + 1}</td>
+                    <td>{row.name}</td>
+                    <td>{row.class_name || "-"}</td>
+                    {(subjects || []).map((subject) => {
+                      const value = row.scores?.[String(subject.id)] ?? null;
+                      return <td key={`${row.student_id}-${subject.id}`}>{formatNumber(value)}</td>;
+                    })}
+                    <td>{formatNumber(row.total)}</td>
+                    <td>{formatNumber(row.average)}</td>
+                    <td>{row.position_label || "-"}</td>
+                  </tr>
+                ))}
+                {(rows || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={(subjects || []).length + 6}>No broadsheet data found.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
