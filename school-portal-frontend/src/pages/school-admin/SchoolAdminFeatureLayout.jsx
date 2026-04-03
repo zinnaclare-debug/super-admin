@@ -41,9 +41,10 @@ function titleFromPath(pathname) {
 export default function SchoolAdminFeatureLayout() {
   const { pathname } = useLocation();
   const showBack = !NO_BACK_EXACT_PATHS.has(pathname);
+  const showHeader = !pathname.startsWith("/school/admin/academic_session");
 
   return (
-    <FeatureShell title={titleFromPath(pathname)} showBack={showBack}>
+    <FeatureShell title={titleFromPath(pathname)} showBack={showBack} showHeader={showHeader}>
       <Outlet />
     </FeatureShell>
   );

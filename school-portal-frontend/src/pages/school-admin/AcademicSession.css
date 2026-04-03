@@ -77,3 +77,25 @@
     grid-template-columns: 1fr;
   }
 }
+
+.academic-session__create-btn,
+.academic-session__action-btn {
+  white-space: nowrap;
+}
+
+.academic-session__action-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .academic-session__create-btn,
+  .academic-session__action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .academic-session__action-cell {
+    min-width: 124px;
+  }
+}

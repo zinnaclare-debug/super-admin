@@ -72,7 +72,7 @@ export default function AcademicSessions() {
             <h3>Academic Sessions</h3>
             <p>Manage academic sessions. Class structure now comes from Branding - Create Class.</p>
           </div>
-          <button className="payx-btn" onClick={() => navigate("/school/admin/academic_session/manage")}>
+          <button className="payx-btn academic-session__create-btn" onClick={() => navigate("/school/admin/academic_session/manage")}>
             + Create Session
           </button>
         </div>
@@ -106,7 +106,7 @@ export default function AcademicSessions() {
                     </td>
                     <td>
                       <button
-                        className="payx-btn payx-btn--soft"
+                        className="payx-btn payx-btn--soft academic-session__action-btn"
                         onClick={() =>
                           navigate("/school/admin/academic_session/manage", { state: { edit: session } })
                         }
@@ -130,3 +130,4 @@ export default function AcademicSessions() {
     </div>
   );
 }
+
