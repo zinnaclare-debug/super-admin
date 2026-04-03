@@ -201,6 +201,45 @@
   min-width: 180px;
 }
 
+.student-report-pagination {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.student-report-pagination__status {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.student-report-pagination__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.student-report-pagination__link {
+  border: none;
+  background: transparent;
+  color: #0f766e;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.student-report-pagination__link:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.student-report-pagination__divider {
+  color: #94a3b8;
+}
+
 .student-report-art--card {
   background: linear-gradient(160deg, #fff7ed, #ecfeff);
 }
@@ -217,5 +256,10 @@
   .student-report-actions .payx-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .student-report-pagination {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

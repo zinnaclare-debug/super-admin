@@ -7,6 +7,8 @@ import visualDataArt from "../../../assets/student-report/visual-data.svg";
 import "../../shared/PaymentsShowcase.css";
 import "./StudentReport.css";
 
+const STUDENT_REPORT_PAGE_SIZE = 50;
+
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
 
@@ -123,6 +125,7 @@ export default function StudentReport() {
   const [resultDownloading, setResultDownloading] = useState(false);
   const [resultError, setResultError] = useState("");
   const [resultMessage, setResultMessage] = useState("");
+  const [summaryPage, setSummaryPage] = useState(1);
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -144,6 +147,16 @@ export default function StudentReport() {
     );
   }, [selectedResultSession, resultTermId]);
 
+  const selectedTermValue = termId || String(context?.selected_term?.id || "");
+  const selectedClassValue = classId || String(context?.selected_class_id || "");
+  const selectedResultTermValue = String(selectedResultTerm?.id || "");
+  const totalSummaryPages = Math.max(1, Math.ceil(rows.length / STUDENT_REPORT_PAGE_SIZE));
+
+  const paginatedRows = useMemo(() => {
+    const start = (summaryPage - 1) * STUDENT_REPORT_PAGE_SIZE;
+    return rows.slice(start, start + STUDENT_REPORT_PAGE_SIZE);
+  }, [rows, summaryPage]);
+
   const load = async (selectedTermId = "", selectedClassId = "") => {
     setLoading(true);
     try {
@@ -154,6 +167,7 @@ export default function StudentReport() {
       setSessionConfigError("");
       setRows(res.data?.data || []);
       setContext(res.data?.context || null);
+      setSummaryPage(1);
     } catch (e) {
       const message = e?.response?.data?.message || "Failed to load student report.";
       if (isMissingCurrentSessionTerm(message)) {
@@ -163,6 +177,7 @@ export default function StudentReport() {
       }
       setRows([]);
       setContext(null);
+      setSummaryPage(1);
     } finally {
       setLoading(false);
     }
@@ -222,10 +237,6 @@ export default function StudentReport() {
       setResultTermId(String(preferred.id));
     }
   }, [selectedResultSession, resultTermId]);
-
-  const selectedTermValue = termId || String(context?.selected_term?.id || "");
-  const selectedClassValue = classId || String(context?.selected_class_id || "");
-  const selectedResultTermValue = String(selectedResultTerm?.id || "");
 
   const resultParams = () => {
     const params = {
@@ -570,49 +581,75 @@ export default function StudentReport() {
           {loading ? (
             <p className="student-report-loading">Loading report...</p>
           ) : (
-            <div className="student-report-table-wrap">
-              <table className="student-report-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 70 }}>S/N</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>A</th>
-                    <th>B</th>
-                    <th>C</th>
-                    <th>D</th>
-                    <th>E</th>
-                    <th>F</th>
-                    <th>Total</th>
-                    <th className="student-report-summary-head">Teacher Comment</th>
-                    <th className="student-report-summary-head">Behaviour Rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.student_id}>
-                      <td>{row.sn}</td>
-                      <td>{row.name}</td>
-                      <td>{row.email || "-"}</td>
-                      <td>{asDash(row.grades?.A)}</td>
-                      <td>{asDash(row.grades?.B)}</td>
-                      <td>{asDash(row.grades?.C)}</td>
-                      <td>{asDash(row.grades?.D)}</td>
-                      <td>{asDash(row.grades?.E)}</td>
-                      <td>{asDash(row.grades?.F)}</td>
-                      <td>{asDash(row.total_graded)}</td>
-                      <td><div className="student-report-note-box">{row.teacher_comment || "-"}</div></td>
-                      <td><div className="student-report-note-box">{row.behaviour_rating || "-"}</div></td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && (
+            <>
+              <div className="student-report-table-wrap">
+                <table className="student-report-table">
+                  <thead>
                     <tr>
-                      <td colSpan="12">No student grading data for this term.</td>
+                      <th style={{ width: 70 }}>S/N</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>A</th>
+                      <th>B</th>
+                      <th>C</th>
+                      <th>D</th>
+                      <th>E</th>
+                      <th>F</th>
+                      <th>Total</th>
+                      <th className="student-report-summary-head">Teacher Comment</th>
+                      <th className="student-report-summary-head">Behaviour Rating</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {paginatedRows.map((row) => (
+                      <tr key={row.student_id}>
+                        <td>{row.sn}</td>
+                        <td>{row.name}</td>
+                        <td>{row.email || "-"}</td>
+                        <td>{asDash(row.grades?.A)}</td>
+                        <td>{asDash(row.grades?.B)}</td>
+                        <td>{asDash(row.grades?.C)}</td>
+                        <td>{asDash(row.grades?.D)}</td>
+                        <td>{asDash(row.grades?.E)}</td>
+                        <td>{asDash(row.grades?.F)}</td>
+                        <td>{asDash(row.total_graded)}</td>
+                        <td><div className="student-report-note-box">{row.teacher_comment || "-"}</div></td>
+                        <td><div className="student-report-note-box">{row.behaviour_rating || "-"}</div></td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 && (
+                      <tr>
+                        <td colSpan="12">No student grading data for this term.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {rows.length > 0 ? (
+                <div className="student-report-pagination">
+                  <span className="student-report-pagination__status">Page {summaryPage} of {totalSummaryPages}</span>
+                  <div className="student-report-pagination__actions">
+                    <button
+                      type="button"
+                      className="student-report-pagination__link"
+                      onClick={() => setSummaryPage((page) => Math.min(totalSummaryPages, page + 1))}
+                      disabled={summaryPage === totalSummaryPages}
+                    >
+                      Next
+                    </button>
+                    <span className="student-report-pagination__divider">|</span>
+                    <button
+                      type="button"
+                      className="student-report-pagination__link"
+                      onClick={() => setSummaryPage((page) => Math.max(1, page - 1))}
+                      disabled={summaryPage === 1}
+                    >
+                      Previous
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </section>
