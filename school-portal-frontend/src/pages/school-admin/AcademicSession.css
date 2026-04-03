@@ -1,0 +1,79 @@
+.academic-session__panel {
+  display: grid;
+  gap: 16px;
+}
+
+.academic-session__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.academic-session__toolbar h3,
+.academic-session__form-head h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.academic-session__toolbar p,
+.academic-session__form-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.academic-session__form-card {
+  display: grid;
+  gap: 14px;
+}
+
+.academic-session__form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.academic-session__form-grid input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+}
+
+.academic-session__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.academic-session__link-btn {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0;
+}
+
+.academic-session__art-card {
+  background: linear-gradient(160deg, #fff7ed, #ecfeff);
+}
+
+.academic-session__art-online {
+  background: linear-gradient(160deg, #fef2f2, #ecfccb);
+}
+
+@media (max-width: 640px) {
+  .academic-session__toolbar {
+    flex-direction: column;
+  }
+
+  .academic-session__form-grid {
+    grid-template-columns: 1fr;
+  }
+}

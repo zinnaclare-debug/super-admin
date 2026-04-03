@@ -1,20 +1,17 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import cityGirlArt from "../../assets/academic-session/city-girl.svg";
+import familyArt from "../../assets/academic-session/family.svg";
+import trueFriendsArt from "../../assets/academic-session/true-friends.svg";
+import "../shared/PaymentsShowcase.css";
+import "./AcademicSession.css";
 
 const formatSessionStatus = (status) => {
   const value = String(status || "").toLowerCase();
   if (value === "current") return "Current";
   if (value === "completed") return "Completed";
   return "Pending";
-};
-
-const panelStyle = {
-  marginTop: 16,
-  border: "1px solid #ddd",
-  padding: 16,
-  borderRadius: 10,
-  background: "#fff",
 };
 
 export default function AcademicSession() {
@@ -53,7 +50,6 @@ export default function AcademicSession() {
     } else {
       openCreate();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.pathname, location?.state]);
 
   const openCreate = () => {
@@ -114,27 +110,29 @@ export default function AcademicSession() {
     const isEdit = showEdit && editing;
 
     return (
-      <div style={panelStyle}>
-        <h3 style={{ marginTop: 0 }}>{isEdit ? "Edit Academic Session" : "Create Academic Session"}</h3>
-        <form onSubmit={isEdit ? updateSession : createSession}>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <input
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              placeholder="e.g. 2026/2027"
-              style={{ width: 260, padding: 10 }}
-              required
-            />
-            <input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2026-2027"
-              style={{ width: 260, padding: 10 }}
-            />
+      <div className="payx-card academic-session__form-card">
+        <div className="academic-session__form-head">
+          <div>
+            <h3>{isEdit ? "Edit Academic Session" : "Create Academic Session"}</h3>
+            <p>Set the session label and academic year used across the school workflow.</p>
           </div>
-          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-            <button type="submit">{isEdit ? "Save" : "Create"}</button>
-            <button type="button" onClick={closePanels}>
+        </div>
+
+        <form onSubmit={isEdit ? updateSession : createSession} className="academic-session__form-grid">
+          <input
+            value={sessionName}
+            onChange={(e) => setSessionName(e.target.value)}
+            placeholder="e.g. 2026/2027"
+            required
+          />
+          <input
+            value={academicYear}
+            onChange={(e) => setAcademicYear(e.target.value)}
+            placeholder="e.g. 2026-2027"
+          />
+          <div className="academic-session__actions">
+            <button type="submit" className="payx-btn">{isEdit ? "Save" : "Create"}</button>
+            <button type="button" className="payx-btn payx-btn--soft" onClick={closePanels}>
               Cancel
             </button>
           </div>
@@ -144,70 +142,92 @@ export default function AcademicSession() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div className="payx-page payx-page--admin">
+      <section className="payx-hero academic-session__hero">
         <div>
-          <p style={{ marginTop: 6, opacity: 0.75 }}>
-            Manage academic sessions. Class structure now comes from Branding - Create Class.
+          <span className="payx-pill">School Admin Academic Session</span>
+          <h2 className="payx-title">Keep sessions organized with a clearer academic session workspace.</h2>
+          <p className="payx-subtitle">
+            Create sessions, update academic years, and move into session details from the same polished experience used across the admin pages.
           </p>
+          <div className="payx-meta">
+            <span>{rows.length} sessions</span>
+            <span>{rows.filter((row) => String(row.status).toLowerCase() === "current").length} current</span>
+            <span>{rows.filter((row) => String(row.status).toLowerCase() === "completed").length} completed</span>
+          </div>
         </div>
-        <button onClick={openCreate} style={{ padding: "10px 14px", borderRadius: 8 }}>
-          + Create Session
-        </button>
-      </div>
 
-      {renderFormPanel()}
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main academic-session__art-main">
+            <img src={cityGirlArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card academic-session__art-card">
+            <img src={familyArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online academic-session__art-online">
+            <img src={trueFriendsArt} alt="" />
+          </div>
+        </div>
+      </section>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <table border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>S/N</th>
-              <th>Session</th>
-              <th>Academic Year</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <tr key={row.id}>
-                <td>{idx + 1}</td>
-                <td>
-                  <button
-                    onClick={() => navigate(`/school/admin/academic_session/${row.id}`)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#2563eb",
-                      cursor: "pointer",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {row.session_name}
-                  </button>
-                </td>
-                <td>{row.academic_year || "N/A"}</td>
-                <td>
-                  <strong>{formatSessionStatus(row.status)}</strong>
-                </td>
-                <td>
-                  <button onClick={() => openEdit(row)}>Edit</button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan="5" style={{ textAlign: "center", opacity: 0.7 }}>
-                  No academic sessions yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+      <section className="payx-panel academic-session__panel">
+        <div className="academic-session__toolbar">
+          <div>
+            <h3>Academic Sessions</h3>
+            <p>Manage academic sessions. Class structure now comes from Branding - Create Class.</p>
+          </div>
+          <button onClick={openCreate} className="payx-btn">+ Create Session</button>
+        </div>
+
+        {renderFormPanel()}
+
+        {loading ? (
+          <p className="payx-state payx-state--loading">Loading...</p>
+        ) : (
+          <div className="payx-card">
+            <div className="payx-table-wrap">
+              <table className="payx-table">
+                <thead>
+                  <tr>
+                    <th>S/N</th>
+                    <th>Session</th>
+                    <th>Academic Year</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, idx) => (
+                    <tr key={row.id}>
+                      <td>{idx + 1}</td>
+                      <td>
+                        <button
+                          onClick={() => navigate(`/school/admin/academic_session/${row.id}`)}
+                          className="academic-session__link-btn"
+                        >
+                          {row.session_name}
+                        </button>
+                      </td>
+                      <td>{row.academic_year || "N/A"}</td>
+                      <td>
+                        <strong>{formatSessionStatus(row.status)}</strong>
+                      </td>
+                      <td>
+                        <button className="payx-btn payx-btn--soft" onClick={() => openEdit(row)}>Edit</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan="5">No academic sessions yet.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
