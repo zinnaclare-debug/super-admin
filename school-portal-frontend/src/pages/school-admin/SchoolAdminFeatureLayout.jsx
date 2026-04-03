@@ -27,6 +27,7 @@ const HEADERLESS_PREFIXES = [
   "/school/admin/broadsheet",
   "/school/admin/transcript",
   "/school/admin/teacher_report",
+  "/school/admin/student_report",
   "/school/admin/website",
   "/school/admin/announcements",
   "/school/admin/student_result",
