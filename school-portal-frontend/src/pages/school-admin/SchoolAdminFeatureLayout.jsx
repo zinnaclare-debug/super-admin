@@ -17,6 +17,18 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/entrance-exam",
 ]);
 
+const HEADERLESS_PREFIXES = [
+  "/school/admin/register",
+  "/school/admin/users",
+  "/school/admin/academic_session",
+  "/school/admin/academics",
+  "/school/admin/payments",
+  "/school/admin/promotion",
+  "/school/admin/website",
+  "/school/admin/announcements",
+  "/school/admin/student_result",
+];
+
 function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/users")) return "Users";
   if (pathname.startsWith("/school/admin/academic_session")) return "Academic Session";
@@ -41,7 +53,7 @@ function titleFromPath(pathname) {
 export default function SchoolAdminFeatureLayout() {
   const { pathname } = useLocation();
   const showBack = !NO_BACK_EXACT_PATHS.has(pathname);
-  const showHeader = !pathname.startsWith("/school/admin/academic_session");
+  const showHeader = !HEADERLESS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   return (
     <FeatureShell title={titleFromPath(pathname)} showBack={showBack} showHeader={showHeader}>

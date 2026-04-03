@@ -94,7 +94,7 @@ export default function VirtualClassHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Virtual Class (Staff)">
+    <StaffFeatureLayout title="Virtual Class (Staff)" showHeader={false}>
       <div className="vcx-page vcx-page--staff">
         <section className="vcx-hero">
           <div>
@@ -236,3 +236,4 @@ export default function VirtualClassHome() {
     </StaffFeatureLayout>
   );
 }
+

@@ -29,7 +29,7 @@ export default function ResultsHome() {
   }, []);
 
   return (
-    <StaffFeatureLayout title="Results">
+    <StaffFeatureLayout title="Results" showHeader={false}>
       <div className="rs-page rs-page--staff">
         <section className="rs-hero">
           <div>
@@ -84,3 +84,4 @@ export default function ResultsHome() {
     </StaffFeatureLayout>
   );
 }
+

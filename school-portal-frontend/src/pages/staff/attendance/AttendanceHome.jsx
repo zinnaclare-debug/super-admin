@@ -87,7 +87,7 @@ export default function AttendanceHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Attendance (Class Teacher)">
+    <StaffFeatureLayout title="Attendance (Class Teacher)" showHeader={false}>
       <div className="sat-page">
         <section className="sat-hero">
           <div>
@@ -262,3 +262,4 @@ export default function AttendanceHome() {
     </StaffFeatureLayout>
   );
 }
+

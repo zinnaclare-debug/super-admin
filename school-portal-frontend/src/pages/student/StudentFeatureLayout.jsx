@@ -17,10 +17,9 @@ const TITLE_BY_PATH = {
 export default function StudentFeatureLayout() {
   const { pathname } = useLocation();
   const title = TITLE_BY_PATH[pathname] || "Student";
-  const showHeader = pathname !== "/student/dashboard";
 
   return (
-    <FeatureShell title={title} showHeader={showHeader}>
+    <FeatureShell title={title} showHeader={false}>
       <Outlet />
     </FeatureShell>
   );

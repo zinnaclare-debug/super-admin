@@ -156,7 +156,7 @@ export default function ClassActivitiesHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Class Activities (Staff)">
+    <StaffFeatureLayout title="Class Activities (Staff)" showHeader={false}>
       <div className="sca-page sca-page--staff">
         <section className="sca-hero">
           <div>
@@ -275,3 +275,4 @@ export default function ClassActivitiesHome() {
     </StaffFeatureLayout>
   );
 }
+

@@ -92,7 +92,7 @@ export default function ELibraryHome() {
   };
 
   return (
-    <StaffFeatureLayout title="E-Library (Teacher)">
+    <StaffFeatureLayout title="E-Library (Teacher)" showHeader={false}>
       <div className="sel-page sel-page--staff">
         <section className="sel-hero">
           <div>
@@ -214,3 +214,4 @@ export default function ELibraryHome() {
     </StaffFeatureLayout>
   );
 }
+

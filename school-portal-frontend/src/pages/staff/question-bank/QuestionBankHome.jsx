@@ -243,7 +243,7 @@ export default function QuestionBankHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Question Bank (Staff)">
+    <StaffFeatureLayout title="Question Bank (Staff)" showHeader={false}>
       <div className="qbx-page">
         <section className="qbx-hero">
           <div>
@@ -498,3 +498,4 @@ export default function QuestionBankHome() {
     </StaffFeatureLayout>
   );
 }
+

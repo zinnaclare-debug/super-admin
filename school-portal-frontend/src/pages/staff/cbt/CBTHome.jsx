@@ -159,7 +159,7 @@ export default function CBTHome() {
   };
 
   return (
-    <StaffFeatureLayout title="CBT (Staff)">
+    <StaffFeatureLayout title="CBT (Staff)" showHeader={false}>
       <div className="cbx-page cbx-page--staff">
         <section className="cbx-hero">
           <div>
@@ -382,3 +382,4 @@ export default function CBTHome() {
     </StaffFeatureLayout>
   );
 }
+

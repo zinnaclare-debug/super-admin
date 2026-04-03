@@ -28,7 +28,7 @@ export default function TopicsHome() {
   }, []);
 
   return (
-    <StaffFeatureLayout title="Topics">
+    <StaffFeatureLayout title="Topics" showHeader={false}>
       <div className="tps-page tps-page--staff">
         <section className="tps-hero">
           <div>
@@ -82,3 +82,4 @@ export default function TopicsHome() {
     </StaffFeatureLayout>
   );
 }
+

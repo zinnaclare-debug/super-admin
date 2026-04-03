@@ -99,3 +99,24 @@
     min-width: 124px;
   }
 }
+
+.academic-session__panel .payx-card,
+.academic-session__panel .payx-table-wrap {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.academic-session__panel .payx-table {
+  min-width: 560px;
+}
+
+@media (max-width: 640px) {
+  .academic-session__panel .payx-card {
+    padding: 12px;
+  }
+
+  .academic-session__panel .payx-table {
+    min-width: 500px;
+  }
+}

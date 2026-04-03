@@ -105,7 +105,7 @@ export default function ClassProgressHome() {
   const metricBehaviour = summary?.behaviour_completed ?? 0;
 
   return (
-    <StaffFeatureLayout title="Class Progress (Class Teacher)">
+    <StaffFeatureLayout title="Class Progress (Class Teacher)" showHeader={false}>
       <div className="ctp-page">
         <section className="ctp-hero">
           <div>

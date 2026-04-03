@@ -89,7 +89,7 @@ export default function BehaviourRatingHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Behaviour Rating (Class Teacher)">
+    <StaffFeatureLayout title="Behaviour Rating (Class Teacher)" showHeader={false}>
       <div className="bvr-page">
         <section className="bvr-hero">
           <div>
@@ -227,3 +227,4 @@ export default function BehaviourRatingHome() {
     </StaffFeatureLayout>
   );
 }
+
