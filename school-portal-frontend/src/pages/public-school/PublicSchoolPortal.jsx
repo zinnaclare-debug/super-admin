@@ -524,8 +524,11 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           <span className="school-site-footer-c">{"\u00A9"}</span>
           <span>{currentYear}</span>
         </div>
-        <p>DESIGNED BY LYTE BRIDGE</p>
+        <a className="school-site-footer-link" href="mailto:lytebridgeinfo@gmail.com">
+          DESIGNED BY LYTE BRIDGE
+        </a>
       </footer>
     </div>
   );
 }
+

@@ -308,7 +308,7 @@
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
 }
 
-.school-site-footer p {
+.school-site-footer-link {
   margin: 0;
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -477,5 +477,6 @@
     align-items: flex-start;
   }
 }
+
 
 

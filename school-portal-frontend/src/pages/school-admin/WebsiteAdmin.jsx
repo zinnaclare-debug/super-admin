@@ -249,12 +249,17 @@ export default function WebsiteAdmin() {
     <div className="website-admin-page">
       <section className="website-admin-hero">
         <div className="website-admin-hero-copy">
-          <span className="website-admin-eyebrow">School Website Management</span>
-          <h1>Shape how your school looks on its public website.</h1>
+          <span className="website-admin-pill">School Website</span>
+          <h1>Shape how your school looks before visitors even click login.</h1>
           <p>
-            Update the hero section, about copy, mission, core values, public contact details,
-            colors, and school content without leaving the dashboard.
+            Update the homepage message, mission, core values, public contact details,
+            theme colors, and school content from one place.
           </p>
+          <div className="website-admin-meta">
+            <span>Homepage copy</span>
+            <span>Public contacts</span>
+            <span>Content publishing</span>
+          </div>
           <div className="website-admin-hero-actions">
             <button type="button" onClick={saveWebsite} disabled={saving}>
               {saving ? "Saving..." : "Save Website"}
@@ -266,28 +271,16 @@ export default function WebsiteAdmin() {
         </div>
 
         <div className="website-admin-hero-art">
-          <img src={landingPageArt} alt="School website layout illustration" />
+          <div className="website-admin-art website-admin-art--main">
+            <img src={landingPageArt} alt="School website layout illustration" />
+          </div>
+          <div className="website-admin-art website-admin-art--left">
+            <img src={portfolioUpdateArt} alt="Content planning illustration" />
+          </div>
+          <div className="website-admin-art website-admin-art--right">
+            <img src={heatmapArt} alt="Content insights illustration" />
+          </div>
         </div>
-      </section>
-
-      <section className="website-admin-showcase-grid">
-        <article className="website-admin-showcase-card website-admin-showcase-card--tone-a">
-          <div>
-            <span className="website-admin-card-tag">Brand Story</span>
-            <h2>Keep your About, Mission, and Core Values fresh.</h2>
-            <p>These sections now save properly and feed directly into the public school website.</p>
-          </div>
-          <img src={portfolioUpdateArt} alt="Portfolio update illustration" />
-        </article>
-
-        <article className="website-admin-showcase-card website-admin-showcase-card--tone-b">
-          <div>
-            <span className="website-admin-card-tag">Content Feed</span>
-            <h2>Publish rich updates with heading, date, text, and up to five photos.</h2>
-            <p>Your school stories are listed below and shown publicly in paginated batches.</p>
-          </div>
-          <img src={heatmapArt} alt="Heatmap illustration" />
-        </article>
       </section>
 
       <section className="website-admin-panel">
@@ -371,7 +364,7 @@ export default function WebsiteAdmin() {
                 <strong>{isEditingContent ? "Edit Content" : "Create Content"}</strong>
                 <p>{todayLabel}</p>
               </div>
-              <span className="website-admin-pill">{totalSelectedImages}/5 images</span>
+              <span className="website-admin-editor-count">{totalSelectedImages}/5 images</span>
             </div>
 
             <div className="website-admin-form-grid">
