@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import portfolioUpdateArt from "../../assets/website-admin/portfolio-update.svg";
+import heatmapArt from "../../assets/website-admin/heatmap.svg";
+import landingPageArt from "../../assets/website-admin/landing-page.svg";
+import "./WebsiteAdmin.css";
 
 const emptyWebsiteContent = {
   hero_title: "",
@@ -26,6 +30,7 @@ const emptyContentForm = {
   content: "",
   existingImages: [],
   photos: [],
+  created_at: "",
 };
 
 function normalizeData(payload = {}) {
@@ -55,6 +60,15 @@ function mapExistingImages(item = {}) {
   }));
 }
 
+function WebsiteField({ label, children, wide = false }) {
+  return (
+    <div className={wide ? "website-admin-field website-admin-field--wide" : "website-admin-field"}>
+      <label>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function WebsiteAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -67,6 +81,10 @@ export default function WebsiteAdmin() {
 
   const isEditingContent = Boolean(contentForm.id);
   const totalSelectedImages = contentForm.existingImages.length + contentForm.photos.length;
+  const todayLabel = useMemo(
+    () => formatDate(contentForm.created_at || new Date().toISOString()),
+    [contentForm.created_at]
+  );
 
   const loadWebsite = async () => {
     const websiteRes = await api.get("/api/school-admin/website");
@@ -135,7 +153,7 @@ export default function WebsiteAdmin() {
   };
 
   const startCreateContent = () => {
-    setContentForm(emptyContentForm);
+    setContentForm({ ...emptyContentForm, created_at: new Date().toISOString() });
     setShowCreateContent(true);
   };
 
@@ -146,6 +164,7 @@ export default function WebsiteAdmin() {
       content: item.content || "",
       existingImages: mapExistingImages(item),
       photos: [],
+      created_at: item.created_at || "",
     });
     setShowCreateContent(true);
     clearCreateContentFlag();
@@ -227,173 +246,226 @@ export default function WebsiteAdmin() {
   if (loading) return <p>Loading school website settings...</p>;
 
   return (
-    <div style={{ display: "grid", gap: 18 }}>
-      <section style={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 14, padding: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <h2 style={{ margin: 0 }}>Website</h2>
-            <p style={{ marginTop: 8, color: "#475569" }}>
-              Manage your school subdomain homepage, public content, contact details, and admissions links.
-            </p>
-          </div>
-          <button onClick={saveWebsite} disabled={saving}>{saving ? "Saving..." : "Save Website"}</button>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginTop: 18 }}>
-          <div>
-            <label>Hero Title</label>
-            <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.hero_title} onChange={(e) => updateWebsiteContent("hero_title", e.target.value)} />
-          </div>
-          <div>
-            <label>About Title</label>
-            <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.about_title} onChange={(e) => updateWebsiteContent("about_title", e.target.value)} />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Hero Subtitle</label>
-            <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.hero_subtitle} onChange={(e) => updateWebsiteContent("hero_subtitle", e.target.value)} />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Apply Now Intro</label>
-            <textarea rows="3" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.admissions_intro} onChange={(e) => updateWebsiteContent("admissions_intro", e.target.value)} />
-          </div>
-          <div>
-            <label>Address</label>
-            <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.address} onChange={(e) => updateWebsiteContent("address", e.target.value)} />
-          </div>
-          <div>
-            <label>Public Email</label>
-            <input type="email" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.contact_email} onChange={(e) => updateWebsiteContent("contact_email", e.target.value)} />
-          </div>
-          <div>
-            <label>Public Phone</label>
-            <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.contact_phone} onChange={(e) => updateWebsiteContent("contact_phone", e.target.value)} />
-          </div>
-          <div>
-            <label>Primary Color</label>
-            <input type="color" style={{ width: "100%", height: 44, marginTop: 6 }} value={websiteContent.primary_color} onChange={(e) => updateWebsiteContent("primary_color", e.target.value)} />
-          </div>
-          <div>
-            <label>Accent Color</label>
-            <input type="color" style={{ width: "100%", height: 44, marginTop: 6 }} value={websiteContent.accent_color} onChange={(e) => updateWebsiteContent("accent_color", e.target.value)} />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>About Us</label>
-            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} placeholder="Tell visitors about your school" />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Core Values</label>
-            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.core_values_text} onChange={(e) => updateWebsiteContent("core_values_text", e.target.value)} placeholder="Enter the school's core values" />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Mission</label>
-            <textarea rows="4" style={{ width: "100%", padding: 10, marginTop: 6 }} value={websiteContent.mission_text} onChange={(e) => updateWebsiteContent("mission_text", e.target.value)} placeholder="Enter the school's mission" />
+    <div className="website-admin-page">
+      <section className="website-admin-hero">
+        <div className="website-admin-hero-copy">
+          <span className="website-admin-eyebrow">School Website Management</span>
+          <h1>Shape how your school looks on its public website.</h1>
+          <p>
+            Update the hero section, about copy, mission, core values, public contact details,
+            colors, and school content without leaving the dashboard.
+          </p>
+          <div className="website-admin-hero-actions">
+            <button type="button" onClick={saveWebsite} disabled={saving}>
+              {saving ? "Saving..." : "Save Website"}
+            </button>
+            <button type="button" className="website-admin-button website-admin-button--ghost" onClick={startCreateContent}>
+              Create Content
+            </button>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+        <div className="website-admin-hero-art">
+          <img src={landingPageArt} alt="School website layout illustration" />
+        </div>
+      </section>
+
+      <section className="website-admin-showcase-grid">
+        <article className="website-admin-showcase-card website-admin-showcase-card--tone-a">
+          <div>
+            <span className="website-admin-card-tag">Brand Story</span>
+            <h2>Keep your About, Mission, and Core Values fresh.</h2>
+            <p>These sections now save properly and feed directly into the public school website.</p>
+          </div>
+          <img src={portfolioUpdateArt} alt="Portfolio update illustration" />
+        </article>
+
+        <article className="website-admin-showcase-card website-admin-showcase-card--tone-b">
+          <div>
+            <span className="website-admin-card-tag">Content Feed</span>
+            <h2>Publish rich updates with heading, date, text, and up to five photos.</h2>
+            <p>Your school stories are listed below and shown publicly in paginated batches.</p>
+          </div>
+          <img src={heatmapArt} alt="Heatmap illustration" />
+        </article>
+      </section>
+
+      <section className="website-admin-panel">
+        <div className="website-admin-panel-head">
+          <div>
+            <h2>Website Details</h2>
+            <p>Control the homepage message, admissions intro, contact details, colors, and public actions.</p>
+          </div>
+        </div>
+
+        <div className="website-admin-form-grid">
+          <WebsiteField label="Hero Title">
+            <input value={websiteContent.hero_title} onChange={(e) => updateWebsiteContent("hero_title", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="About Title">
+            <input value={websiteContent.about_title} onChange={(e) => updateWebsiteContent("about_title", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Address">
+            <input value={websiteContent.address} onChange={(e) => updateWebsiteContent("address", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Public Email">
+            <input type="email" value={websiteContent.contact_email} onChange={(e) => updateWebsiteContent("contact_email", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Public Phone">
+            <input value={websiteContent.contact_phone} onChange={(e) => updateWebsiteContent("contact_phone", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Primary Color">
+            <input type="color" className="website-admin-color" value={websiteContent.primary_color} onChange={(e) => updateWebsiteContent("primary_color", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Accent Color">
+            <input type="color" className="website-admin-color" value={websiteContent.accent_color} onChange={(e) => updateWebsiteContent("accent_color", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Hero Subtitle" wide>
+            <textarea rows="4" value={websiteContent.hero_subtitle} onChange={(e) => updateWebsiteContent("hero_subtitle", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="Apply Now Intro" wide>
+            <textarea rows="4" value={websiteContent.admissions_intro} onChange={(e) => updateWebsiteContent("admissions_intro", e.target.value)} />
+          </WebsiteField>
+
+          <WebsiteField label="About Us" wide>
+            <textarea rows="5" value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} placeholder="Tell visitors about your school." />
+          </WebsiteField>
+
+          <WebsiteField label="Core Values" wide>
+            <textarea rows="5" value={websiteContent.core_values_text} onChange={(e) => updateWebsiteContent("core_values_text", e.target.value)} placeholder="What values define your school?" />
+          </WebsiteField>
+
+          <WebsiteField label="Mission" wide>
+            <textarea rows="5" value={websiteContent.mission_text} onChange={(e) => updateWebsiteContent("mission_text", e.target.value)} placeholder="What mission drives the school?" />
+          </WebsiteField>
+        </div>
+
+        <div className="website-admin-toggle-row">
           <label><input type="checkbox" checked={websiteContent.show_apply_now} onChange={(e) => updateWebsiteContent("show_apply_now", e.target.checked)} /> Show Apply Now</label>
           <label><input type="checkbox" checked={websiteContent.show_entrance_exam} onChange={(e) => updateWebsiteContent("show_entrance_exam", e.target.checked)} /> Show Entrance Exam</label>
           <label><input type="checkbox" checked={websiteContent.show_verify_score} onChange={(e) => updateWebsiteContent("show_verify_score", e.target.checked)} /> Show Verify Score</label>
         </div>
       </section>
 
-      <section style={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 14, padding: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+      <section className="website-admin-panel">
+        <div className="website-admin-panel-head">
           <div>
-            <h2 style={{ margin: 0 }}>School Contents</h2>
-            <p style={{ marginTop: 8, color: "#475569" }}>
-              Create school content blocks with heading, automatic date, written content, and up to 5 photos.
-            </p>
+            <h2>School Contents</h2>
+            <p>Create school updates with heading, automatic date, written content, and up to five photos.</p>
           </div>
           <button type="button" onClick={startCreateContent}>Create Content</button>
         </div>
 
         {showCreateContent ? (
-          <div style={{ marginTop: 16, border: "1px solid #dbeafe", borderRadius: 12, padding: 16, background: "#f8fbff", display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <strong>{isEditingContent ? "Edit Content" : "Create Content"}</strong>
-              <span style={{ color: "#64748b", fontSize: 13 }}>
-                {totalSelectedImages}/5 images selected
-              </span>
-            </div>
-            <div>
-              <label>Heading</label>
-              <input style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.heading} onChange={(e) => setContentForm((prev) => ({ ...prev, heading: e.target.value }))} placeholder="Enter content heading" />
-            </div>
-            <div>
-              <label>Date</label>
-              <input style={{ width: "100%", padding: 10, marginTop: 6, background: "#e2e8f0" }} value={formatDate(new Date().toISOString())} readOnly />
-            </div>
-            {contentForm.existingImages.length > 0 ? (
+          <div className="website-admin-editor">
+            <div className="website-admin-editor-head">
               <div>
-                <label>Existing Photos</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginTop: 8 }}>
-                  {contentForm.existingImages.map((image) => (
-                    <div key={image.path} style={{ border: "1px solid #dbe3ef", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-                      {image.url ? (
-                        <img src={image.url} alt={contentForm.heading || "School content"} style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
-                      ) : (
-                        <div style={{ height: 100, display: "grid", placeItems: "center", color: "#64748b", fontSize: 12 }}>Image</div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeExistingImage(image.path)}
-                        style={{ width: "100%", border: 0, borderTop: "1px solid #dbe3ef", padding: "8px 10px", background: "#fff5f5", color: "#b91c1c", fontWeight: 700, cursor: "pointer" }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <strong>{isEditingContent ? "Edit Content" : "Create Content"}</strong>
+                <p>{todayLabel}</p>
               </div>
-            ) : null}
-            <div>
-              <label>Photos (Maximum 5)</label>
-              <input type="file" accept="image/*" multiple style={{ width: "100%", marginTop: 6 }} onChange={handlePhotoChange} />
-              {contentForm.photos.length > 0 ? (
-                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {contentForm.photos.map((file) => (
-                    <span key={file.name} style={{ padding: "6px 10px", borderRadius: 999, background: "#eff6ff", color: "#1d4ed8", fontSize: 12, fontWeight: 600 }}>{file.name}</span>
-                  ))}
-                </div>
+              <span className="website-admin-pill">{totalSelectedImages}/5 images</span>
+            </div>
+
+            <div className="website-admin-form-grid">
+              <WebsiteField label="Heading" wide>
+                <input
+                  value={contentForm.heading}
+                  onChange={(e) => setContentForm((prev) => ({ ...prev, heading: e.target.value }))}
+                  placeholder="Enter content heading"
+                />
+              </WebsiteField>
+
+              <WebsiteField label="Date">
+                <input value={todayLabel} readOnly className="website-admin-input-readonly" />
+              </WebsiteField>
+
+              <WebsiteField label="Photos (Maximum 5)" wide>
+                <input type="file" accept="image/*" multiple onChange={handlePhotoChange} />
+                {contentForm.photos.length > 0 ? (
+                  <div className="website-admin-file-chips">
+                    {contentForm.photos.map((file) => (
+                      <span key={file.name}>{file.name}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </WebsiteField>
+
+              {contentForm.existingImages.length > 0 ? (
+                <WebsiteField label="Existing Photos" wide>
+                  <div className="website-admin-existing-images">
+                    {contentForm.existingImages.map((image) => (
+                      <div key={image.path} className="website-admin-existing-card">
+                        {image.url ? <img src={image.url} alt={contentForm.heading || "School content"} /> : <div className="website-admin-image-fallback">Image</div>}
+                        <button type="button" className="website-admin-text-button" onClick={() => removeExistingImage(image.path)}>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </WebsiteField>
               ) : null}
+
+              <WebsiteField label="Content" wide>
+                <textarea
+                  rows="7"
+                  value={contentForm.content}
+                  onChange={(e) => setContentForm((prev) => ({ ...prev, content: e.target.value }))}
+                  placeholder="Write the school content here"
+                />
+              </WebsiteField>
             </div>
-            <div>
-              <label>Content</label>
-              <textarea rows="6" style={{ width: "100%", padding: 10, marginTop: 6 }} value={contentForm.content} onChange={(e) => setContentForm((prev) => ({ ...prev, content: e.target.value }))} placeholder="Write the school content here" />
-            </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="button" onClick={saveContent} disabled={savingContent}>{savingContent ? "Saving..." : isEditingContent ? "Update" : "Save"}</button>
-              <button type="button" onClick={resetContentEditor} disabled={savingContent}>Cancel</button>
+
+            <div className="website-admin-editor-actions">
+              <button type="button" onClick={saveContent} disabled={savingContent}>
+                {savingContent ? "Saving..." : isEditingContent ? "Update Content" : "Save Content"}
+              </button>
+              <button type="button" className="website-admin-button website-admin-button--ghost" onClick={resetContentEditor} disabled={savingContent}>
+                Cancel
+              </button>
             </div>
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+        <div className="website-admin-content-list">
           {contents.map((item) => (
-            <article key={item.id} style={{ border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "#fff" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+            <article key={item.id} className="website-admin-content-card">
+              <div className="website-admin-content-card-head">
                 <div>
-                  <h3 style={{ margin: 0 }}>{item.heading}</h3>
-                  <span style={{ color: "#64748b", fontSize: 13 }}>{item.display_date || formatDate(item.created_at)}</span>
+                  <h3>{item.heading}</h3>
+                  <span>{item.display_date || formatDate(item.created_at)}</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" onClick={() => startEditContent(item)}>Edit</button>
-                  <button type="button" onClick={() => deleteContent(item.id)} style={{ background: "#fff5f5", color: "#b91c1c", border: "1px solid #fecaca" }}>Delete</button>
+                <div className="website-admin-card-actions">
+                  <button type="button" className="website-admin-button website-admin-button--ghost" onClick={() => startEditContent(item)}>
+                    Edit
+                  </button>
+                  <button type="button" className="website-admin-button website-admin-button--danger" onClick={() => deleteContent(item.id)}>
+                    Delete
+                  </button>
                 </div>
               </div>
-              <p style={{ color: "#334155", marginTop: 10, whiteSpace: "pre-wrap" }}>{item.content}</p>
+
+              <p>{item.content}</p>
+
               {item.image_urls?.length ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginTop: 12 }}>
+                <div className="website-admin-content-gallery">
                   {item.image_urls.map((url) => (
-                    <img key={url} src={url} alt={item.heading} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10, border: "1px solid #dbe3ef" }} />
+                    <img key={url} src={url} alt={item.heading} />
                   ))}
                 </div>
               ) : null}
             </article>
           ))}
+
           {contents.length === 0 ? (
-            <div style={{ border: "1px dashed #cbd5e1", borderRadius: 12, padding: 18, textAlign: "center", color: "#64748b" }}>
+            <div className="website-admin-empty-state">
               No school content created yet.
             </div>
           ) : null}
@@ -402,4 +474,3 @@ export default function WebsiteAdmin() {
     </div>
   );
 }
-

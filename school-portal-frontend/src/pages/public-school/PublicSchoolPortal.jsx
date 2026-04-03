@@ -76,12 +76,15 @@ function ContactWidget({ icon, title, value, children }) {
   );
 }
 
+const CONTENT_PREVIEW_LIMIT = 100;
+
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
   const [siteData, setSiteData] = useState(initialSiteData);
   const [loading, setLoading] = useState(!initialSiteData);
   const [error, setError] = useState("");
   const [contentFeed, setContentFeed] = useState(initialSiteData?.school?.content_feed || { data: [], meta: { current_page: 1, last_page: 1, total: 0 } });
   const [contentLoading, setContentLoading] = useState(false);
+  const [expandedContentIds, setExpandedContentIds] = useState({});
   const [applyForm, setApplyForm] = useState({
     full_name: "",
     phone: "",
@@ -160,11 +163,19 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         data: Array.isArray(res.data?.data) ? res.data.data : [],
         meta: res.data?.meta || { current_page: 1, last_page: 1, total: 0 },
       });
+      setExpandedContentIds({});
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load school contents.");
     } finally {
       setContentLoading(false);
     }
+  };
+
+  const toggleExpandedContent = (contentId) => {
+    setExpandedContentIds((prev) => ({
+      ...prev,
+      [contentId]: !prev[contentId],
+    }));
   };
 
   if (loading) {
@@ -313,37 +324,48 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                 <h2>School Contents</h2>
                 <p>Highlights, updates, and important stories from the school community.</p>
               </div>
-              {contentMeta.total > 0 ? (
-                <span className="school-site-content-counter">{contentMeta.current_page} / {contentMeta.last_page}</span>
-              ) : null}
             </div>
 
             {contentLoading ? <p className="school-site-content-empty">Loading school contents...</p> : null}
 
-            {!contentLoading && contentItems.length > 0 ? contentItems.map((item) => (
-              <article key={item.id} className="school-site-content-card">
-                <div className="school-site-content-copy">
-                  <div className="school-site-content-meta">
-                    <h3>{item.heading}</h3>
-                    <span>{item.display_date || formatDate(item.created_at)}</span>
+            {!contentLoading && contentItems.length > 0 ? contentItems.map((item) => {
+              const fullContent = String(item.content || "");
+              const needsToggle = fullContent.length > CONTENT_PREVIEW_LIMIT;
+              const isExpanded = Boolean(expandedContentIds[item.id]);
+              const visibleContent = needsToggle && !isExpanded
+                ? `${fullContent.slice(0, CONTENT_PREVIEW_LIMIT).trimEnd()}...`
+                : fullContent;
+
+              return (
+                <article key={item.id} className="school-site-content-card">
+                  <div className="school-site-content-copy">
+                    <div className="school-site-content-meta">
+                      <h3>{item.heading}</h3>
+                      <span>{item.display_date || formatDate(item.created_at)}</span>
+                    </div>
+                    <p>{visibleContent}</p>
+                    {needsToggle ? (
+                      <button type="button" className="school-site-content-toggle" onClick={() => toggleExpandedContent(item.id)}>
+                        {isExpanded ? "See less" : "See more"}
+                      </button>
+                    ) : null}
                   </div>
-                  <p>{item.content}</p>
-                </div>
-                {item.image_urls?.length ? (
-                  <div className="school-site-content-gallery">
-                    {item.image_urls.map((url, index) => (
-                      <img key={`${item.id}-${index}`} src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            )) : null}
+                  {item.image_urls?.length ? (
+                    <div className="school-site-content-gallery">
+                      {item.image_urls.map((url, index) => (
+                        <img key={`${item.id}-${index}`} src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            }) : null}
 
             {!contentLoading && contentItems.length === 0 ? (
               <div className="school-site-content-empty">No school content has been published yet.</div>
             ) : null}
 
-            {contentMeta.total > 1 ? (
+            {contentMeta.last_page > 1 ? (
               <div className="school-site-content-pagination">
                 <button type="button" onClick={() => loadContentPage(contentMeta.current_page - 1)} disabled={contentLoading || contentMeta.current_page <= 1}>
                   Previous

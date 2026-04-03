@@ -310,7 +310,7 @@ class PublicSchoolWebsiteController extends Controller
         $paginator = SchoolWebsiteContent::query()
             ->where('school_id', $school->id)
             ->latest()
-            ->paginate(1, ['*'], 'page', max(1, $page));
+            ->paginate(10, ['*'], 'page', max(1, $page));
 
         return [
             'data' => collect($paginator->items())
@@ -369,3 +369,4 @@ class PublicSchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
