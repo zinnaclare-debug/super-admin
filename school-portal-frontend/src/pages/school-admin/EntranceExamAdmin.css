@@ -156,3 +156,45 @@
     grid-template-columns: 1fr;
   }
 }
+.examadmin-levels {
+  display: grid;
+  gap: 16px;
+}
+
+.examadmin-level-card {
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.examadmin-level-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.examadmin-level-head h4 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.examadmin-level-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.examadmin-level-card .examadmin-class-grid {
+  margin-top: 6px;
+}
+
+.examadmin-class-card h5 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+}

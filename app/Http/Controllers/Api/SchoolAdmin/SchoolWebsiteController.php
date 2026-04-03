@@ -68,6 +68,7 @@ class SchoolWebsiteController extends Controller
 
         return response()->json([
             'available_classes' => $availableClasses,
+            'available_class_groups' => SchoolPublicWebsiteData::availableClassGroups($school),
             'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
         ]);
     }
@@ -129,6 +130,7 @@ class SchoolWebsiteController extends Controller
             'message' => 'Entrance exam settings updated successfully.',
             'data' => [
                 'available_classes' => $availableClasses,
+                'available_class_groups' => SchoolPublicWebsiteData::availableClassGroups($school),
                 'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
             ],
         ]);
@@ -191,7 +193,9 @@ class SchoolWebsiteController extends Controller
             return response()->json(['message' => 'No valid question bank questions selected for this class.'], 422);
         }
 
-        [$updatedClassExam, $addedCount] = $this->mutateClassExamQuestions(
+        $addedCount = 0;
+
+        $updatedClassExam = $this->mutateClassExamQuestions(
             $school,
             $resolvedClassName,
             function (array $questionsList) use ($questions, $subjectMap, &$addedCount) {
@@ -273,7 +277,7 @@ class SchoolWebsiteController extends Controller
             return response()->json(['message' => 'Selected subject is not registered for this class.'], 422);
         }
 
-        [$updatedClassExam] = $this->mutateClassExamQuestions(
+        $updatedClassExam = $this->mutateClassExamQuestions(
             $school,
             $resolvedClassName,
             function (array $questionsList) use ($payload, $subject) {
@@ -308,7 +312,9 @@ class SchoolWebsiteController extends Controller
         $school = $this->schoolFromRequest($request);
         $resolvedClassName = $this->resolveEntranceExamClassName($school, $className);
 
-        [$updatedClassExam, $removed] = $this->mutateClassExamQuestions(
+        $removed = false;
+
+        $updatedClassExam = $this->mutateClassExamQuestions(
             $school,
             $resolvedClassName,
             function (array $questionsList) use ($questionId, &$removed) {
@@ -579,7 +585,7 @@ class SchoolWebsiteController extends Controller
         })->all();
     }
 
-    private function mutateClassExamQuestions(School $school, string $className, callable $callback): array
+    private function mutateClassExamQuestions(School $school, string $className, callable $callback): ?array
     {
         $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
         $config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
@@ -602,10 +608,9 @@ class SchoolWebsiteController extends Controller
         $school->entrance_exam_config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($config, $availableClasses);
         $school->save();
 
-        return [
-            SchoolPublicWebsiteData::findClassExam($school->entrance_exam_config, $className),
-            $school,
-        ];
+        $normalizedConfig = SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
+
+        return SchoolPublicWebsiteData::findClassExam($normalizedConfig, $className);
     }
 
     private function entranceQuestionFingerprint(array $question): string
@@ -656,4 +661,13 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
+
+
+
+
+
+
+
+
 

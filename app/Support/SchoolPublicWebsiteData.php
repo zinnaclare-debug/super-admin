@@ -9,6 +9,17 @@ class SchoolPublicWebsiteData
 {
     public static function availableClasses(?School $school): array
     {
+        return collect(self::availableClassGroups($school))
+            ->flatMap(fn (array $group) => $group['classes'] ?? [])
+            ->map(fn ($name) => trim((string) $name))
+            ->filter(fn ($name) => $name !== '')
+            ->unique(fn ($name) => strtolower($name))
+            ->values()
+            ->all();
+    }
+
+    public static function availableClassGroups(?School $school): array
+    {
         if (! $school) {
             return [];
         }
@@ -16,10 +27,21 @@ class SchoolPublicWebsiteData
         $normalized = ClassTemplateSchema::normalize($school->class_templates);
 
         return collect(ClassTemplateSchema::activeSections($normalized))
-            ->flatMap(fn (array $section) => ClassTemplateSchema::activeClassNames($section))
-            ->map(fn ($name) => trim((string) $name))
-            ->filter(fn ($name) => $name !== '')
-            ->unique(fn ($name) => strtolower($name))
+            ->map(function (array $section) {
+                $classes = collect(ClassTemplateSchema::activeClassNames($section))
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter(fn ($name) => $name !== '')
+                    ->unique(fn ($name) => strtolower($name))
+                    ->values()
+                    ->all();
+
+                return [
+                    'key' => (string) ($section['key'] ?? ''),
+                    'label' => trim((string) ($section['label'] ?? '')) ?: 'Level',
+                    'classes' => $classes,
+                ];
+            })
+            ->filter(fn (array $group) => ! empty($group['classes']))
             ->values()
             ->all();
     }
@@ -265,3 +287,4 @@ class SchoolPublicWebsiteData
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
+

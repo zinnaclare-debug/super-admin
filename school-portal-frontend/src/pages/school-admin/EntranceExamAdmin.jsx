@@ -31,6 +31,7 @@ function normalizeClassExam(className, exam = {}) {
 function normalizeData(payload = {}) {
   return {
     availableClasses: Array.isArray(payload.available_classes) ? payload.available_classes : [],
+    availableClassGroups: Array.isArray(payload.available_class_groups) ? payload.available_class_groups : [],
     entranceExamConfig: {
       ...emptyExamConfig,
       ...(payload.entrance_exam_config || {}),
@@ -68,14 +69,34 @@ export default function EntranceExamAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [availableClasses, setAvailableClasses] = useState([]);
+  const [availableClassGroups, setAvailableClassGroups] = useState([]);
   const [applications, setApplications] = useState([]);
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
+
+  const classGroups = useMemo(() => {
+    const baseGroups = Array.isArray(availableClassGroups) && availableClassGroups.length
+      ? availableClassGroups
+      : [{ key: "all", label: "All Classes", classes: availableClasses }];
+
+    return baseGroups
+      .map((group) => {
+        const exams = (group.classes || [])
+          .map((className) => examConfig.class_exams.find((exam) => exam.class_name === className))
+          .filter(Boolean);
+
+        return {
+          key: String(group.key || group.label || "level"),
+          label: String(group.label || "Level"),
+          exams,
+        };
+      })
+      .filter((group) => group.exams.length > 0);
+  }, [availableClassGroups, availableClasses, examConfig.class_exams]);
 
   const totalQuestions = useMemo(
     () => examConfig.class_exams.reduce((sum, exam) => sum + examQuestionCount(exam), 0),
     [examConfig.class_exams]
   );
-
   const enabledClasses = useMemo(
     () => examConfig.class_exams.filter((exam) => exam.enabled).length,
     [examConfig.class_exams]
@@ -85,6 +106,7 @@ export default function EntranceExamAdmin() {
     const response = await api.get("/api/school-admin/entrance-exam");
     const normalized = normalizeData(response.data || {});
     setAvailableClasses(normalized.availableClasses);
+    setAvailableClassGroups(normalized.availableClassGroups);
     setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
   };
 
@@ -129,6 +151,7 @@ export default function EntranceExamAdmin() {
       });
       const normalized = normalizeData(response.data?.data || {});
       setAvailableClasses(normalized.availableClasses);
+    setAvailableClassGroups(normalized.availableClassGroups);
       setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
       alert("Entrance exam settings saved.");
     } catch (err) {
@@ -249,75 +272,88 @@ export default function EntranceExamAdmin() {
           </div>
         </div>
 
-        <div className="examadmin-class-grid">
-          {examConfig.class_exams.map((exam) => (
-            <article key={exam.class_name} className="examadmin-class-card">
-              <div className="examadmin-class-head">
+        <div className="examadmin-levels">
+          {classGroups.map((group) => (
+            <div key={group.key} className="examadmin-level-card">
+              <div className="examadmin-level-head">
                 <div>
-                  <h4>{exam.class_name}</h4>
-                  <p>
-                    {examQuestionCount(exam)} question{examQuestionCount(exam) === 1 ? "" : "s"} configured
-                  </p>
+                  <h4>{group.label}</h4>
+                  <p>{group.exams.length} class{group.exams.length === 1 ? "" : "es"} in this level</p>
                 </div>
-                <label className="examadmin-switch examadmin-switch--compact">
-                  <input
-                    type="checkbox"
-                    checked={exam.enabled}
-                    onChange={(e) => updateClassExam(exam.class_name, "enabled", e.target.checked)}
-                  />
-                  <span>Enable</span>
-                </label>
               </div>
 
-              <div className="examadmin-class-fields">
-                <label className="examadmin-field">
-                  <span>Duration (minutes)</span>
-                  <input
-                    className="payx-input"
-                    type="number"
-                    min="5"
-                    max="180"
-                    value={exam.duration_minutes}
-                    onChange={(e) => updateClassExam(exam.class_name, "duration_minutes", Number(e.target.value || 0))}
-                  />
-                </label>
-                <label className="examadmin-field">
-                  <span>Pass Mark</span>
-                  <input
-                    className="payx-input"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={exam.pass_mark}
-                    onChange={(e) => updateClassExam(exam.class_name, "pass_mark", Number(e.target.value || 0))}
-                  />
-                </label>
-              </div>
+              <div className="examadmin-class-grid">
+                {group.exams.map((exam) => (
+                  <article key={exam.class_name} className="examadmin-class-card">
+                    <div className="examadmin-class-head">
+                      <div>
+                        <h5>{exam.class_name}</h5>
+                        <p>
+                          {examQuestionCount(exam)} question{examQuestionCount(exam) === 1 ? "" : "s"} configured
+                        </p>
+                      </div>
+                      <label className="examadmin-switch examadmin-switch--compact">
+                        <input
+                          type="checkbox"
+                          checked={exam.enabled}
+                          onChange={(e) => updateClassExam(exam.class_name, "enabled", e.target.checked)}
+                        />
+                        <span>Enable</span>
+                      </label>
+                    </div>
 
-              <label className="examadmin-field examadmin-field--full">
-                <span>Instructions</span>
-                <textarea
-                  className="payx-input examadmin-textarea"
-                  rows="3"
-                  value={exam.instructions}
-                  onChange={(e) => updateClassExam(exam.class_name, "instructions", e.target.value)}
-                />
-              </label>
+                    <div className="examadmin-class-fields">
+                      <label className="examadmin-field">
+                        <span>Duration (minutes)</span>
+                        <input
+                          className="payx-input"
+                          type="number"
+                          min="5"
+                          max="180"
+                          value={exam.duration_minutes}
+                          onChange={(e) => updateClassExam(exam.class_name, "duration_minutes", Number(e.target.value || 0))}
+                        />
+                      </label>
+                      <label className="examadmin-field">
+                        <span>Pass Mark</span>
+                        <input
+                          className="payx-input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={exam.pass_mark}
+                          onChange={(e) => updateClassExam(exam.class_name, "pass_mark", Number(e.target.value || 0))}
+                        />
+                      </label>
+                    </div>
 
-              <div className="examadmin-class-footer">
-                <div className="examadmin-class-stats">
-                  <span>{exam.enabled ? "Live for admissions" : "Currently disabled"}</span>
-                  <span>{exam.pass_mark}% pass mark</span>
-                </div>
-                <button
-                  type="button"
-                  className="payx-btn payx-btn--soft"
-                  onClick={() => navigate(`/school/admin/entrance-exam/classes/${encodeURIComponent(exam.class_name)}/questions`)}
-                >
-                  Questions
-                </button>
+                    <label className="examadmin-field examadmin-field--full">
+                      <span>Instructions</span>
+                      <textarea
+                        className="payx-input examadmin-textarea"
+                        rows="3"
+                        value={exam.instructions}
+                        onChange={(e) => updateClassExam(exam.class_name, "instructions", e.target.value)}
+                      />
+                    </label>
+
+                    <div className="examadmin-class-footer">
+                      <div className="examadmin-class-stats">
+                        <span>{exam.enabled ? "Live for admissions" : "Currently disabled"}</span>
+                        <span>{exam.pass_mark}% pass mark</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="payx-btn payx-btn--soft"
+                        onClick={() => navigate(`/school/admin/entrance-exam/classes/${encodeURIComponent(exam.class_name)}/questions`)}
+                      >
+                        Questions
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </article>
+            </div>
           ))}
         </div>
       </section>
@@ -367,3 +403,5 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+
+
