@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import { compressProfilePhoto, PROFILE_PHOTO_GUIDE } from "../../utils/profileImage";
+import onlineProfileArt from "../../assets/register/online-profile.svg";
+import emailConsentArt from "../../assets/register/email-consent.svg";
+import onboardingArt from "../../assets/register/onboarding.svg";
+import "./Register.css";
 
 const prettyLevel = (value) =>
   String(value || "")
@@ -481,9 +485,38 @@ export default function Register() {
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div className="reg-page">
+      <section className="reg-hero">
+        <div>
+          <span className="reg-pill">School Admin Register</span>
+          <h2>Create student and staff records with a cleaner onboarding flow.</h2>
+          <p>
+            Manage single registration, photo upload, username generation, and bulk student CSV import from one polished workspace.
+          </p>
+          <div className="reg-meta">
+            <span>Single create</span>
+            <span>Bulk import</span>
+            <span>Photo ready</span>
+          </div>
+        </div>
+
+        <div className="reg-hero-art" aria-hidden="true">
+          <div className="reg-art reg-art--main">
+            <img src={onboardingArt} alt="" />
+          </div>
+          <div className="reg-art reg-art--profile">
+            <img src={onlineProfileArt} alt="" />
+          </div>
+          <div className="reg-art reg-art--email">
+            <img src={emailConsentArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="reg-panel">
+        <div className="reg-panel-inner">
       {isEditMode && username && (
-        <p style={{ marginTop: 4, opacity: 0.75 }}>
+        <p className="reg-username">
           Username: <strong>{username}</strong>
         </p>
       )}
@@ -692,7 +725,7 @@ export default function Register() {
       )}
 
       {step === 2 && !isEditMode && (
-        <div style={{ marginTop: 16 }}>
+        <div className="reg-generated">
           <h3>Generated Username</h3>
 
           <input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -709,7 +742,7 @@ export default function Register() {
       )}
 
       {!isEditMode && (
-        <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid #e5e7eb" }}>
+        <div className="reg-bulk">
           <h3>Bulk Student CSV Upload</h3>
           <p style={{ marginTop: 4, opacity: 0.8 }}>
             Use the template. Include password and optional username per row.
@@ -832,8 +865,11 @@ export default function Register() {
           )}
         </div>
       )}
+        </div>
+      </section>
     </div>
   );
 }
+
 
 
