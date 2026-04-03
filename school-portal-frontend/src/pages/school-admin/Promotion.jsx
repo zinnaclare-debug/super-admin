@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 import { getStoredUser } from "../../utils/authStorage";
+import onlineWishesArt from "../../assets/promotion/online-wishes.svg";
+import referralArt from "../../assets/promotion/referral.svg";
+import onlineAdArt from "../../assets/promotion/online-ad.svg";
+import "../shared/PaymentsShowcase.css";
+import "./Promotion.css";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
+
+const prettyLevel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 export default function Promotion() {
   const [levels, setLevels] = useState([]);
@@ -131,7 +141,7 @@ export default function Promotion() {
         try {
           await api.post(`/api/school-admin/promotion/classes/${selectedClass.id}/students/${studentId}/promote`);
           promotedCount += 1;
-        } catch (e) {
+        } catch {
           failedNames.push(row?.name || `Student ${studentId}`);
         }
       }
@@ -155,142 +165,173 @@ export default function Promotion() {
   }, []);
 
   return (
-    <div>
-      {sessionConfigError ? (
-        <p style={{ marginTop: 10, color: "#b45309" }}>{sessionConfigError}</p>
-      ) : null}
-      <p style={{ marginTop: 6, opacity: 0.8 }}>
-        {schoolName} | Session: {session?.session_name || session?.academic_year || "-"} | Term:{" "}
-        {term?.name || "-"}
-      </p>
-
-      {loadingLevels ? (
-        <p>Loading available classes...</p>
-      ) : (
-        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-          {levels.map((item) => (
-            <div
-              key={item.level}
-              style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, background: "#fff" }}
-            >
-              <strong>{String(item.level || "").toUpperCase()}</strong>
-              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {(item.classes || []).map((cls) => (
-                  <button
-                    key={cls.id}
-                    onClick={() => loadClassStudents(cls)}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      border: selectedClass?.id === cls.id ? "1px solid #2563eb" : "1px solid #ccc",
-                      background: selectedClass?.id === cls.id ? "#eff6ff" : "#fff",
-                    }}
-                  >
-                    {cls.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          {levels.length === 0 && <p>No classes found in the current session.</p>}
-        </div>
-      )}
-
-      {selectedClass && (
-        <div style={{ marginTop: 18 }}>
-          <h3 style={{ marginBottom: 6 }}>
-            {selectedClass.name} ({selectedClass.level})
-          </h3>
-          <p style={{ marginTop: 0, opacity: 0.75 }}>
-            {nextClass
-              ? `Next Class: ${nextClass.name}${students[0]?.next_session?.session_name ? ` | Session: ${students[0].next_session.session_name}` : ""}`
-              : "This is the final class for this level."}
+    <div className="payx-page payx-page--admin">
+      <section className="payx-hero">
+        <div>
+          <span className="payx-pill">School Admin Promotion</span>
+          <h2 className="payx-title">Move students forward with a clearer promotion workflow.</h2>
+          <p className="payx-subtitle">
+            Choose a class, review promotable students, and run one-by-one or bulk promotion with the same polished layout as Payments.
           </p>
+          <div className="payx-meta">
+            <span>{schoolName}</span>
+            <span>{session?.session_name || session?.academic_year || "Session -"}</span>
+            <span>{term?.name || "Term -"}</span>
+          </div>
+        </div>
 
-          {!loadingStudents && promotableStudents.length > 0 && (
-            <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ opacity: 0.8 }}>
-                <div>
-                  Selected: <strong>{selectedPromotableIds.length}</strong> of <strong>{promotableStudents.length}</strong> promotable student(s)
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main">
+            <img src={onlineWishesArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card promo-art--card">
+            <img src={referralArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online promo-art--online">
+            <img src={onlineAdArt} alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section className="payx-panel">
+        {sessionConfigError ? <p className="payx-state payx-state--warn">{sessionConfigError}</p> : null}
+        {loadingLevels ? <p className="payx-state payx-state--loading">Loading available classes...</p> : null}
+
+        {!loadingLevels ? (
+          <div className="promo-grid">
+            {levels.map((item) => (
+              <article key={item.level} className="payx-card">
+                <div className="promo-level-head">
+                  <h3>{prettyLevel(item.level)}</h3>
+                  <span className="promo-level-badge">{(item.classes || []).length} class{(item.classes || []).length === 1 ? "" : "es"}</span>
                 </div>
-                {bulkPromoting && bulkProgress.total > 0 && (
-                  <small style={{ display: "block", marginTop: 4 }}>
-                    Promoting {bulkProgress.current} of {bulkProgress.total}
-                    {bulkProgress.name ? `: ${bulkProgress.name}` : ""}
-                  </small>
-                )}
-              </div>
-              <button onClick={bulkPromoteStudents} disabled={bulkPromoting || selectedPromotableIds.length === 0}>
-                {bulkPromoting && bulkProgress.total > 0
-                  ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...`
-                  : "Bulk Promote"}
-              </button>
-            </div>
-          )}
 
-          {loadingStudents ? (
-            <p>Loading students...</p>
-          ) : (
-            <table border="1" cellPadding="10" cellSpacing="0" width="100%">
-              <thead>
-                <tr>
-                  <th style={{ width: 60 }}>
-                    <input
-                      type="checkbox"
-                      checked={allPromotableSelected}
-                      onChange={toggleSelectAll}
-                      disabled={promotableStudents.length === 0 || bulkPromoting}
-                    />
-                  </th>
-                  <th style={{ width: 70 }}>S/N</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th style={{ width: 220 }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((row) => {
-                  const canSelect = row.can_promote && !row.already_promoted;
-                  return (
-                    <tr key={row.student_id}>
-                      <td>
+                <div className="promo-class-list">
+                  {(item.classes || []).map((cls) => (
+                    <button
+                      key={cls.id}
+                      type="button"
+                      className={`promo-class-btn${selectedClass?.id === cls.id ? " promo-class-btn--active" : ""}`}
+                      onClick={() => loadClassStudents(cls)}
+                    >
+                      {cls.name}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))}
+
+            {levels.length === 0 ? (
+              <div className="payx-card">
+                <p className="payx-state payx-state--warn">No classes found in the current session.</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {selectedClass ? (
+          <div className="payx-card promo-selected-card">
+            <div className="promo-selected-head">
+              <div>
+                <h3>{selectedClass.name} ({prettyLevel(selectedClass.level)})</h3>
+                <p className="promo-selected-text">
+                  {nextClass
+                    ? `Next Class: ${nextClass.name}${students[0]?.next_session?.session_name ? ` | Session: ${students[0].next_session.session_name}` : ""}`
+                    : "This is the final class for this level."}
+                </p>
+              </div>
+              {promotableStudents.length > 0 ? (
+                <button className="payx-btn" type="button" onClick={bulkPromoteStudents} disabled={bulkPromoting || selectedPromotableIds.length === 0}>
+                  {bulkPromoting && bulkProgress.total > 0
+                    ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...`
+                    : "Bulk Promote"}
+                </button>
+              ) : null}
+            </div>
+
+            {!loadingStudents && promotableStudents.length > 0 ? (
+              <div className="payx-kv promo-progress-grid">
+                <div className="payx-row">
+                  <span className="payx-label">Selected</span>
+                  <span className="payx-value">{selectedPromotableIds.length} of {promotableStudents.length} promotable student(s)</span>
+                </div>
+                {bulkPromoting && bulkProgress.total > 0 ? (
+                  <div className="payx-row">
+                    <span className="payx-label">Progress</span>
+                    <span className="payx-value">{bulkProgress.current} of {bulkProgress.total}{bulkProgress.name ? `: ${bulkProgress.name}` : ""}</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {loadingStudents ? (
+              <p className="payx-state payx-state--loading" style={{ marginTop: 12 }}>Loading students...</p>
+            ) : (
+              <div className="payx-table-wrap">
+                <table className="payx-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 60 }}>
                         <input
                           type="checkbox"
-                          checked={selectedStudentIds.includes(row.student_id)}
-                          onChange={() => toggleStudentSelection(row.student_id)}
-                          disabled={!canSelect || bulkPromoting}
+                          checked={allPromotableSelected}
+                          onChange={toggleSelectAll}
+                          disabled={promotableStudents.length === 0 || bulkPromoting}
                         />
-                      </td>
-                      <td>{row.sn}</td>
-                      <td>{row.name}</td>
-                      <td>{row.email || "-"}</td>
-                      <td>
-                        <button
-                          onClick={() => promoteStudent(row.student_id)}
-                          disabled={!row.can_promote || promotingStudentId === row.student_id || bulkPromoting}
-                        >
-                          {promotingStudentId === row.student_id
-                            ? "Promoting..."
-                            : row.already_promoted
-                              ? "Promoted"
-                              : row.can_promote
-                                ? "Promote"
-                                : "No Next Class"}
-                        </button>
-                      </td>
+                      </th>
+                      <th style={{ width: 70 }}>S/N</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th style={{ width: 220 }}>Action</th>
                     </tr>
-                  );
-                })}
-                {students.length === 0 && (
-                  <tr>
-                    <td colSpan="5">No students enrolled in this class.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+                  </thead>
+                  <tbody>
+                    {students.map((row) => {
+                      const canSelect = row.can_promote && !row.already_promoted;
+                      return (
+                        <tr key={row.student_id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(row.student_id)}
+                              onChange={() => toggleStudentSelection(row.student_id)}
+                              disabled={!canSelect || bulkPromoting}
+                            />
+                          </td>
+                          <td>{row.sn}</td>
+                          <td>{row.name}</td>
+                          <td>{row.email || "-"}</td>
+                          <td>
+                            <button
+                              className={`payx-btn${!row.can_promote || row.already_promoted ? " payx-btn--soft" : ""}`}
+                              type="button"
+                              onClick={() => promoteStudent(row.student_id)}
+                              disabled={!row.can_promote || promotingStudentId === row.student_id || bulkPromoting}
+                            >
+                              {promotingStudentId === row.student_id
+                                ? "Promoting..."
+                                : row.already_promoted
+                                  ? "Promoted"
+                                  : row.can_promote
+                                    ? "Promote"
+                                    : "No Next Class"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {students.length === 0 ? (
+                      <tr>
+                        <td colSpan="5">No students enrolled in this class.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

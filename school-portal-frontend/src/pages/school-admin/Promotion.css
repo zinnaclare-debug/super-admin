@@ -1,0 +1,94 @@
+.promo-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.promo-level-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.promo-level-head h3 {
+  margin: 0;
+}
+
+.promo-level-badge {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.9);
+}
+
+.promo-class-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.promo-class-btn {
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #0f172a;
+  background: linear-gradient(130deg, #ffffff, #eff6ff);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.promo-class-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+  border-color: #60a5fa;
+}
+
+.promo-class-btn--active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.promo-selected-card {
+  margin-top: 14px;
+}
+
+.promo-selected-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.promo-selected-head h3 {
+  margin: 0;
+}
+
+.promo-selected-text {
+  margin: 6px 0 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.promo-progress-grid {
+  margin-top: 14px;
+}
+
+.promo-art--card {
+  background: linear-gradient(160deg, #fff7ed, #ecfccb);
+}
+
+.promo-art--online {
+  background: linear-gradient(160deg, #f0f9ff, #fce7f3);
+}
+
+@media (max-width: 640px) {
+  .promo-selected-head {
+    flex-direction: column;
+  }
+}
