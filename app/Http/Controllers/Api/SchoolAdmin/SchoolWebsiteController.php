@@ -3,12 +3,18 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
+use App\Models\QuestionBankQuestion;
 use App\Models\School;
 use App\Models\SchoolAdmissionApplication;
+use App\Models\SchoolClass;
 use App\Models\SchoolWebsiteContent;
+use App\Models\Subject;
+use App\Models\TermSubject;
 use App\Support\SchoolPublicWebsiteData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class SchoolWebsiteController extends Controller
 {
@@ -70,6 +76,7 @@ class SchoolWebsiteController extends Controller
     {
         $school = $this->schoolFromRequest($request);
         $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
+        $currentConfig = SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
 
         $payload = $request->validate([
             'entrance_exam_config' => ['required', 'array'],
@@ -86,6 +93,11 @@ class SchoolWebsiteController extends Controller
             'entrance_exam_config.class_exams.*.pass_mark' => ['nullable', 'integer', 'min:0', 'max:100'],
             'entrance_exam_config.class_exams.*.instructions' => ['nullable', 'string', 'max:3000'],
             'entrance_exam_config.class_exams.*.questions' => ['nullable', 'array'],
+            'entrance_exam_config.class_exams.*.questions.*.id' => ['nullable', 'string', 'max:80'],
+            'entrance_exam_config.class_exams.*.questions.*.subject_id' => ['nullable', 'integer'],
+            'entrance_exam_config.class_exams.*.questions.*.subject_name' => ['nullable', 'string', 'max:120'],
+            'entrance_exam_config.class_exams.*.questions.*.question_bank_question_id' => ['nullable', 'integer'],
+            'entrance_exam_config.class_exams.*.questions.*.source_type' => ['nullable', 'in:manual,question_bank,ai'],
             'entrance_exam_config.class_exams.*.questions.*.question' => ['nullable', 'string', 'max:500'],
             'entrance_exam_config.class_exams.*.questions.*.option_a' => ['nullable', 'string', 'max:255'],
             'entrance_exam_config.class_exams.*.questions.*.option_b' => ['nullable', 'string', 'max:255'],
@@ -94,10 +106,23 @@ class SchoolWebsiteController extends Controller
             'entrance_exam_config.class_exams.*.questions.*.correct_option' => ['nullable', 'in:A,B,C,D'],
         ]);
 
-        $school->entrance_exam_config = SchoolPublicWebsiteData::normalizeEntranceExamConfig(
-            $payload['entrance_exam_config'] ?? [],
-            $availableClasses
-        );
+        $incomingConfig = $payload['entrance_exam_config'] ?? [];
+        $currentExamMap = collect($currentConfig['class_exams'] ?? [])
+            ->keyBy(fn (array $exam) => strtolower(trim((string) ($exam['class_name'] ?? ''))));
+
+        if (array_key_exists('class_exams', $incomingConfig) && is_array($incomingConfig['class_exams'])) {
+            $incomingConfig['class_exams'] = collect($incomingConfig['class_exams'])
+                ->map(function (array $exam) use ($currentExamMap) {
+                    $key = strtolower(trim((string) ($exam['class_name'] ?? '')));
+                    if (! array_key_exists('questions', $exam) && $currentExamMap->has($key)) {
+                        $exam['questions'] = $currentExamMap->get($key)['questions'] ?? [];
+                    }
+                    return $exam;
+                })
+                ->all();
+        }
+
+        $school->entrance_exam_config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($incomingConfig, $availableClasses);
         $school->save();
 
         return response()->json([
@@ -105,6 +130,212 @@ class SchoolWebsiteController extends Controller
             'data' => [
                 'available_classes' => $availableClasses,
                 'entrance_exam_config' => SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses),
+            ],
+        ]);
+    }
+
+    public function classQuestions(Request $request, string $className)
+    {
+        $school = $this->schoolFromRequest($request);
+        $resolvedClassName = $this->resolveEntranceExamClassName($school, $className);
+        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
+        $config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
+        $classExam = SchoolPublicWebsiteData::findClassExam($config, $resolvedClassName) ?? [
+            'class_name' => $resolvedClassName,
+            'enabled' => false,
+            'duration_minutes' => 30,
+            'pass_mark' => 50,
+            'instructions' => '',
+            'questions' => [],
+        ];
+
+        $subjects = $this->subjectsForClass($school, $resolvedClassName);
+        $selectedQuestionBankIds = collect($classExam['questions'] ?? [])
+            ->pluck('question_bank_question_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => [
+                'class_name' => $resolvedClassName,
+                'class_exam' => $classExam,
+                'subjects' => $subjects,
+                'selected_question_bank_ids' => $selectedQuestionBankIds,
+            ],
+        ]);
+    }
+
+    public function exportClassQuestions(Request $request, string $className)
+    {
+        $school = $this->schoolFromRequest($request);
+        $resolvedClassName = $this->resolveEntranceExamClassName($school, $className);
+        $payload = $request->validate([
+            'question_ids' => ['required', 'array', 'min:1'],
+            'question_ids.*' => ['required', 'integer'],
+        ]);
+
+        $subjects = $this->subjectsForClass($school, $resolvedClassName);
+        $subjectMap = collect($subjects)->keyBy('subject_id');
+        $allowedSubjectIds = $subjectMap->keys()->map(fn ($id) => (int) $id)->all();
+
+        $questions = QuestionBankQuestion::query()
+            ->where('school_id', $school->id)
+            ->whereIn('subject_id', $allowedSubjectIds)
+            ->whereIn('id', $payload['question_ids'])
+            ->orderByDesc('id')
+            ->get();
+
+        if ($questions->isEmpty()) {
+            return response()->json(['message' => 'No valid question bank questions selected for this class.'], 422);
+        }
+
+        [$updatedClassExam, $addedCount] = $this->mutateClassExamQuestions(
+            $school,
+            $resolvedClassName,
+            function (array $questionsList) use ($questions, $subjectMap, &$addedCount) {
+                $addedCount = 0;
+                $existingBankIds = collect($questionsList)
+                    ->pluck('question_bank_question_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $existingFingerprints = collect($questionsList)
+                    ->map(fn (array $question) => $this->entranceQuestionFingerprint($question))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                foreach ($questions as $question) {
+                    $fingerprint = $this->entranceQuestionFingerprint([
+                        'question' => $question->question_text,
+                        'option_a' => $question->option_a,
+                        'option_b' => $question->option_b,
+                        'option_c' => $question->option_c,
+                        'option_d' => $question->option_d,
+                    ]);
+
+                    if (in_array((int) $question->id, $existingBankIds, true) || in_array($fingerprint, $existingFingerprints, true)) {
+                        continue;
+                    }
+
+                    $subject = $subjectMap->get((int) $question->subject_id);
+                    $questionsList[] = [
+                        'id' => (string) Str::uuid(),
+                        'subject_id' => (int) $question->subject_id,
+                        'subject_name' => (string) ($subject['subject_name'] ?? $question->subject_name ?? ''),
+                        'question_bank_question_id' => (int) $question->id,
+                        'source_type' => 'question_bank',
+                        'question' => (string) $question->question_text,
+                        'option_a' => (string) $question->option_a,
+                        'option_b' => (string) $question->option_b,
+                        'option_c' => (string) $question->option_c,
+                        'option_d' => (string) $question->option_d,
+                        'correct_option' => (string) $question->correct_option,
+                    ];
+                    $existingBankIds[] = (int) $question->id;
+                    $existingFingerprints[] = $fingerprint;
+                    $addedCount++;
+                }
+
+                return $questionsList;
+            }
+        );
+
+        return response()->json([
+            'message' => $addedCount > 0 ? 'Selected questions added to entrance exam.' : 'Selected questions were already added to this entrance exam.',
+            'data' => [
+                'class_exam' => $updatedClassExam,
+            ],
+        ]);
+    }
+
+    public function storeClassQuestion(Request $request, string $className)
+    {
+        $school = $this->schoolFromRequest($request);
+        $resolvedClassName = $this->resolveEntranceExamClassName($school, $className);
+        $payload = $request->validate([
+            'subject_id' => ['required', 'integer'],
+            'question' => ['required', 'string', 'max:500'],
+            'option_a' => ['required', 'string', 'max:255'],
+            'option_b' => ['required', 'string', 'max:255'],
+            'option_c' => ['required', 'string', 'max:255'],
+            'option_d' => ['required', 'string', 'max:255'],
+            'correct_option' => ['required', 'in:A,B,C,D'],
+        ]);
+
+        $subjects = $this->subjectsForClass($school, $resolvedClassName);
+        $subjectMap = collect($subjects)->keyBy('subject_id');
+        $subject = $subjectMap->get((int) $payload['subject_id']);
+
+        if (! $subject) {
+            return response()->json(['message' => 'Selected subject is not registered for this class.'], 422);
+        }
+
+        [$updatedClassExam] = $this->mutateClassExamQuestions(
+            $school,
+            $resolvedClassName,
+            function (array $questionsList) use ($payload, $subject) {
+                $questionsList[] = [
+                    'id' => (string) Str::uuid(),
+                    'subject_id' => (int) $payload['subject_id'],
+                    'subject_name' => (string) ($subject['subject_name'] ?? ''),
+                    'question_bank_question_id' => null,
+                    'source_type' => 'manual',
+                    'question' => trim((string) $payload['question']),
+                    'option_a' => trim((string) $payload['option_a']),
+                    'option_b' => trim((string) $payload['option_b']),
+                    'option_c' => trim((string) $payload['option_c']),
+                    'option_d' => trim((string) $payload['option_d']),
+                    'correct_option' => trim((string) $payload['correct_option']),
+                ];
+
+                return $questionsList;
+            }
+        );
+
+        return response()->json([
+            'message' => 'Question added to entrance exam successfully.',
+            'data' => [
+                'class_exam' => $updatedClassExam,
+            ],
+        ], 201);
+    }
+
+    public function destroyClassQuestion(Request $request, string $className, string $questionId)
+    {
+        $school = $this->schoolFromRequest($request);
+        $resolvedClassName = $this->resolveEntranceExamClassName($school, $className);
+
+        [$updatedClassExam, $removed] = $this->mutateClassExamQuestions(
+            $school,
+            $resolvedClassName,
+            function (array $questionsList) use ($questionId, &$removed) {
+                $removed = false;
+                $filtered = collect($questionsList)
+                    ->reject(function (array $question) use ($questionId, &$removed) {
+                        $matches = (string) ($question['id'] ?? '') === $questionId;
+                        if ($matches) {
+                            $removed = true;
+                        }
+                        return $matches;
+                    })
+                    ->values()
+                    ->all();
+
+                return $filtered;
+            }
+        );
+
+        if (! $removed) {
+            return response()->json(['message' => 'Entrance exam question not found.'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Question removed from entrance exam.',
+            'data' => [
+                'class_exam' => $updatedClassExam,
             ],
         ]);
     }
@@ -251,6 +482,148 @@ class SchoolWebsiteController extends Controller
         return School::query()->findOrFail($schoolId);
     }
 
+    private function resolveEntranceExamClassName(School $school, string $className): string
+    {
+        $availableClass = collect(SchoolPublicWebsiteData::availableClasses($school))
+            ->first(fn ($available) => strtolower(trim((string) $available)) === strtolower(trim((string) $className)));
+
+        abort_if(! $availableClass, 404, 'Class not found for entrance exam setup.');
+
+        return (string) $availableClass;
+    }
+
+    private function subjectsForClass(School $school, string $className): array
+    {
+        $normalizedClassName = strtolower(trim((string) $className));
+        $currentSessionId = AcademicSession::query()
+            ->where('school_id', $school->id)
+            ->where('status', 'current')
+            ->value('id');
+
+        $classQuery = SchoolClass::query()
+            ->where('school_id', $school->id)
+            ->whereRaw('LOWER(name) = ?', [$normalizedClassName]);
+
+        if ($currentSessionId) {
+            $classQuery->where('academic_session_id', $currentSessionId);
+        }
+
+        $classIds = $classQuery->pluck('id');
+        if ($classIds->isEmpty()) {
+            $classIds = SchoolClass::query()
+                ->where('school_id', $school->id)
+                ->whereRaw('LOWER(name) = ?', [$normalizedClassName])
+                ->pluck('id');
+        }
+
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        $termSubjects = TermSubject::query()
+            ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->when(
+                $currentSessionId,
+                fn ($query) => $query
+                    ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+                    ->where('terms.academic_session_id', $currentSessionId),
+                fn ($query) => $query->leftJoin('terms', 'terms.id', '=', 'term_subjects.term_id')
+            )
+            ->where('term_subjects.school_id', $school->id)
+            ->whereIn('term_subjects.class_id', $classIds)
+            ->orderBy('subjects.name')
+            ->get([
+                'subjects.id as subject_id',
+                'subjects.name as subject_name',
+                'subjects.code as subject_code',
+            ])
+            ->unique('subject_id')
+            ->values();
+
+        if ($termSubjects->isEmpty()) {
+            return [];
+        }
+
+        $questionsBySubject = QuestionBankQuestion::query()
+            ->where('school_id', $school->id)
+            ->whereIn('subject_id', $termSubjects->pluck('subject_id')->all())
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('subject_id');
+
+        return $termSubjects->map(function ($subject) use ($questionsBySubject) {
+            $subjectQuestions = $questionsBySubject->get($subject->subject_id, collect())
+                ->map(fn (QuestionBankQuestion $question) => [
+                    'id' => (int) $question->id,
+                    'question_text' => (string) $question->question_text,
+                    'option_a' => (string) $question->option_a,
+                    'option_b' => (string) $question->option_b,
+                    'option_c' => (string) ($question->option_c ?? ''),
+                    'option_d' => (string) ($question->option_d ?? ''),
+                    'correct_option' => (string) $question->correct_option,
+                    'explanation' => (string) ($question->explanation ?? ''),
+                    'media_type' => (string) ($question->media_type ?? ''),
+                    'media_url' => $question->media_path ? $this->storageUrl($question->media_path) : null,
+                    'source_type' => (string) ($question->source_type ?? 'manual'),
+                ])
+                ->values()
+                ->all();
+
+            return [
+                'subject_id' => (int) $subject->subject_id,
+                'subject_name' => (string) $subject->subject_name,
+                'subject_code' => (string) ($subject->subject_code ?? ''),
+                'questions' => $subjectQuestions,
+                'question_count' => count($subjectQuestions),
+            ];
+        })->all();
+    }
+
+    private function mutateClassExamQuestions(School $school, string $className, callable $callback): array
+    {
+        $availableClasses = SchoolPublicWebsiteData::availableClasses($school);
+        $config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($school->entrance_exam_config, $availableClasses);
+        $classExam = SchoolPublicWebsiteData::findClassExam($config, $className) ?? [
+            'class_name' => $className,
+            'enabled' => false,
+            'duration_minutes' => 30,
+            'pass_mark' => 50,
+            'instructions' => '',
+            'questions' => [],
+        ];
+
+        $classExam['questions'] = $callback((array) ($classExam['questions'] ?? []));
+
+        $config['class_exams'] = collect($config['class_exams'] ?? [])
+            ->map(fn (array $exam) => strtolower(trim((string) ($exam['class_name'] ?? ''))) === strtolower(trim($className)) ? $classExam : $exam)
+            ->values()
+            ->all();
+
+        $school->entrance_exam_config = SchoolPublicWebsiteData::normalizeEntranceExamConfig($config, $availableClasses);
+        $school->save();
+
+        return [
+            SchoolPublicWebsiteData::findClassExam($school->entrance_exam_config, $className),
+            $school,
+        ];
+    }
+
+    private function entranceQuestionFingerprint(array $question): string
+    {
+        $parts = [
+            strtolower(trim((string) ($question['question'] ?? ''))),
+            strtolower(trim((string) ($question['option_a'] ?? ''))),
+            strtolower(trim((string) ($question['option_b'] ?? ''))),
+            strtolower(trim((string) ($question['option_c'] ?? ''))),
+            strtolower(trim((string) ($question['option_d'] ?? ''))),
+        ];
+
+        return trim(implode('|', array_map(
+            fn ($value) => preg_replace('/\s+/', ' ', (string) $value) ?? '',
+            $parts
+        )));
+    }
+
     private function contentPayload(SchoolWebsiteContent $content): array
     {
         $paths = collect($content->image_paths ?? [])->filter()->values();
@@ -283,3 +656,4 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+

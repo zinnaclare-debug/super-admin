@@ -29,6 +29,7 @@ const HEADERLESS_PREFIXES = [
   "/school/admin/teacher_report",
   "/school/admin/student_report",
   "/school/admin/website",
+  "/school/admin/entrance-exam",
   "/school/admin/announcements",
   "/school/admin/student_result",
 ];
@@ -65,3 +66,4 @@ export default function SchoolAdminFeatureLayout() {
     </FeatureShell>
   );
 }
+

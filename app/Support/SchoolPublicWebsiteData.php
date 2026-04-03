@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\School;
+use Illuminate\Support\Str;
 
 class SchoolPublicWebsiteData
 {
@@ -166,6 +167,11 @@ class SchoolPublicWebsiteData
         foreach ($questions as $question) {
             $question = is_array($question) ? $question : [];
             $normalizedQuestion = [
+                'id' => self::string($question['id'] ?? null, (string) Str::uuid(), 80),
+                'subject_id' => self::nullableInteger($question['subject_id'] ?? null),
+                'subject_name' => self::string($question['subject_name'] ?? null, '', 120),
+                'question_bank_question_id' => self::nullableInteger($question['question_bank_question_id'] ?? null),
+                'source_type' => self::sourceType($question['source_type'] ?? null),
                 'question' => self::string($question['question'] ?? null, '', 500),
                 'option_a' => self::string($question['option_a'] ?? null, '', 255),
                 'option_b' => self::string($question['option_b'] ?? null, '', 255),
@@ -241,11 +247,21 @@ class SchoolPublicWebsiteData
         return max($min, min($max, $number));
     }
 
+    private static function nullableInteger(mixed $value): ?int
+    {
+        $number = filter_var($value, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE);
+        return $number === null ? null : (int) $number;
+    }
+
+    private static function sourceType(mixed $value): string
+    {
+        $sourceType = strtolower(trim((string) ($value ?? '')));
+        return in_array($sourceType, ['manual', 'question_bank', 'ai'], true) ? $sourceType : 'manual';
+    }
+
     private static function correctOption(mixed $value): string
     {
         $option = strtoupper(trim((string) ($value ?? '')));
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
-
-

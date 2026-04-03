@@ -1,0 +1,158 @@
+.examadmin-page {
+  display: grid;
+  gap: 18px;
+}
+
+.examadmin-art--side {
+  background: linear-gradient(160deg, #ede9fe, #dbeafe);
+}
+
+.examadmin-art--corner {
+  background: linear-gradient(160deg, #fef3c7, #cffafe);
+}
+
+.examadmin-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.examadmin-panel-head h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.examadmin-note {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.examadmin-switches {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.examadmin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 9px 12px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.examadmin-switch input {
+  margin: 0;
+}
+
+.examadmin-switch--compact {
+  white-space: nowrap;
+}
+
+.examadmin-copy-grid {
+  margin-top: 16px;
+}
+
+.examadmin-field {
+  display: grid;
+  gap: 6px;
+}
+
+.examadmin-field span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.examadmin-field--full {
+  grid-column: 1 / -1;
+}
+
+.examadmin-textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.examadmin-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.examadmin-class-card {
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.examadmin-class-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.examadmin-class-head h4 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.examadmin-class-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.examadmin-class-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.examadmin-class-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.examadmin-class-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.examadmin-class-stats span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.examadmin-empty-cell {
+  text-align: center;
+  color: #64748b;
+}
+
+@media (max-width: 720px) {
+  .examadmin-class-fields {
+    grid-template-columns: 1fr;
+  }
+}

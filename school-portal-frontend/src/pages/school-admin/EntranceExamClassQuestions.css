@@ -1,0 +1,274 @@
+.exq-page {
+  display: grid;
+  gap: 18px;
+}
+
+.exq-classbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.exq-title {
+  margin: 10px 0 6px;
+  color: #f8fafc;
+  line-height: 1.06;
+  font-size: clamp(1.35rem, 2.1vw, 2rem);
+}
+
+.exq-subtitle {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.5;
+  max-width: 62ch;
+}
+
+.exq-toolbar,
+.exq-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.exq-section-head h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.exq-note {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.exq-meta {
+  margin-top: 0;
+}
+
+.exq-subjects {
+  display: grid;
+  gap: 16px;
+}
+
+.exq-subject-card {
+  margin-top: 0;
+}
+
+.exq-subject-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.exq-subject-toggle {
+  flex: 1 1 320px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exq-subject-title-wrap {
+  display: grid;
+  gap: 4px;
+}
+
+.exq-subject-title-wrap strong {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.exq-subject-title-wrap small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.exq-subject-toggle-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 22px;
+  line-height: 30px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.exq-subject-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.exq-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.exq-subject-body {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.exq-manual-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.exq-manual-card h4 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.exq-manual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.exq-field {
+  display: grid;
+  gap: 6px;
+}
+
+.exq-field span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.exq-field--full {
+  grid-column: 1 / -1;
+}
+
+.exq-field--compact {
+  max-width: 220px;
+}
+
+.exq-textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.exq-table-wrap {
+  overflow-x: auto;
+}
+
+.exq-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.exq-table thead th {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 13px;
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.exq-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #edf2f7;
+  color: #1f2937;
+  font-size: 13px;
+  vertical-align: top;
+}
+
+.exq-table tbody tr:nth-child(odd) {
+  background: #f8fafc;
+}
+
+.exq-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.exq-options {
+  display: grid;
+  gap: 4px;
+}
+
+.exq-media-link,
+.exq-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.exq-link-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.exq-link-btn--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.exq-empty-cell {
+  text-align: center;
+  color: #64748b;
+}
+
+@media (max-width: 840px) {
+  .exq-manual-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exq-field--compact {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .exq-classbar,
+  .exq-toolbar,
+  .exq-section-head,
+  .exq-subject-head {
+    align-items: stretch;
+  }
+
+  .exq-subject-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
