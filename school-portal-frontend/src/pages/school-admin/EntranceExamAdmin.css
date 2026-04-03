@@ -199,3 +199,4 @@
   font-size: 1rem;
 }
 
+\n.examadmin-class-card p,\n.examadmin-class-card h5 {\n  word-break: break-word;\n}\n\n@media (max-width: 640px) {\n  .examadmin-panel-head {\n    align-items: stretch;\n  }\n\n  .examadmin-panel-head .payx-btn {\n    width: 100%;\n  }\n\n  .examadmin-level-head {\n    flex-direction: column;\n    align-items: flex-start;\n  }\n\n  .examadmin-class-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .examadmin-class-footer {\n    flex-direction: column;\n    align-items: flex-start;\n  }\n\n  .examadmin-class-stats {\n    width: 100%;\n  }\n}\n
