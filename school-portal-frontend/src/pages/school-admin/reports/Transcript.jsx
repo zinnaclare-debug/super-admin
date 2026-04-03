@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import api from "../../../services/api";
+import researchingArt from "../../../assets/transcript/researching.svg";
+import savingNotesArt from "../../../assets/transcript/saving-notes.svg";
+import documentWarningArt from "../../../assets/transcript/document-warning.svg";
+import "../../shared/PaymentsShowcase.css";
 import "./Transcript.css";
 
 function fileNameFromHeaders(headers, fallback) {
@@ -182,88 +186,112 @@ export default function Transcript() {
   };
 
   return (
-    <div className="transcript-page">
-      <div className="transcript-card">
-        <div className="transcript-grid">
-          <div className="transcript-field">
-            <label htmlFor="transcript-email">Student Email</label>
-            <input
-              id="transcript-email"
-              type="email"
-              placeholder="student@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    <div className="payx-page payx-page--admin transcript-page">
+      <section className="payx-hero transcript-hero">
+        <div>
+          <span className="payx-pill">School Admin Transcript</span>
+          <h2 className="payx-title">Search and download student transcripts from one clearer review workspace.</h2>
+          <p className="payx-subtitle">
+            Look up a student by email, review yearly transcript groupings by session and class, then export the official transcript PDF when needed.
+          </p>
+          <div className="payx-meta">
+            <span>{context?.student?.name || "Student lookup"}</span>
+            <span>{context?.student?.email || "Email-based search"}</span>
+            <span>{groupedEntries.length} session group{groupedEntries.length === 1 ? "" : "s"}</span>
           </div>
         </div>
 
-        <div className="transcript-actions">
-          <button onClick={searchTranscript} disabled={!canSearch || searching}>
-            {searching ? "Searching..." : "Search"}
-          </button>
-          <button className="secondary" onClick={downloadTranscript} disabled={!canSearch || downloading}>
-            {downloading ? "Downloading..." : "Download Transcript"}
-          </button>
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main transcript-art--main">
+            <img src={researchingArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card transcript-art--card">
+            <img src={savingNotesArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online transcript-art--online">
+            <img src={documentWarningArt} alt="" />
+          </div>
         </div>
+      </section>
 
-        {error ? <p className="transcript-error">{error}</p> : null}
-        {message ? <p className="transcript-message">{message}</p> : null}
-      </div>
-
-      {context?.student ? (
-        <div className="transcript-meta">
-          <p>
-            <strong>Student:</strong> {context.student.name} ({context.student.email})
-          </p>
-          <p>
-            <strong>Total Sessions:</strong> {Number(context.entries_count || groupedEntries.length || 0)}
-          </p>
-        </div>
-      ) : null}
-
-      <div className="transcript-session-grid">
-        {groupedEntries.map((group, groupIndex) => (
-          <div className="transcript-entry" key={`${group.session?.id || "s"}-${group.class?.id || "c"}-${groupIndex}`}>
-            <div className="transcript-entry-head">
-              <h3>
-                {group.session?.academic_year || group.session?.session_name || "-"} | {group.class?.name || "-"}
-              </h3>
+      <section className="payx-panel transcript-panel">
+        <div className="payx-card transcript-card">
+          <div className="transcript-grid">
+            <div className="transcript-field">
+              <label htmlFor="transcript-email">Student Email</label>
+              <input
+                id="transcript-email"
+                type="email"
+                placeholder="student@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
+          </div>
 
-            <div className="transcript-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>First Term</th>
-                    <th>Second Term</th>
-                    <th>Third Term</th>
-                    <th>Annual Average</th>
-                    <th>Annual Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(group.rows || []).map((row, idx) => (
-                    <tr key={`${groupIndex}-${idx}-${row.subject_name}`}>
-                      <td>{row.subject_name}</td>
-                      <td>{row.first_total === null ? "-" : row.first_total}</td>
-                      <td>{row.second_total === null ? "-" : row.second_total}</td>
-                      <td>{row.third_total === null ? "-" : row.third_total}</td>
-                      <td>{row.annual_average === null ? "-" : Number(row.annual_average).toFixed(2)}</td>
-                      <td>{row.annual_grade || "-"}</td>
-                    </tr>
-                  ))}
-                  {(group.rows || []).length === 0 ? (
+          <div className="transcript-actions">
+            <button className="payx-btn" onClick={searchTranscript} disabled={!canSearch || searching}>
+              {searching ? "Searching..." : "Search"}
+            </button>
+            <button className="payx-btn transcript-download-btn" onClick={downloadTranscript} disabled={!canSearch || downloading}>
+              {downloading ? "Downloading..." : "Download Transcript"}
+            </button>
+          </div>
+
+          {context?.student ? (
+            <p className="transcript-meta">
+              Student: {context.student.name} ({context.student.email}) | Total Sessions: {Number(context.entries_count || groupedEntries.length || 0)}
+            </p>
+          ) : null}
+
+          {error ? <p className="transcript-error">{error}</p> : null}
+          {message ? <p className="transcript-message">{message}</p> : null}
+        </div>
+
+        <div className="transcript-session-grid">
+          {groupedEntries.map((group, groupIndex) => (
+            <div className="payx-card transcript-entry" key={`${group.session?.id || "s"}-${group.class?.id || "c"}-${groupIndex}`}>
+              <div className="transcript-entry-head">
+                <h3>
+                  {group.session?.academic_year || group.session?.session_name || "-"} | {group.class?.name || "-"}
+                </h3>
+              </div>
+
+              <div className="transcript-table-wrap">
+                <table className="transcript-table">
+                  <thead>
                     <tr>
-                      <td colSpan="6">No graded records.</td>
+                      <th>Subject</th>
+                      <th>First Term</th>
+                      <th>Second Term</th>
+                      <th>Third Term</th>
+                      <th>Annual Average</th>
+                      <th>Annual Grade</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(group.rows || []).map((row, idx) => (
+                      <tr key={`${groupIndex}-${idx}-${row.subject_name}`}>
+                        <td>{row.subject_name}</td>
+                        <td>{row.first_total === null ? "-" : row.first_total}</td>
+                        <td>{row.second_total === null ? "-" : row.second_total}</td>
+                        <td>{row.third_total === null ? "-" : row.third_total}</td>
+                        <td>{row.annual_average === null ? "-" : Number(row.annual_average).toFixed(2)}</td>
+                        <td>{row.annual_grade || "-"}</td>
+                      </tr>
+                    ))}
+                    {(group.rows || []).length === 0 ? (
+                      <tr>
+                        <td colSpan="6">No graded records.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

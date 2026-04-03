@@ -9,7 +9,6 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/payments",
   "/school/admin/promotion",
   "/school/admin/broadsheet",
-  "/school/admin/broadsheet",
   "/school/admin/transcript",
   "/school/admin/teacher_report",
   "/school/admin/student_report",
@@ -26,6 +25,7 @@ const HEADERLESS_PREFIXES = [
   "/school/admin/payments",
   "/school/admin/promotion",
   "/school/admin/broadsheet",
+  "/school/admin/transcript",
   "/school/admin/website",
   "/school/admin/announcements",
   "/school/admin/student_result",
@@ -63,6 +63,3 @@ export default function SchoolAdminFeatureLayout() {
     </FeatureShell>
   );
 }
-
-
-

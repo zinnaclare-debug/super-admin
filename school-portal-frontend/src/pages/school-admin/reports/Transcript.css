@@ -1,13 +1,18 @@
 .transcript-page {
   display: grid;
+  gap: 18px;
+}
+
+.transcript-panel {
+  display: grid;
   gap: 16px;
 }
 
-.transcript-card {
-  background: #fff;
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  padding: 14px;
+.transcript-card,
+.transcript-entry {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .transcript-grid {
@@ -24,16 +29,17 @@
 .transcript-field label {
   font-size: 13px;
   color: #1e3a8a;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.transcript-field input,
-.transcript-field select {
+.transcript-field input {
   width: 100%;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
   font-size: 14px;
+  background: #fff;
+  box-sizing: border-box;
 }
 
 .transcript-actions {
@@ -43,58 +49,32 @@
   gap: 10px;
 }
 
-.transcript-actions button {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  background: #2563eb;
+.transcript-download-btn {
+  background: linear-gradient(130deg, #0f766e, #22c55e 95%);
   color: #fff;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.transcript-actions button.secondary {
-  background: #0f766e;
-}
-
-.transcript-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.transcript-error {
-  color: #b91c1c;
-  margin: 10px 0 0;
-}
-
-.transcript-message {
-  color: #1f2937;
-  margin: 10px 0 0;
 }
 
 .transcript-meta {
-  background: #eff6ff;
-  border-radius: 10px;
-  border: 1px solid #bfdbfe;
-  padding: 12px 14px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.55;
 }
 
-.transcript-meta p {
-  margin: 4px 0;
+.transcript-error {
+  margin: 10px 0 0;
+  color: #b91c1c;
 }
 
-.transcript-entry {
-  width: 100%;
-  background: #fff;
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  padding: 14px 16px;
+.transcript-message {
+  margin: 10px 0 0;
+  color: #1f2937;
 }
 
 .transcript-session-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
 
 .transcript-entry-head h3 {
@@ -103,42 +83,53 @@
   font-size: 15px;
 }
 
-.transcript-entry-head p {
-  margin: 6px 0 0;
-  color: #334155;
-  font-size: 13px;
-}
-
 .transcript-table-wrap {
   width: 100%;
-  overflow: visible;
-  margin-top: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  margin-top: 12px;
 }
 
-.transcript-table-wrap table {
+.transcript-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  min-width: 720px;
 }
 
-.transcript-table-wrap th,
-.transcript-table-wrap td {
+.transcript-table th,
+.transcript-table td {
   border: 1px solid #e2e8f0;
-  padding: 7px 8px;
+  padding: 8px 10px;
   font-size: 12px;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.transcript-table-wrap th {
-  background: #f8fafc;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
-@media (max-width: 760px) {
-  .transcript-entry {
-    padding: 12px;
+.transcript-table th {
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.transcript-table td:not(:first-child),
+.transcript-table th:not(:first-child) {
+  text-align: center;
+}
+
+.transcript-art--card {
+  background: linear-gradient(160deg, #fff7ed, #ecfeff);
+}
+
+.transcript-art--online {
+  background: linear-gradient(160deg, #eef2ff, #fef3c7);
+}
+
+@media (max-width: 640px) {
+  .transcript-actions {
+    flex-direction: column;
+  }
+
+  .transcript-actions .payx-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
-
-
