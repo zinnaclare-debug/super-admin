@@ -200,23 +200,27 @@ export default function Promotion() {
         {!loadingLevels ? (
           <div className="promo-grid">
             {levels.map((item) => (
-              <article key={item.level} className="payx-card">
+              <article key={item.level} className="payx-card promo-level-card">
                 <div className="promo-level-head">
                   <h3>{prettyLevel(item.level)}</h3>
-                  <span className="promo-level-badge">{(item.classes || []).length} class{(item.classes || []).length === 1 ? "" : "es"}</span>
+                  <span className="promo-level-badge">
+                    {(item.classes || []).length} class{(item.classes || []).length === 1 ? "" : "es"}
+                  </span>
                 </div>
 
-                <div className="promo-class-list">
-                  {(item.classes || []).map((cls) => (
-                    <button
-                      key={cls.id}
-                      type="button"
-                      className={`promo-class-btn${selectedClass?.id === cls.id ? " promo-class-btn--active" : ""}`}
-                      onClick={() => loadClassStudents(cls)}
-                    >
-                      {cls.name}
-                    </button>
-                  ))}
+                <div className="promo-level-body">
+                  <div className="promo-class-list">
+                    {(item.classes || []).map((cls) => (
+                      <button
+                        key={cls.id}
+                        type="button"
+                        className={`promo-class-btn${selectedClass?.id === cls.id ? " promo-class-btn--active" : ""}`}
+                        onClick={() => loadClassStudents(cls)}
+                      >
+                        {cls.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </article>
             ))}
@@ -241,7 +245,12 @@ export default function Promotion() {
                 </p>
               </div>
               {promotableStudents.length > 0 ? (
-                <button className="payx-btn" type="button" onClick={bulkPromoteStudents} disabled={bulkPromoting || selectedPromotableIds.length === 0}>
+                <button
+                  className="payx-btn"
+                  type="button"
+                  onClick={bulkPromoteStudents}
+                  disabled={bulkPromoting || selectedPromotableIds.length === 0}
+                >
                   {bulkPromoting && bulkProgress.total > 0
                     ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...`
                     : "Bulk Promote"}
@@ -253,12 +262,17 @@ export default function Promotion() {
               <div className="payx-kv promo-progress-grid">
                 <div className="payx-row">
                   <span className="payx-label">Selected</span>
-                  <span className="payx-value">{selectedPromotableIds.length} of {promotableStudents.length} promotable student(s)</span>
+                  <span className="payx-value">
+                    {selectedPromotableIds.length} of {promotableStudents.length} promotable student(s)
+                  </span>
                 </div>
                 {bulkPromoting && bulkProgress.total > 0 ? (
                   <div className="payx-row">
                     <span className="payx-label">Progress</span>
-                    <span className="payx-value">{bulkProgress.current} of {bulkProgress.total}{bulkProgress.name ? `: ${bulkProgress.name}` : ""}</span>
+                    <span className="payx-value">
+                      {bulkProgress.current} of {bulkProgress.total}
+                      {bulkProgress.name ? `: ${bulkProgress.name}` : ""}
+                    </span>
                   </div>
                 ) : null}
               </div>

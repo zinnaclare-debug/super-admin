@@ -1,15 +1,23 @@
 .promo-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.promo-level-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .promo-level-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 0;
+  min-width: 180px;
 }
 
 .promo-level-head h3 {
@@ -25,10 +33,16 @@
   background: rgba(219, 234, 254, 0.9);
 }
 
+.promo-level-body {
+  flex: 1;
+  min-width: 280px;
+}
+
 .promo-class-list {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .promo-class-btn {
@@ -87,9 +101,25 @@
   background: linear-gradient(160deg, #f0f9ff, #fce7f3);
 }
 
+@media (max-width: 900px) {
+  .promo-level-card {
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 640px) {
   .promo-selected-head {
     flex-direction: column;
   }
-}
 
+  .promo-level-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .promo-level-head,
+  .promo-level-body {
+    min-width: 0;
+    width: 100%;
+  }
+}
