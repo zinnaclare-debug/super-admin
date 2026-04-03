@@ -46,7 +46,7 @@ export default function AcademicsHome() {
   if (!data) return <p>No current academic session. Set a session to CURRENT first.</p>;
 
   return (
-    <div className="payx-page payx-page--admin">
+    <div className="payx-page payx-page--admin academics-home">
       <section className="payx-hero academics-home__hero">
         <div>
           <span className="payx-pill">School Admin Academics</span>
@@ -122,9 +122,9 @@ export default function AcademicsHome() {
           </div>
         </div>
 
-        <div className="payx-card">
-          <div className="payx-table-wrap">
-            <table className="payx-table">
+        <div className="payx-card academics-home__table-card">
+          <div className="payx-table-wrap academics-home__table-wrap">
+            <table className="payx-table academics-home__table">
               <thead>
                 <tr>
                   <th style={{ width: 70 }}>S/N</th>
@@ -140,7 +140,7 @@ export default function AcademicsHome() {
                     <td><strong>{prettyLevel(c.level)}</strong></td>
                     <td>{c.name}</td>
                     <td>
-                      <button className="payx-btn" onClick={() => navigate(`/school/admin/academics/classes/${c.id}/subjects`)}>
+                      <button className="payx-btn academics-home__action-btn" onClick={() => navigate(`/school/admin/academics/classes/${c.id}/subjects`)}>
                         Create / Manage Subjects
                       </button>
                     </td>
@@ -160,4 +160,3 @@ export default function AcademicsHome() {
     </div>
   );
 }
-

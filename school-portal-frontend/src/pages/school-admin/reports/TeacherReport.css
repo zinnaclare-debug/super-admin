@@ -1,0 +1,140 @@
+.teacher-report-page {
+  display: grid;
+  gap: 18px;
+}
+
+.teacher-report-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.teacher-report-card,
+.teacher-report-table-card {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.teacher-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.teacher-report-field {
+  display: grid;
+  gap: 6px;
+}
+
+.teacher-report-field label {
+  font-size: 13px;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.teacher-report-field select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.teacher-report-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.teacher-report-download-btn {
+  background: linear-gradient(130deg, #0f766e, #22c55e 95%);
+  color: #fff;
+}
+
+.teacher-report-meta {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.teacher-report-warning {
+  margin: 0 0 12px;
+  color: #b45309;
+}
+
+.teacher-report-loading {
+  margin: 0;
+  color: #334155;
+}
+
+.teacher-report-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.teacher-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 960px;
+}
+
+.teacher-report-table th,
+.teacher-report-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.teacher-report-table th {
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.teacher-report-table td:nth-child(2),
+.teacher-report-table td:nth-child(3) {
+  text-align: left;
+}
+
+.teacher-report-summary-head {
+  min-width: 260px;
+}
+
+.teacher-report-summary-box {
+  min-width: 220px;
+  min-height: 44px;
+  max-height: 52px;
+  overflow: auto;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: left;
+}
+
+.teacher-report-art--card {
+  background: linear-gradient(160deg, #fff7ed, #ecfeff);
+}
+
+.teacher-report-art--online {
+  background: linear-gradient(160deg, #eef2ff, #fef3c7);
+}
+
+@media (max-width: 640px) {
+  .teacher-report-actions {
+    flex-direction: column;
+  }
+
+  .teacher-report-actions .payx-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

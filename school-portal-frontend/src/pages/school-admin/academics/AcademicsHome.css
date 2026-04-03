@@ -1,6 +1,15 @@
+.academics-home {
+  min-width: 0;
+}
+
 .academics-home__panel {
   display: grid;
   gap: 16px;
+  min-width: 0;
+}
+
+.academics-home__panel > * {
+  min-width: 0;
 }
 
 .academics-home__toolbar {
@@ -21,20 +30,27 @@
   color: #64748b;
 }
 
+.academics-home__toolbar-actions {
+  min-width: 0;
+}
+
 .academics-home__toolbar-actions select {
-  min-width: 200px;
+  min-width: min(200px, 100%);
+  max-width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   padding: 10px 12px;
   background: #ffffff;
   font: inherit;
   color: #0f172a;
+  box-sizing: border-box;
 }
 
 .academics-home__filters {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
 }
 
 .academics-home__filter-btn {
@@ -46,6 +62,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  max-width: 100%;
 }
 
 .academics-home__filter-btn:hover {
@@ -63,8 +80,30 @@
   background: linear-gradient(180deg, #fff7ed, #ffffff);
 }
 
+.academics-home__summary-card,
+.academics-home__table-card {
+  min-width: 0;
+}
+
 .academics-home__summary-card {
   padding-top: 14px;
+}
+
+.academics-home__table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.academics-home__table {
+  width: 100%;
+  min-width: 620px;
+}
+
+.academics-home__action-btn {
+  white-space: normal;
+  width: 100%;
+  justify-content: center;
 }
 
 .academics-home__art-card {
@@ -83,5 +122,9 @@
   .academics-home__toolbar-actions,
   .academics-home__toolbar-actions select {
     width: 100%;
+  }
+
+  .academics-home__table {
+    min-width: 560px;
   }
 }
