@@ -172,9 +172,11 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:entrance_exam');
     Route::put('/school-admin/entrance-exam', [SchoolAdminWebsiteController::class, 'updateEntranceExam'])
         ->middleware('feature:entrance_exam');
-        Route::patch('/school-admin/entrance-exam/applications/{application}/reset', [SchoolAdminWebsiteController::class, 'resetEntranceExamApplication'])
-    Route::patch('/school-admin/entrance-exam/applications/{application}/status', [SchoolAdminWebsiteController::class, 'updateApplicationStatus'])
-        ->middleware('feature:entrance_exam');
+      Route::patch('/school-admin/entrance-exam/applications/{application}/reset', [SchoolAdminWebsiteController::class, 'resetEntranceExamApplication'])
+    ->middleware('feature:entrance_exam');
+Route::patch('/school-admin/entrance-exam/applications/{application}/status', [SchoolAdminWebsiteController::class, 'updateApplicationStatus'])
+    ->middleware('feature:entrance_exam');
+
     Route::get('/school-admin/entrance-exam/classes/{className}/questions', [SchoolAdminWebsiteController::class, 'classQuestions'])
         ->middleware('feature:entrance_exam');
     Route::post('/school-admin/entrance-exam/classes/{className}/questions/export', [SchoolAdminWebsiteController::class, 'exportClassQuestions'])
@@ -513,6 +515,9 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
+
+
 
 
 
