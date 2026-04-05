@@ -92,6 +92,7 @@ export default function SubjectScores() {
   const [subjectName, setSubjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resultsPublished, setResultsPublished] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
   const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
@@ -152,10 +153,12 @@ export default function SubjectScores() {
       setSchema(normalizedSchema);
       setGradingSchema(normalizedGradingSchema);
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
+      setResultsPublished(Boolean(res.data?.data?.results_published));
       setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
+      setResultsPublished(false);
     } finally {
       setLoading(false);
     }
@@ -166,6 +169,7 @@ export default function SubjectScores() {
   }, [termSubjectId]);
 
   const updateCa = (studentId, caIndex, value) => {
+    if (resultsPublished) return;
     const score = clamp(Number(value || 0), 0, schema.ca_maxes[caIndex] || 0);
     setRows((prev) =>
       prev.map((row) => {
@@ -182,6 +186,7 @@ export default function SubjectScores() {
   };
 
   const updateExam = (studentId, value) => {
+    if (resultsPublished) return;
     const exam = clamp(Number(value || 0), 0, schema.exam_max);
     setRows((prev) =>
       prev.map((row) => {
@@ -194,6 +199,11 @@ export default function SubjectScores() {
   };
 
   const saveAll = async () => {
+    if (resultsPublished) {
+      alert("Results have been published by the super admin. Staff can edit again after results are unpublished.");
+      return;
+    }
+
     setSaving(true);
     try {
       await api.post(`/api/staff/results/subjects/${termSubjectId}/scores`, {
@@ -216,6 +226,12 @@ export default function SubjectScores() {
       <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
         Assessment pattern: {caPattern}. Total max: 100.
       </div>
+
+      {resultsPublished ? (
+        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 14, fontWeight: 600 }}>
+          Results are currently published by the super admin. Staff editing is locked until the results are unpublished.
+        </div>
+      ) : null}
 
       {departmentOptions.length > 0 && (
         <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -256,7 +272,7 @@ export default function SubjectScores() {
           <strong>Students:</strong> {filteredRows.length}
           {selectedDepartmentId !== "all" && <span style={{ opacity: 0.75 }}> filtered from {rows.length}</span>}
         </div>
-        <button onClick={saveAll} disabled={saving || loading || rows.length === 0}>
+        <button onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>
           {saving ? "Saving..." : "Save Scores"}
         </button>
       </div>
@@ -296,6 +312,7 @@ export default function SubjectScores() {
                       min="0"
                       max={schema.ca_maxes[idx]}
                       onChange={(e) => updateCa(row.student_id, idx, e.target.value)}
+                      disabled={resultsPublished}
                       style={{ width: 80 }}
                     />
                   </td>
@@ -310,6 +327,7 @@ export default function SubjectScores() {
                     min="0"
                     max={schema.exam_max}
                     onChange={(e) => updateExam(row.student_id, e.target.value)}
+                    disabled={resultsPublished}
                     style={{ width: 80 }}
                   />
                 </td>
@@ -336,3 +354,4 @@ export default function SubjectScores() {
     </StaffFeatureLayout>
   );
 }
+
