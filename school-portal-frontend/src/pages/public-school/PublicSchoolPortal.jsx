@@ -888,9 +888,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                 <button type="submit" disabled={busyAction === "exam-submit"}>{busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}</button>
               </form>
             ) : null}
-          </section>
-        </main>
-      ) : null}
+          
 
             {page === "verify" ? (
         <main className="school-site-main school-site-form-page">
