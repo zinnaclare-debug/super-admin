@@ -15,6 +15,12 @@ return new class extends Migration
             } catch (\Throwable $e) {
                 // Ignore if the index does not exist.
             }
+
+            try {
+                DB::statement('ALTER TABLE `school_admission_applications` DROP INDEX `school_admission_applications_payment_reference_index`');
+            } catch (\Throwable $e) {
+                // Ignore if the index does not exist.
+            }
         }
 
         Schema::table('school_admission_applications', function (Blueprint $table) {
@@ -87,6 +93,12 @@ return new class extends Migration
         if (Schema::hasTable('school_admission_applications')) {
             try {
                 DB::statement('ALTER TABLE `school_admission_applications` DROP INDEX `school_admission_applications_application_number_unique`');
+            } catch (\Throwable $e) {
+                // Ignore if the index does not exist.
+            }
+
+            try {
+                DB::statement('ALTER TABLE `school_admission_applications` DROP INDEX `school_admission_applications_payment_reference_index`');
             } catch (\Throwable $e) {
                 // Ignore if the index does not exist.
             }
