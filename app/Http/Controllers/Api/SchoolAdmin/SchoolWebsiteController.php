@@ -17,8 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-use App\Models\SchoolAdmissionApplication;
-
 class SchoolWebsiteController extends Controller
 {
     public function showWebsite(Request $request)
