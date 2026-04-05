@@ -377,8 +377,8 @@
   font-weight: 800;
   letter-spacing: 0.2px;
   color: #ffffff;
-  background: linear-gradient(135deg, #0ea5e9, #2563eb 42%, #0f766e);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);
+  background: linear-gradient(135deg, var(--login-primary), var(--login-accent));
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--login-primary) 32%, transparent);
   transition: transform 0.18s ease, filter 0.18s ease;
 }
 
@@ -519,5 +519,4 @@
 .login-page--compact .login-mark img {
   max-height: 140px;
 }
-
 
