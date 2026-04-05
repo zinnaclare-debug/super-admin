@@ -88,3 +88,4 @@ class TenantContextController extends Controller
         return School::query()->where('subdomain', $subdomain)->first();
     }
 }
+

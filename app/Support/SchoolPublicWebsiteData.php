@@ -103,9 +103,13 @@ class SchoolPublicWebsiteData
             'enabled' => self::bool($value['enabled'] ?? false, false),
             'application_open' => self::bool($value['application_open'] ?? true, true),
             'verification_open' => self::bool($value['verification_open'] ?? true, true),
+            'application_fee_amount' => self::money($value['application_fee_amount'] ?? 0, 0),
+            'application_fee_tax_rate' => self::money($value['application_fee_tax_rate'] ?? 1.6, 1.6, 0, 100),
+            'application_fee_tax_amount' => self::money(($value['application_fee_amount'] ?? 0) * (($value['application_fee_tax_rate'] ?? 1.6) / 100), 0),
+            'application_fee_total' => self::money(($value['application_fee_amount'] ?? 0) + (($value['application_fee_amount'] ?? 0) * (($value['application_fee_tax_rate'] ?? 1.6) / 100)), 0),
             'apply_intro' => self::string($value['apply_intro'] ?? null, 'Fill the form below and keep your application number for the next admission steps.', 1500),
-            'exam_intro' => self::string($value['exam_intro'] ?? null, 'Enter your application details to take the entrance examination assigned to your selected class.', 1500),
-            'verify_intro' => self::string($value['verify_intro'] ?? null, 'Use your application number and contact details to verify your exam score.', 1500),
+            'exam_intro' => self::string($value['exam_intro'] ?? null, 'Enter your application number to take the entrance examination assigned to your selected class.', 1500),
+            'verify_intro' => self::string($value['verify_intro'] ?? null, 'Use your application number to verify your entrance exam result.', 1500),
             'class_exams' => $normalizedClassExams,
         ];
     }
@@ -269,6 +273,17 @@ class SchoolPublicWebsiteData
         return max($min, min($max, $number));
     }
 
+
+    private static function money(mixed $value, float $fallback = 0.0, float $min = 0.0, float $max = 100000000.0): float
+    {
+        $number = filter_var($value, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE);
+        if ($number === null) {
+            $number = $fallback;
+        }
+
+        $bounded = max($min, min($max, (float) $number));
+        return round($bounded, 2);
+    }
     private static function nullableInteger(mixed $value): ?int
     {
         $number = filter_var($value, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE);
@@ -287,4 +302,7 @@ class SchoolPublicWebsiteData
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
+
+
+
 

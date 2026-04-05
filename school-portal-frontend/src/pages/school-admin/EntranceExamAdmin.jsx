@@ -60,11 +60,11 @@ function coerceExamConfig(config, availableClasses) {
   };
 }
 
-function examQuestionCount(exam) {
+const TAX_RATE = 1.6;\r\n\r\nfunction examQuestionCount(exam) {
   return Array.isArray(exam?.questions) ? exam.questions.length : 0;
 }
 
-function toDateTimeLocal(value) {
+const computeFee = (value) => {\r\n  const amount = Number(value || 0);\r\n  const taxRate = TAX_RATE;\r\n  const taxAmount = Number((amount * (taxRate / 100)).toFixed(2));\r\n  const total = Number((amount + taxAmount).toFixed(2));\r\n  return { amount, taxRate, taxAmount, total };\r\n};\r\n\r\nfunction toDateTimeLocal(value) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 16);
@@ -79,6 +79,7 @@ export default function EntranceExamAdmin() {
   const [availableClasses, setAvailableClasses] = useState([]);
   const [availableClassGroups, setAvailableClassGroups] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
 
@@ -146,6 +147,21 @@ export default function EntranceExamAdmin() {
       alert(validationError || err?.response?.data?.message || "Failed to reset entrance exam.");
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const updateApplicationStatus = async (applicationId, status) => {
+    setUpdatingStatusId(applicationId);
+    try {
+      await api.patch(`/api/school-admin/entrance-exam/applications/${applicationId}/status`, {
+        admin_result_status: status || null,
+      });
+      await loadApplications();
+    } catch (err) {
+      const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
+      alert(validationError || err?.response?.data?.message || "Failed to update result status.");
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -402,6 +418,43 @@ export default function EntranceExamAdmin() {
       <section className="payx-panel">
         <div className="examadmin-panel-head">
           <div>
+            <h3>Entrance Exam Billing</h3>
+            <p className="examadmin-note">Set the application fee. A 1.6% tax will be applied automatically.</p>
+          </div>
+          <button className="payx-btn" onClick={saveExamConfig} disabled={saving}>
+            {saving ? "Saving..." : "Save Billing"}
+          </button>
+        </div>
+
+        <div className="payx-grid-2 examadmin-copy-grid">
+          <label className="examadmin-field">
+            <span>Application Fee (NGN)</span>
+            <input
+              className="payx-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={examConfig.application_fee_amount}
+              onChange={(e) => updateFeeAmount(e.target.value)}
+            />
+          </label>
+          <label className="examadmin-field">
+            <span>Tax Rate</span>
+            <input className="payx-input" value={`${examConfig.application_fee_tax_rate || 1.6}%`} disabled />
+          </label>
+          <label className="examadmin-field">
+            <span>Tax Amount (NGN)</span>
+            <input className="payx-input" value={Number(examConfig.application_fee_tax_amount || 0).toFixed(2)} disabled />
+          </label>
+          <label className="examadmin-field">
+            <span>Total Amount (NGN)</span>
+            <input className="payx-input" value={Number(examConfig.application_fee_total || 0).toFixed(2)} disabled />
+          </label>
+        </div>
+      </section>
+      <section className="payx-panel">
+        <div className="examadmin-panel-head">
+          <div>
             <h3>Registered Applicants</h3>
             <p className="examadmin-note">Candidates who applied through your public school website will appear here.</p>
           </div>
@@ -418,6 +471,7 @@ export default function EntranceExamAdmin() {
                 <th>Application No.</th>
                 <th>Exam Status</th>
                 <th>Score</th>
+                <th>Result Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -431,7 +485,18 @@ export default function EntranceExamAdmin() {
                   <td>{application.application_number}</td>
                   <td>{application.exam_status}</td>
                   <td>{application.score ?? "-"}</td>
-                    <td>
+                  <td>
+                    <select
+                      value={application.admin_result_status || ""}
+                      onChange={(e) => updateApplicationStatus(application.id, e.target.value)}
+                      disabled={updatingStatusId === application.id}
+                    >
+                      <option value="">Awaiting</option>
+                      <option value="passed">Pass</option>
+                      <option value="failed">Fail</option>
+                    </select>
+                  </td>
+                  <td>
                       <button
                         type="button"
                         className="payx-btn payx-btn--soft"
@@ -445,7 +510,7 @@ export default function EntranceExamAdmin() {
               ))}
               {applications.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="examadmin-empty-cell">No applicants yet.</td>
+                  <td colSpan="9" className="examadmin-empty-cell">No applicants yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -455,6 +520,14 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

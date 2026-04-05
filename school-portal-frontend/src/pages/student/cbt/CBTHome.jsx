@@ -21,6 +21,8 @@ export default function StudentCBTHome() {
     block_copy_paste: true,
     block_tab_switch: true,
     auto_submit_on_violation: true,
+    auto_submit_on_fullscreen_exit: true,
+    auto_submit_on_multiple_faces: true,
     ai_proctoring_enabled: true,
     max_warnings: 3,
     no_face_timeout_seconds: 30,
@@ -485,4 +487,5 @@ export default function StudentCBTHome() {
     </div>
   );
 }
+
 

@@ -81,7 +81,11 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
 
   const fullscreenHandler = () => {
     if (policy?.fullscreen_required && !document.fullscreenElement) {
-      warn("fullscreen_exit");
+      if (policy?.auto_submit_on_violation || policy?.auto_submit_on_fullscreen_exit) {
+        onMajorViolation({ reason: "fullscreen_exit", warnings: state.warnings });
+      } else {
+        warn("fullscreen_exit");
+      }
     }
   };
 
@@ -117,6 +121,9 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
             state.noFaceSeconds = 0;
             if (faces.length > 1) {
               warn("multiple_faces_detected");
+              if (policy?.auto_submit_on_violation || policy?.auto_submit_on_multiple_faces) {
+                onMajorViolation({ reason: "multiple_faces_detected", warnings: state.warnings });
+              }
             }
 
             // Head movement guard (best effort): if face center jumps repeatedly, treat as violation.
@@ -215,3 +222,4 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     stop,
   };
 }
+

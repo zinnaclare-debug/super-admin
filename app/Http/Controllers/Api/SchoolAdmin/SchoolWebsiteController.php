@@ -85,6 +85,9 @@ class SchoolWebsiteController extends Controller
             'entrance_exam_config.enabled' => ['nullable', 'boolean'],
             'entrance_exam_config.application_open' => ['nullable', 'boolean'],
             'entrance_exam_config.verification_open' => ['nullable', 'boolean'],
+            'entrance_exam_config.application_fee_amount' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
+            'entrance_exam_config.application_fee_tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'entrance_exam_config.application_fee_total' => ['nullable', 'numeric', 'min:0', 'max:20000000'],
             'entrance_exam_config.apply_intro' => ['nullable', 'string', 'max:1500'],
             'entrance_exam_config.exam_intro' => ['nullable', 'string', 'max:1500'],
             'entrance_exam_config.verify_intro' => ['nullable', 'string', 'max:1500'],
@@ -693,6 +696,8 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
+
 
 
 
