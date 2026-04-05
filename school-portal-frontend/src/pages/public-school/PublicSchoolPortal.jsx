@@ -82,6 +82,7 @@ const CONTENT_PREVIEW_LIMIT = 100;
 const QUESTIONS_PER_PAGE = 4;
 
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
+    const [searchParams, setSearchParams] = useSearchParams();
   const [siteData, setSiteData] = useState(initialSiteData);
   const [loading, setLoading] = useState(!initialSiteData);
   const [error, setError] = useState("");
@@ -109,6 +110,9 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [busyAction, setBusyAction] = useState("");
   const securityRef = useRef(null);
   const submittingRef = useRef(false);
+
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (initialSiteData) {
