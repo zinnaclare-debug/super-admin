@@ -541,3 +541,41 @@
     width: 100%;
   }
 }
+
+.school-site-option {
+  min-width: 0;
+}
+
+.school-site-option input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.school-site-option span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .school-site-section,
+  .school-site-result-card,
+  .school-site-question-block,
+  .school-site-exam-shell {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .school-site-exam-shell {
+    max-width: 100%;
+  }
+
+  .school-site-question-block {
+    overflow: hidden;
+  }
+
+  .school-site-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+}
