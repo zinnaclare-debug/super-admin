@@ -67,13 +67,23 @@ function examQuestionCount(exam) {
   return Array.isArray(exam?.questions) ? exam.questions.length : 0;
 }
 
-const computeFee = (value) => {\r\n  const amount = Number(value || 0);\r\n  const taxRate = TAX_RATE;\r\n  const taxAmount = Number((amount * (taxRate / 100)).toFixed(2));\r\n  const total = Number((amount + taxAmount).toFixed(2));\r\n  return { amount, taxRate, taxAmount, total };\r\n};\r\n\r\nfunction toDateTimeLocal(value) {
+const computeFee = (value) => {
+  const amount = Number(value || 0);
+  const taxRate = TAX_RATE;
+  const taxAmount = Number((amount * (taxRate / 100)).toFixed(2));
+  const total = Number((amount + taxAmount).toFixed(2));
+
+  return { amount, taxRate, taxAmount, total };
+};
+
+function toDateTimeLocal(value) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 16);
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
 
 export default function EntranceExamAdmin() {
   const navigate = useNavigate();
