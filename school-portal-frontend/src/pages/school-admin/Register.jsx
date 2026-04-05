@@ -6,6 +6,7 @@ import onlineProfileArt from "../../assets/register/online-profile.svg";
 import emailConsentArt from "../../assets/register/email-consent.svg";
 import onboardingArt from "../../assets/register/onboarding.svg";
 import "./Register.css";
+import PasswordVisibilityToggle from "../../components/PasswordVisibilityToggle";
 
 const prettyLevel = (value) =>
   String(value || "")
@@ -36,6 +37,7 @@ export default function Register() {
   const isEditMode = Boolean(editUserId);
 
   const [step, setStep] = useState(1);
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
 
   const [photo, setPhoto] = useState(null);
@@ -567,13 +569,19 @@ export default function Register() {
             <div className="reg-field-grid reg-field-grid--two">
               <input name="name" placeholder="Full Name" value={form.name} onChange={handleChange} />
               <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-              <input
-                type="password"
-                name="password"
-                placeholder={isEditMode ? "New Password (optional)" : "Password"}
-                value={form.password}
-                onChange={handleChange}
-              />
+              <div className="password-visibility-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder={isEditMode ? "New Password (optional)" : "Password"}
+                  value={form.password}
+                  onChange={handleChange}
+                />
+                <PasswordVisibilityToggle
+                  visible={showPassword}
+                  onToggle={() => setShowPassword((value) => !value)}
+                />
+              </div>
               <input name="address" placeholder="Address" value={form.address} onChange={handleChange} />
             </div>
 
@@ -906,6 +914,7 @@ export default function Register() {
     </div>
   );
 }
+
 
 
 

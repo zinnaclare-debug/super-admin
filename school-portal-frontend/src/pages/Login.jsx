@@ -7,10 +7,12 @@ import brandBanner from "../assets/home/lytebridge-brand.jpg";
 import brandLogo from "../assets/home/lytebridge-logo.png";
 import { setAuthState, setStoredFeatures } from "../utils/authStorage";
 import "./Login.css";
+import PasswordVisibilityToggle from "../components/PasswordVisibilityToggle";
 
 function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [tenantSchool, setTenantSchool] = useState(null);
@@ -221,15 +223,21 @@ const loginThemeStyle = useMemo(
             />
 
             <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              placeholder="Enter password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
+            <div className="password-visibility-field">
+              <input
+                id="login-password"
+                placeholder="Enter password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <PasswordVisibilityToggle
+                visible={showPassword}
+                onToggle={() => setShowPassword((value) => !value)}
+              />
+            </div>
 
             <button className="login-btn" disabled={loading}>
               {loading ? "Logging in..." : "Login"}
@@ -271,6 +279,7 @@ const loginThemeStyle = useMemo(
 }
 
 export default Login;
+
 
 
 
