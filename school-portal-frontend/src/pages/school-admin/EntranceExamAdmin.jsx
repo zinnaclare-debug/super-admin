@@ -64,6 +64,14 @@ function examQuestionCount(exam) {
   return Array.isArray(exam?.questions) ? exam.questions.length : 0;
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 16);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function EntranceExamAdmin() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -71,6 +79,7 @@ export default function EntranceExamAdmin() {
   const [availableClasses, setAvailableClasses] = useState([]);
   const [availableClassGroups, setAvailableClassGroups] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [resettingId, setResettingId] = useState(null);
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
 
   const classGroups = useMemo(() => {
@@ -113,6 +122,31 @@ export default function EntranceExamAdmin() {
   const loadApplications = async () => {
     const response = await api.get("/api/school-admin/entrance-exam/applications");
     setApplications(Array.isArray(response.data?.data) ? response.data.data : []);
+  };
+
+  const resetApplication = async (application) => {
+    const defaultValue = application?.exam_rescheduled_for
+      ? toDateTimeLocal(application.exam_rescheduled_for)
+      : "";
+    const rescheduledFor = window.prompt(
+      "Enter new exam date/time (YYYY-MM-DDTHH:MM)",
+      defaultValue
+    );
+    if (!rescheduledFor) return;
+
+    setResettingId(application.id);
+    try {
+      await api.patch(`/api/school-admin/entrance-exam/applications/${application.id}/reset`, {
+        rescheduled_for: rescheduledFor,
+      });
+      await loadApplications();
+      alert("Entrance exam reset successfully.");
+    } catch (err) {
+      const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
+      alert(validationError || err?.response?.data?.message || "Failed to reset entrance exam.");
+    } finally {
+      setResettingId(null);
+    }
   };
 
   const load = async () => {
@@ -384,6 +418,7 @@ export default function EntranceExamAdmin() {
                 <th>Application No.</th>
                 <th>Exam Status</th>
                 <th>Score</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -396,11 +431,21 @@ export default function EntranceExamAdmin() {
                   <td>{application.application_number}</td>
                   <td>{application.exam_status}</td>
                   <td>{application.score ?? "-"}</td>
-                </tr>
+                    <td>
+                      <button
+                        type="button"
+                        className="payx-btn payx-btn--soft"
+                        onClick={() => resetApplication(application)}
+                        disabled={resettingId === application.id}
+                      >
+                        {resettingId === application.id ? "Resetting..." : "Reset Exam"}
+                      </button>
+                    </td>
+                  </tr>
               ))}
               {applications.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="examadmin-empty-cell">No applicants yet.</td>
+                  <td colSpan="8" className="examadmin-empty-cell">No applicants yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -410,6 +455,22 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

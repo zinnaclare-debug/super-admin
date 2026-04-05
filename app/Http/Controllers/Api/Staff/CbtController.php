@@ -483,3 +483,4 @@ class CbtController extends Controller
     return response()->json(['message' => 'Deleted']);
   }
 }
+

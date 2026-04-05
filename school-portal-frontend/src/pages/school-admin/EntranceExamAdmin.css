@@ -199,4 +199,68 @@
   font-size: 1rem;
 }
 
-\n.examadmin-class-card p,\n.examadmin-class-card h5 {\n  word-break: break-word;\n}\n\n@media (max-width: 640px) {\n  .examadmin-panel-head {\n    align-items: stretch;\n  }\n\n  .examadmin-panel-head .payx-btn {\n    width: 100%;\n  }\n\n  .examadmin-level-head {\n    flex-direction: column;\n    align-items: flex-start;\n  }\n\n  .examadmin-class-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .examadmin-class-footer {\n    flex-direction: column;\n    align-items: flex-start;\n  }\n\n  .examadmin-class-stats {\n    width: 100%;\n  }\n}\n
+
+.examadmin-class-card p,
+.examadmin-class-card h5 {
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .examadmin-panel-head {
+    align-items: stretch;
+  }
+
+  .examadmin-panel-head .payx-btn {
+    width: 100%;
+  }
+
+  .examadmin-level-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .examadmin-class-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .examadmin-class-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .examadmin-class-stats {
+    width: 100%;
+  }
+}
+
+
+.examadmin-level-total {
+  margin: 4px 0 0;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.examadmin-level-card,
+.examadmin-class-card {
+  min-width: 0;
+}
+
+.payx-table-wrap {
+  overflow-x: auto;
+}
+
+.payx-table {
+  min-width: 720px;
+}
+
+.examadmin-class-card p,
+.examadmin-class-card h5 {
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .payx-table {
+    min-width: 600px;
+  }
+}

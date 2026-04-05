@@ -170,7 +170,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
         ->middleware('feature:entrance_exam');
     Route::put('/school-admin/entrance-exam', [SchoolAdminWebsiteController::class, 'updateEntranceExam'])
         ->middleware('feature:entrance_exam');
-    Route::get('/school-admin/entrance-exam/applications', [SchoolAdminWebsiteController::class, 'applications'])
+        Route::patch('/school-admin/entrance-exam/applications/{application}/reset', [SchoolAdminWebsiteController::class, 'resetEntranceExamApplication'])
         ->middleware('feature:entrance_exam');
     Route::get('/school-admin/entrance-exam/classes/{className}/questions', [SchoolAdminWebsiteController::class, 'classQuestions'])
         ->middleware('feature:entrance_exam');
@@ -450,7 +450,7 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/cbt/subjects', [StaffCbtController::class, 'subjects']);
     Route::get('/staff/cbt/exams', [StaffCbtController::class, 'index']);
     Route::post('/staff/cbt/exams', [StaffCbtController::class, 'store']);
-    Route::patch('/staff/cbt/exams/{exam}', [StaffCbtController::class, 'update']);
+        Route::patch('/staff/cbt/exams/{exam}/reset', [StaffCbtController::class, 'resetExam']);
     Route::get('/staff/cbt/exams/{exam}/questions', [StaffCbtController::class, 'examQuestions']);
     Route::get('/staff/cbt/exams/{exam}/results', [StaffCbtController::class, 'examResults']);
     Route::post('/staff/cbt/exams/{exam}/export-question-bank', [StaffCbtController::class, 'exportFromQuestionBank']);
@@ -510,6 +510,12 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
+
+
+
+
+
 
 
 

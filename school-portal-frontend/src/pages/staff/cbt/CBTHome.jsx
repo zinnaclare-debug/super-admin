@@ -61,6 +61,7 @@ export default function CBTHome() {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingExamId, setEditingExamId] = useState(null);
+  const [resettingExamId, setResettingExamId] = useState(null);
 
   const [form, setForm] = useState(createDefaultForm());
 
@@ -146,6 +147,31 @@ export default function CBTHome() {
       security_policy: { ...defaultSecurityPolicy, ...examPolicy },
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const resetExamSchedule = async (exam) => {
+    const defaultStart = toDateTimeLocal(exam.starts_at);
+    const defaultEnd = toDateTimeLocal(exam.ends_at);
+    const startsAt = window.prompt("New start date/time (YYYY-MM-DDTHH:MM)", defaultStart);
+    if (!startsAt) return;
+    const endsAt = window.prompt("New end date/time (YYYY-MM-DDTHH:MM)", defaultEnd);
+    if (!endsAt) return;
+
+    setResettingExamId(exam.id);
+    try {
+      await api.patch(`/api/staff/cbt/exams/${exam.id}/reset`, {
+        starts_at: localDateTimeToIso(startsAt),
+        ends_at: localDateTimeToIso(endsAt),
+        duration_minutes: Number(exam.duration_minutes ?? exam.duration ?? 60),
+      });
+      await load();
+      alert("CBT exam reset successfully.");
+    } catch (err) {
+      const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
+      alert(validationError || err?.response?.data?.message || "Failed to reset CBT exam.");
+    } finally {
+      setResettingExamId(null);
+    }
   };
 
   const removeExam = async (id) => {
@@ -354,6 +380,13 @@ export default function CBTHome() {
                           </button>
                           <button
                             className="cbx-btn cbx-btn--soft"
+                            onClick={() => resetExamSchedule(x)}
+                            disabled={resettingExamId === x.id}
+                          >
+                            {resettingExamId === x.id ? "Resetting..." : "Reset Exam"}
+                          </button>
+                          <button
+                            className="cbx-btn cbx-btn--soft"
                             onClick={() => navigate(`/staff/cbt/${x.id}/questions`)}
                           >
                             View Exam
@@ -382,4 +415,7 @@ export default function CBTHome() {
     </StaffFeatureLayout>
   );
 }
+
+
+
 

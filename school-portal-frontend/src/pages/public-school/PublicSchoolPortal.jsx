@@ -231,7 +231,12 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         setExamAnswers(Array(payload?.exam?.questions?.length || 0).fill(""));
       }
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to load entrance exam.");
+      const scheduledFor = err?.response?.data?.scheduled_for;
+      if (scheduledFor) {
+        alert(`Entrance exam is scheduled for ${formatDate(scheduledFor)}.`);
+      } else {
+        alert(err?.response?.data?.message || "Failed to load entrance exam.");
+      }
     } finally {
       setBusyAction("");
     }
@@ -533,6 +538,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
 
 
 

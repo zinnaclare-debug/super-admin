@@ -12,6 +12,7 @@ use App\Models\SchoolWebsiteContent;
 use App\Models\Subject;
 use App\Models\TermSubject;
 use App\Support\SchoolPublicWebsiteData;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -346,6 +347,32 @@ class SchoolWebsiteController extends Controller
         ]);
     }
 
+        public function resetEntranceExamApplication(Request $request, SchoolAdmissionApplication $application)
+    {
+        $school = $this->schoolFromRequest($request);
+        abort_if((int) $application->school_id !== (int) $school->id, 404, 'Application not found.');
+
+        $payload = $request->validate([
+            'rescheduled_for' => ['required', 'date'],
+        ]);
+
+        $rescheduledFor = Carbon::parse($payload['rescheduled_for']);
+
+        $application->exam_status = 'pending';
+        $application->score = null;
+        $application->result_status = null;
+        $application->exam_submitted_at = null;
+        $application->exam_answers = [];
+        $application->exam_result = null;
+        $application->exam_rescheduled_for = $rescheduledFor;
+        $application->exam_reset_at = now();
+        $application->save();
+
+        return response()->json([
+            'message' => 'Entrance exam reset successfully.',
+            'data' => $this->applicationPayload($application->fresh()),
+        ]);
+    }
     public function applications(Request $request)
     {
         $school = $this->schoolFromRequest($request);
@@ -356,21 +383,7 @@ class SchoolWebsiteController extends Controller
             ->get()
             ->values()
             ->map(function (SchoolAdmissionApplication $application, int $index) {
-                return [
-                    'id' => $application->id,
-                    'sn' => $index + 1,
-                    'application_number' => $application->application_number,
-                    'full_name' => $application->full_name,
-                    'phone' => $application->phone,
-                    'email' => $application->email,
-                    'information' => trim($application->phone . ' | ' . $application->email, ' |'),
-                    'applying_for_class' => $application->applying_for_class,
-                    'exam_status' => $application->exam_status,
-                    'score' => $application->score,
-                    'result_status' => $application->result_status,
-                    'submitted_at' => optional($application->exam_submitted_at)->toIso8601String(),
-                    'created_at' => optional($application->created_at)->toIso8601String(),
-                ];
+                return $this->applicationPayload($application, $index + 1);
             });
 
         return response()->json(['data' => $applications]);
@@ -481,7 +494,26 @@ class SchoolWebsiteController extends Controller
             'message' => 'School content deleted successfully.',
         ]);
     }
-
+    private function applicationPayload(SchoolAdmissionApplication $application, ?int $sn = null): array
+    {
+        return [
+            'id' => $application->id,
+            'sn' => $sn,
+            'application_number' => $application->application_number,
+            'full_name' => $application->full_name,
+            'phone' => $application->phone,
+            'email' => $application->email,
+            'information' => trim($application->phone . ' | ' . $application->email, ' |'),
+            'applying_for_class' => $application->applying_for_class,
+            'exam_status' => $application->exam_status,
+            'score' => $application->score,
+            'result_status' => $application->result_status,
+            'submitted_at' => optional($application->exam_submitted_at)->toIso8601String(),
+            'created_at' => optional($application->created_at)->toIso8601String(),
+            'exam_rescheduled_for' => optional($application->exam_rescheduled_for)->toIso8601String(),
+            'exam_reset_at' => optional($application->exam_reset_at)->toIso8601String(),
+        ];
+    }
     private function schoolFromRequest(Request $request): School
     {
         $schoolId = (int) $request->user()->school_id;
@@ -661,6 +693,23 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
