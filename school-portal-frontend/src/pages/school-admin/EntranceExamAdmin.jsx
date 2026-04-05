@@ -60,7 +60,10 @@ function coerceExamConfig(config, availableClasses) {
   };
 }
 
-const TAX_RATE = 1.6;\r\n\r\nfunction examQuestionCount(exam) {
+const TAX_RATE = 1.6;
+
+function examQuestionCount(exam) {
+
   return Array.isArray(exam?.questions) ? exam.questions.length : 0;
 }
 
