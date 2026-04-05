@@ -136,7 +136,7 @@ class PublicSchoolWebsiteController extends Controller
                     'email' => $application->email,
                     'phone' => $application->phone,
                     'applying_for_class' => $application->applying_for_class,
-                    'exam_available' => ,
+                    'exam_available' => true,
                     'receipt_available' => true,
                 ],
             ], 201);
