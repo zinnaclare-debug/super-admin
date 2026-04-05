@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\ClassDepartment;
 use App\Models\LevelDepartment;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Term;
+use App\Support\SchoolSubscriptionBilling;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -363,6 +365,8 @@ class AcademicStructureController extends Controller
         $schoolId = (int) $request->user()->school_id;
         abort_unless((int) $term->school_id === $schoolId, 403);
 
+        $this->validateCurrentSelectionCode($request);
+
         $session = AcademicSession::query()
             ->where('id', $term->academic_session_id)
             ->where('school_id', $schoolId)
@@ -374,13 +378,51 @@ class AcademicStructureController extends Controller
             ], 422);
         }
 
-        Term::query()
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $term->academic_session_id)
-            ->update(['is_current' => false]);
+        return DB::transaction(function () use ($schoolId, $term) {
+            Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $term->academic_session_id)
+                ->update(['is_current' => false]);
 
-        $term->update(['is_current' => true]);
+            $term->update(['is_current' => true]);
 
-        return response()->json(['data' => $term]);
+            $school = School::query()->find($schoolId);
+            if ($school) {
+                $this->resetLifecycleState($school);
+            }
+
+            return response()->json([
+                'message' => 'Current term updated successfully. Results were unpublished for the new cycle.',
+                'data' => $term->fresh(),
+                'results_published' => false,
+            ]);
+        });
+    }
+
+    private function validateCurrentSelectionCode(Request $request): void
+    {
+        $validated = $request->validate([
+            'current_selection_code' => ['required', 'digits:4'],
+        ]);
+
+        if (! hash_equals('2026', (string) $validated['current_selection_code'])) {
+            abort(response()->json([
+                'message' => 'Invalid current selection confirmation code.',
+                'errors' => [
+                    'current_selection_code' => ['Invalid current selection confirmation code.'],
+                ],
+            ], 422));
+        }
+    }
+
+    private function resetLifecycleState(School $school): void
+    {
+        if ($school->results_published) {
+            $school->results_published = false;
+            $school->save();
+        }
+
+        $settings = SchoolSubscriptionBilling::getSettings($school);
+        SchoolSubscriptionBilling::clearPendingOverride($settings);
     }
 }

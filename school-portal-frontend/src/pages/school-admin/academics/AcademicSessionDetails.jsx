@@ -17,6 +17,7 @@ export default function AcademicSessionDetails() {
   const [terms, setTerms] = useState([]);
   const [currentTerm, setCurrentTerm] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
   const schoolName = useMemo(() => {
     const user = getStoredUser();
@@ -48,12 +49,47 @@ export default function AcademicSessionDetails() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const setCurrent = async (termId) => {
+  const requestCurrentSelectionCode = (actionLabel) => {
+    const code = window.prompt(`Enter current selection code (2026) to ${actionLabel}:`);
+    if (code === null) return null;
+    return code.trim();
+  };
+
+  const setSessionCurrent = async () => {
+    if (!session?.id) return;
+
+    const code = requestCurrentSelectionCode('set this session as current');
+    if (!code) return;
+
+    setProcessing(true);
     try {
-      await api.patch(`/api/school-admin/terms/${termId}/set-current`);
+      await api.patch(`/api/school-admin/academic-sessions/${session.id}/set-current`, {
+        current_selection_code: code,
+      });
       await load();
+      alert('Current session updated. Results are now unpublished for the new cycle.');
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to set current term");
+      alert(err?.response?.data?.message || 'Failed to set current session');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const setCurrent = async (termId) => {
+    const code = requestCurrentSelectionCode('set this term as current');
+    if (!code) return;
+
+    setProcessing(true);
+    try {
+      await api.patch(`/api/school-admin/terms/${termId}/set-current`, {
+        current_selection_code: code,
+      });
+      await load();
+      alert('Current term updated. Results are now unpublished for the new cycle.');
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to set current term');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -83,6 +119,14 @@ export default function AcademicSessionDetails() {
         <p style={{ marginTop: 0, opacity: 0.85 }}>
           Current Term: <strong>{currentTerm?.name || "Not set"}</strong>
         </p>
+        <p style={{ marginTop: 0, opacity: 0.8 }}>
+          Setting a new current session or term will unpublish results and refresh billing for the new cycle.
+        </p>
+        {session && session.status !== "current" ? (
+          <button onClick={setSessionCurrent} disabled={processing} style={{ marginTop: 8 }}>
+            {processing ? "Processing..." : "Set This Session Current"}
+          </button>
+        ) : null}
       </div>
 
       {loading && <p>Loading session details...</p>}
@@ -100,6 +144,7 @@ export default function AcademicSessionDetails() {
                 <button
                   key={term.id}
                   onClick={() => setCurrent(term.id)}
+                  disabled={processing}
                   style={{
                     padding: "8px 10px",
                     borderRadius: 6,
