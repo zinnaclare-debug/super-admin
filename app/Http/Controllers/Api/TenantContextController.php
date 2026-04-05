@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\School;
+use App\Support\SchoolPublicWebsiteData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -33,6 +34,10 @@ class TenantContextController extends Controller
                 'school_location' => $tenantSchool->location,
                 'contact_email' => $tenantSchool->contact_email,
                 'contact_phone' => $tenantSchool->contact_phone,
+                'website_content' => SchoolPublicWebsiteData::normalizeWebsiteContent(
+                    $tenantSchool->website_content,
+                    $tenantSchool
+                ),
             ],
         ]);
     }
