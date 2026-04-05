@@ -17,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+use App\Models\SchoolAdmissionApplication;
+
 class SchoolWebsiteController extends Controller
 {
     public function showWebsite(Request $request)
@@ -27,6 +29,45 @@ class SchoolWebsiteController extends Controller
             'website_content' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school),
         ]);
     }
+
+
+    public function listApplications(Request $request)
+{
+    $school = $request->user()->school;
+
+    $query = SchoolAdmissionApplication::query()
+        ->where('school_id', $school->id);
+
+    $search = trim((string) $request->query('search', ''));
+    if ($search !== '') {
+        $query->where(function ($q) use ($search) {
+            $q->where('full_name', 'like', "%{$search}%")
+                ->orWhere('application_number', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
+        });
+    }
+
+    $class = trim((string) $request->query('class', ''));
+    if ($class !== '') {
+        $query->where('applying_for_class', $class);
+    }
+
+    $applications = $query
+        ->latest()
+        ->paginate((int) $request->query('per_page', 20));
+
+    return response()->json([
+        'data' => $applications->items(),
+        'meta' => [
+            'current_page' => $applications->currentPage(),
+            'last_page' => $applications->lastPage(),
+            'per_page' => $applications->perPage(),
+            'total' => $applications->total(),
+        ],
+    ]);
+}
+
 
     public function updateWebsite(Request $request)
     {
