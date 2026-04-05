@@ -179,6 +179,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
 
     Route::get('/school-admin/entrance-exam/classes/{className}/questions', [SchoolAdminWebsiteController::class, 'classQuestions'])
         ->middleware('feature:entrance_exam');
+        Route::get('/school-admin/entrance-exam/applications', [SchoolAdminWebsiteController::class, 'listApplications'])
+    ->middleware('feature:entrance_exam');
+
     Route::post('/school-admin/entrance-exam/classes/{className}/questions/export', [SchoolAdminWebsiteController::class, 'exportClassQuestions'])
         ->middleware('feature:entrance_exam');
     Route::post('/school-admin/entrance-exam/classes/{className}/questions', [SchoolAdminWebsiteController::class, 'storeClassQuestion'])

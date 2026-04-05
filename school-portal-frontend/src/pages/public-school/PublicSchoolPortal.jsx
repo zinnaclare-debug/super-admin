@@ -912,9 +912,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           </section>
         </main>
       ) : null}
-          </section>
-        </main>
-      ) : null}
+         
 
       <footer className="school-site-footer">
         <div className="school-site-footer-mark">
