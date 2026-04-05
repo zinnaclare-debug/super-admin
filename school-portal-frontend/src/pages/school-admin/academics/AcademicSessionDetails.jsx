@@ -55,26 +55,6 @@ export default function AcademicSessionDetails() {
     return code.trim();
   };
 
-  const setSessionCurrent = async () => {
-    if (!session?.id) return;
-
-    const code = requestCurrentSelectionCode('set this session as current');
-    if (!code) return;
-
-    setProcessing(true);
-    try {
-      await api.patch(`/api/school-admin/academic-sessions/${session.id}/set-current`, {
-        current_selection_code: code,
-      });
-      await load();
-      alert('Current session updated. Results are now unpublished for the new cycle.');
-    } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to set current session');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   const setCurrent = async (termId) => {
     const code = requestCurrentSelectionCode('set this term as current');
     if (!code) return;
@@ -122,11 +102,6 @@ export default function AcademicSessionDetails() {
         <p style={{ marginTop: 0, opacity: 0.8 }}>
           Setting a new current session or term will unpublish results and refresh billing for the new cycle.
         </p>
-        {session && session.status !== "current" ? (
-          <button onClick={setSessionCurrent} disabled={processing} style={{ marginTop: 8 }}>
-            {processing ? "Processing..." : "Set This Session Current"}
-          </button>
-        ) : null}
       </div>
 
       {loading && <p>Loading session details...</p>}

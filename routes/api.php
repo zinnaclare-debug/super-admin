@@ -268,10 +268,6 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:academic_session');
 
 
-    Route::patch('/school-admin/academic-sessions/{session}/set-current', [AcademicSessionController::class, 'setStatus'])
-        ->middleware('feature:academic_session');
-
-
     // âœ… Your controller uses setStatus() so keep this name
 
     // âœ… Academic Structure (Details page + Departments per level)

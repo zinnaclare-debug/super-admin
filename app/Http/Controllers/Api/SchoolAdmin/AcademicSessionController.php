@@ -12,7 +12,6 @@ use App\Models\Term;
 use App\Models\TermSubject;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
-use App\Support\SchoolSubscriptionBilling;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -136,55 +135,9 @@ class AcademicSessionController extends Controller
 
     public function setStatus(Request $request, AcademicSession $session)
     {
-        $schoolId = (int) $request->user()->school_id;
-        abort_unless((int) $session->school_id === $schoolId, 403);
-
-        $this->validateCurrentSelectionCode($request);
-
-        return DB::transaction(function () use ($schoolId, $session) {
-            AcademicSession::query()
-                ->where('school_id', $schoolId)
-                ->where('status', 'current')
-                ->where('id', '!=', (int) $session->id)
-                ->update(['status' => 'completed']);
-
-            $session->status = 'current';
-            $session->save();
-
-            $hasCurrentTerm = Term::query()
-                ->where('school_id', $schoolId)
-                ->where('academic_session_id', (int) $session->id)
-                ->where('is_current', true)
-                ->exists();
-
-            if (! $hasCurrentTerm) {
-                Term::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', (int) $session->id)
-                    ->update(['is_current' => false]);
-
-                $firstTerm = Term::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', (int) $session->id)
-                    ->orderBy('id')
-                    ->first();
-
-                if ($firstTerm) {
-                    $firstTerm->update(['is_current' => true]);
-                }
-            }
-
-            $school = School::query()->find($schoolId);
-            if ($school) {
-                $this->resetLifecycleState($school);
-            }
-
-            return response()->json([
-                'message' => 'Academic session set to current successfully. Results were unpublished for the new cycle.',
-                'data' => $session->fresh(),
-                'results_published' => false,
-            ]);
-        });
+        return response()->json([
+            'message' => 'Only super admin can change academic session status.',
+        ], 403);
     }
 
     public function details(Request $request, AcademicSession $session)
@@ -377,33 +330,6 @@ class AcademicSessionController extends Controller
     }
 
 
-
-    private function validateCurrentSelectionCode(Request $request): void
-    {
-        $validated = $request->validate([
-            'current_selection_code' => ['required', 'digits:4'],
-        ]);
-
-        if (! hash_equals('2026', (string) $validated['current_selection_code'])) {
-            abort(response()->json([
-                'message' => 'Invalid current selection confirmation code.',
-                'errors' => [
-                    'current_selection_code' => ['Invalid current selection confirmation code.'],
-                ],
-            ], 422));
-        }
-    }
-
-    private function resetLifecycleState(School $school): void
-    {
-        if ($school->results_published) {
-            $school->results_published = false;
-            $school->save();
-        }
-
-        $settings = SchoolSubscriptionBilling::getSettings($school);
-        SchoolSubscriptionBilling::clearPendingOverride($settings);
-    }
 
     private function resolveSourceSessionForCarryOver(int $schoolId, int $newSessionId): ?AcademicSession
     {

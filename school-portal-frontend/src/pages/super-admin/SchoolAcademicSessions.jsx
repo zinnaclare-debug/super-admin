@@ -37,15 +37,28 @@ export default function SchoolAcademicSessions() {
   }, [schoolId]);
 
   const updateStatus = async (sessionId, status) => {
+    let payload = { status };
+
+    if (status === "current") {
+      const currentSelectionCode = window.prompt("Enter current selection code (2026) to set this session current:");
+      if (currentSelectionCode === null) {
+        return;
+      }
+      payload = { status, current_selection_code: currentSelectionCode.trim() };
+    }
+
     setUpdatingId(sessionId);
     try {
       await api.patch(
         `/api/super-admin/schools/${schoolId}/academic-sessions/${sessionId}/status`,
-        { status }
+        payload
       );
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update session status.");
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err.response?.data?.message || "Failed to update session status.");
     } finally {
       setUpdatingId(null);
     }

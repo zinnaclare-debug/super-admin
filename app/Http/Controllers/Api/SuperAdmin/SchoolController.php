@@ -20,6 +20,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\GradingSchema;
+use App\Support\SchoolSubscriptionBilling;
 use App\Support\UserCredentialStore;
 use Illuminate\Validation\ValidationException;
 
@@ -475,12 +476,15 @@ class SchoolController extends Controller
 
         $payload = $request->validate([
             'status' => 'required|in:pending,current,completed',
+            'current_selection_code' => ['nullable', 'digits:4'],
         ]);
 
         return DB::transaction(function () use ($school, $session, $payload) {
             $status = $payload['status'];
 
             if ($status === 'current') {
+                $this->validateCurrentSelectionCode($payload);
+
                 AcademicSession::query()
                     ->where('school_id', $school->id)
                     ->where('status', 'current')
@@ -509,6 +513,8 @@ class SchoolController extends Controller
                         $firstTerm->update(['is_current' => true]);
                     }
                 }
+
+                $school->results_published = false;
             } else {
                 Term::query()
                     ->where('school_id', $school->id)
@@ -517,8 +523,15 @@ class SchoolController extends Controller
             }
 
             $session->update(['status' => $status]);
+            $school->save();
 
-            return response()->json(['data' => $session]);
+            $settings = SchoolSubscriptionBilling::getSettings($school);
+            SchoolSubscriptionBilling::clearPendingOverride($settings);
+
+            return response()->json([
+                'data' => $session,
+                'results_published' => (bool) $school->results_published,
+            ]);
         });
     }
 
@@ -535,6 +548,17 @@ class SchoolController extends Controller
         return response()->json([
             'message' => 'Academic session deleted successfully.',
         ]);
+    }
+
+    private function validateCurrentSelectionCode(array $payload): void
+    {
+        $code = (string) ($payload['current_selection_code'] ?? '');
+
+        if (! hash_equals('2026', $code)) {
+            throw ValidationException::withMessages([
+                'current_selection_code' => ['Invalid current selection confirmation code.'],
+            ]);
+        }
     }
 
     private function validateDeleteCode(Request $request): void
