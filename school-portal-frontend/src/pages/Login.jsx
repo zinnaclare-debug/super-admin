@@ -121,7 +121,11 @@ const loginThemeStyle = useMemo(
   };
 
   return (
-    <div className={`login-page${isLytCentralDomain ? " login-page--compact" : ""}`}>
+   <div
+  className={`login-page${isLytCentralDomain ? " login-page--compact" : ""}`}
+  style={loginThemeStyle}
+>
+
       <div className="login-ambient login-ambient--one" />
       <div className="login-ambient login-ambient--two" />
       <div className="login-shell">
@@ -182,9 +186,19 @@ const loginThemeStyle = useMemo(
           </div>
 
           {tenantSchool && !isLytCentralDomain ? (
-            <button type="button" className="login-back-link" onClick={goBackToSchoolWebsite}>
-              Home
-            </button>
+           <button
+  type="button"
+  className="login-back-link"
+  onClick={goBackToSchoolWebsite}
+  style={{
+    background: "linear-gradient(135deg, var(--login-primary), var(--login-accent))",
+    borderColor: "var(--login-primary)",
+    color: "#fff",
+  }}
+>
+  Home
+</button>
+
           ) : null}
 
           <form onSubmit={handleSubmit} className="login-form">
