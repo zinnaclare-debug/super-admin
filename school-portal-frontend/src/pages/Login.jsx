@@ -40,7 +40,16 @@ function Login() {
   const tenantContactEmail = (tenantSchool?.contact_email || "").trim();
   const tenantContactPhone = (tenantSchool?.contact_phone || "").trim();
   const tenantDialPhone = tenantContactPhone.replace(/[^\d+]/g, "");
-  const loginThemeStyle = useMemo(() => ({\r\n    '--login-primary': tenantSchool?.primary_color || '#0f172a',\r\n    '--login-accent': tenantSchool?.accent_color || '#0f766e',\r\n  }), [tenantSchool?.primary_color, tenantSchool?.accent_color]);\r\n\r\n  const isLytCentralDomain = useMemo(() => {
+const loginThemeStyle = useMemo(
+  () => ({
+    '--login-primary': tenantSchool?.primary_color || '#0f172a',
+    '--login-accent': tenantSchool?.accent_color || '#f97316',
+  }),
+  [tenantSchool]
+);
+
+
+  const isLytCentralDomain = useMemo(() => {
     const host = window.location.hostname.toLowerCase();
     return host === "lyt.com.ng" || host === "www.lyt.com.ng";
   }, []);
@@ -241,5 +250,6 @@ function Login() {
 }
 
 export default Login;
+
 
 
