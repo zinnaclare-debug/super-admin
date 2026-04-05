@@ -49,14 +49,9 @@ export default function AcademicSessionDetails() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const requestCurrentSelectionCode = (actionLabel) => {
-    const code = window.prompt(`Enter current selection code (2026) to ${actionLabel}:`);
-    if (code === null) return null;
-    return code.trim();
-  };
 
   const setCurrent = async (termId) => {
-    const code = requestCurrentSelectionCode('set this term as current');
+    const code = window.prompt('Enter current selection code:')?.trim() ?? null;
     if (!code) return;
 
     setProcessing(true);
@@ -65,7 +60,6 @@ export default function AcademicSessionDetails() {
         current_selection_code: code,
       });
       await load();
-      alert('Current term updated. Results are now unpublished for the new cycle.');
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to set current term');
     } finally {
@@ -224,3 +218,4 @@ export default function AcademicSessionDetails() {
     </div>
   );
 }
+

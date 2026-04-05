@@ -554,7 +554,7 @@ class SchoolController extends Controller
     {
         $code = (string) ($payload['current_selection_code'] ?? '');
 
-        if (! hash_equals('2026', $code)) {
+        if (! hash_equals('4722', $code)) {
             throw ValidationException::withMessages([
                 'current_selection_code' => ['Invalid current selection confirmation code.'],
             ]);

@@ -40,7 +40,7 @@ export default function SchoolAcademicSessions() {
     let payload = { status };
 
     if (status === "current") {
-      const currentSelectionCode = window.prompt("Enter current selection code (2026) to set this session current:");
+      const currentSelectionCode = window.prompt("Enter current selection code (4722):");
       if (currentSelectionCode === null) {
         return;
       }
@@ -187,3 +187,4 @@ export default function SchoolAcademicSessions() {
     </div>
   );
 }
+
