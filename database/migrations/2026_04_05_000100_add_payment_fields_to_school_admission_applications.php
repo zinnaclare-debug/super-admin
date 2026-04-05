@@ -2,12 +2,21 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('school_admission_applications')) {
+            try {
+                DB::statement('ALTER TABLE `school_admission_applications` DROP INDEX `school_admission_applications_application_number_unique`');
+            } catch (\Throwable $e) {
+                // Ignore if the index does not exist.
+            }
+        }
+
         Schema::table('school_admission_applications', function (Blueprint $table) {
             if (Schema::hasColumn('school_admission_applications', 'application_number')) {
                 $table->string('application_number')->nullable()->unique()->change();
@@ -75,6 +84,14 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('school_admission_applications')) {
+            try {
+                DB::statement('ALTER TABLE `school_admission_applications` DROP INDEX `school_admission_applications_application_number_unique`');
+            } catch (\Throwable $e) {
+                // Ignore if the index does not exist.
+            }
+        }
+
         Schema::table('school_admission_applications', function (Blueprint $table) {
             if (Schema::hasColumn('school_admission_applications', 'admin_result_status')) {
                 $table->dropColumn('admin_result_status');
