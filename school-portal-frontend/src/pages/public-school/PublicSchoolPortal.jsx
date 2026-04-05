@@ -81,6 +81,8 @@ function ContactWidget({ icon, title, value, children }) {
 const CONTENT_PREVIEW_LIMIT = 100;
 const QUESTIONS_PER_PAGE = 4;
 
+
+
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
     const [searchParams, setSearchParams] = useSearchParams();
   const [siteData, setSiteData] = useState(initialSiteData);
@@ -112,7 +114,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const submittingRef = useRef(false);
 
 
-  const [searchParams, setSearchParams] = useSearchParams();
+ 
 
   useEffect(() => {
     if (initialSiteData) {
@@ -770,91 +772,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       ) : null}
 
 
-            {page === "exam" ? (
-        <main className="school-site-main school-site-form-page">
-          <section className="school-site-section">
-            <h1>Entrance Exam</h1>
-            <p>{entranceExam.exam_intro}</p>
-            {!examData ? (
-              <form className="school-site-form" onSubmit={handleExamLookup}>
-                <input placeholder="Application Number" value={lookupForm.application_number} onChange={(e) => setLookupForm((prev) => ({ ...prev, application_number: e.target.value }))} required />
-                <button type="submit" disabled={busyAction === "exam-lookup"}>{busyAction === "exam-lookup" ? "Checking..." : "Load Exam"}</button>
-              </form>
-            ) : null}
-
-            {examData?.completed ? (
-              <div className="school-site-result-card">
-                <h3>Exam Submitted</h3>
-                <p><strong>{examData.result?.full_name}</strong></p>
-                <p>We have received your entrance exam submission.</p>
-              </div>
-            ) : null}
-
-            {examData?.exam ? (
-              <form className="cbx-panel" style={{ maxWidth: 980, margin: "0 auto" }} onSubmit={handleExamSubmit}>
-                <div style={{ marginBottom: 12, fontWeight: 700, color: "#0f172a" }}>
-                  Answered {answeredCount} / {examQuestionTotal}
-                </div>
-                {examSecurityStatus ? (
-                  <p className="cbx-state cbx-state--warning">{examSecurityStatus}</p>
-                ) : null}
-                <div className="cbx-state cbx-state--neutral">Page {examPage + 1} of {totalExamPages}</div>
-
-                {currentExamQuestions.map((question, idx) => {
-                  const questionIndex = examPageStart + idx;
-                  return (
-                    <div key={question.id} className="school-site-question-block">
-                      <h4>{questionIndex + 1}. {question.question}</h4>
-                      {['A', 'B', 'C', 'D'].map((optionKey) => {
-                        const optionValue = question[`option_${optionKey.toLowerCase()}`];
-                        return (
-                          <label key={optionKey} className="school-site-option">
-                            <input
-                              type="radio"
-                              name={`question-${questionIndex}`}
-                              value={optionKey}
-                              checked={examAnswers[questionIndex] === optionKey}
-                              onChange={(e) => setExamAnswers((prev) => prev.map((item, answerIndex) => answerIndex === questionIndex ? e.target.value : item))}
-                            />
-                            <span>{optionKey}. {optionValue}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-
-                <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="cbx-btn cbx-btn--soft"
-                    onClick={() => setExamPage((pageIndex) => Math.max(0, pageIndex - 1))}
-                    disabled={examPage <= 0}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="cbx-btn cbx-btn--soft"
-                    onClick={() => setExamPage((pageIndex) => Math.min(totalExamPages - 1, pageIndex + 1))}
-                    disabled={examPage >= totalExamPages - 1}
-                  >
-                    Next
-                  </button>
-                  <button
-                    type="submit"
-                    className="cbx-btn"
-                    style={{ marginLeft: "auto" }}
-                    disabled={busyAction === "exam-submit"}
-                  >
-                    {busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </section>
-        </main>
-      ) : null}
+          
 
             {examData?.completed ? (
               <div className="school-site-result-card">
