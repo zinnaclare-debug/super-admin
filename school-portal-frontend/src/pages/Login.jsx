@@ -42,11 +42,18 @@ function Login() {
   const tenantDialPhone = tenantContactPhone.replace(/[^\d+]/g, "");
 const loginThemeStyle = useMemo(
   () => ({
-    '--login-primary': tenantSchool?.primary_color || '#0f172a',
-    '--login-accent': tenantSchool?.accent_color || '#f97316',
+    '--login-primary':
+      tenantSchool?.website_content?.primary_color ||
+      tenantSchool?.primary_color ||
+      '#0f172a',
+    '--login-accent':
+      tenantSchool?.website_content?.accent_color ||
+      tenantSchool?.accent_color ||
+      '#f97316',
   }),
   [tenantSchool]
 );
+
 
 
   const isLytCentralDomain = useMemo(() => {
