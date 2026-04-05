@@ -504,3 +504,40 @@
 }
 
 
+
+.school-site-fee-card p {
+  word-break: break-word;
+}
+
+.school-site-exam-shell {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.school-site-exam-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.school-site-question-block,
+.school-site-question-block h4,
+.school-site-option span,
+.school-site-exam-shell .cbx-state {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .school-site-exam-actions {
+    flex-direction: column;
+  }
+
+  .school-site-exam-actions .cbx-btn {
+    width: 100%;
+  }
+}

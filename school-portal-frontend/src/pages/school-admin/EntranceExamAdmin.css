@@ -83,10 +83,52 @@
   resize: vertical;
 }
 
+.examadmin-levels {
+  display: grid;
+  gap: 16px;
+}
+
+.examadmin-level-card {
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.examadmin-level-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.examadmin-level-head h4 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.examadmin-level-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.examadmin-level-total {
+  margin: 4px 0 0;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .examadmin-class-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+  margin-top: 6px;
 }
 
 .examadmin-class-card {
@@ -96,6 +138,7 @@
   padding: 14px;
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .examadmin-class-head {
@@ -106,9 +149,11 @@
   align-items: flex-start;
 }
 
-.examadmin-class-head h4 {
+.examadmin-class-head h5,
+.examadmin-billing-card-head h5 {
   margin: 0;
   color: #0f172a;
+  font-size: 1rem;
 }
 
 .examadmin-class-head p {
@@ -146,63 +191,119 @@
   font-weight: 700;
 }
 
+.examadmin-billing-levels {
+  margin-top: 16px;
+}
+
+.examadmin-level-card--billing {
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.examadmin-billing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.examadmin-billing-card {
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.examadmin-billing-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.examadmin-billing-card-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.examadmin-billing-meta {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.examadmin-billing-meta div {
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  min-width: 0;
+}
+
+.examadmin-billing-meta small {
+  display: block;
+  margin-bottom: 4px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.examadmin-billing-meta strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
 .examadmin-empty-cell {
   text-align: center;
   color: #64748b;
 }
 
-@media (max-width: 720px) {
-  .examadmin-class-fields {
-    grid-template-columns: 1fr;
-  }
-}
-.examadmin-levels {
-  display: grid;
-  gap: 16px;
+.payx-table-wrap {
+  overflow-x: auto;
 }
 
-.examadmin-level-card {
-  border: 1px solid #dbeafe;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 14px;
-  display: grid;
-  gap: 14px;
+.payx-table {
+  min-width: 720px;
 }
 
-.examadmin-level-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+.payx-table select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
 }
-
-.examadmin-level-head h4 {
-  margin: 0;
-  color: #0f172a;
-}
-
-.examadmin-level-head p {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.examadmin-level-card .examadmin-class-grid {
-  margin-top: 6px;
-}
-
-.examadmin-class-card h5 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 1rem;
-}
-
 
 .examadmin-class-card p,
-.examadmin-class-card h5 {
+.examadmin-class-card h5,
+.examadmin-billing-card h5,
+.examadmin-billing-card strong,
+.examadmin-billing-card span {
   word-break: break-word;
+}
+
+@media (max-width: 960px) {
+  .examadmin-class-grid,
+  .examadmin-billing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .examadmin-class-fields,
+  .examadmin-billing-meta {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -214,16 +315,9 @@
     width: 100%;
   }
 
-  .examadmin-level-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .examadmin-class-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .examadmin-class-footer {
+  .examadmin-level-head,
+  .examadmin-class-footer,
+  .examadmin-billing-card-head {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -233,42 +327,13 @@
   }
 }
 
+@media (max-width: 560px) {
+  .examadmin-class-grid,
+  .examadmin-billing-grid {
+    grid-template-columns: 1fr;
+  }
 
-.examadmin-level-total {
-  margin: 4px 0 0;
-  color: #1e40af;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.examadmin-level-card,
-.examadmin-class-card {
-  min-width: 0;
-}
-
-.payx-table-wrap {
-  overflow-x: auto;
-}
-
-.payx-table {
-  min-width: 720px;
-}
-
-.examadmin-class-card p,
-.examadmin-class-card h5 {
-  word-break: break-word;
-}
-
-@media (max-width: 640px) {
   .payx-table {
     min-width: 600px;
   }
 }
-
-.payx-table select {
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-}
-

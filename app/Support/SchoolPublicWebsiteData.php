@@ -99,14 +99,24 @@ class SchoolPublicWebsiteData
             $normalizedClassExams[] = $extraExam;
         }
 
+        $applicationFeeAmount = self::money($value['application_fee_amount'] ?? 0, 0);
+        $applicationFeeTaxRate = self::money($value['application_fee_tax_rate'] ?? 1.6, 1.6, 0, 100);
+        $applicationFeeTaxAmount = self::money($applicationFeeAmount * ($applicationFeeTaxRate / 100), 0);
+        $applicationFeeTotal = self::money($applicationFeeAmount + $applicationFeeTaxAmount, 0);
+
+        $normalizedClassExams = array_values(array_map(
+            static fn (array $exam): array => self::applyClassExamFeeDefaults($exam, $applicationFeeAmount, $applicationFeeTaxRate),
+            $normalizedClassExams
+        ));
+
         return [
             'enabled' => self::bool($value['enabled'] ?? false, false),
             'application_open' => self::bool($value['application_open'] ?? true, true),
             'verification_open' => self::bool($value['verification_open'] ?? true, true),
-            'application_fee_amount' => self::money($value['application_fee_amount'] ?? 0, 0),
-            'application_fee_tax_rate' => self::money($value['application_fee_tax_rate'] ?? 1.6, 1.6, 0, 100),
-            'application_fee_tax_amount' => self::money(($value['application_fee_amount'] ?? 0) * (($value['application_fee_tax_rate'] ?? 1.6) / 100), 0),
-            'application_fee_total' => self::money(($value['application_fee_amount'] ?? 0) + (($value['application_fee_amount'] ?? 0) * (($value['application_fee_tax_rate'] ?? 1.6) / 100)), 0),
+            'application_fee_amount' => $applicationFeeAmount,
+            'application_fee_tax_rate' => $applicationFeeTaxRate,
+            'application_fee_tax_amount' => $applicationFeeTaxAmount,
+            'application_fee_total' => $applicationFeeTotal,
             'apply_intro' => self::string($value['apply_intro'] ?? null, 'Fill the form below and keep your application number for the next admission steps.', 1500),
             'exam_intro' => self::string($value['exam_intro'] ?? null, 'Enter your application number to take the entrance examination assigned to your selected class.', 1500),
             'verify_intro' => self::string($value['verify_intro'] ?? null, 'Use your application number to verify your entrance exam result.', 1500),
@@ -142,6 +152,10 @@ class SchoolPublicWebsiteData
             'duration_minutes' => (int) $classExam['duration_minutes'],
             'pass_mark' => (int) $classExam['pass_mark'],
             'instructions' => (string) $classExam['instructions'],
+            'application_fee_amount' => (float) ($classExam['application_fee_amount'] ?? 0),
+            'application_fee_tax_rate' => (float) ($classExam['application_fee_tax_rate'] ?? 1.6),
+            'application_fee_tax_amount' => (float) ($classExam['application_fee_tax_amount'] ?? 0),
+            'application_fee_total' => (float) ($classExam['application_fee_total'] ?? 0),
             'question_count' => count((array) ($classExam['questions'] ?? [])),
             'questions' => array_values(array_map(
                 static fn (array $question, int $index) => [
@@ -169,6 +183,10 @@ class SchoolPublicWebsiteData
             'duration_minutes' => self::integer($exam['duration_minutes'] ?? 30, 5, 180, 30),
             'pass_mark' => self::integer($exam['pass_mark'] ?? 50, 0, 100, 50),
             'instructions' => self::string($exam['instructions'] ?? null, '', 3000),
+            'application_fee_amount' => self::money($exam['application_fee_amount'] ?? 0, 0),
+            'application_fee_tax_rate' => self::money($exam['application_fee_tax_rate'] ?? 1.6, 1.6, 0, 100),
+            'application_fee_tax_amount' => self::money(($exam['application_fee_amount'] ?? 0) * (($exam['application_fee_tax_rate'] ?? 1.6) / 100), 0),
+            'application_fee_total' => self::money(($exam['application_fee_amount'] ?? 0) + (($exam['application_fee_amount'] ?? 0) * (($exam['application_fee_tax_rate'] ?? 1.6) / 100)), 0),
             'questions' => self::normalizeQuestions($exam['questions'] ?? []),
         ];
     }
@@ -181,8 +199,33 @@ class SchoolPublicWebsiteData
             'duration_minutes' => 30,
             'pass_mark' => 50,
             'instructions' => '',
+            'application_fee_amount' => 0,
+            'application_fee_tax_rate' => 1.6,
+            'application_fee_tax_amount' => 0,
+            'application_fee_total' => 0,
             'questions' => [],
         ];
+    }
+
+    private static function applyClassExamFeeDefaults(array $exam, float|int $defaultAmount, float|int $defaultTaxRate): array
+    {
+        $amount = array_key_exists('application_fee_amount', $exam)
+            ? self::money($exam['application_fee_amount'] ?? 0, (float) $defaultAmount, 0, 10000000)
+            : self::money($defaultAmount, 0);
+
+        $taxRate = array_key_exists('application_fee_tax_rate', $exam)
+            ? self::money($exam['application_fee_tax_rate'] ?? $defaultTaxRate, (float) $defaultTaxRate, 0, 100)
+            : self::money($defaultTaxRate, 1.6, 0, 100);
+
+        $taxAmount = self::money($amount * ($taxRate / 100), 0);
+        $total = self::money($amount + $taxAmount, 0);
+
+        $exam['application_fee_amount'] = $amount;
+        $exam['application_fee_tax_rate'] = $taxRate;
+        $exam['application_fee_tax_amount'] = $taxAmount;
+        $exam['application_fee_total'] = $total;
+
+        return $exam;
     }
 
     private static function normalizeQuestions(mixed $questions): array
@@ -302,7 +345,4 @@ class SchoolPublicWebsiteData
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
-
-
-
 

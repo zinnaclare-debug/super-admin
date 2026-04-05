@@ -116,6 +116,9 @@
   background: rgba(248, 250, 252, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.62);
   padding: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .cbx-panel + .cbx-panel {
@@ -300,3 +303,4 @@
     grid-template-columns: 1fr;
   }
 }
+

@@ -136,6 +136,7 @@ class SchoolWebsiteController extends Controller
             'entrance_exam_config.class_exams.*.duration_minutes' => ['nullable', 'integer', 'min:5', 'max:180'],
             'entrance_exam_config.class_exams.*.pass_mark' => ['nullable', 'integer', 'min:0', 'max:100'],
             'entrance_exam_config.class_exams.*.instructions' => ['nullable', 'string', 'max:3000'],
+            'entrance_exam_config.class_exams.*.application_fee_amount' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
             'entrance_exam_config.class_exams.*.questions' => ['nullable', 'array'],
             'entrance_exam_config.class_exams.*.questions.*.id' => ['nullable', 'string', 'max:80'],
             'entrance_exam_config.class_exams.*.questions.*.subject_id' => ['nullable', 'integer'],
@@ -735,32 +736,4 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

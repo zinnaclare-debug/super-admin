@@ -7,23 +7,49 @@ import readingNotesArt from "../../assets/entrance-exam/reading-notes.svg";
 import "../shared/PaymentsShowcase.css";
 import "./EntranceExamAdmin.css";
 
+const TAX_RATE = 1.6;
+
 const emptyExamConfig = {
   enabled: false,
   application_open: true,
   verification_open: true,
+  application_fee_amount: 0,
+  application_fee_tax_rate: TAX_RATE,
+  application_fee_tax_amount: 0,
+  application_fee_total: 0,
   apply_intro: "",
   exam_intro: "",
   verify_intro: "",
   class_exams: [],
 };
 
+function computeFee(value, taxRate = TAX_RATE) {
+  const amount = Number(value || 0);
+  const normalizedTaxRate = Number(taxRate || TAX_RATE);
+  const taxAmount = Number((amount * (normalizedTaxRate / 100)).toFixed(2));
+  const total = Number((amount + taxAmount).toFixed(2));
+
+  return {
+    amount,
+    taxRate: normalizedTaxRate,
+    taxAmount,
+    total,
+  };
+}
+
 function normalizeClassExam(className, exam = {}) {
+  const fee = computeFee(exam.application_fee_amount ?? 0, exam.application_fee_tax_rate ?? TAX_RATE);
+
   return {
     class_name: String(exam.class_name || className || ""),
     enabled: Boolean(exam.enabled),
     duration_minutes: Number(exam.duration_minutes || 30),
     pass_mark: Number(exam.pass_mark || 50),
     instructions: String(exam.instructions || ""),
+    application_fee_amount: fee.amount,
+    application_fee_tax_rate: fee.taxRate,
+    application_fee_tax_amount: fee.taxAmount,
+    application_fee_total: fee.total,
     questions: Array.isArray(exam.questions) ? exam.questions : [],
   };
 }
@@ -50,31 +76,27 @@ function coerceExamConfig(config, availableClasses) {
     ])
   );
 
+  const normalizedClassExams = availableClasses.map((className) => {
+    const key = String(className || "").toLowerCase();
+    return existing.get(key) || normalizeClassExam(className);
+  });
+
+  const rootFee = computeFee(config.application_fee_amount ?? 0, config.application_fee_tax_rate ?? TAX_RATE);
+
   return {
     ...emptyExamConfig,
     ...config,
-    class_exams: availableClasses.map((className) => {
-      const key = String(className || "").toLowerCase();
-      return existing.get(key) || normalizeClassExam(className);
-    }),
+    application_fee_amount: rootFee.amount,
+    application_fee_tax_rate: rootFee.taxRate,
+    application_fee_tax_amount: rootFee.taxAmount,
+    application_fee_total: rootFee.total,
+    class_exams: normalizedClassExams,
   };
 }
 
-const TAX_RATE = 1.6;
-
 function examQuestionCount(exam) {
-
   return Array.isArray(exam?.questions) ? exam.questions.length : 0;
 }
-
-const computeFee = (value) => {
-  const amount = Number(value || 0);
-  const taxRate = TAX_RATE;
-  const taxAmount = Number((amount * (taxRate / 100)).toFixed(2));
-  const total = Number((amount + taxAmount).toFixed(2));
-
-  return { amount, taxRate, taxAmount, total };
-};
 
 function toDateTimeLocal(value) {
   if (!value) return "";
@@ -83,7 +105,6 @@ function toDateTimeLocal(value) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-
 
 export default function EntranceExamAdmin() {
   const navigate = useNavigate();
@@ -206,6 +227,25 @@ export default function EntranceExamAdmin() {
     }));
   };
 
+  const updateClassFeeAmount = (className, value) => {
+    const fee = computeFee(value);
+
+    setExamConfig((prev) => ({
+      ...prev,
+      class_exams: prev.class_exams.map((exam) =>
+        exam.class_name === className
+          ? {
+              ...exam,
+              application_fee_amount: fee.amount,
+              application_fee_tax_rate: fee.taxRate,
+              application_fee_tax_amount: fee.taxAmount,
+              application_fee_total: fee.total,
+            }
+          : exam
+      ),
+    }));
+  };
+
   const saveExamConfig = async () => {
     setSaving(true);
     try {
@@ -214,7 +254,7 @@ export default function EntranceExamAdmin() {
       });
       const normalized = normalizeData(response.data?.data || {});
       setAvailableClasses(normalized.availableClasses);
-    setAvailableClassGroups(normalized.availableClassGroups);
+      setAvailableClassGroups(normalized.availableClassGroups);
       setExamConfig(coerceExamConfig(normalized.entranceExamConfig, normalized.availableClasses));
       alert("Entrance exam settings saved.");
     } catch (err) {
@@ -341,6 +381,7 @@ export default function EntranceExamAdmin() {
               (sum, exam) => sum + examQuestionCount(exam),
               0
             );
+
             return (
               <div key={group.key} className="examadmin-level-card">
                 <div className="examadmin-level-head">
@@ -354,76 +395,76 @@ export default function EntranceExamAdmin() {
                 <div className="examadmin-class-grid">
                   {group.exams.map((exam) => (
                     <article key={exam.class_name} className="examadmin-class-card">
-                    <div className="examadmin-class-head">
-                      <div>
-                        <h5>{exam.class_name}</h5>
-                        <p>
-                          {examQuestionCount(exam)} question{examQuestionCount(exam) === 1 ? "" : "s"} configured
-                        </p>
+                      <div className="examadmin-class-head">
+                        <div>
+                          <h5>{exam.class_name}</h5>
+                          <p>
+                            {examQuestionCount(exam)} question{examQuestionCount(exam) === 1 ? "" : "s"} configured
+                          </p>
+                        </div>
+                        <label className="examadmin-switch examadmin-switch--compact">
+                          <input
+                            type="checkbox"
+                            checked={exam.enabled}
+                            onChange={(e) => updateClassExam(exam.class_name, "enabled", e.target.checked)}
+                          />
+                          <span>Enable</span>
+                        </label>
                       </div>
-                      <label className="examadmin-switch examadmin-switch--compact">
-                        <input
-                          type="checkbox"
-                          checked={exam.enabled}
-                          onChange={(e) => updateClassExam(exam.class_name, "enabled", e.target.checked)}
-                        />
-                        <span>Enable</span>
-                      </label>
-                    </div>
 
-                    <div className="examadmin-class-fields">
-                      <label className="examadmin-field">
-                        <span>Duration (minutes)</span>
-                        <input
-                          className="payx-input"
-                          type="number"
-                          min="5"
-                          max="180"
-                          value={exam.duration_minutes}
-                          onChange={(e) => updateClassExam(exam.class_name, "duration_minutes", Number(e.target.value || 0))}
-                        />
-                      </label>
-                      <label className="examadmin-field">
-                        <span>Pass Mark</span>
-                        <input
-                          className="payx-input"
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={exam.pass_mark}
-                          onChange={(e) => updateClassExam(exam.class_name, "pass_mark", Number(e.target.value || 0))}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="examadmin-field examadmin-field--full">
-                      <span>Instructions</span>
-                      <textarea
-                        className="payx-input examadmin-textarea"
-                        rows="3"
-                        value={exam.instructions}
-                        onChange={(e) => updateClassExam(exam.class_name, "instructions", e.target.value)}
-                      />
-                    </label>
-
-                    <div className="examadmin-class-footer">
-                      <div className="examadmin-class-stats">
-                        <span>{exam.enabled ? "Live for admissions" : "Currently disabled"}</span>
-                        <span>{exam.pass_mark}% pass mark</span>
+                      <div className="examadmin-class-fields">
+                        <label className="examadmin-field">
+                          <span>Duration (minutes)</span>
+                          <input
+                            className="payx-input"
+                            type="number"
+                            min="5"
+                            max="180"
+                            value={exam.duration_minutes}
+                            onChange={(e) => updateClassExam(exam.class_name, "duration_minutes", Number(e.target.value || 0))}
+                          />
+                        </label>
+                        <label className="examadmin-field">
+                          <span>Pass Mark</span>
+                          <input
+                            className="payx-input"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={exam.pass_mark}
+                            onChange={(e) => updateClassExam(exam.class_name, "pass_mark", Number(e.target.value || 0))}
+                          />
+                        </label>
                       </div>
-                      <button
-                        type="button"
-                        className="payx-btn payx-btn--soft"
-                        onClick={() => navigate(`/school/admin/entrance-exam/classes/${encodeURIComponent(exam.class_name)}/questions`)}
-                      >
-                        Questions
-                      </button>
-                    </div>
-                  </article>
-                ))}
+
+                      <label className="examadmin-field examadmin-field--full">
+                        <span>Instructions</span>
+                        <textarea
+                          className="payx-input examadmin-textarea"
+                          rows="3"
+                          value={exam.instructions}
+                          onChange={(e) => updateClassExam(exam.class_name, "instructions", e.target.value)}
+                        />
+                      </label>
+
+                      <div className="examadmin-class-footer">
+                        <div className="examadmin-class-stats">
+                          <span>{exam.enabled ? "Live for admissions" : "Currently disabled"}</span>
+                          <span>{exam.pass_mark}% pass mark</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="payx-btn payx-btn--soft"
+                          onClick={() => navigate(`/school/admin/entrance-exam/classes/${encodeURIComponent(exam.class_name)}/questions`)}
+                        >
+                          Questions
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
-            </div>
-          );
+            );
           })}
         </div>
       </section>
@@ -431,40 +472,66 @@ export default function EntranceExamAdmin() {
       <section className="payx-panel">
         <div className="examadmin-panel-head">
           <div>
-            <h3>Entrance Exam Billing</h3>
-            <p className="examadmin-note">Set the application fee. A 1.6% tax will be applied automatically.</p>
+            <h3>Application Fee by Level</h3>
+            <p className="examadmin-note">Each level contains fee boxes for its classes. Tax stays at 1.6% automatically.</p>
           </div>
           <button className="payx-btn" onClick={saveExamConfig} disabled={saving}>
             {saving ? "Saving..." : "Save Billing"}
           </button>
         </div>
 
-        <div className="payx-grid-2 examadmin-copy-grid">
-          <label className="examadmin-field">
-            <span>Application Fee (NGN)</span>
-            <input
-              className="payx-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={examConfig.application_fee_amount}
-              onChange={(e) => updateFeeAmount(e.target.value)}
-            />
-          </label>
-          <label className="examadmin-field">
-            <span>Tax Rate</span>
-            <input className="payx-input" value={`${examConfig.application_fee_tax_rate || 1.6}%`} disabled />
-          </label>
-          <label className="examadmin-field">
-            <span>Tax Amount (NGN)</span>
-            <input className="payx-input" value={Number(examConfig.application_fee_tax_amount || 0).toFixed(2)} disabled />
-          </label>
-          <label className="examadmin-field">
-            <span>Total Amount (NGN)</span>
-            <input className="payx-input" value={Number(examConfig.application_fee_total || 0).toFixed(2)} disabled />
-          </label>
+        <div className="examadmin-levels examadmin-billing-levels">
+          {classGroups.map((group) => (
+            <div key={`${group.key}-billing`} className="examadmin-level-card examadmin-level-card--billing">
+              <div className="examadmin-level-head">
+                <div>
+                  <h4>{group.label}</h4>
+                  <p>Set the application fee for each class in this level.</p>
+                </div>
+              </div>
+
+              <div className="examadmin-billing-grid">
+                {group.exams.map((exam) => (
+                  <article key={`${exam.class_name}-fee`} className="examadmin-billing-card">
+                    <div className="examadmin-billing-card-head">
+                      <h5>{exam.class_name}</h5>
+                      <span>{exam.enabled ? "Exam enabled" : "Exam disabled"}</span>
+                    </div>
+
+                    <label className="examadmin-field">
+                      <span>Application Fee (NGN)</span>
+                      <input
+                        className="payx-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={exam.application_fee_amount}
+                        onChange={(e) => updateClassFeeAmount(exam.class_name, e.target.value)}
+                      />
+                    </label>
+
+                    <div className="examadmin-billing-meta">
+                      <div>
+                        <small>Tax Rate</small>
+                        <strong>{Number(exam.application_fee_tax_rate || TAX_RATE).toFixed(1)}%</strong>
+                      </div>
+                      <div>
+                        <small>Tax Amount</small>
+                        <strong>NGN {Number(exam.application_fee_tax_amount || 0).toFixed(2)}</strong>
+                      </div>
+                      <div>
+                        <small>Total</small>
+                        <strong>NGN {Number(exam.application_fee_total || 0).toFixed(2)}</strong>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
+
       <section className="payx-panel">
         <div className="examadmin-panel-head">
           <div>
@@ -510,16 +577,16 @@ export default function EntranceExamAdmin() {
                     </select>
                   </td>
                   <td>
-                      <button
-                        type="button"
-                        className="payx-btn payx-btn--soft"
-                        onClick={() => resetApplication(application)}
-                        disabled={resettingId === application.id}
-                      >
-                        {resettingId === application.id ? "Resetting..." : "Reset Exam"}
-                      </button>
-                    </td>
-                  </tr>
+                    <button
+                      type="button"
+                      className="payx-btn payx-btn--soft"
+                      onClick={() => resetApplication(application)}
+                      disabled={resettingId === application.id}
+                    >
+                      {resettingId === application.id ? "Resetting..." : "Reset Exam"}
+                    </button>
+                  </td>
+                </tr>
               ))}
               {applications.length === 0 ? (
                 <tr>
@@ -533,45 +600,3 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

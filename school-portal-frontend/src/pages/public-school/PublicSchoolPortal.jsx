@@ -153,10 +153,14 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const school = siteData?.school || null;
   const website = school?.website_content || {};
   const entranceExam = school?.entrance_exam || {};
-  const feeAmount = Number(entranceExam.application_fee_amount || 0);
-  const feeTaxRate = Number(entranceExam.application_fee_tax_rate || 0);
-  const feeTaxAmount = Number(entranceExam.application_fee_tax_amount || 0);
-  const feeTotal = Number(entranceExam.application_fee_total || 0);
+  const selectedClassOption = useMemo(() => {
+    const options = Array.isArray(entranceExam.available_classes) ? entranceExam.available_classes : [];
+    return options.find((item) => item.class_name === applyForm.applying_for_class) || null;
+  }, [entranceExam.available_classes, applyForm.applying_for_class]);
+  const feeAmount = Number(selectedClassOption?.application_fee_amount ?? entranceExam.application_fee_amount ?? 0);
+  const feeTaxRate = Number(selectedClassOption?.application_fee_tax_rate ?? entranceExam.application_fee_tax_rate ?? 0);
+  const feeTaxAmount = Number(selectedClassOption?.application_fee_tax_amount ?? entranceExam.application_fee_tax_amount ?? 0);
+  const feeTotal = Number(selectedClassOption?.application_fee_total ?? entranceExam.application_fee_total ?? 0);
   const logoUrl = school?.logo_url ? toAbsoluteUrl(school.logo_url) : "";
   const currentYear = new Date().getFullYear();
   const contactAddress = website.address || school?.location || "";
@@ -574,8 +578,9 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             <h1>Apply Now</h1>
             <p>{entranceExam.apply_intro || website.admissions_intro}</p>
 
-            <div className="school-site-result-card" style={{ marginBottom: 16 }}>
+            <div className="school-site-result-card school-site-fee-card" style={{ marginBottom: 16 }}>
               <h3>Entrance Exam Fee</h3>
+              <p>{selectedClassOption?.class_name ? `Fee for ${selectedClassOption.class_name}` : "Select a class to view the fee"}</p>
               <p>Application Fee: NGN {feeAmount.toFixed(2)}</p>
               <p>Tax ({feeTaxRate.toFixed(1)}%): NGN {feeTaxAmount.toFixed(2)}</p>
               <p><strong>Total: NGN {feeTotal.toFixed(2)}</strong></p>
@@ -672,7 +677,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             ) : null}
 
             {examData?.exam ? (
-              <form className="cbx-panel" style={{ maxWidth: 980, margin: "0 auto" }} onSubmit={handleExamSubmit}>
+              <form className="cbx-panel school-site-exam-shell" onSubmit={handleExamSubmit}>
                 <div style={{ marginBottom: 12, fontWeight: 700, color: "#0f172a" }}>
                   Answered {answeredCount} / {examQuestionTotal}
                 </div>
@@ -711,7 +716,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                   );
                 })}
 
-                <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div className="school-site-exam-actions">
                   <button
                     type="button"
                     className="cbx-btn cbx-btn--soft"
@@ -846,24 +851,4 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -62,6 +62,10 @@ class PublicSchoolWebsiteController extends Controller
                             'question_count' => count((array) ($exam['questions'] ?? [])),
                             'duration_minutes' => (int) $exam['duration_minutes'],
                             'pass_mark' => (int) $exam['pass_mark'],
+                            'application_fee_amount' => (float) ($exam['application_fee_amount'] ?? 0),
+                            'application_fee_tax_rate' => (float) ($exam['application_fee_tax_rate'] ?? 1.6),
+                            'application_fee_tax_amount' => (float) ($exam['application_fee_tax_amount'] ?? 0),
+                            'application_fee_total' => (float) ($exam['application_fee_total'] ?? 0),
                         ],
                         (array) ($entranceExamConfig['class_exams'] ?? [])
                     )),
@@ -141,11 +145,11 @@ class PublicSchoolWebsiteController extends Controller
             return response()->json(['message' => 'Invalid class selected.'], 422);
         }
 
-        $feeAmount = (float) ($entranceExamConfig['application_fee_amount'] ?? 0);
-        $taxRate = (float) ($entranceExamConfig['application_fee_tax_rate'] ?? 1.6);
+        $selectedClassExam = SchoolPublicWebsiteData::findClassExam($entranceExamConfig, $selectedClass);
+        $feeAmount = (float) ($selectedClassExam['application_fee_amount'] ?? $entranceExamConfig['application_fee_amount'] ?? 0);
+        $taxRate = (float) ($selectedClassExam['application_fee_tax_rate'] ?? $entranceExamConfig['application_fee_tax_rate'] ?? 1.6);
         $taxAmount = round($feeAmount * ($taxRate / 100), 2);
         $total = round($feeAmount + $taxAmount, 2);
-
         $application = SchoolAdmissionApplication::create([
             'school_id' => $school->id,
             'application_number' => null,
