@@ -351,27 +351,6 @@ export default function EntranceExamAdmin() {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
-          <span className="examadmin-note">Page {applicationsPage} of {totalApplicationPages}</span>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              type="button"
-              className="payx-btn payx-btn--soft"
-              onClick={() => setApplicationsPage((page) => Math.max(1, page - 1))}
-              disabled={applicationsPage === 1}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="payx-btn payx-btn--soft"
-              onClick={() => setApplicationsPage((page) => Math.min(totalApplicationPages, page + 1))}
-              disabled={applicationsPage === totalApplicationPages}
-            >
-              Next
-            </button>
-          </div>
-        </div>
       </section>
 
       <section className="payx-panel">
