@@ -385,7 +385,7 @@ class PublicSchoolWebsiteController extends Controller
             $options = new Options();
             $options->set('isHtml5ParserEnabled', true);
             $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            $dompdfTempDir = storage_path('app/dompdf-temp');
             if (! is_dir($dompdfTempDir)) {
                 @mkdir($dompdfTempDir, 0775, true);
             }
