@@ -386,6 +386,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const totalExamPages = Math.max(1, Math.ceil(Math.max(examQuestionTotal, 1) / QUESTIONS_PER_PAGE));
   const examPageStart = examPage * QUESTIONS_PER_PAGE;
   const currentExamQuestions = examQuestions.slice(examPageStart, examPageStart + QUESTIONS_PER_PAGE);
+  const hideExamChrome = page === "exam" && examStarted && Boolean(examData?.exam);
   const handleApply = async (e) => {
     e.preventDefault();
     setBusyAction("apply");
@@ -483,7 +484,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
   return (
     <div className="school-site-shell" style={themeStyle}>
-      <header className="school-site-nav">
+      {!hideExamChrome ? (
+        <header className="school-site-nav">
         <div className="school-site-brand">
           {logoUrl ? <img src={logoUrl} alt={`${school.name} logo`} /> : <div className="school-site-brand-mark">{school.name?.slice(0, 1) || "S"}</div>}
           <div>
@@ -503,6 +505,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           ))}
         </nav>
       </header>
+      ) : null}
 
       {error ? <p className="school-site-state school-site-state--error">{error}</p> : null}
 
@@ -748,10 +751,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                       </div>
                       <div className="school-site-exam-stats">
                         <article>
-                          <span>Questions</span>
-                          <strong>{examQuestionTotal}</strong>
-                        </article>
-                        <article>
                           <span>Pages</span>
                           <strong>{totalExamPages}</strong>
                         </article>
@@ -917,68 +916,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       ) : null}
 
 
-          
-
-            {examData?.completed ? (
-              <div className="school-site-result-card">
-                <h3>Exam Already Submitted</h3>
-                <p><strong>{examData.result?.full_name}</strong></p>
-                <p>Score: {examData.result?.score ?? "-"}</p>
-                <p>Status: {examData.result?.result_status || examData.result?.exam_status}</p>
-              </div>
-            ) : null}
-
-            {examData?.exam ? (
-              <form className="school-site-form school-site-exam-form" onSubmit={handleExamSubmit}>
-                <div className="school-site-result-card">
-                  <p><strong>{examData.application?.full_name}</strong></p>
-                  <p>Class: {examData.application?.applying_for_class}</p>
-                  <p>Duration: {examData.exam.duration_minutes} minutes</p>
-                  <p>Pass Mark: {examData.exam.pass_mark}</p>
-                  <p className="school-site-exam-progress">Answered: {answeredCount} / {examQuestionTotal}</p>
-                  <p>{examData.exam.instructions || "Answer all questions and submit once."}</p>
-                </div>
-                {examData.exam.questions.map((question, index) => (
-                  <div key={question.id} className="school-site-question-block">
-                    <h4>{index + 1}. {question.question}</h4>
-                    {["A", "B", "C", "D"].map((optionKey) => {
-                      const optionValue = question[`option_${optionKey.toLowerCase()}`];
-                      return (
-                        <label key={optionKey} className="school-site-option">
-                          <input type="radio" name={`question-${index}`} value={optionKey} checked={examAnswers[index] === optionKey} onChange={(e) => setExamAnswers((prev) => prev.map((item, answerIndex) => answerIndex === index ? e.target.value : item))} />
-                          <span>{optionKey}. {optionValue}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ))}
-                <button type="submit" disabled={busyAction === "exam-submit"}>{busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}</button>
-              </form>
-            ) : null}
-          
-
-            {page === "verify" ? (
-        <main className="school-site-main school-site-form-page">
-          <section className="school-site-section">
-            <h1>Verify Score</h1>
-            <p>{entranceExam.verify_intro}</p>
-            <form className="school-site-form" onSubmit={handleVerify}>
-              <input placeholder="Application Number" value={verifyForm.application_number} onChange={(e) => setVerifyForm((prev) => ({ ...prev, application_number: e.target.value }))} required />
-              <button type="submit" disabled={busyAction === "verify"}>{busyAction === "verify" ? "Checking..." : "Verify Score"}</button>
-            </form>
-            {verifyResult ? (
-              <div className="school-site-result-card">
-                <h3>{verifyResult.full_name}</h3>
-                <p>Application Number: {verifyResult.application_number}</p>
-                <p>Class: {verifyResult.applying_for_class}</p>
-                <p><strong>Result: {verifyResult.review_status}</strong></p>
-              </div>
-            ) : null}
-          </section>
-        </main>
-      ) : null}
-         
-
+      {!hideExamChrome ? (
       <footer className="school-site-footer">
         <div className="school-site-footer-mark">
           <span className="school-site-footer-c">{"\u00A9"}</span>
@@ -988,6 +926,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           DESIGNED BY LYTE BRIDGE
         </a>
       </footer>
+      ) : null}
     </div>
   );
 }
