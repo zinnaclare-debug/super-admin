@@ -14,6 +14,7 @@ use App\Models\TermSubject;
 use App\Support\SchoolPublicWebsiteData;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -404,6 +405,7 @@ class SchoolWebsiteController extends Controller
         $application->exam_status = 'pending';
         $application->score = null;
         $application->result_status = null;
+        $application->admin_result_status = null;
         $application->exam_submitted_at = null;
         $application->exam_answers = [];
         $application->exam_result = null;
@@ -416,6 +418,24 @@ class SchoolWebsiteController extends Controller
             'data' => $this->applicationPayload($application->fresh()),
         ]);
     }
+    public function updateApplicationStatus(Request $request, SchoolAdmissionApplication $application)
+    {
+        $school = $this->schoolFromRequest($request);
+        abort_if((int) $application->school_id !== (int) $school->id, 404, 'Application not found.');
+
+        $payload = $request->validate([
+            'admin_result_status' => ['nullable', Rule::in(['passed', 'failed'])],
+        ]);
+
+        $application->admin_result_status = $payload['admin_result_status'] ?? null;
+        $application->save();
+
+        return response()->json([
+            'message' => 'Entrance exam result status updated successfully.',
+            'data' => $this->applicationPayload($application->fresh()),
+        ]);
+    }
+
     public function applications(Request $request)
     {
         $school = $this->schoolFromRequest($request);
@@ -551,6 +571,7 @@ class SchoolWebsiteController extends Controller
             'exam_status' => $application->exam_status,
             'score' => $application->score,
             'result_status' => $application->result_status,
+            'admin_result_status' => $application->admin_result_status,
             'submitted_at' => optional($application->exam_submitted_at)->toIso8601String(),
             'created_at' => optional($application->created_at)->toIso8601String(),
             'exam_rescheduled_for' => optional($application->exam_rescheduled_for)->toIso8601String(),
