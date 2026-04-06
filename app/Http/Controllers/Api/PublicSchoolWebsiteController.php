@@ -192,7 +192,7 @@ class PublicSchoolWebsiteController extends Controller
         }
 
         $reference = $this->generatePaymentReference($school);
-        $callbackUrl = (string) config('services.paystack.callback_url');
+        $callbackUrl = $this->entranceExamCallbackUrl($request);
 
         $initializePayload = [
             'email' => $application->email,
@@ -331,6 +331,22 @@ class PublicSchoolWebsiteController extends Controller
         return response()->json([
             'data' => $this->applicationPaymentPayload($application),
         ]);
+    }
+
+    private function entranceExamCallbackUrl(Request $request): string
+    {
+        $host = trim((string) $request->getSchemeAndHttpHost());
+
+        if ($host !== '') {
+            return rtrim($host, '/') . '/apply-now';
+        }
+
+        $fallback = trim((string) config('services.paystack.callback_url', ''));
+        if ($fallback !== '') {
+            return $fallback;
+        }
+
+        return url('/apply-now');
     }
 
     public function entranceExamReceipt(Request $request)
@@ -692,4 +708,5 @@ class PublicSchoolWebsiteController extends Controller
         }
     }
 }
+
 
