@@ -385,13 +385,20 @@ class PublicSchoolWebsiteController extends Controller
             $options = new Options();
             $options->set('isHtml5ParserEnabled', true);
             $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = storage_path('app/dompdf-temp');
-            if (! is_dir($dompdfTempDir)) {
-                @mkdir($dompdfTempDir, 0775, true);
+            $options->set('defaultFont', 'Helvetica');
+
+            $dompdfBaseDir = storage_path('app/dompdf');
+            $dompdfTempDir = $dompdfBaseDir . DIRECTORY_SEPARATOR . 'temp';
+            $dompdfFontCacheDir = $dompdfBaseDir . DIRECTORY_SEPARATOR . 'font-cache';
+
+            foreach ([$dompdfBaseDir, $dompdfTempDir, $dompdfFontCacheDir] as $directory) {
+                if (! is_dir($directory)) {
+                    @mkdir($directory, 0775, true);
+                }
             }
+
             $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfTempDir);
+            $options->set('fontCache', $dompdfFontCacheDir);
             $options->set('chroot', base_path());
 
             $dompdf = new Dompdf($options);
@@ -407,6 +414,8 @@ class PublicSchoolWebsiteController extends Controller
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]);
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json([
                 'message' => 'Failed to generate receipt PDF.',
                 'error' => $e->getMessage(),
