@@ -115,6 +115,12 @@ export default function EntranceExamAdmin() {
   const [applications, setApplications] = useState([]);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [resettingId, setResettingId] = useState(null);
+  const [resetDialog, setResetDialog] = useState({
+    open: false,
+    applicationId: null,
+    applicantName: "",
+    rescheduled_for: "",
+  });
   const [examConfig, setExamConfig] = useState(emptyExamConfig);
 
   const classGroups = useMemo(() => {
@@ -159,22 +165,36 @@ export default function EntranceExamAdmin() {
     setApplications(Array.isArray(response.data?.data) ? response.data.data : []);
   };
 
-  const resetApplication = async (application) => {
-    const defaultValue = application?.exam_rescheduled_for
-      ? toDateTimeLocal(application.exam_rescheduled_for)
-      : "";
-    const rescheduledFor = window.prompt(
-      "Enter new exam date/time (YYYY-MM-DDTHH:MM)",
-      defaultValue
-    );
-    if (!rescheduledFor) return;
+  const openResetDialog = (application) => {
+    setResetDialog({
+      open: true,
+      applicationId: application.id,
+      applicantName: application.full_name || "Applicant",
+      rescheduled_for: application?.exam_rescheduled_for ? toDateTimeLocal(application.exam_rescheduled_for) : "",
+    });
+  };
 
-    setResettingId(application.id);
+  const closeResetDialog = () => {
+    if (resettingId) return;
+    setResetDialog({
+      open: false,
+      applicationId: null,
+      applicantName: "",
+      rescheduled_for: "",
+    });
+  };
+
+  const submitResetApplication = async (e) => {
+    e.preventDefault();
+    if (!resetDialog.applicationId || !resetDialog.rescheduled_for) return;
+
+    setResettingId(resetDialog.applicationId);
     try {
-      await api.patch(`/api/school-admin/entrance-exam/applications/${application.id}/reset`, {
-        rescheduled_for: rescheduledFor,
+      await api.patch(`/api/school-admin/entrance-exam/applications/${resetDialog.applicationId}/reset`, {
+        rescheduled_for: resetDialog.rescheduled_for,
       });
       await loadApplications();
+      closeResetDialog();
       alert("Entrance exam reset successfully.");
     } catch (err) {
       const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
@@ -580,7 +600,7 @@ export default function EntranceExamAdmin() {
                     <button
                       type="button"
                       className="payx-btn payx-btn--soft"
-                      onClick={() => resetApplication(application)}
+                      onClick={() => openResetDialog(application)}
                       disabled={resettingId === application.id}
                     >
                       {resettingId === application.id ? "Resetting..." : "Reset Exam"}
@@ -597,6 +617,43 @@ export default function EntranceExamAdmin() {
           </table>
         </div>
       </section>
+
+      {resetDialog.open ? (
+        <div className="examadmin-reset-backdrop" onClick={closeResetDialog}>
+          <div className="examadmin-reset-card" onClick={(e) => e.stopPropagation()}>
+            <div className="examadmin-reset-head">
+              <div>
+                <h3>Reset Entrance Exam</h3>
+                <p className="examadmin-note">The current exam date and time is already loaded for {resetDialog.applicantName}, so you can adjust it instead of typing from scratch.</p>
+              </div>
+              <button type="button" className="payx-btn payx-btn--soft" onClick={closeResetDialog} disabled={Boolean(resettingId)}>
+                Close
+              </button>
+            </div>
+
+            <form className="examadmin-reset-form" onSubmit={submitResetApplication}>
+              <label className="examadmin-field">
+                <span>New Exam Date and Time</span>
+                <input
+                  className="payx-input"
+                  type="datetime-local"
+                  value={resetDialog.rescheduled_for}
+                  onChange={(e) => setResetDialog((prev) => ({ ...prev, rescheduled_for: e.target.value }))}
+                  required
+                />
+              </label>
+              <div className="examadmin-reset-actions">
+                <button type="button" className="payx-btn payx-btn--soft" onClick={closeResetDialog} disabled={Boolean(resettingId)}>
+                  Cancel
+                </button>
+                <button type="submit" className="payx-btn" disabled={Boolean(resettingId)}>
+                  {resettingId ? "Saving..." : "Save New Exam Time"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

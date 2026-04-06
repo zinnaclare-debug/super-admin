@@ -337,3 +337,66 @@
     min-width: 600px;
   }
 }
+
+
+.examadmin-reset-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.examadmin-reset-card {
+  width: min(560px, 100%);
+  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.examadmin-reset-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.examadmin-reset-head h3 {
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+
+.examadmin-reset-form {
+  display: grid;
+  gap: 14px;
+}
+
+.examadmin-reset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .examadmin-reset-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .examadmin-reset-head,
+  .examadmin-reset-actions {
+    flex-direction: column;
+  }
+
+  .examadmin-reset-head .payx-btn,
+  .examadmin-reset-actions .payx-btn {
+    width: 100%;
+  }
+}

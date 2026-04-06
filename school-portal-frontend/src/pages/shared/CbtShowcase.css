@@ -304,3 +304,60 @@
   }
 }
 
+
+
+.cbx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.cbx-modal-card {
+  width: min(680px, 100%);
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.22);
+  padding: 18px;
+}
+
+.cbx-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.cbx-modal-head h3 {
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+
+.cbx-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .cbx-modal-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .cbx-modal-head,
+  .cbx-modal-actions {
+    flex-direction: column;
+  }
+
+  .cbx-modal-actions .cbx-btn,
+  .cbx-modal-head .cbx-btn {
+    width: 100%;
+  }
+}

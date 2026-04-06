@@ -62,6 +62,13 @@ export default function CBTHome() {
   const [loading, setLoading] = useState(true);
   const [editingExamId, setEditingExamId] = useState(null);
   const [resettingExamId, setResettingExamId] = useState(null);
+  const [resetModal, setResetModal] = useState({
+    open: false,
+    examId: null,
+    examTitle: "",
+    starts_at: "",
+    ends_at: "",
+  });
 
   const [form, setForm] = useState(createDefaultForm());
 
@@ -149,22 +156,41 @@ export default function CBTHome() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const resetExamSchedule = async (exam) => {
-    const defaultStart = toDateTimeLocal(exam.starts_at);
-    const defaultEnd = toDateTimeLocal(exam.ends_at);
-    const startsAt = window.prompt("New start date/time (YYYY-MM-DDTHH:MM)", defaultStart);
-    if (!startsAt) return;
-    const endsAt = window.prompt("New end date/time (YYYY-MM-DDTHH:MM)", defaultEnd);
-    if (!endsAt) return;
+  const openResetExamScheduleModal = (exam) => {
+    setResetModal({
+      open: true,
+      examId: exam.id,
+      examTitle: exam.title || "CBT Exam",
+      starts_at: toDateTimeLocal(exam.starts_at),
+      ends_at: toDateTimeLocal(exam.ends_at),
+    });
+  };
 
-    setResettingExamId(exam.id);
+  const closeResetExamScheduleModal = () => {
+    if (resettingExamId) return;
+    setResetModal({
+      open: false,
+      examId: null,
+      examTitle: "",
+      starts_at: "",
+      ends_at: "",
+    });
+  };
+
+  const submitResetExamSchedule = async (e) => {
+    e.preventDefault();
+    if (!resetModal.examId || !resetModal.starts_at || !resetModal.ends_at) return;
+
+    const exam = exams.find((item) => item.id === resetModal.examId);
+    setResettingExamId(resetModal.examId);
     try {
-      await api.patch(`/api/staff/cbt/exams/${exam.id}/reset`, {
-        starts_at: localDateTimeToIso(startsAt),
-        ends_at: localDateTimeToIso(endsAt),
-        duration_minutes: Number(exam.duration_minutes ?? exam.duration ?? 60),
+      await api.patch(`/api/staff/cbt/exams/${resetModal.examId}/reset`, {
+        starts_at: localDateTimeToIso(resetModal.starts_at),
+        ends_at: localDateTimeToIso(resetModal.ends_at),
+        duration_minutes: Number(exam?.duration_minutes ?? exam?.duration ?? 60),
       });
       await load();
+      closeResetExamScheduleModal();
       alert("CBT exam reset successfully.");
     } catch (err) {
       const validationError = Object.values(err?.response?.data?.errors || {}).flat()[0];
@@ -380,7 +406,7 @@ export default function CBTHome() {
                           </button>
                           <button
                             className="cbx-btn cbx-btn--soft"
-                            onClick={() => resetExamSchedule(x)}
+                            onClick={() => openResetExamScheduleModal(x)}
                             disabled={resettingExamId === x.id}
                           >
                             {resettingExamId === x.id ? "Resetting..." : "Reset Exam"}
@@ -411,6 +437,49 @@ export default function CBTHome() {
             </div>
           )}
         </section>
+
+        {resetModal.open ? (
+          <div className="cbx-modal-backdrop" onClick={closeResetExamScheduleModal}>
+            <div className="cbx-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="cbx-modal-head">
+                <div>
+                  <h3>Reset CBT Exam</h3>
+                  <p className="cbx-note">The current exam window is already loaded so you can edit it quickly for {resetModal.examTitle}.</p>
+                </div>
+                <button type="button" className="cbx-btn cbx-btn--soft" onClick={closeResetExamScheduleModal} disabled={Boolean(resettingExamId)}>
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={submitResetExamSchedule} className="cbx-form cbx-form--wide">
+                <div className="cbx-form-grid">
+                  <input
+                    className="cbx-field"
+                    type="datetime-local"
+                    value={resetModal.starts_at}
+                    onChange={(e) => setResetModal((prev) => ({ ...prev, starts_at: e.target.value }))}
+                    required
+                  />
+                  <input
+                    className="cbx-field"
+                    type="datetime-local"
+                    value={resetModal.ends_at}
+                    onChange={(e) => setResetModal((prev) => ({ ...prev, ends_at: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="cbx-modal-actions">
+                  <button type="button" className="cbx-btn cbx-btn--soft" onClick={closeResetExamScheduleModal} disabled={Boolean(resettingExamId)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="cbx-btn" disabled={Boolean(resettingExamId)}>
+                    {resettingExamId ? "Saving..." : "Save New Exam Time"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </div>
     </StaffFeatureLayout>
   );
