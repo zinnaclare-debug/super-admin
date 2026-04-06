@@ -868,3 +868,38 @@
     margin-left: 0;
   }
 }
+
+
+.school-site-question-stack::before {
+  content: "Questions On This Page";
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: -4px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.12);
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.school-site-question-card {
+  border: 1px solid rgba(186, 230, 253, 0.95);
+  box-shadow: 0 20px 38px rgba(15, 23, 42, 0.08);
+}
+
+.school-site-question-card h4 {
+  min-height: 3.4em;
+}
+
+@media (max-width: 640px) {
+  .school-site-question-stack::before {
+    margin-bottom: 0;
+  }
+
+  .school-site-question-card h4 {
+    min-height: 0;
+  }
+}

@@ -743,7 +743,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                         <span className="cbx-pill">Secured Entrance CBT</span>
                         <h3 className="school-site-exam-title">{examData.application?.applying_for_class || "Entrance Exam"}</h3>
                         <p className="school-site-exam-copy">
-                          Review the instructions below, then begin the exam in fullscreen mode. Leaving fullscreen or switching tabs can auto-submit the exam.
+                          Review the instructions below, then begin the exam in fullscreen mode. Questions stay hidden until the candidate clicks Begin Exam, and leaving fullscreen or switching tabs can auto-submit the exam.
                         </p>
                       </div>
                       <div className="school-site-exam-stats">
@@ -758,10 +758,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                         <article>
                           <span>Duration</span>
                           <strong>{examData.exam?.duration_minutes || 0} mins</strong>
-                        </article>
-                        <article>
-                          <span>Pass Mark</span>
-                          <strong>{examData.exam?.pass_mark || 0}%</strong>
                         </article>
                       </div>
                     </div>
@@ -823,11 +819,11 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                       <p className="cbx-state cbx-state--warning">{examSecurityStatus}</p>
                     ) : null}
 
-                    <div className="school-site-question-stack">
+                    <div className="school-site-question-stack" key={`page-${examPage}`}>
                       {currentExamQuestions.map((question, idx) => {
                         const questionIndex = examPageStart + idx;
                         return (
-                          <article key={question.id} className="school-site-question-block school-site-question-card">
+                          <article key={`question-${questionIndex}`} className="school-site-question-block school-site-question-card">
                             <div className="school-site-question-number">Question {questionIndex + 1}</div>
                             <h4>{question.question}</h4>
                             <div className="school-site-option-list">
