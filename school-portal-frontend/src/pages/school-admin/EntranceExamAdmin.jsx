@@ -473,7 +473,7 @@ export default function EntranceExamAdmin() {
         <div className="examadmin-panel-head">
           <div>
             <h3>Application Fee by Level</h3>
-            <p className="examadmin-note">Each level contains fee boxes for its classes. Tax stays at 1.6% automatically.</p>
+            <p className="examadmin-note">Each level contains fee boxes for its classes. Processing fee stays at 1.6% automatically.</p>
           </div>
           <button className="payx-btn" onClick={saveExamConfig} disabled={saving}>
             {saving ? "Saving..." : "Save Billing"}
@@ -512,11 +512,11 @@ export default function EntranceExamAdmin() {
 
                     <div className="examadmin-billing-meta">
                       <div>
-                        <small>Tax Rate</small>
+                        <small>Processing Fee Rate</small>
                         <strong>{Number(exam.application_fee_tax_rate || TAX_RATE).toFixed(1)}%</strong>
                       </div>
                       <div>
-                        <small>Tax Amount</small>
+                        <small>Processing Fee Amount</small>
                         <strong>NGN {Number(exam.application_fee_tax_amount || 0).toFixed(2)}</strong>
                       </div>
                       <div>
@@ -600,3 +600,4 @@ export default function EntranceExamAdmin() {
     </div>
   );
 }
+

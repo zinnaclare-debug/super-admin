@@ -243,7 +243,7 @@ export default function SchoolSubscriptionStatus() {
                       <strong>{formatMoney(quote.subtotal, quote.currency)}</strong>
                     </div>
                     <div className="sd-subscription-line">
-                      <span>Tax ({quote.tax_percent}%)</span>
+                      <span>Processing Fee ({quote.tax_percent}%)</span>
                       <strong>{formatMoney(quote.tax_amount, quote.currency)}</strong>
                     </div>
                     <div className="sd-subscription-line sd-subscription-line--total">
@@ -298,3 +298,4 @@ export default function SchoolSubscriptionStatus() {
     </>
   );
 }
+

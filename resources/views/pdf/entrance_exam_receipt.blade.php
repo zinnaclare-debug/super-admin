@@ -183,7 +183,7 @@
         </tr>
         <tr>
             <td>2</td>
-            <td>Tax ({{ number_format((float) ($application?->tax_rate ?? 0), 2) }}%)</td>
+            <td>Processing Fee ({{ number_format((float) ($application?->tax_rate ?? 0), 2) }}%)</td>
             <td class="money">{{ number_format((float) ($application?->tax_amount ?? 0), 2) }}</td>
         </tr>
     </tbody>
@@ -205,3 +205,4 @@
 </div>
 </body>
 </html>
+

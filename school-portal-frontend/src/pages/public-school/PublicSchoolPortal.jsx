@@ -582,7 +582,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               <h3>Entrance Exam Fee</h3>
               <p>{selectedClassOption?.class_name ? `Fee for ${selectedClassOption.class_name}` : "Select a class to view the fee"}</p>
               <p>Application Fee: NGN {feeAmount.toFixed(2)}</p>
-              <p>Tax ({feeTaxRate.toFixed(1)}%): NGN {feeTaxAmount.toFixed(2)}</p>
+              <p>Processing Fee ({feeTaxRate.toFixed(1)}%): NGN {feeTaxAmount.toFixed(2)}</p>
               <p><strong>Total: NGN {feeTotal.toFixed(2)}</strong></p>
             </div>
 
@@ -853,5 +853,6 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
 
 

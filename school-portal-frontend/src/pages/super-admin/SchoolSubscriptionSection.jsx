@@ -173,7 +173,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
       <div className="sai-subscription-head">
         <div>
           <h3>Subscription Billing</h3>
-          <p className="sai-note">Configure the school subscription plan, payment channels, tax, and manual override.</p>
+          <p className="sai-note">Configure the school subscription plan, payment channels, processing fee, and manual override.</p>
         </div>
         <span className={`sai-status-pill sai-status-pill--${summary.status_tone || "yellow"}`}>
           {summary.status_label || "FREE VERSION"}
@@ -226,7 +226,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             </div>
 
             <div className="sai-field">
-              <label>Tax Percent</label>
+              <label>Processing Fee Percent</label>
               <input
                 type="number"
                 min="0"
@@ -325,7 +325,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
                 <div className="sai-quote-list">
                   <span>Subtotal</span>
                   <strong>{formatMoney(quote.subtotal, quote.currency)}</strong>
-                  <span>Tax ({quote.tax_percent}%)</span>
+                  <span>Processing Fee ({quote.tax_percent}%)</span>
                   <strong>{formatMoney(quote.tax_amount, quote.currency)}</strong>
                   <span>Total Due</span>
                   <strong>{formatMoney(quote.total_amount, quote.currency)}</strong>
@@ -427,3 +427,4 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     </section>
   );
 }
+
