@@ -579,3 +579,16 @@
     align-items: start;
   }
 }
+
+.school-site-exam-stage {
+  margin-top: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .school-site-exam-stage {
+    padding: 14px;
+    border-radius: 18px;
+  }
+}
