@@ -81,7 +81,39 @@ function ContactWidget({ icon, title, value, children }) {
 const CONTENT_PREVIEW_LIMIT = 100;
 const QUESTIONS_PER_PAGE = 4;
 
+function sanitizeExamQuestion(question, index) {
+  if (!question || typeof question !== "object") return null;
+  const normalized = {
+    id: question.id ?? index + 1,
+    question: String(question.question || "").trim(),
+    option_a: String(question.option_a || "").trim(),
+    option_b: String(question.option_b || "").trim(),
+    option_c: String(question.option_c || "").trim(),
+    option_d: String(question.option_d || "").trim(),
+  };
 
+  if (!normalized.question) return null;
+  if (!normalized.option_a || !normalized.option_b || !normalized.option_c || !normalized.option_d) return null;
+  return normalized;
+}
+
+function sanitizeExamPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const questions = Array.isArray(payload?.exam?.questions)
+    ? payload.exam.questions.map((question, index) => sanitizeExamQuestion(question, index)).filter(Boolean)
+    : [];
+
+  return {
+    ...payload,
+    exam: payload.exam
+      ? {
+          ...payload.exam,
+          questions,
+          question_count: questions.length,
+        }
+      : payload.exam,
+  };
+}
 
 export default function PublicSchoolPortal({ page = "home", initialSiteData = null }) {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -103,6 +135,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [lookupForm, setLookupForm] = useState({ application_number: "" });
   const [verifyForm, setVerifyForm] = useState({ application_number: "" });
   const [examData, setExamData] = useState(null);
+  const [examStarted, setExamStarted] = useState(false);
   const [examAnswers, setExamAnswers] = useState([]);
   const [examPage, setExamPage] = useState(0);
   const [examSecurityStatus, setExamSecurityStatus] = useState("");
@@ -214,6 +247,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       securityRef.current.stop();
       securityRef.current = null;
     }
+    setExamStarted(false);
   };
 
   const startSecurityRuntime = async () => {
@@ -346,11 +380,12 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
   const contentItems = Array.isArray(contentFeed?.data) ? contentFeed.data : [];
   const contentMeta = contentFeed?.meta || { current_page: 1, last_page: 1, total: 0 };
-  const examQuestionTotal = examData?.exam?.questions?.length || 0;
-  const answeredCount = examAnswers.filter((answer) => ["A", "B", "C", "D"].includes(String(answer))).length;
-  const totalExamPages = Math.max(1, Math.ceil(examQuestionTotal / QUESTIONS_PER_PAGE));
+  const examQuestions = Array.isArray(examData?.exam?.questions) ? examData.exam.questions : [];
+  const examQuestionTotal = examQuestions.length;
+  const answeredCount = examAnswers.slice(0, examQuestionTotal).filter((answer) => ["A", "B", "C", "D"].includes(String(answer))).length;
+  const totalExamPages = Math.max(1, Math.ceil(Math.max(examQuestionTotal, 1) / QUESTIONS_PER_PAGE));
   const examPageStart = examPage * QUESTIONS_PER_PAGE;
-  const currentExamQuestions = examData?.exam?.questions?.slice(examPageStart, examPageStart + QUESTIONS_PER_PAGE) || [];
+  const currentExamQuestions = examQuestions.slice(examPageStart, examPageStart + QUESTIONS_PER_PAGE);
   const handleApply = async (e) => {
     e.preventDefault();
     setBusyAction("apply");
@@ -383,14 +418,20 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         setExamData({ completed: true, result: res.data.data });
         setExamAnswers([]);
       } else {
-        const payload = res.data?.data || null;
+        const payload = sanitizeExamPayload(res.data?.data || null);
+        if (!payload?.exam?.questions?.length) {
+          alert("This entrance exam has no complete questions yet. Please contact the school admin.");
+          setExamData(null);
+          setExamAnswers([]);
+          return;
+        }
         setExamData(payload);
-        setExamAnswers(Array(payload?.exam?.questions?.length || 0).fill(""));
+        setExamStarted(false);
+        setExamAnswers(Array(payload.exam.questions.length).fill(""));
         setExamPage(0);
-        setExamSecurityStatus("");
+        setExamSecurityStatus("Press Begin Exam to enter fullscreen and start the secured CBT session.");
         setExamWarnings(0);
         setExamHeadWarnings(0);
-        await startSecurityRuntime();
       }
     } catch (err) {
       const scheduledFor = err?.response?.data?.scheduled_for;
@@ -407,6 +448,23 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const handleExamSubmit = async (e) => {
     e.preventDefault();
     await submitEntranceExam("manual");
+  };
+
+  const handleBeginEntranceExam = async () => {
+    if (!examData?.exam || examStarted) return;
+    setBusyAction("exam-start");
+    setExamSecurityStatus("Starting secured exam session...");
+    try {
+      await startSecurityRuntime();
+      setExamStarted(true);
+      setExamSecurityStatus("Security active. Stay fullscreen and focus on the exam.");
+    } catch {
+      stopSecurityRuntime();
+      setExamSecurityStatus("Fullscreen permission is required before you can start this exam.");
+      alert("Allow fullscreen access to begin the secured entrance exam.");
+    } finally {
+      setBusyAction("");
+    }
   };
 
   const handleVerify = async (e) => {
@@ -678,72 +736,156 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
             {examData?.exam ? (
               <div className="cbx-page cbx-page--student school-site-exam-stage">
-                <form className="cbx-panel school-site-exam-shell" onSubmit={handleExamSubmit}>
-                  <div style={{ marginBottom: 12, fontWeight: 700, color: "#0f172a" }}>
-                    Answered {answeredCount} / {examQuestionTotal}
-                  </div>
-                  {examSecurityStatus ? (
-                    <p className="cbx-state cbx-state--warning">{examSecurityStatus}</p>
-                  ) : null}
-                  <div className="cbx-state cbx-state--neutral">Page {examPage + 1} of {totalExamPages}</div>
-
-                  {currentExamQuestions.map((question, idx) => {
-                    const questionIndex = examPageStart + idx;
-                    return (
-                      <div key={question.id} className="school-site-question-block">
-                        <h4>{questionIndex + 1}. {question.question}</h4>
-                        {["A", "B", "C", "D"].map((optionKey) => {
-                          const optionValue = question[`option_${optionKey.toLowerCase()}`];
-                          return (
-                            <label key={optionKey} className="school-site-option">
-                              <input
-                                type="radio"
-                                name={`question-${questionIndex}`}
-                                value={optionKey}
-                                checked={examAnswers[questionIndex] === optionKey}
-                                onChange={(e) =>
-                                  setExamAnswers((prev) =>
-                                    prev.map((item, answerIndex) =>
-                                      answerIndex === questionIndex ? e.target.value : item
-                                    )
-                                  )
-                                }
-                              />
-                              <span>{optionKey}. {optionValue}</span>
-                            </label>
-                          );
-                        })}
+                {!examStarted ? (
+                  <section className="cbx-panel school-site-exam-shell school-site-exam-shell--intro">
+                    <div className="school-site-exam-hero">
+                      <div>
+                        <span className="cbx-pill">Secured Entrance CBT</span>
+                        <h3 className="school-site-exam-title">{examData.application?.applying_for_class || "Entrance Exam"}</h3>
+                        <p className="school-site-exam-copy">
+                          Review the instructions below, then begin the exam in fullscreen mode. Leaving fullscreen or switching tabs can auto-submit the exam.
+                        </p>
                       </div>
-                    );
-                  })}
+                      <div className="school-site-exam-stats">
+                        <article>
+                          <span>Questions</span>
+                          <strong>{examQuestionTotal}</strong>
+                        </article>
+                        <article>
+                          <span>Pages</span>
+                          <strong>{totalExamPages}</strong>
+                        </article>
+                        <article>
+                          <span>Duration</span>
+                          <strong>{examData.exam?.duration_minutes || 0} mins</strong>
+                        </article>
+                        <article>
+                          <span>Pass Mark</span>
+                          <strong>{examData.exam?.pass_mark || 0}%</strong>
+                        </article>
+                      </div>
+                    </div>
 
-                  <div className="school-site-exam-actions">
-                    <button
-                      type="button"
-                      className="cbx-btn cbx-btn--soft"
-                      onClick={() => setExamPage((pageIndex) => Math.max(0, pageIndex - 1))}
-                      disabled={examPage <= 0}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      className="cbx-btn cbx-btn--soft"
-                      onClick={() => setExamPage((pageIndex) => Math.min(totalExamPages - 1, pageIndex + 1))}
-                      disabled={examPage >= totalExamPages - 1}
-                    >
-                      Next
-                    </button>
-                    <button
-                      type="submit"
-                      className="cbx-btn"
-                      style={{ marginLeft: "auto" }}
-                      disabled={busyAction === "exam-submit"}
-                    >
-                      {busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}
-                    </button>
-                  </div>
-                </form>
+                    {examData.exam?.instructions ? (
+                      <div className="school-site-exam-brief">
+                        <h4>Exam Instructions</h4>
+                        <p>{examData.exam.instructions}</p>
+                      </div>
+                    ) : null}
+
+                    <div className="school-site-security-grid">
+                      <article className="school-site-security-card">
+                        <h4>Security Rules</h4>
+                        <ul>
+                          <li>Fullscreen is compulsory throughout the exam.</li>
+                          <li>Tab switching, copy, paste, and right-click are blocked.</li>
+                          <li>Webcam-based monitoring may flag multiple faces or major head movement.</li>
+                        </ul>
+                      </article>
+                      <article className="school-site-security-card">
+                        <h4>Before You Begin</h4>
+                        <ul>
+                          <li>Use a stable browser window and keep this tab active.</li>
+                          <li>Check that your device can allow fullscreen access.</li>
+                          <li>Click Begin Exam only when you are ready to answer immediately.</li>
+                        </ul>
+                      </article>
+                    </div>
+
+                    {examSecurityStatus ? <p className="cbx-state cbx-state--warning">{examSecurityStatus}</p> : null}
+
+                    <div className="school-site-exam-actions school-site-exam-actions--intro">
+                      <button
+                        type="button"
+                        className="cbx-btn"
+                        onClick={handleBeginEntranceExam}
+                        disabled={busyAction === "exam-start"}
+                      >
+                        {busyAction === "exam-start" ? "Starting Exam..." : "Begin Exam"}
+                      </button>
+                    </div>
+                  </section>
+                ) : (
+                  <form className="cbx-panel school-site-exam-shell school-site-exam-shell--active" onSubmit={handleExamSubmit}>
+                    <div className="school-site-exam-topbar">
+                      <div className="school-site-exam-progress">
+                        <span className="school-site-exam-progress-label">Progress</span>
+                        <strong>Answered {answeredCount} of {examQuestionTotal}</strong>
+                      </div>
+                      <div className="school-site-exam-badges">
+                        <span className="school-site-exam-badge">Page {examPage + 1} / {totalExamPages}</span>
+                        <span className="school-site-exam-badge">Warnings {examWarnings}</span>
+                        <span className="school-site-exam-badge">Head Movement {examHeadWarnings}</span>
+                      </div>
+                    </div>
+
+                    {examSecurityStatus ? (
+                      <p className="cbx-state cbx-state--warning">{examSecurityStatus}</p>
+                    ) : null}
+
+                    <div className="school-site-question-stack">
+                      {currentExamQuestions.map((question, idx) => {
+                        const questionIndex = examPageStart + idx;
+                        return (
+                          <article key={question.id} className="school-site-question-block school-site-question-card">
+                            <div className="school-site-question-number">Question {questionIndex + 1}</div>
+                            <h4>{question.question}</h4>
+                            <div className="school-site-option-list">
+                              {["A", "B", "C", "D"].map((optionKey) => {
+                                const optionValue = question[`option_${optionKey.toLowerCase()}`];
+                                return (
+                                  <label key={optionKey} className={`school-site-option${examAnswers[questionIndex] === optionKey ? " school-site-option--selected" : ""}`}>
+                                    <input
+                                      type="radio"
+                                      name={`question-${questionIndex}`}
+                                      value={optionKey}
+                                      checked={examAnswers[questionIndex] === optionKey}
+                                      onChange={(e) =>
+                                        setExamAnswers((prev) =>
+                                          prev.map((item, answerIndex) =>
+                                            answerIndex === questionIndex ? e.target.value : item
+                                          )
+                                        )
+                                      }
+                                    />
+                                    <span className="school-site-option-key">{optionKey}</span>
+                                    <span className="school-site-option-text">{optionValue}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+
+                    <div className="school-site-exam-actions">
+                      <button
+                        type="button"
+                        className="cbx-btn cbx-btn--soft"
+                        onClick={() => setExamPage((pageIndex) => Math.max(0, pageIndex - 1))}
+                        disabled={examPage <= 0}
+                      >
+                        Previous Page
+                      </button>
+                      <button
+                        type="button"
+                        className="cbx-btn cbx-btn--soft"
+                        onClick={() => setExamPage((pageIndex) => Math.min(totalExamPages - 1, pageIndex + 1))}
+                        disabled={examPage >= totalExamPages - 1}
+                      >
+                        Next Page
+                      </button>
+                      <button
+                        type="submit"
+                        className="cbx-btn school-site-exam-submit"
+                        disabled={busyAction === "exam-submit"}
+                      >
+                        {busyAction === "exam-submit" ? "Submitting..." : "Submit Entrance Exam"}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             ) : null}
           </section>
