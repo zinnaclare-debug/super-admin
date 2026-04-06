@@ -198,6 +198,7 @@ class PublicSchoolWebsiteController extends Controller
             'email' => $application->email,
             'amount' => (int) round($total * 100),
             'reference' => $reference,
+            'channels' => ['card', 'bank', 'ussd', 'qr', 'bank_transfer'],
             'metadata' => [
                 'type' => 'entrance_exam',
                 'school_id' => $school->id,

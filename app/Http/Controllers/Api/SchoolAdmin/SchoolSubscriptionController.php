@@ -80,6 +80,7 @@ class SchoolSubscriptionController extends Controller
             'term_id' => $cycle === SchoolSubscriptionBilling::CYCLE_TERMLY ? (int) $term->id : null,
             'billing_cycle' => $cycle,
             'reference' => $reference,
+            'channels' => ['card', 'bank', 'ussd', 'qr', 'bank_transfer'],
             'status' => 'pending',
             'payment_channel' => SchoolSubscriptionBilling::CHANNEL_PAYSTACK,
             'student_count_snapshot' => (int) $quote['student_count'],

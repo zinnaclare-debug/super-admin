@@ -193,6 +193,7 @@ class SchoolFeesController extends Controller
             'email' => $user->email,
             'amount' => (int) round($requestedAmount * 100),
             'reference' => $reference,
+            'channels' => ['card', 'bank', 'ussd', 'qr', 'bank_transfer'],
             'callback_url' => $callbackUrl,
             'metadata' => [
                 'school_id' => $schoolId,
