@@ -113,6 +113,9 @@ export default function EntranceExamAdmin() {
   const [availableClasses, setAvailableClasses] = useState([]);
   const [availableClassGroups, setAvailableClassGroups] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [applicantSearchInput, setApplicantSearchInput] = useState("");
+  const [applicantSearch, setApplicantSearch] = useState("");
+  const [applicationsPage, setApplicationsPage] = useState(1);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [resetDialog, setResetDialog] = useState({
@@ -151,6 +154,28 @@ export default function EntranceExamAdmin() {
     () => examConfig.class_exams.filter((exam) => exam.enabled).length,
     [examConfig.class_exams]
   );
+  const filteredApplications = useMemo(() => {
+    const query = applicantSearch.trim().toLowerCase();
+    if (!query) return applications;
+
+    return applications.filter((application) => {
+      const haystacks = [
+        application.full_name,
+        application.information,
+        application.applying_for_class,
+        application.application_number,
+        application.exam_status,
+        application.admin_result_status,
+      ];
+
+      return haystacks.some((value) => String(value || "").toLowerCase().includes(query));
+    });
+  }, [applications, applicantSearch]);
+  const totalApplicationPages = Math.max(1, Math.ceil(filteredApplications.length / 15));
+  const paginatedApplications = useMemo(() => {
+    const start = (applicationsPage - 1) * 15;
+    return filteredApplications.slice(start, start + 15);
+  }, [filteredApplications, applicationsPage]);
 
   const loadSettings = async () => {
     const response = await api.get("/api/school-admin/entrance-exam");
@@ -234,6 +259,10 @@ export default function EntranceExamAdmin() {
     load();
   }, []);
 
+  useEffect(() => {
+    setApplicationsPage((currentPage) => Math.min(currentPage, totalApplicationPages));
+  }, [totalApplicationPages]);
+
   const updateExamConfig = (field, value) => {
     setExamConfig((prev) => ({ ...prev, [field]: value }));
   };
@@ -264,6 +293,11 @@ export default function EntranceExamAdmin() {
           : exam
       ),
     }));
+  };
+
+  const submitApplicantSearch = () => {
+    setApplicantSearch(applicantSearchInput.trim());
+    setApplicationsPage(1);
   };
 
   const saveExamConfig = async () => {
@@ -314,6 +348,28 @@ export default function EntranceExamAdmin() {
           </div>
           <div className="payx-art payx-art--online examadmin-art--corner">
             <img src={readingNotesArt} alt="" />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+          <span className="examadmin-note">Page {applicationsPage} of {totalApplicationPages}</span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className="payx-btn payx-btn--soft"
+              onClick={() => setApplicationsPage((page) => Math.max(1, page - 1))}
+              disabled={applicationsPage === 1}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="payx-btn payx-btn--soft"
+              onClick={() => setApplicationsPage((page) => Math.min(totalApplicationPages, page + 1))}
+              disabled={applicationsPage === totalApplicationPages}
+            >
+              Next
+            </button>
           </div>
         </div>
       </section>
@@ -560,6 +616,27 @@ export default function EntranceExamAdmin() {
           </div>
         </div>
 
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+          <input
+            className="payx-input"
+            type="text"
+            placeholder="Search applicants"
+            value={applicantSearchInput}
+            onChange={(e) => setApplicantSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitApplicantSearch();
+              }
+            }}
+            style={{ maxWidth: 320 }}
+          />
+          <button type="button" className="payx-btn" onClick={submitApplicantSearch}>
+            Search
+          </button>
+          <span className="examadmin-note">Showing {paginatedApplications.length} of {filteredApplications.length} applicant(s)</span>
+        </div>
+
         <div className="payx-table-wrap">
           <table className="payx-table">
             <thead>
@@ -576,9 +653,9 @@ export default function EntranceExamAdmin() {
               </tr>
             </thead>
             <tbody>
-              {applications.map((application) => (
+              {paginatedApplications.map((application, index) => (
                 <tr key={application.id}>
-                  <td>{application.sn}</td>
+                  <td>{(applicationsPage - 1) * 15 + index + 1}</td>
                   <td>{application.full_name}</td>
                   <td>{application.information || "-"}</td>
                   <td>{application.applying_for_class}</td>
@@ -608,13 +685,35 @@ export default function EntranceExamAdmin() {
                   </td>
                 </tr>
               ))}
-              {applications.length === 0 ? (
+              {filteredApplications.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="examadmin-empty-cell">No applicants yet.</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+          <span className="examadmin-note">Page {applicationsPage} of {totalApplicationPages}</span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className="payx-btn payx-btn--soft"
+              onClick={() => setApplicationsPage((page) => Math.max(1, page - 1))}
+              disabled={applicationsPage === 1}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="payx-btn payx-btn--soft"
+              onClick={() => setApplicationsPage((page) => Math.min(totalApplicationPages, page + 1))}
+              disabled={applicationsPage === totalApplicationPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </section>
 
