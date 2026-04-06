@@ -370,39 +370,27 @@ class PublicSchoolWebsiteController extends Controller
         }
 
         $logoDataUri = $this->logoDataUri($school->logo_path);
+        $safeReference = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $application->payment_reference);
+        $filename = 'entrance_exam_receipt_' . ($safeReference ?: $application->id) . '.pdf';
+        $viewData = [
+            'school' => $school,
+            'logoDataUri' => $logoDataUri,
+            'application' => $application,
+            'generatedAt' => now(),
+        ];
 
         try {
             @set_time_limit(120);
             @ini_set('memory_limit', '512M');
 
-            $html = view('pdf.entrance_exam_receipt', [
-                'school' => $school,
-                'logoDataUri' => $logoDataUri,
-                'application' => $application,
-                'generatedAt' => now(),
-            ])->render();
-
-            $options = new Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-            if (!is_dir($dompdfTempDir)) {
-                @mkdir($dompdfTempDir, 0775, true);
+            try {
+                $pdfOutput = $this->renderEntranceExamReceiptPdf($viewData);
+            } catch (\Throwable $primaryError) {
+                report($primaryError);
+                $pdfOutput = $this->renderSimpleEntranceExamReceiptPdf($viewData);
             }
-            $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfTempDir);
-            $options->set('chroot', base_path());
 
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-
-            $safeReference = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $application->payment_reference);
-            $filename = 'entrance_exam_receipt_' . ($safeReference ?: $application->id) . '.pdf';
-
-            return response($dompdf->output(), 200, [
+            return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]);
@@ -543,6 +531,109 @@ class PublicSchoolWebsiteController extends Controller
         return response()->json([
             'data' => $this->applicationReviewPayload($application),
         ]);
+    }
+
+    private function renderEntranceExamReceiptPdf(array $viewData): string
+    {
+        $html = view('pdf.entrance_exam_receipt', $viewData)->render();
+
+        return $this->renderPdfFromHtml($html);
+    }
+
+    private function renderSimpleEntranceExamReceiptPdf(array $viewData): string
+    {
+        $schoolName = strtoupper((string) data_get($viewData, 'school.name', 'SCHOOL'));
+        $schoolLocation = strtoupper((string) data_get($viewData, 'school.location', ''));
+        $applicationNumber = strtoupper((string) data_get($viewData, 'application.application_number', '-'));
+        $fullName = strtoupper((string) data_get($viewData, 'application.full_name', '-'));
+        $className = strtoupper((string) data_get($viewData, 'application.applying_for_class', '-'));
+        $email = (string) data_get($viewData, 'application.email', '-');
+        $phone = (string) data_get($viewData, 'application.phone', '-');
+        $paymentReference = strtoupper((string) data_get($viewData, 'application.payment_reference', '-'));
+        $paymentStatus = strtoupper((string) data_get($viewData, 'application.payment_status', '-'));
+        $amountDue = number_format((float) data_get($viewData, 'application.amount_due', 0), 2);
+        $processingFeeRate = number_format((float) data_get($viewData, 'application.tax_rate', 0), 2);
+        $processingFee = number_format((float) data_get($viewData, 'application.tax_amount', 0), 2);
+        $totalPaid = number_format((float) data_get($viewData, 'application.amount_paid', data_get($viewData, 'application.amount_total', 0)), 2);
+        $generatedAt = data_get($viewData, 'generatedAt');
+        $generatedLabel = '-';
+        if (!empty($generatedAt)) {
+            try {
+                $generatedLabel = Carbon::parse($generatedAt)->format('j M Y, g:i A');
+            } catch (\Throwable $e) {
+                $generatedLabel = '-';
+            }
+        }
+        $paidAt = data_get($viewData, 'application.paid_at') ?: data_get($viewData, 'application.created_at');
+        $paidAtLabel = '-';
+        if (!empty($paidAt)) {
+            try {
+                $paidAtLabel = Carbon::parse($paidAt)->format('j M Y, g:i A');
+            } catch (\Throwable $e) {
+                $paidAtLabel = '-';
+            }
+        }
+
+        $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Entrance Exam Receipt</title>'
+            . '<style>'
+            . 'body{font-family:Arial,Helvetica,DejaVu Sans,sans-serif;font-size:11px;color:#111827;}'
+            . '.sheet{border:1px solid #cbd5e1;padding:18px;}'
+            . 'h1{margin:0;font-size:20px;text-align:center;}'
+            . 'h2{margin:4px 0 0;font-size:12px;text-align:center;font-weight:600;}'
+            . '.title{margin:14px 0 10px;padding:8px 10px;background:#0f766e;color:#fff;text-align:center;font-size:15px;font-weight:700;}'
+            . 'table{width:100%;border-collapse:collapse;margin-top:10px;}'
+            . 'th,td{border:1px solid #1f2937;padding:6px;vertical-align:top;}'
+            . 'th{background:#f3f4f6;text-align:left;width:28%;}'
+            . '.money{text-align:right;}'
+            . '.summary td:first-child{font-weight:700;background:#f8fafc;width:70%;}'
+            . '.meta{margin-top:12px;font-size:10px;color:#475569;text-align:right;}'
+            . '</style></head><body><div class="sheet">'
+            . '<h1>' . e($schoolName) . '</h1>'
+            . '<h2>' . e($schoolLocation) . '</h2>'
+            . '<div class="title">ENTRANCE EXAM RECEIPT</div>'
+            . '<table>'
+            . '<tr><th>Applicant Name</th><td>' . e($fullName) . '</td><th>Application Number</th><td>' . e($applicationNumber) . '</td></tr>'
+            . '<tr><th>Class Applied For</th><td>' . e($className) . '</td><th>Payment Status</th><td>' . e($paymentStatus) . '</td></tr>'
+            . '<tr><th>Email</th><td>' . e($email) . '</td><th>Phone</th><td>' . e($phone) . '</td></tr>'
+            . '<tr><th>Reference</th><td>' . e($paymentReference) . '</td><th>Payment Date</th><td>' . e($paidAtLabel) . '</td></tr>'
+            . '</table>'
+            . '<table>'
+            . '<thead><tr><th style="width:10%;">No.</th><th>Description</th><th style="width:24%;">Amount (NGN)</th></tr></thead>'
+            . '<tbody>'
+            . '<tr><td>1</td><td>Entrance Exam Application Fee</td><td class="money">' . $amountDue . '</td></tr>'
+            . '<tr><td>2</td><td>Processing Fee (' . e($processingFeeRate) . '%)</td><td class="money">' . $processingFee . '</td></tr>'
+            . '</tbody></table>'
+            . '<table class="summary">'
+            . '<tr><td>Amount Paid</td><td class="money">' . $totalPaid . '</td></tr>'
+            . '</table>'
+            . '<div class="meta">Generated: ' . e($generatedLabel) . '</div>'
+            . '</div></body></html>';
+
+        return $this->renderPdfFromHtml($html);
+    }
+
+    private function renderPdfFromHtml(string $html): string
+    {
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return $dompdf->output();
     }
 
     private function tenantSchool(Request $request): ?School
