@@ -385,20 +385,13 @@ class PublicSchoolWebsiteController extends Controller
             $options = new Options();
             $options->set('isHtml5ParserEnabled', true);
             $options->set('isRemoteEnabled', true);
-            $options->set('defaultFont', 'Helvetica');
-
-            $dompdfBaseDir = storage_path('app/dompdf');
-            $dompdfTempDir = $dompdfBaseDir . DIRECTORY_SEPARATOR . 'temp';
-            $dompdfFontCacheDir = $dompdfBaseDir . DIRECTORY_SEPARATOR . 'font-cache';
-
-            foreach ([$dompdfBaseDir, $dompdfTempDir, $dompdfFontCacheDir] as $directory) {
-                if (! is_dir($directory)) {
-                    @mkdir($directory, 0775, true);
-                }
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
             }
-
             $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfFontCacheDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
             $options->set('chroot', base_path());
 
             $dompdf = new Dompdf($options);
