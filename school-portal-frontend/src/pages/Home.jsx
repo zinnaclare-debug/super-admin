@@ -2,44 +2,39 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import PublicSchoolPortal from "./public-school/PublicSchoolPortal";
-import heroArt from "../assets/dashboard/branding.svg";
-import modulesArt from "../assets/dashboard/modules.svg";
-import flyerArt from "../assets/home/lytebridge-flyer.jpeg";
 import brandArt from "../assets/home/lytebridge-brand.jpg";
+import coreFunctionsArt from "../assets/home/lytebridge-core-functions.jpeg";
+import unlockPotentialArt from "../assets/home/lytebridge-unlock-potential.jpeg";
 import "./Home.css";
 
-const FEATURE_LIST = [
-  "Notes Upload: Teachers can upload lesson notes and learning materials for students.",
-  "Announcement Desk: Central notice board for school-wide and class-specific announcements.",
-  "Class Activities: Assignment submission, quizzes, and interactive classroom tasks.",
-  "Timetable Access for Parents: Enables parents to monitor class schedules and academic activities.",
-  "Integration with Social Media and School Website: Direct links to official social media platforms and the school website.",
-  "Question Bank: Centralized repository of exam and practice questions.",
-  "AI-Powered Questions (Standard-Based): Intelligent question generation aligned with approved curriculum standards.",
-  "CBT Examination Features: Secure computer-based testing with automated marking and monitoring.",
-  "Results Management (Modified to School Standard): Accurate result processing and reporting customized to school formats.",
-  "E-Library: Digital library with textbooks, reference materials, and past questions.",
-  "Virtual Class (Google Meet Integration): Live online classes with real-time teacher-student interaction.",
-  "Mobile Application: User-friendly mobile app for students, parents, and teachers.",
-  "Cloud Upload and Data Storage: Secure cloud-based storage for academic records and learning materials.",
-  "Secure Server: High-level data protection for data safety and system reliability.",
-  "Google Drive Integration / Print and Store Options: Flexible backup, printing, and physical record options.",
-  "Beautiful and User-Friendly Interface: Clean, modern design for easy navigation and better user experience.",
-  "Teachers' Training and Support: Onboarding, continuous training, and technical support.",
+const CORE_FUNCTIONS = [
+  "Broadsheet Management",
+  "Result Management (Report Cards)",
+  "Student Transcript Generation",
+  "Announcements & Notice Board",
+  "Online School Fees Payment (Paystack Integration)",
+  "Free School Website (Included)",
+  "Mobile Application (Students, Parents & Teachers)",
+  "Parent Engagement Dashboard",
+  "Timetable Management",
+  "Virtual Classes (Live Classes - Google Meet Integration)",
+  "CBT Examinations (Computer-Based Tests)",
+  "Online Assignments & Submissions",
+  "Online Classes / Learning Portal",
+  "Saves Thousands in Paper Costs (Go Paperless)",
 ];
 
-const EXTRA_VALUE = [
-  "Multi-school tenancy with subdomain setup for each school.",
-  "Role-based access for super admin, school admin, staff, students, and parents.",
-  "Real-time operational visibility for academics, attendance, assessments, and billing.",
-  "Deployment and migration support for schools moving from manual to digital workflows.",
+const HIGHLIGHTS = [
+  "Free 1 term trial at zero cost.",
+  "Subsequently, 350 per term per student.",
+  "Fast onboarding with support for school owners, staff, parents, and learners.",
+  "Modern digital workflows that reduce paper use and improve communication.",
 ];
 
 const CONTACT_LINES = [
-  { phone: "+2348027453306", dial: "+2348027453306", location: "FCT" },
-  { phone: "+234 9136806652", dial: "+2349136806652", location: "Ekiti State" },
-  { phone: "+234 816 986 6477", dial: "+2348169866477", location: "Kwara State" },
-  { phone: "+234 706 690 6190", dial: "+2347066906190", location: "FCT" },
+  { phone: "+2348027453306", dial: "+2348027453306", label: "Call us now" },
+  { phone: "+2349136806652", dial: "+2349136806652", label: "WhatsApp and phone" },
+  { phone: "+2347066906190", dial: "+2347066906190", label: "Support line" },
 ];
 
 function Home() {
@@ -94,16 +89,31 @@ function Home() {
       <main className="home-main">
         <section className="home-hero">
           <div className="home-hero-copy">
-            <p className="home-kicker">Digital School Operations</p>
-            <h1>Build a smarter school with one reliable platform.</h1>
+            <p className="home-kicker">Modern ICT Solution For Schools</p>
+            <h1>Upgrade your school with a smarter digital platform built for daily operations.</h1>
             <p>
-              Lytebridge helps schools run teaching, examinations, reporting, communication, and
-              parent engagement from one secure cloud platform.
+              Lytebridge Professional Service LTD helps schools manage results, payments, virtual
+              classes, communication, parent engagement, and learning delivery from one reliable
+              portal.
             </p>
+            <div className="home-hero-metrics">
+              <article>
+                <strong>Free 1 Term Trial</strong>
+                <span>Start at zero cost</span>
+              </article>
+              <article>
+                <strong>N350 / Student</strong>
+                <span>Per term afterwards</span>
+              </article>
+              <article>
+                <strong>Go Paperless</strong>
+                <span>Save cost and time</span>
+              </article>
+            </div>
             <div className="home-hero-badges">
-              <span>One Term Free Trial</span>
-              <span>N350 / Student / Term</span>
-              <span>One-time Setup: N40,000</span>
+              {HIGHLIGHTS.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
             </div>
             <div className="home-hero-actions">
               <a href="tel:+2348027453306">Call +2348027453306</a>
@@ -114,17 +124,24 @@ function Home() {
           </div>
 
           <div className="home-hero-visual">
-            <img src={heroArt} alt="School platform visual" />
+            <div className="home-hero-photo-stack">
+              <img src={unlockPotentialArt} alt="Lytebridge unlock potential flyer" />
+              <div className="home-hero-aside">
+                <p>School Management Platform</p>
+                <h2>Built for school owners that want speed, visibility, and growth.</h2>
+                <span>Results, broadsheet, CBT, payments, portal, mobile app and more.</span>
+              </div>
+            </div>
           </div>
         </section>
 
         <section className="home-section">
           <div className="home-section-head">
-            <h2>Key Features</h2>
-            <p>Designed for teachers, school admins, students, and parents.</p>
+            <h2>Core Functions</h2>
+            <p>Everything your school needs to run a modern digital operation.</p>
           </div>
           <div className="home-feature-grid">
-            {FEATURE_LIST.map((item) => (
+            {CORE_FUNCTIONS.map((item) => (
               <article key={item} className="home-feature-card">
                 {item}
               </article>
@@ -133,66 +150,61 @@ function Home() {
         </section>
 
         <section className="home-section home-pricing">
-          <div className="home-section-head">
-            <h2>Pricing & Subscription</h2>
-            <p>Simple pricing for schools of all sizes.</p>
-          </div>
           <div className="home-pricing-grid">
-            <article>
-              <h3>Subscription Fee</h3>
+            <article className="home-pricing-card home-pricing-card--wide">
+              <p className="home-pricing-label">Launch Offer</p>
+              <h2>Free 1 term trial at zero cost.</h2>
+              <p>
+                Launch your school portal, explore the dashboard, and onboard your team before
+                subscription begins.
+              </p>
+            </article>
+            <article className="home-pricing-card">
+              <p className="home-pricing-label">Subscription</p>
               <p className="home-price">N350</p>
-              <p>Per student, per term.</p>
+              <p>Per term, per student.</p>
             </article>
-            <article>
-              <h3>Free Trial</h3>
-              <p className="home-price">1 Term</p>
-              <p>Free trial for new schools.</p>
+            <article className="home-pricing-card home-pricing-card--contact">
+              <p className="home-pricing-label">Need a quick start?</p>
+              <div className="home-pricing-actions">
+                <a href="tel:+2348027453306">Call Us</a>
+                <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
+                  WhatsApp Us
+                </a>
+              </div>
             </article>
-            <article>
-              <h3>Installation Fee</h3>
-              <p className="home-price">N40,000</p>
-              <p>One-time setup, configuration, and onboarding.</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="home-section home-section--value">
-          <div className="home-section-head">
-            <h2>Additional Value</h2>
-            <p>What schools also get from Lytebridge.</p>
-          </div>
-          <div className="home-value-wrap">
-            <ul>
-              {EXTRA_VALUE.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <img src={flyerArt} alt="Lytebridge school management platform brochure" />
           </div>
         </section>
 
         <section className="home-section home-contact">
-          <img src={modulesArt} alt="Modules and workflows" />
           <div className="home-contact-copy">
             <h2>Ready to launch your school portal?</h2>
             <p>
-              Reach us for onboarding, deployment, support, and account setup across Nigeria.
+              Reach us for onboarding, deployment, support, and fast setup for your school portal.
             </p>
             <div className="home-contact-grid">
               {CONTACT_LINES.map((line) => (
-                <a key={`${line.phone}-${line.location}`} className="home-contact-card" href={`tel:${line.dial}`}>
+                <a key={`${line.phone}-${line.label}`} className="home-contact-card" href={`tel:${line.dial}`}>
                   <span className="home-contact-phone">{line.phone}</span>
-                  <span className="home-contact-state">{line.location}</span>
+                  <span className="home-contact-state">{line.label}</span>
                 </a>
               ))}
             </div>
             <div className="home-contact-actions">
-              <a href="mailto:lytebridgeprofessionalservices@gmail.com">
-                lytebridgeprofessionalservices@gmail.com
+              <a href="tel:+2348027453306">
+                Call 08027453306
               </a>
               <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
-                WhatsApp Chat
+                WhatsApp Us
               </a>
+            </div>
+          </div>
+          <div className="home-contact-gallery">
+            <div className="home-contact-photo home-contact-photo--primary">
+              <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
+            </div>
+            <div className="home-contact-photo home-contact-photo--secondary">
+              <img src={unlockPotentialArt} alt="Lytebridge school innovation flyer" />
             </div>
           </div>
         </section>
