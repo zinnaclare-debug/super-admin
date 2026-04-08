@@ -529,8 +529,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               <p>{website.about_text}</p>
             </article>
             <article>
-              <h3>Core Values</h3>
-              <p>{website.core_values_text}</p>
+              <h3>Vision</h3>
+              <p>{website.vision_text}</p>
             </article>
             <article>
               <h3>Mission</h3>
@@ -930,6 +930,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
+
 
 
 

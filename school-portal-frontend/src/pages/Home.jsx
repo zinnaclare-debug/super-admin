@@ -24,11 +24,54 @@ const CORE_FUNCTIONS = [
   "Saves Thousands in Paper Costs (Go Paperless)",
 ];
 
-const HIGHLIGHTS = [
-  "Free 1 term trial at zero cost.",
-  "Subsequently, 350 per term per student.",
-  "Fast onboarding with support for school owners, staff, parents, and learners.",
-  "Modern digital workflows that reduce paper use and improve communication.",
+const SERVICE_GROUPS = [
+  {
+    title: "Education Services",
+    items: [
+      "School Setup & Registration",
+      "Academic Planning & Curriculum Support",
+      "Staff Training & Capacity Building",
+      "School Administration Consulting",
+      "Result & Report Sheet Design",
+      "CBT Examination Setup",
+    ],
+  },
+  {
+    title: "ICT Services",
+    items: [
+      "Website Design",
+      "School Portal Development",
+      "Mobile App Development",
+      "Computer Training",
+      "Networking & System Installation",
+      "Online Learning Platform Setup",
+      "Technical Support",
+    ],
+  },
+  {
+    title: "School Management Software",
+    items: [
+      "Student Records Management",
+      "Online Results & Broadsheet",
+      "School Fees Management",
+      "Attendance Management",
+      "Parent Portal Access",
+      "SMS & Notification System",
+      "CBT Examination System",
+      "Staff Management",
+    ],
+  },
+  {
+    title: "Digital School Solutions",
+    items: [
+      "Online School Website",
+      "Virtual Classes",
+      "Learning Portal",
+      "Mobile Application",
+      "Online Payments",
+      "Transcript & Broadsheet Processing",
+    ],
+  },
 ];
 
 const CONTACT_LINES = [
@@ -89,32 +132,26 @@ function Home() {
       <main className="home-main">
         <section className="home-hero">
           <div className="home-hero-copy">
-            <p className="home-kicker">Modern ICT Solution For Schools</p>
-            <h1>Upgrade your school with a smarter digital platform built for daily operations.</h1>
-            <p>
-              Lytebridge Professional Service LTD helps schools manage results, payments, virtual
-              classes, communication, parent engagement, and learning delivery from one reliable
-              portal.
+            <p className="home-kicker">LyteBridge Professional Services</p>
+            <h1>Smart Solutions for Smart Schools</h1>
+            <p className="home-hero-intro">
+              Education services, ICT support, school software, and digital learning solutions for
+              modern institutions.
             </p>
-            <div className="home-hero-metrics">
-              <article>
-                <strong>Free 1 Term Trial</strong>
-                <span>Start at zero cost</span>
-              </article>
-              <article>
-                <strong>N350 / Student</strong>
-                <span>Per term afterwards</span>
-              </article>
-              <article>
-                <strong>Go Paperless</strong>
-                <span>Save cost and time</span>
-              </article>
-            </div>
-            <div className="home-hero-badges">
-              {HIGHLIGHTS.map((item) => (
-                <span key={item}>{item}</span>
+
+            <div className="home-service-grid">
+              {SERVICE_GROUPS.map((group) => (
+                <article key={group.title} className="home-service-card">
+                  <h2>{group.title}</h2>
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
               ))}
             </div>
+
             <div className="home-hero-actions">
               <a href="tel:+2348027453306">Call +2348027453306</a>
               <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
@@ -144,39 +181,34 @@ function Home() {
           </div>
         </section>
 
-        <section className="home-section home-pricing">
-          <div className="home-pricing-grid">
-            <article className="home-pricing-card home-pricing-card--wide">
-              <p className="home-pricing-label">Launch Offer</p>
-              <h2>Free 1 term trial at zero cost.</h2>
-              <p>
-                Launch your school portal, explore the dashboard, and onboard your team before
-                subscription begins.
-              </p>
-            </article>
-            <article className="home-pricing-card">
-              <p className="home-pricing-label">Subscription</p>
-              <p className="home-price">N350</p>
-              <p>Per term, per student.</p>
-            </article>
-            <article className="home-pricing-card home-pricing-card--contact">
-              <p className="home-pricing-label">Need a quick start?</p>
-              <div className="home-pricing-actions">
-                <a href="tel:+2348027453306">Call Us</a>
-                <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
-                  WhatsApp Us
-                </a>
-              </div>
-            </article>
-          </div>
-        </section>
-
         <section className="home-section home-contact">
-          <div className="home-contact-copy">
-            <h2>Ready to launch your school portal?</h2>
-            <p>
-              Reach us for onboarding, deployment, support, and fast setup for your school portal.
-            </p>
+          <div className="home-contact-photo home-contact-photo--primary">
+            <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
+          </div>
+
+          <div className="home-contact-copy-wrap">
+            <div className="home-contact-copy">
+              <p className="home-contact-kicker">Launch Offer</p>
+              <h2>Ready to launch your school portal?</h2>
+              <p>
+                Free 1 term trial at zero cost. Launch your school portal, explore the dashboard,
+                and onboard your team before subscription begins.
+              </p>
+            </div>
+
+            <div className="home-contact-summary">
+              <article className="home-summary-card">
+                <span>Subscription</span>
+                <strong>N350</strong>
+                <p>Per term, per student.</p>
+              </article>
+              <article className="home-summary-card">
+                <span>Support</span>
+                <strong>Fast Setup</strong>
+                <p>Deployment, onboarding, and technical support for your school portal.</p>
+              </article>
+            </div>
+
             <div className="home-contact-grid">
               {CONTACT_LINES.map((line) => (
                 <a key={`${line.phone}-${line.label}`} className="home-contact-card" href={`tel:${line.dial}`}>
@@ -185,21 +217,12 @@ function Home() {
                 </a>
               ))}
             </div>
+
             <div className="home-contact-actions">
-              <a href="tel:+2348027453306">
-                Call 08027453306
-              </a>
+              <a href="tel:+2348027453306">Call 08027453306</a>
               <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
                 WhatsApp Us
               </a>
-            </div>
-          </div>
-          <div className="home-contact-gallery">
-            <div className="home-contact-photo home-contact-photo--primary">
-              <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
-            </div>
-            <div className="home-contact-photo home-contact-photo--secondary">
-              <img src={unlockPotentialArt} alt="Lytebridge school innovation flyer" />
             </div>
           </div>
         </section>

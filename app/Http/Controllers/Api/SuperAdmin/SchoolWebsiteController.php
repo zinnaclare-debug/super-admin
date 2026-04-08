@@ -38,6 +38,8 @@ class SchoolWebsiteController extends Controller
             'website_content.hero_subtitle' => ['nullable', 'string', 'max:600'],
             'website_content.about_title' => ['nullable', 'string', 'max:120'],
             'website_content.about_text' => ['nullable', 'string', 'max:3000'],
+            'website_content.vision_text' => ['nullable', 'string', 'max:3000'],
+            'website_content.mission_text' => ['nullable', 'string', 'max:3000'],
             'website_content.admissions_intro' => ['nullable', 'string', 'max:1200'],
             'website_content.address' => ['nullable', 'string', 'max:255'],
             'website_content.contact_email' => ['nullable', 'email', 'max:255'],
@@ -138,4 +140,7 @@ class SchoolWebsiteController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
+
+
 

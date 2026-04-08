@@ -61,6 +61,7 @@ class SchoolPublicWebsiteData
             'about_title' => self::string($value['about_title'] ?? null, 'About Our School', 120),
             'about_text' => self::string($value['about_text'] ?? null, $schoolName !== '' ? "Learn more about {$schoolName}, our values, and the learning experience we provide for every child." : 'Learn more about our values and learning experience.', 3000),
             'core_values_text' => self::string($value['core_values_text'] ?? null, '', 3000),
+            'vision_text' => self::string($value['vision_text'] ?? null, '', 3000),
             'mission_text' => self::string($value['mission_text'] ?? null, '', 3000),
             'admissions_intro' => self::string($value['admissions_intro'] ?? null, 'Complete the application form to begin admission processing for your child.', 1200),
             'address' => self::string($value['address'] ?? null, $location, 255),
@@ -345,4 +346,9 @@ class SchoolPublicWebsiteData
         return in_array($option, ['A', 'B', 'C', 'D'], true) ? $option : '';
     }
 }
+
+
+
+
+
 

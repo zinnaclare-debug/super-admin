@@ -6,6 +6,8 @@ const emptyWebsiteContent = {
   hero_subtitle: "",
   about_title: "",
   about_text: "",
+  vision_text: "",
+  mission_text: "",
   admissions_intro: "",
   address: "",
   contact_email: "",
@@ -226,7 +228,7 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
         <div>
           <h3>Website</h3>
           <p className="sai-note">
-            Manage what each school subdomain shows on its public home page, admissions form, entrance exam, and score verification page.
+            Manage what each school subdomain shows on its public home page, including About Us, Vision, Mission, admissions, entrance exam, and score verification content.
           </p>
         </div>
         <button type="button" onClick={saveAll} disabled={saving}>
@@ -252,8 +254,16 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
           <input value={websiteContent.address} onChange={(e) => updateWebsiteContent("address", e.target.value)} />
         </div>
         <div className="sai-field sai-field--wide">
-          <label>About Text</label>
+          <label>About Us</label>
           <textarea rows="5" value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} />
+        </div>
+        <div className="sai-field sai-field--wide">
+          <label>Vision</label>
+          <textarea rows="5" value={websiteContent.vision_text} onChange={(e) => updateWebsiteContent("vision_text", e.target.value)} />
+        </div>
+        <div className="sai-field sai-field--wide">
+          <label>Mission</label>
+          <textarea rows="5" value={websiteContent.mission_text} onChange={(e) => updateWebsiteContent("mission_text", e.target.value)} />
         </div>
         <div className="sai-field sai-field--wide">
           <label>Apply Now Intro</label>
@@ -447,4 +457,5 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
     </section>
   );
 }
+
 

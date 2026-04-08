@@ -12,6 +12,7 @@ const emptyWebsiteContent = {
   about_title: "",
   about_text: "",
   core_values_text: "",
+  vision_text: "",
   mission_text: "",
   admissions_intro: "",
   address: "",
@@ -252,7 +253,7 @@ export default function WebsiteAdmin() {
           <span className="website-admin-pill">School Website</span>
           <h1>Shape how your school looks before visitors even click login.</h1>
           <p>
-            Update the homepage message, mission, core values, public contact details,
+            Update the homepage message, About Us, Vision, Mission, public contact details,
             theme colors, and school content from one place.
           </p>
           <div className="website-admin-meta">
@@ -332,8 +333,8 @@ export default function WebsiteAdmin() {
             <textarea rows="5" value={websiteContent.about_text} onChange={(e) => updateWebsiteContent("about_text", e.target.value)} placeholder="Tell visitors about your school." />
           </WebsiteField>
 
-          <WebsiteField label="Core Values" wide>
-            <textarea rows="5" value={websiteContent.core_values_text} onChange={(e) => updateWebsiteContent("core_values_text", e.target.value)} placeholder="What values define your school?" />
+          <WebsiteField label="Vision" wide>
+            <textarea rows="5" value={websiteContent.vision_text} onChange={(e) => updateWebsiteContent("vision_text", e.target.value)} placeholder="What vision leads the school?" />
           </WebsiteField>
 
           <WebsiteField label="Mission" wide>
@@ -467,3 +468,5 @@ export default function WebsiteAdmin() {
     </div>
   );
 }
+
+
