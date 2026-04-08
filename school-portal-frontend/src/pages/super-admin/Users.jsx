@@ -36,7 +36,7 @@ function Users() {
 
       <div style={{ marginTop: 14 }}>
         <strong>Schools</strong>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8, maxWidth: 420 }}>
           {loadingSchools ? (
             <p>Loading schools...</p>
           ) : schools.length === 0 ? (
@@ -47,10 +47,11 @@ function Users() {
                 key={s.id}
                 onClick={() => navigate(`/super-admin/users/${s.id}`)}
                 style={{
-                  padding: "8px 10px",
+                  padding: "10px 12px",
                   borderRadius: 6,
                   border: "1px solid #ccc",
                   background: "#fff",
+                  textAlign: "left",
                 }}
               >
                 {s.name}
