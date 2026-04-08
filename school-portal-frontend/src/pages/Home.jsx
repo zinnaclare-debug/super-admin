@@ -126,11 +126,6 @@ function Home() {
           <div className="home-hero-visual">
             <div className="home-hero-photo-stack">
               <img src={unlockPotentialArt} alt="Lytebridge unlock potential flyer" />
-              <div className="home-hero-aside">
-                <p>School Management Platform</p>
-                <h2>Built for school owners that want speed, visibility, and growth.</h2>
-                <span>Results, broadsheet, CBT, payments, portal, mobile app and more.</span>
-              </div>
             </div>
           </div>
         </section>
