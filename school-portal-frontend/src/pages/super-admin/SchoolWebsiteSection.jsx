@@ -8,6 +8,9 @@ const emptyWebsiteContent = {
   about_text: "",
   vision_text: "",
   mission_text: "",
+  core_functions_title: "",
+  contact_section_title: "",
+  contact_section_intro: "",
   admissions_intro: "",
   address: "",
   contact_email: "",
@@ -265,6 +268,18 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
           <label>Mission</label>
           <textarea rows="5" value={websiteContent.mission_text} onChange={(e) => updateWebsiteContent("mission_text", e.target.value)} />
         </div>
+        <div className="sai-field">
+          <label>Core Functions Title</label>
+          <input value={websiteContent.core_functions_title} onChange={(e) => updateWebsiteContent("core_functions_title", e.target.value)} />
+        </div>
+        <div className="sai-field">
+          <label>Contact Section Title</label>
+          <input value={websiteContent.contact_section_title} onChange={(e) => updateWebsiteContent("contact_section_title", e.target.value)} />
+        </div>
+        <div className="sai-field sai-field--wide">
+          <label>Contact Section Intro</label>
+          <textarea rows="3" value={websiteContent.contact_section_intro} onChange={(e) => updateWebsiteContent("contact_section_intro", e.target.value)} />
+        </div>
         <div className="sai-field sai-field--wide">
           <label>Apply Now Intro</label>
           <textarea rows="3" value={websiteContent.admissions_intro} onChange={(e) => updateWebsiteContent("admissions_intro", e.target.value)} />
@@ -457,5 +472,6 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
     </section>
   );
 }
+
 
 

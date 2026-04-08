@@ -4,7 +4,6 @@ import api from "../services/api";
 import PublicSchoolPortal from "./public-school/PublicSchoolPortal";
 import brandArt from "../assets/home/lytebridge-brand.jpg";
 import coreFunctionsArt from "../assets/home/lytebridge-core-functions.jpeg";
-import unlockPotentialArt from "../assets/home/lytebridge-unlock-potential.jpeg";
 import "./Home.css";
 
 const CORE_FUNCTIONS = [
@@ -24,53 +23,21 @@ const CORE_FUNCTIONS = [
   "Saves Thousands in Paper Costs (Go Paperless)",
 ];
 
-const SERVICE_GROUPS = [
+const COMPANY_OVERVIEW_CARDS = [
   {
-    title: "Education Services",
-    items: [
-      "School Setup & Registration",
-      "Academic Planning & Curriculum Support",
-      "Staff Training & Capacity Building",
-      "School Administration Consulting",
-      "Result & Report Sheet Design",
-      "CBT Examination Setup",
-    ],
+    title: "About Us",
+    text:
+      "LyteBridge Professional Services is a dynamic and innovative solutions provider specializing in Education, ICT, and School Management Software. We help schools, educational institutions, and organizations improve efficiency, embrace digital transformation, and operate with professional standards.",
   },
   {
-    title: "ICT Services",
-    items: [
-      "Website Design",
-      "School Portal Development",
-      "Mobile App Development",
-      "Computer Training",
-      "Networking & System Installation",
-      "Online Learning Platform Setup",
-      "Technical Support",
-    ],
+    title: "Vision",
+    text:
+      "Our services are designed to simplify school administration, enhance teaching and learning, and provide reliable technology solutions tailored to modern educational needs. From school setup and educational consulting to ICT infrastructure and complete school management systems, LyteBridge delivers affordable, user-friendly, and scalable solutions.",
   },
   {
-    title: "School Management Software",
-    items: [
-      "Student Records Management",
-      "Online Results & Broadsheet",
-      "School Fees Management",
-      "Attendance Management",
-      "Parent Portal Access",
-      "SMS & Notification System",
-      "CBT Examination System",
-      "Staff Management",
-    ],
-  },
-  {
-    title: "Digital School Solutions",
-    items: [
-      "Online School Website",
-      "Virtual Classes",
-      "Learning Portal",
-      "Mobile Application",
-      "Online Payments",
-      "Transcript & Broadsheet Processing",
-    ],
+    title: "Mission",
+    text:
+      "At LyteBridge Professional Services, we focus on professionalism, innovation, and excellence. Our goal is to empower institutions to go paperless, save cost, improve productivity, and manage their operations smarter through technology-driven solutions. LyteBridge Professional Services: Empowering Digital Education.",
   },
 ];
 
@@ -134,42 +101,22 @@ function Home() {
           <div className="home-hero-copy">
             <p className="home-kicker">LyteBridge Professional Services</p>
             <h1>Smart Solutions for Smart Schools</h1>
-            <p className="home-hero-intro">
-              Education services, ICT support, school software, and digital learning solutions for
-              modern institutions.
-            </p>
+            <p className="home-hero-intro">Empowering Digital Education</p>
 
-            <div className="home-service-grid">
-              {SERVICE_GROUPS.map((group) => (
-                <article key={group.title} className="home-service-card">
-                  <h2>{group.title}</h2>
-                  <ul>
-                    {group.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
+            <div className="home-overview-grid">
+              {COMPANY_OVERVIEW_CARDS.map((card) => (
+                <article key={card.title} className="home-overview-card">
+                  <h2>{card.title}</h2>
+                  <p>{card.text}</p>
                 </article>
               ))}
-            </div>
-
-            <div className="home-hero-actions">
-              <a href="tel:+2348027453306">Call +2348027453306</a>
-              <a href="https://wa.me/2348027453306" target="_blank" rel="noreferrer">
-                WhatsApp Us
-              </a>
-            </div>
-          </div>
-
-          <div className="home-hero-visual">
-            <div className="home-hero-photo-stack">
-              <img src={unlockPotentialArt} alt="Lytebridge unlock potential flyer" />
             </div>
           </div>
         </section>
 
         <section className="home-section">
           <div className="home-section-head">
-            <h2>Core Functions</h2>
+            <h2>School Management Core Functions</h2>
             <p>Everything your school needs to run a modern digital operation.</p>
           </div>
           <div className="home-feature-grid">
@@ -182,7 +129,7 @@ function Home() {
         </section>
 
         <section className="home-section home-contact">
-          <div className="home-contact-photo home-contact-photo--primary">
+          <div className="home-contact-photo home-contact-photo--flyer">
             <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
           </div>
 
