@@ -129,11 +129,11 @@ function Home() {
         </section>
 
         <section className="home-section home-contact">
-          <div className="home-contact-photo home-contact-photo--flyer">
-            <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
-          </div>
-
           <div className="home-contact-copy-wrap">
+            <div className="home-contact-photo home-contact-photo--flyer">
+              <img src={coreFunctionsArt} alt="Lytebridge core functions flyer" />
+            </div>
+
             <div className="home-contact-copy">
               <p className="home-contact-kicker">Launch Offer</p>
               <h2>Ready to launch your school portal?</h2>

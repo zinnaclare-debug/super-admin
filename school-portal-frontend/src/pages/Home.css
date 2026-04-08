@@ -217,47 +217,52 @@
 }
 
 .home-contact {
-  display: grid;
-  grid-template-columns: 0.94fr 1.06fr;
-  gap: 18px;
-  align-items: stretch;
-}
-
-.home-contact-photo {
-  border-radius: 24px;
-  overflow: hidden;
-  border: 1px solid rgba(12, 91, 45, 0.1);
-  box-shadow: 0 20px 45px rgba(7, 58, 27, 0.12);
-  background: linear-gradient(180deg, #0d542a, #15733a);
-}
-
-.home-contact-photo--flyer {
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.home-contact-photo img {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
   display: block;
-  border-radius: 14px;
 }
 
 .home-contact-copy-wrap {
   display: grid;
   gap: 16px;
   border-radius: 24px;
-  padding: 24px;
+  padding: 0;
   background: linear-gradient(180deg, #ffffff, #f5fff7);
   border: 1px solid rgba(12, 91, 45, 0.1);
+  overflow: hidden;
+}
+
+.home-contact-photo {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.home-contact-photo--flyer {
+  padding: 0;
+  display: block;
+}
+
+.home-contact-photo img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  display: block;
+  border-radius: 0;
+}
+
+.home-contact-copy,
+.home-contact-summary,
+.home-contact-grid,
+.home-contact-actions {
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 .home-contact-copy {
   display: grid;
   gap: 10px;
+  padding-top: 4px;
 }
 
 .home-contact h2 {
@@ -344,6 +349,7 @@
 
 .home-contact-actions {
   margin-top: 6px;
+  margin-bottom: 24px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -387,7 +393,6 @@
   }
 
   .home-overview-grid,
-  .home-contact,
   .home-contact-summary {
     grid-template-columns: 1fr;
   }
@@ -421,10 +426,16 @@
   }
 
   .home-hero-copy,
-  .home-section,
-  .home-contact-copy-wrap,
-  .home-contact-photo--flyer {
+  .home-section {
     padding: 16px 12px;
+  }
+
+  .home-contact-copy,
+  .home-contact-summary,
+  .home-contact-grid,
+  .home-contact-actions {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .home-feature-card {
@@ -433,9 +444,6 @@
 
   .home-contact-actions {
     flex-direction: column;
-  }
-
-  .home-contact-photo {
-    order: -1;
+    margin-bottom: 16px;
   }
 }
