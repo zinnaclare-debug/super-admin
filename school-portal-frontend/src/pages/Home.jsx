@@ -88,7 +88,7 @@ function Home() {
           <img className="home-brand-logo" src={brandArt} alt="Lytebridge Professional Services logo" />
           <div>
             <p className="home-brand-name">Lytebridge Professional Service LTD</p>
-            <p className="home-brand-sub">School Management Platform</p>
+            
           </div>
         </div>
         <Link className="home-login-btn" to="/login">
@@ -179,3 +179,4 @@ function Home() {
 }
 
 export default Home;
+
