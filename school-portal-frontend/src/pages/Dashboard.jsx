@@ -21,27 +21,42 @@ function Overview() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    let active = true;
+
+    const loadStats = async () => {
       try {
-        const [statsRes, contentRes] = await Promise.all([
-          api.get("/api/super-admin/stats"),
-          api.get("/api/super-admin/platform-content"),
-        ]);
+        const res = await api.get("/api/super-admin/stats");
+        if (!active) return;
         setStats({
-          schools: statsRes.data?.schools ?? 0,
-          active_users: statsRes.data?.active_users ?? 0,
-          admins: statsRes.data?.admins ?? 0,
+          schools: res.data?.schools ?? 0,
+          active_users: res.data?.active_users ?? 0,
+          admins: res.data?.admins ?? 0,
         });
-        setPlatformContent({ ...defaultPlatformContent, ...(contentRes.data?.data || {}) });
       } catch {
+        if (!active) return;
         setStats({ schools: 0, active_users: 0, admins: 0 });
-        setPlatformContent(defaultPlatformContent);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    load();
+
+    const loadPlatformContent = async () => {
+      try {
+        const res = await api.get("/api/super-admin/platform-content");
+        if (!active) return;
+        setPlatformContent({ ...defaultPlatformContent, ...(res.data?.data || {}) });
+      } catch {
+        if (!active) return;
+        setPlatformContent(defaultPlatformContent);
+      }
+    };
+
+    loadStats();
+    loadPlatformContent();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const updateField = (field, value) => {
