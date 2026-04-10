@@ -37,7 +37,7 @@ const COMPANY_OVERVIEW_CARDS = [
   {
     title: "Mission",
     text:
-      "At LyteBridge Professional Services, we focus on professionalism, innovation, and excellence. Our goal is to empower institutions to go paperless, save cost, improve productivity, and manage their operations smarter through technology-driven solutions. LyteBridge Professional Services: Empowering Digital Education.",
+      "At LyteBridge Professional Services, we focus on professionalism, innovation, and excellence. Our goal is to empower institutions to go paperless, save cost, improve productivity, and manage their operations smarter through technology-driven solutions.",
   },
 ];
 
@@ -100,8 +100,6 @@ function Home() {
         <section className="home-hero">
           <div className="home-hero-copy">
             <p className="home-kicker">LyteBridge Professional Services</p>
-            <h1>Smart Solutions for Smart Schools</h1>
-            <p className="home-hero-intro">Empowering Digital Education</p>
 
             <div className="home-overview-grid">
               {COMPANY_OVERVIEW_CARDS.map((card) => (
@@ -179,4 +177,5 @@ function Home() {
 }
 
 export default Home;
+
 
