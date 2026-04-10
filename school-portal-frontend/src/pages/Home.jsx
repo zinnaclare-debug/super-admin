@@ -23,23 +23,14 @@ const CORE_FUNCTIONS = [
   "Saves Thousands in Paper Costs (Go Paperless)",
 ];
 
-const COMPANY_OVERVIEW_CARDS = [
-  {
-    title: "About Us",
-    text:
-      "LyteBridge Professional Services is a dynamic and innovative solutions provider specializing in Education, ICT, and School Management Software. We help schools, educational institutions, and organizations improve efficiency, embrace digital transformation, and operate with professional standards.",
-  },
-  {
-    title: "Vision",
-    text:
-      "Our services are designed to simplify school administration, enhance teaching and learning, and provide reliable technology solutions tailored to modern educational needs. From school setup and educational consulting to ICT infrastructure and complete school management systems, LyteBridge delivers affordable, user-friendly, and scalable solutions.",
-  },
-  {
-    title: "Mission",
-    text:
-      "At LyteBridge Professional Services, we focus on professionalism, innovation, and excellence. Our goal is to empower institutions to go paperless, save cost, improve productivity, and manage their operations smarter through technology-driven solutions.",
-  },
-];
+const DEFAULT_PLATFORM_CONTENT = {
+  about_text:
+    "LyteBridge Professional Services is a dynamic and innovative solutions provider specializing in Education, ICT, and School Management Software. We help schools, educational institutions, and organizations improve efficiency, embrace digital transformation, and operate with professional standards.",
+  vision_text:
+    "Our services are designed to simplify school administration, enhance teaching and learning, and provide reliable technology solutions tailored to modern educational needs. From school setup and educational consulting to ICT infrastructure and complete school management systems, LyteBridge delivers affordable, user-friendly, and scalable solutions.",
+  mission_text:
+    "At LyteBridge Professional Services, we focus on professionalism, innovation, and excellence. Our goal is to empower institutions to go paperless, save cost, improve productivity, and manage their operations smarter through technology-driven solutions.",
+};
 
 const CONTACT_LINES = [
   { phone: "+2348027453306", dial: "+2348027453306", label: "Call us now" },
@@ -49,20 +40,28 @@ const CONTACT_LINES = [
 
 function Home() {
   const [siteData, setSiteData] = useState(null);
+  const [platformContent, setPlatformContent] = useState(DEFAULT_PLATFORM_CONTENT);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    api
-      .get("/api/public/school-site")
-      .then((res) => {
+    Promise.allSettled([
+      api.get("/api/public/school-site"),
+      api.get("/api/public/platform-content"),
+    ])
+      .then(([siteResult, contentResult]) => {
         if (!active) return;
-        setSiteData(res.data || null);
-      })
-      .catch(() => {
-        if (!active) return;
-        setSiteData(null);
+
+        if (siteResult.status === "fulfilled") {
+          setSiteData(siteResult.value.data || null);
+        } else {
+          setSiteData(null);
+        }
+
+        if (contentResult.status === "fulfilled") {
+          setPlatformContent({ ...DEFAULT_PLATFORM_CONTENT, ...(contentResult.value.data?.data || {}) });
+        }
       })
       .finally(() => {
         if (active) setLoaded(true);
@@ -81,6 +80,12 @@ function Home() {
     return <PublicSchoolPortal page="home" initialSiteData={siteData} />;
   }
 
+  const companyOverviewCards = [
+    { title: "About Us", text: platformContent.about_text },
+    { title: "Vision", text: platformContent.vision_text },
+    { title: "Mission", text: platformContent.mission_text },
+  ];
+
   return (
     <div className="home-page">
       <header className="home-nav">
@@ -88,7 +93,6 @@ function Home() {
           <img className="home-brand-logo" src={brandArt} alt="Lytebridge Professional Services logo" />
           <div>
             <p className="home-brand-name">Lytebridge Professional Service LTD</p>
-            
           </div>
         </div>
         <Link className="home-login-btn" to="/login">
@@ -99,10 +103,8 @@ function Home() {
       <main className="home-main">
         <section className="home-hero">
           <div className="home-hero-copy">
-            <p className="home-kicker">LyteBridge Professional Services</p>
-
             <div className="home-overview-grid">
-              {COMPANY_OVERVIEW_CARDS.map((card) => (
+              {companyOverviewCards.map((card) => (
                 <article key={card.title} className="home-overview-card">
                   <h2>{card.title}</h2>
                   <p>{card.text}</p>
@@ -177,5 +179,3 @@ function Home() {
 }
 
 export default Home;
-
-

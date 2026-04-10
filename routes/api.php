@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\TenantContextController;
 use App\Http\Controllers\Api\Payments\PaystackWebhookController;
 use App\Http\Controllers\Api\PublicSchoolWebsiteController;
+use App\Http\Controllers\Api\PublicPlatformContentController;
 
 use App\Http\Controllers\Api\SuperAdmin\SchoolController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolFeatureController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\SuperAdmin\LoginDetailsController as SuperAdminLogi
 use App\Http\Controllers\Api\SuperAdmin\PaymentsController as SuperAdminPaymentsController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolSubscriptionController as SuperAdminSchoolSubscriptionController;
 use App\Http\Controllers\Api\SuperAdmin\SchoolWebsiteController as SuperAdminSchoolWebsiteController;
+use App\Http\Controllers\Api\SuperAdmin\PlatformContentController as SuperAdminPlatformContentController;
 
 use App\Http\Controllers\Api\SchoolAdmin\RegistrationController;
 use App\Http\Controllers\Api\SchoolAdmin\UserManagementController;
@@ -68,6 +70,7 @@ Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/tenant/context', [TenantContextController::class, 'show']);
 Route::get('/public/school-site', [PublicSchoolWebsiteController::class, 'show']);
+Route::get('/public/platform-content', [PublicPlatformContentController::class, 'show']);
 Route::get('/public/school-contents', [PublicSchoolWebsiteController::class, 'contents']);
 Route::post('/public/apply-now', [PublicSchoolWebsiteController::class, 'applyNow']);
 Route::post('/public/entrance-exam/lookup', [PublicSchoolWebsiteController::class, 'lookupEntranceExam']);
@@ -87,6 +90,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
 
     Route::get('/super-admin/dashboard', [DashboardController::class, 'index']);
     Route::get('/super-admin/stats', [DashboardController::class, 'stats']);
+    Route::get('/super-admin/platform-content', [SuperAdminPlatformContentController::class, 'show']);
+    Route::put('/super-admin/platform-content', [SuperAdminPlatformContentController::class, 'update']);
 
     Route::get('/super-admin/users', [UserController::class, 'index']);
     Route::post('/super-admin/users', [UserController::class, 'store']);
@@ -518,6 +523,8 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
+
 
 
 
