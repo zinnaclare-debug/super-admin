@@ -123,6 +123,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [contentFeed, setContentFeed] = useState(initialSiteData?.school?.content_feed || { data: [], meta: { current_page: 1, last_page: 1, total: 0 } });
   const [contentLoading, setContentLoading] = useState(false);
   const [expandedContentIds, setExpandedContentIds] = useState({});
+  const [activeImage, setActiveImage] = useState("");
   const [applyForm, setApplyForm] = useState({
     full_name: "",
     phone: "",
@@ -572,9 +573,19 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
                   </div>
                   {item.image_urls?.length ? (
                     <div className="school-site-content-gallery">
-                      {item.image_urls.map((url, index) => (
-                        <img key={`${item.id}-${index}`} src={toAbsoluteUrl(url)} alt={`${item.heading} ${index + 1}`} />
-                      ))}
+                      {item.image_urls.map((url, index) => {
+                        const imageUrl = toAbsoluteUrl(url);
+                        return (
+                          <button
+                            key={`${item.id}-${index}`}
+                            type="button"
+                            className="school-site-content-image-btn"
+                            onClick={() => setActiveImage(imageUrl)}
+                          >
+                            <img src={imageUrl} alt={`${item.heading} ${index + 1}`} />
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </article>
@@ -916,6 +927,15 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       ) : null}
 
 
+      {activeImage ? (
+        <div className="school-site-lightbox" role="dialog" aria-modal="true" onClick={() => setActiveImage("")}>
+          <button type="button" className="school-site-lightbox-close" onClick={() => setActiveImage("")}>Close</button>
+          <div className="school-site-lightbox-stage" onClick={(event) => event.stopPropagation()}>
+            <img src={activeImage} alt="Selected school content" />
+          </div>
+        </div>
+      ) : null}
+
       {!hideExamChrome ? (
       <footer className="school-site-footer">
         <div className="school-site-footer-mark">
@@ -930,6 +950,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
+
 
 
 
