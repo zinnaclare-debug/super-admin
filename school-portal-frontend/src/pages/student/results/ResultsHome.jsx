@@ -73,10 +73,13 @@ export default function StudentResultsHome() {
   const [assessmentSchema, setAssessmentSchema] = useState(DEFAULT_SCHEMA);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [requestingPdf, setRequestingPdf] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [pdfJob, setPdfJob] = useState(null);
   const [error, setError] = useState("");
 
   const caIndices = useMemo(() => activeCaIndices(assessmentSchema), [assessmentSchema]);
+  const isPdfProcessing = pdfJob && ["pending", "processing"].includes(pdfJob.status);
 
   const loadClasses = async () => {
     setLoadingClasses(true);
@@ -127,18 +130,66 @@ export default function StudentResultsHome() {
   }, []);
 
   useEffect(() => {
+    setPdfJob(null);
     loadResults(selected);
   }, [selected]);
 
-  const downloadResultPdf = async () => {
+  useEffect(() => {
+    if (!pdfJob?.id || !["pending", "processing"].includes(pdfJob.status)) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/student/results/download-jobs/${pdfJob.id}`);
+        if (!cancelled) {
+          setPdfJob(res.data?.data || null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setPdfJob((current) =>
+            current
+              ? {
+                  ...current,
+                  status: "failed",
+                  error_message:
+                    e?.response?.data?.message || "Failed to refresh PDF status. Please try again.",
+                }
+              : current
+          );
+        }
+      }
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pdfJob]);
+
+  const startResultPdfGeneration = async () => {
     if (!selected) return;
+    setRequestingPdf(true);
+    setError("");
+    try {
+      const res = await api.post("/api/student/results/download-jobs", {
+        class_id: selected.class_id,
+        term_id: selected.term_id,
+      });
+      setPdfJob(res.data?.data || null);
+    } catch (e) {
+      alert(e?.response?.data?.message || e?.message || "Failed to start result PDF generation");
+    } finally {
+      setRequestingPdf(false);
+    }
+  };
+
+  const downloadGeneratedResultPdf = async () => {
+    if (!selected || !pdfJob?.id) return;
     setDownloading(true);
     try {
-      const res = await api.get("/api/student/results/download", {
-        params: {
-          class_id: selected.class_id,
-          term_id: selected.term_id,
-        },
+      const res = await api.get(`/api/student/results/download-jobs/${pdfJob.id}/file`, {
         responseType: "blob",
       });
       const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
@@ -155,7 +206,7 @@ export default function StudentResultsHome() {
       link.href = blobUrl;
       link.download = fileNameFromHeaders(
         res.headers,
-        `${(selected.class_name || "class").replace(/\s+/g, "_")}_${(selected.term_name || "term").replace(/\s+/g, "_")}_result.pdf`
+        pdfJob.file_name || `${(selected.class_name || "class").replace(/\s+/g, "_")}_${(selected.term_name || "term").replace(/\s+/g, "_")}_result.pdf`
       );
       document.body.appendChild(link);
       link.click();
@@ -173,6 +224,25 @@ export default function StudentResultsHome() {
     }
   };
 
+  const pdfActionLabel = (() => {
+    if (requestingPdf) return "Starting...";
+    if (downloading) return "Downloading...";
+    if (pdfJob?.status === "completed") return "Download Ready PDF";
+    if (pdfJob?.status === "failed") return "Retry Result PDF";
+    if (pdfJob?.status === "processing") return "Processing PDF...";
+    if (pdfJob?.status === "pending") return "Queued...";
+    return "Generate Result PDF";
+  })();
+
+  const handlePdfAction = () => {
+    if (pdfJob?.status === "completed") {
+      downloadGeneratedResultPdf();
+      return;
+    }
+
+    startResultPdfGeneration();
+  };
+
   return (
     <div className="rs-page rs-page--student">
       <section className="rs-hero">
@@ -180,7 +250,7 @@ export default function StudentResultsHome() {
           <span className="rs-pill">Student Results</span>
           <h2 className="rs-title">Track your performance by class and term</h2>
           <p className="rs-subtitle">
-            Switch across assigned class records, review CA and exam scores, and download your result PDF instantly.
+            Switch across assigned class records, review CA and exam scores, then generate your school-specific PDF when you are ready.
           </p>
           <div className="rs-meta">
             <span>{loadingClasses ? "Loading..." : `${classes.length} class record${classes.length === 1 ? "" : "s"}`}</span>
@@ -236,10 +306,34 @@ export default function StudentResultsHome() {
               <h3 className="rs-results-title">
                 {selected.class_name} - {selected.term_name}
               </h3>
-              <button className="rs-btn" onClick={downloadResultPdf} disabled={loadingResults || downloading}>
-                {downloading ? "Downloading..." : "Download Result PDF"}
+              <button
+                className="rs-btn"
+                onClick={handlePdfAction}
+                disabled={loadingResults || requestingPdf || downloading || isPdfProcessing}
+              >
+                {pdfActionLabel}
               </button>
             </div>
+
+            {pdfJob?.status === "pending" || pdfJob?.status === "processing" ? (
+              <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>
+                {pdfJob.status === "processing"
+                  ? "Your result PDF is being prepared for this school. We will keep checking until it is ready."
+                  : "Your result PDF request is in queue. Processing will begin shortly."}
+              </p>
+            ) : null}
+
+            {pdfJob?.status === "completed" ? (
+              <p className="rs-state" style={{ marginTop: 10 }}>
+                Your result PDF is ready. Click the button above to download it.
+              </p>
+            ) : null}
+
+            {pdfJob?.status === "failed" ? (
+              <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>
+                {pdfJob.error_message || "Result PDF generation failed. Please try again."}
+              </p>
+            ) : null}
 
             {loadingResults ? (
               <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>

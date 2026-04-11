@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Student;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateStudentResultPdfJob;
 use App\Models\AcademicSession;
+use App\Models\GeneratedDocument;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
 use App\Models\School;
@@ -268,7 +270,6 @@ class ResultsController extends Controller
             'assessment_schema' => $this->assessmentSchemaForSchool($schoolId),
         ]);
     }
-
     // GET /api/student/results/download?class_id=1&term_id=2
     public function download(Request $request)
     {
@@ -326,144 +327,20 @@ class ResultsController extends Controller
         }
 
         try {
-            @set_time_limit(120);
-            @ini_set('memory_limit', '512M');
-
-            $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
-
-            $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->where('student_id', $student->id)
-                ->first();
-
-            $attendance = StudentAttendance::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->where('student_id', $student->id)
-                ->first();
-            $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->first();
-
-            $classTeacher = $this->resolveClassTeacherForStudentTerm(
-                $schoolId,
+            $generated = $this->buildStudentResultPdfForResolvedStudent(
+                $user,
+                $user,
+                $student,
+                $session,
+                $term,
                 $class,
-                (int) $student->id,
+                $classId,
                 $termId
             );
 
-            $school = $user->school;
-            $studentPhotoPath = $student?->photo_path ?: $user?->photo_path;
-
-            $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $summary = $this->summarizeRows($schoolId, $rows);
-            $totalScore = $summary['total_score'];
-            $averageScore = $summary['average_score'];
-            $overallGrade = $summary['overall_grade'];
-            $averageDisplay = $summary['average_display'];
-
-            $teacherComment = (string) ($attendance?->comment ?? '');
-            if ($teacherComment === '') {
-                $teacherComment = $overallGrade !== '-'
-                    ? $this->defaultTeacherComment((int) round($averageScore))
-                    : 'No graded subject available yet.';
-            }
-            $schoolHeadComment = $overallGrade !== '-'
-                ? $this->defaultHeadComment((int) round($averageScore))
-                : 'No graded subject available yet.';
-
-            $behaviourTraits = [
-                ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-                ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-                ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-                ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-                ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-                ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-                ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-            ];
-
-            $viewData = [
-                'school' => $school,
-                'session' => $session,
-                'term' => $term,
-                'class' => $class,
-                'student' => $student,
-                'studentUser' => $user,
-                'rows' => $rows,
-                'totalScore' => $totalScore,
-                'averageScore' => $averageScore,
-                'averageDisplay' => $averageDisplay,
-                'overallGrade' => $overallGrade,
-                'attendance' => $attendance,
-                'attendanceSetting' => $attendanceSetting,
-                'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
-                'teacherComment' => $teacherComment,
-                'schoolHeadComment' => $schoolHeadComment,
-                'classTeacher' => $classTeacher,
-                'behaviourTraits' => $behaviourTraits,
-                'assessmentSchema' => $assessmentSchema,
-                'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
-                'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
-                'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
-            ];
-
-            $viewDataWithAssets = $viewData;
-            $viewDataWithoutAssets = $viewData;
-            $viewDataWithoutAssets['schoolLogoDataUri'] = null;
-            $viewDataWithoutAssets['studentPhotoDataUri'] = null;
-            $viewDataWithoutAssets['headSignatureDataUri'] = null;
-
-            try {
-                $pdfOutput = $this->renderStudentResultPdf($viewDataWithAssets);
-            } catch (Throwable $pdfError) {
-                Log::warning('Student result PDF primary render failed, retrying without embedded images', [
-                    'school_id' => $schoolId,
-                    'user_id' => $user->id ?? null,
-                    'student_id' => $student->id ?? null,
-                    'class_id' => $classId,
-                    'term_id' => $termId,
-                    'error' => $pdfError->getMessage(),
-                ]);
-
-                try {
-                    $pdfOutput = $this->renderStudentResultPdf($viewDataWithoutAssets);
-                } catch (Throwable $fallbackError) {
-                    Log::warning('Student result PDF image-free render failed, trying simplified template with assets', [
-                        'school_id' => $schoolId,
-                        'user_id' => $user->id ?? null,
-                        'student_id' => $student->id ?? null,
-                        'class_id' => $classId,
-                        'term_id' => $termId,
-                        'error' => $fallbackError->getMessage(),
-                    ]);
-
-                    try {
-                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithAssets);
-                    } catch (Throwable $simpleWithAssetError) {
-                        Log::warning('Student result simplified template with assets failed, using simplified template without assets', [
-                            'school_id' => $schoolId,
-                            'user_id' => $user->id ?? null,
-                            'student_id' => $student->id ?? null,
-                            'class_id' => $classId,
-                            'term_id' => $termId,
-                            'error' => $simpleWithAssetError->getMessage(),
-                        ]);
-
-                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithoutAssets);
-                    }
-                }
-            }
-
-            $safeStudent = Str::slug((string) $user->name ?: 'student');
-            $safeTerm = Str::slug((string) $term->name ?: 'term');
-            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-            $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
-
-            return response($pdfOutput, 200, [
+            return response($generated['pdf_output'], 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="' . $generated['file_name'] . '"',
             ]);
         } catch (Throwable $e) {
             Log::error('Student result PDF generation failed', [
@@ -479,6 +356,215 @@ class ResultsController extends Controller
                 'message' => 'Unable to generate result PDF. Please check student/session data and branding images.',
             ], 500);
         }
+    }
+
+    // POST /api/student/results/download-jobs
+    public function requestDownloadJob(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+
+        if (!$user->school || !$user->school->results_published) {
+            return response()->json(['message' => 'Results are not yet published for your school'], 403);
+        }
+
+        $payload = $request->validate([
+            'class_id' => 'required|integer',
+            'term_id' => 'required|integer',
+        ]);
+
+        $schoolId = (int) $user->school_id;
+        $classId = (int) $payload['class_id'];
+        $termId = (int) $payload['term_id'];
+
+        $session = AcademicSession::where('school_id', $schoolId)
+            ->where('status', 'current')
+            ->first();
+
+        if (!$session) {
+            return response()->json(['message' => 'No current session found'], 422);
+        }
+
+        $student = Student::where('user_id', $user->id)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$student) {
+            return response()->json(['message' => 'Student record not found'], 404);
+        }
+
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (!in_array($classId, $classIds, true)) {
+            return response()->json(['message' => 'You are not enrolled in the selected class for this session'], 403);
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+        if (!$class) {
+            return response()->json(['message' => 'Class not found'], 404);
+        }
+
+        $term = Term::where('id', $termId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+        if (!$term) {
+            return response()->json(['message' => 'Term not found'], 404);
+        }
+
+        $safeStudent = Str::slug((string) ($user->name ?: 'student'));
+        $safeTerm = Str::slug((string) ($term->name ?: 'term'));
+        $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+
+        $document = GeneratedDocument::create([
+            'school_id' => $schoolId,
+            'requested_by_user_id' => (int) $user->id,
+            'type' => 'student_result_pdf',
+            'status' => GeneratedDocument::STATUS_PENDING,
+            'disk' => 'local',
+            'payload' => [
+                'class_id' => $classId,
+                'term_id' => $termId,
+            ],
+            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf",
+        ]);
+
+        GenerateStudentResultPdfJob::dispatch((int) $document->id);
+
+        return response()->json([
+            'message' => 'Result PDF generation started.',
+            'data' => $this->generatedDocumentPayload($document),
+        ], 202);
+    }
+
+    // GET /api/student/results/download-jobs/{generatedDocument}
+    public function downloadJobStatus(Request $request, GeneratedDocument $generatedDocument)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+
+        if (
+            (int) $generatedDocument->requested_by_user_id !== (int) $user->id
+            || (int) $generatedDocument->school_id !== (int) $user->school_id
+            || (string) $generatedDocument->type !== 'student_result_pdf'
+        ) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $generatedDocument->refresh();
+
+        return response()->json([
+            'data' => $this->generatedDocumentPayload($generatedDocument),
+        ]);
+    }
+
+    // GET /api/student/results/download-jobs/{generatedDocument}/file
+    public function downloadGeneratedFile(Request $request, GeneratedDocument $generatedDocument)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+
+        if (
+            (int) $generatedDocument->requested_by_user_id !== (int) $user->id
+            || (int) $generatedDocument->school_id !== (int) $user->school_id
+            || (string) $generatedDocument->type !== 'student_result_pdf'
+        ) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        if ($generatedDocument->status !== GeneratedDocument::STATUS_COMPLETED || !$generatedDocument->file_path) {
+            return response()->json(['message' => 'Document is still processing.'], 409);
+        }
+
+        $disk = (string) ($generatedDocument->disk ?: 'local');
+        if (!Storage::disk($disk)->exists($generatedDocument->file_path)) {
+            return response()->json(['message' => 'Generated file not found.'], 404);
+        }
+
+        return Storage::disk($disk)->download(
+            $generatedDocument->file_path,
+            $generatedDocument->file_name ?: 'student_result.pdf',
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    public function generateStudentResultPdfDocumentForJob(int $requestingUserId, int $schoolId, int $classId, int $termId): array
+    {
+        $user = User::where('id', $requestingUserId)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$user || $user->role !== 'student') {
+            throw new \RuntimeException('Student user not found for document generation.');
+        }
+
+        $school = $user->school ?: $user->school()->first();
+        if (!$school || !$school->results_published) {
+            throw new \RuntimeException('Results are not published for this school.');
+        }
+
+        $session = AcademicSession::where('school_id', $schoolId)
+            ->where('status', 'current')
+            ->first();
+        if (!$session) {
+            throw new \RuntimeException('No current session found.');
+        }
+
+        $student = Student::where('user_id', $user->id)
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$student) {
+            throw new \RuntimeException('Student record not found.');
+        }
+
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (!in_array($classId, $classIds, true)) {
+            throw new \RuntimeException('Student is not enrolled in the selected class for this session.');
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+        if (!$class) {
+            throw new \RuntimeException('Class not found.');
+        }
+
+        $term = Term::where('id', $termId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+        if (!$term) {
+            throw new \RuntimeException('Term not found.');
+        }
+
+        return $this->buildStudentResultPdfForResolvedStudent(
+            $user,
+            $user,
+            $student,
+            $session,
+            $term,
+            $class,
+            $classId,
+            $termId
+        );
+    }
+
+    private function generatedDocumentPayload(GeneratedDocument $generatedDocument): array
+    {
+        return [
+            'id' => (int) $generatedDocument->id,
+            'type' => (string) $generatedDocument->type,
+            'status' => (string) $generatedDocument->status,
+            'file_name' => $generatedDocument->file_name,
+            'error_message' => $generatedDocument->error_message,
+            'can_download' => $generatedDocument->status === GeneratedDocument::STATUS_COMPLETED && !empty($generatedDocument->file_path),
+            'created_at' => optional($generatedDocument->created_at)->toIso8601String(),
+            'started_at' => optional($generatedDocument->started_at)->toIso8601String(),
+            'completed_at' => optional($generatedDocument->completed_at)->toIso8601String(),
+        ];
     }
 
     // GET /api/school-admin/reports/student-result/download?student=...&academic_session_id=...&term_id=...
@@ -841,6 +927,160 @@ class ResultsController extends Controller
 
         return $classFromEnrollmentSession ? (int) $classFromEnrollmentSession : null;
     }
+    private function buildStudentResultPdfForResolvedStudent(
+        User $actor,
+        User $studentUser,
+        Student $student,
+        AcademicSession $session,
+        Term $term,
+        SchoolClass $class,
+        int $classId,
+        int $termId
+    ): array {
+        $schoolId = (int) $actor->school_id;
+
+        @set_time_limit(120);
+        @ini_set('memory_limit', '512M');
+
+        $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+
+        $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('term_id', $termId)
+            ->where('student_id', $student->id)
+            ->first();
+
+        $attendance = StudentAttendance::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('term_id', $termId)
+            ->where('student_id', $student->id)
+            ->first();
+        $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('term_id', $termId)
+            ->first();
+
+        $classTeacher = $this->resolveClassTeacherForStudentTerm(
+            $schoolId,
+            $class,
+            (int) $student->id,
+            $termId
+        );
+
+        $school = $actor->school ?: $actor->school()->first();
+        $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
+
+        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+        $summary = $this->summarizeRows($schoolId, $rows);
+        $totalScore = $summary['total_score'];
+        $averageScore = $summary['average_score'];
+        $overallGrade = $summary['overall_grade'];
+        $averageDisplay = $summary['average_display'];
+
+        $teacherComment = (string) ($attendance?->comment ?? '');
+        if ($teacherComment === '') {
+            $teacherComment = $overallGrade !== '-'
+                ? $this->defaultTeacherComment((int) round($averageScore))
+                : 'No graded subject available yet.';
+        }
+        $schoolHeadComment = $overallGrade !== '-'
+            ? $this->defaultHeadComment((int) round($averageScore))
+            : 'No graded subject available yet.';
+
+        $behaviourTraits = [
+            ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
+            ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
+            ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
+            ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
+            ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
+            ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
+            ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
+        ];
+
+        $viewData = [
+            'school' => $school,
+            'session' => $session,
+            'term' => $term,
+            'class' => $class,
+            'student' => $student,
+            'studentUser' => $studentUser,
+            'rows' => $rows,
+            'totalScore' => $totalScore,
+            'averageScore' => $averageScore,
+            'averageDisplay' => $averageDisplay,
+            'overallGrade' => $overallGrade,
+            'attendance' => $attendance,
+            'attendanceSetting' => $attendanceSetting,
+            'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
+            'teacherComment' => $teacherComment,
+            'schoolHeadComment' => $schoolHeadComment,
+            'classTeacher' => $classTeacher,
+            'behaviourTraits' => $behaviourTraits,
+            'assessmentSchema' => $assessmentSchema,
+            'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
+            'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
+            'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
+        ];
+
+        $viewDataWithAssets = $viewData;
+        $viewDataWithoutAssets = $viewData;
+        $viewDataWithoutAssets['schoolLogoDataUri'] = null;
+        $viewDataWithoutAssets['studentPhotoDataUri'] = null;
+        $viewDataWithoutAssets['headSignatureDataUri'] = null;
+
+        try {
+            $pdfOutput = $this->renderStudentResultPdf($viewDataWithAssets);
+        } catch (Throwable $pdfError) {
+            Log::warning('Student result PDF primary render failed, retrying without embedded images', [
+                'school_id' => $schoolId,
+                'actor_user_id' => $actor->id ?? null,
+                'student_user_id' => $studentUser->id ?? null,
+                'student_id' => $student->id ?? null,
+                'class_id' => $classId,
+                'term_id' => $termId,
+                'error' => $pdfError->getMessage(),
+            ]);
+
+            try {
+                $pdfOutput = $this->renderStudentResultPdf($viewDataWithoutAssets);
+            } catch (Throwable $fallbackError) {
+                Log::warning('Student result PDF image-free render failed, trying simplified template with assets', [
+                    'school_id' => $schoolId,
+                    'actor_user_id' => $actor->id ?? null,
+                    'student_user_id' => $studentUser->id ?? null,
+                    'student_id' => $student->id ?? null,
+                    'class_id' => $classId,
+                    'term_id' => $termId,
+                    'error' => $fallbackError->getMessage(),
+                ]);
+
+                try {
+                    $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithAssets);
+                } catch (Throwable $simpleWithAssetError) {
+                    Log::warning('Student result simplified template with assets failed, using simplified template without assets', [
+                        'school_id' => $schoolId,
+                        'actor_user_id' => $actor->id ?? null,
+                        'student_user_id' => $studentUser->id ?? null,
+                        'student_id' => $student->id ?? null,
+                        'class_id' => $classId,
+                        'term_id' => $termId,
+                        'error' => $simpleWithAssetError->getMessage(),
+                    ]);
+
+                    $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithoutAssets);
+                }
+            }
+        }
+
+        $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+        $safeTerm = Str::slug((string) ($term->name ?: 'term'));
+        $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+
+        return [
+            'pdf_output' => $pdfOutput,
+            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf",
+        ];
+    }
 
     private function downloadPdfForResolvedStudent(
         User $actor,
@@ -855,147 +1095,20 @@ class ResultsController extends Controller
         $schoolId = (int) $actor->school_id;
 
         try {
-            @set_time_limit(120);
-            @ini_set('memory_limit', '512M');
-
-            $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
-
-            $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->where('student_id', $student->id)
-                ->first();
-
-            $attendance = StudentAttendance::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->where('student_id', $student->id)
-                ->first();
-            $attendanceSetting = TermAttendanceSetting::where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('term_id', $termId)
-                ->first();
-
-            $classTeacher = $this->resolveClassTeacherForStudentTerm(
-                $schoolId,
+            $generated = $this->buildStudentResultPdfForResolvedStudent(
+                $actor,
+                $studentUser,
+                $student,
+                $session,
+                $term,
                 $class,
-                (int) $student->id,
+                $classId,
                 $termId
             );
 
-            $school = $actor->school ?: $actor->school()->first();
-            $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
-
-            $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
-            $summary = $this->summarizeRows($schoolId, $rows);
-            $totalScore = $summary['total_score'];
-            $averageScore = $summary['average_score'];
-            $overallGrade = $summary['overall_grade'];
-            $averageDisplay = $summary['average_display'];
-
-            $teacherComment = (string) ($attendance?->comment ?? '');
-            if ($teacherComment === '') {
-                $teacherComment = $overallGrade !== '-'
-                    ? $this->defaultTeacherComment((int) round($averageScore))
-                    : 'No graded subject available yet.';
-            }
-            $schoolHeadComment = $overallGrade !== '-'
-                ? $this->defaultHeadComment((int) round($averageScore))
-                : 'No graded subject available yet.';
-
-            $behaviourTraits = [
-                ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-                ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-                ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-                ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-                ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-                ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-                ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-            ];
-
-            $viewData = [
-                'school' => $school,
-                'session' => $session,
-                'term' => $term,
-                'class' => $class,
-                'student' => $student,
-                'studentUser' => $studentUser,
-                'rows' => $rows,
-                'totalScore' => $totalScore,
-                'averageScore' => $averageScore,
-                'averageDisplay' => $averageDisplay,
-                'overallGrade' => $overallGrade,
-                'attendance' => $attendance,
-                'attendanceSetting' => $attendanceSetting,
-                'nextTermBeginDate' => $attendanceSetting?->next_term_begin_date,
-                'teacherComment' => $teacherComment,
-                'schoolHeadComment' => $schoolHeadComment,
-                'classTeacher' => $classTeacher,
-                'behaviourTraits' => $behaviourTraits,
-                'assessmentSchema' => $assessmentSchema,
-                'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
-                'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
-                'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
-            ];
-
-            $viewDataWithAssets = $viewData;
-            $viewDataWithoutAssets = $viewData;
-            $viewDataWithoutAssets['schoolLogoDataUri'] = null;
-            $viewDataWithoutAssets['studentPhotoDataUri'] = null;
-            $viewDataWithoutAssets['headSignatureDataUri'] = null;
-
-            try {
-                $pdfOutput = $this->renderStudentResultPdf($viewDataWithAssets);
-            } catch (Throwable $pdfError) {
-                Log::warning('School-admin student result PDF primary render failed, retrying without embedded images', [
-                    'school_id' => $schoolId,
-                    'actor_user_id' => $actor->id ?? null,
-                    'student_user_id' => $studentUser->id ?? null,
-                    'student_id' => $student->id ?? null,
-                    'class_id' => $classId,
-                    'term_id' => $termId,
-                    'error' => $pdfError->getMessage(),
-                ]);
-
-                try {
-                    $pdfOutput = $this->renderStudentResultPdf($viewDataWithoutAssets);
-                } catch (Throwable $fallbackError) {
-                    Log::warning('School-admin student result image-free render failed, trying simplified template with assets', [
-                        'school_id' => $schoolId,
-                        'actor_user_id' => $actor->id ?? null,
-                        'student_user_id' => $studentUser->id ?? null,
-                        'student_id' => $student->id ?? null,
-                        'class_id' => $classId,
-                        'term_id' => $termId,
-                        'error' => $fallbackError->getMessage(),
-                    ]);
-
-                    try {
-                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithAssets);
-                    } catch (Throwable $simpleWithAssetError) {
-                        Log::warning('School-admin student result simplified template with assets failed, using simplified template without assets', [
-                            'school_id' => $schoolId,
-                            'actor_user_id' => $actor->id ?? null,
-                            'student_user_id' => $studentUser->id ?? null,
-                            'student_id' => $student->id ?? null,
-                            'class_id' => $classId,
-                            'term_id' => $termId,
-                            'error' => $simpleWithAssetError->getMessage(),
-                        ]);
-
-                        $pdfOutput = $this->renderSimpleStudentResultPdf($viewDataWithoutAssets);
-                    }
-                }
-            }
-
-            $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-            $safeTerm = Str::slug((string) ($term->name ?: 'term'));
-            $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
-            $filename = "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf";
-
-            return response($pdfOutput, 200, [
+            return response($generated['pdf_output'], 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="' . $generated['file_name'] . '"',
             ]);
         } catch (Throwable $e) {
             Log::error('School-admin student result PDF generation failed', [
@@ -1587,6 +1700,9 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
+
+
 
 
 

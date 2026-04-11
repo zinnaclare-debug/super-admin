@@ -508,6 +508,9 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/results/classes', [StudentResultsController::class, 'classes']);
     Route::get('/student/results', [StudentResultsController::class, 'index']);
     Route::get('/student/results/download', [StudentResultsController::class, 'download']);
+    Route::post('/student/results/download-jobs', [StudentResultsController::class, 'requestDownloadJob']);
+    Route::get('/student/results/download-jobs/{generatedDocument}', [StudentResultsController::class, 'downloadJobStatus']);
+    Route::get('/student/results/download-jobs/{generatedDocument}/file', [StudentResultsController::class, 'downloadGeneratedFile']);
     Route::get('/student/topics/subjects', [StudentTopicsController::class, 'mySubjects']);
     Route::get('/student/topics', [StudentTopicsController::class, 'index']);
     Route::get('/student/e-library/subjects', [StudentELibraryController::class, 'mySubjects']);
@@ -523,6 +526,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 
