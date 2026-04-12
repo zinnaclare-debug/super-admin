@@ -4,6 +4,7 @@ import { getStoredUser } from "../../../utils/authStorage";
 import allTheDataArt from "../../../assets/student-report/all-the-data.svg";
 import fileAnalysisArt from "../../../assets/student-report/file-analysis.svg";
 import visualDataArt from "../../../assets/student-report/visual-data.svg";
+import { useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/PaymentsShowcase.css";
 import "./StudentReport.css";
 
@@ -11,28 +12,6 @@ const STUDENT_REPORT_PAGE_SIZE = 50;
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
-
-const fileNameFromHeaders = (headers, fallback) => {
-  const contentDisposition = headers?.["content-disposition"] || "";
-  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!match?.[1]) return fallback || "student_report.pdf";
-  return decodeURIComponent(match[1].replace(/"/g, "").trim());
-};
-
-const messageFromBlobError = async (blob, fallback) => {
-  try {
-    const text = await blob.text();
-    if (!text) return fallback;
-    try {
-      const parsed = JSON.parse(text);
-      return parsed?.message || fallback;
-    } catch {
-      return text;
-    }
-  } catch {
-    return fallback;
-  }
-};
 
 const toCsvCell = (value) => {
   const raw = value == null ? "" : String(value);
@@ -112,7 +91,6 @@ export default function StudentReport() {
   const [termId, setTermId] = useState("");
   const [classId, setClassId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [sessionConfigError, setSessionConfigError] = useState("");
   const [resultSessions, setResultSessions] = useState([]);
   const [resultSessionId, setResultSessionId] = useState("");
@@ -122,10 +100,29 @@ export default function StudentReport() {
   const [resultContext, setResultContext] = useState(null);
   const [resultLoadingOptions, setResultLoadingOptions] = useState(true);
   const [resultSearching, setResultSearching] = useState(false);
-  const [resultDownloading, setResultDownloading] = useState(false);
   const [resultError, setResultError] = useState("");
   const [resultMessage, setResultMessage] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
   const [summaryPage, setSummaryPage] = useState(1);
+  const {
+    job: resultJob,
+    setJob: setResultJob,
+    requesting: resultRequesting,
+    setRequesting: setResultRequesting,
+    downloading: resultDownloading,
+    isProcessing: resultIsProcessing,
+    downloadGeneratedFile: downloadResultGeneratedFile,
+  } = useGeneratedDocumentJob();
+  const {
+    job: reportJob,
+    setJob: setReportJob,
+    requesting: reportRequesting,
+    setRequesting: setReportRequesting,
+    downloading: reportDownloading,
+    isProcessing: reportIsProcessing,
+    downloadGeneratedFile: downloadReportGeneratedFile,
+  } = useGeneratedDocumentJob();
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -150,6 +147,7 @@ export default function StudentReport() {
   const selectedTermValue = termId || String(context?.selected_term?.id || "");
   const selectedClassValue = classId || String(context?.selected_class_id || "");
   const selectedResultTermValue = String(selectedResultTerm?.id || "");
+  const canResultDownload = Boolean(resultEmail.trim()) && Boolean(selectedResultSession) && Boolean(selectedResultTerm);
   const totalSummaryPages = Math.max(1, Math.ceil(rows.length / STUDENT_REPORT_PAGE_SIZE));
 
   const paginatedRows = useMemo(() => {
@@ -169,11 +167,11 @@ export default function StudentReport() {
       setContext(res.data?.context || null);
       setSummaryPage(1);
     } catch (e) {
-      const message = e?.response?.data?.message || "Failed to load student report.";
-      if (isMissingCurrentSessionTerm(message)) {
-        setSessionConfigError(message);
+      const loadedMessage = e?.response?.data?.message || "Failed to load student report.";
+      if (isMissingCurrentSessionTerm(loadedMessage)) {
+        setSessionConfigError(loadedMessage);
       } else {
-        alert(message);
+        alert(loadedMessage);
       }
       setRows([]);
       setContext(null);
@@ -248,7 +246,7 @@ export default function StudentReport() {
   };
 
   const searchStudentResult = async () => {
-    if (!resultEmail.trim() || !selectedResultSession || !selectedResultTerm) {
+    if (!canResultDownload) {
       setResultError("Enter student email, session and term.");
       return;
     }
@@ -274,87 +272,113 @@ export default function StudentReport() {
     }
   };
 
-  const downloadStudentResult = async () => {
-    if (!resultEmail.trim() || !selectedResultSession || !selectedResultTerm) {
+  const startStudentResultPdf = async () => {
+    if (!canResultDownload) {
       setResultError("Enter student email, session and term.");
       return;
     }
 
-    setResultDownloading(true);
+    setResultRequesting(true);
     setResultError("");
+    setResultMessage("");
     try {
-      const res = await api.get("/api/school-admin/reports/student-result/download", {
-        params: resultParams(),
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const message = await messageFromBlobError(res.data, "Failed to download student result PDF.");
-        throw new Error(message);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, "student_result.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      const res = await api.post("/api/school-admin/reports/student-result/download-jobs", resultParams());
+      setResultJob(res.data?.data || null);
+      setResultMessage("Student result PDF generation started.");
     } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const message = await messageFromBlobError(e.response.data, "Failed to download student result PDF.");
-        setResultError(message);
-      } else {
-        setResultError(e?.response?.data?.message || e?.message || "Failed to download student result PDF.");
-      }
+      setResultError(e?.response?.data?.message || e?.message || "Failed to start student result PDF generation.");
     } finally {
-      setResultDownloading(false);
+      setResultRequesting(false);
+    }
+  };
+
+  const downloadStudentResult = async () => {
+    if (!canResultDownload) {
+      setResultError("Enter student email, session and term.");
+      return;
+    }
+
+    try {
+      await downloadResultGeneratedFile("student_result.pdf");
+      setResultMessage("Student result downloaded successfully.");
+    } catch (e) {
+      setResultError(e?.message || "Failed to download student result PDF.");
+    }
+  };
+
+  const handleStudentResultPdfAction = async () => {
+    if (resultJob?.status === "completed") {
+      await downloadStudentResult();
+      return;
+    }
+
+    await startStudentResultPdf();
+  };
+
+  const studentResultActionLabel = (() => {
+    if (resultRequesting) return "Starting...";
+    if (resultDownloading) return "Downloading...";
+    if (resultJob?.status === "completed") return "Download Result";
+    if (resultJob?.status === "failed") return "Retry Result PDF";
+    if (resultJob?.status === "processing") return "Processing Result...";
+    if (resultJob?.status === "pending") return "Queued...";
+    return "Generate Result PDF";
+  })();
+
+  const startStudentReportPdf = async () => {
+    if (rows.length === 0) return;
+
+    setReportRequesting(true);
+    setReportError("");
+    setReportMessage("");
+    try {
+      const payload = {};
+      if (selectedTermValue) {
+        payload.term_id = Number(selectedTermValue);
+      }
+      if (selectedClassValue) {
+        payload.class_id = Number(selectedClassValue);
+      }
+
+      const res = await api.post("/api/school-admin/reports/student/download-jobs", payload);
+      setReportJob(res.data?.data || null);
+      setReportMessage("Student report PDF generation started.");
+    } catch (e) {
+      setReportError(e?.response?.data?.message || e?.message || "Failed to start student report PDF generation.");
+    } finally {
+      setReportRequesting(false);
     }
   };
 
   const downloadPdf = async () => {
     if (rows.length === 0) return;
 
-    setDownloadingPdf(true);
     try {
-      const params = {};
-      if (selectedTermValue) params.term_id = selectedTermValue;
-      if (selectedClassValue) params.class_id = selectedClassValue;
-
-      const res = await api.get("/api/school-admin/reports/student/download", {
-        params,
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const message = await messageFromBlobError(res.data, "Failed to download student report PDF.");
-        throw new Error(message);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, "student_report.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadReportGeneratedFile("student_report.pdf");
+      setReportMessage("Student report downloaded successfully.");
     } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const message = await messageFromBlobError(e.response.data, "Failed to download student report PDF.");
-        alert(message);
-      } else {
-        alert(e?.response?.data?.message || e?.message || "Failed to download student report PDF.");
-      }
-    } finally {
-      setDownloadingPdf(false);
+      setReportError(e?.message || "Failed to download student report PDF.");
     }
   };
+
+  const handleStudentReportPdfAction = async () => {
+    if (reportJob?.status === "completed") {
+      await downloadPdf();
+      return;
+    }
+
+    await startStudentReportPdf();
+  };
+
+  const studentReportActionLabel = (() => {
+    if (reportRequesting) return "Starting...";
+    if (reportDownloading) return "Downloading...";
+    if (reportJob?.status === "completed") return "Download PDF";
+    if (reportJob?.status === "failed") return "Retry PDF";
+    if (reportJob?.status === "processing") return "Processing PDF...";
+    if (reportJob?.status === "pending") return "Queued...";
+    return "Generate PDF";
+  })();
 
   return (
     <div className="payx-page payx-page--admin student-report-page">
@@ -400,7 +424,12 @@ export default function StudentReport() {
                 type="email"
                 placeholder="student@example.com"
                 value={resultEmail}
-                onChange={(e) => setResultEmail(e.target.value)}
+                onChange={(e) => {
+                  setResultEmail(e.target.value);
+                  setResultJob(null);
+                  setResultError("");
+                  setResultMessage("");
+                }}
               />
             </div>
 
@@ -411,6 +440,9 @@ export default function StudentReport() {
                 value={resultSessionId}
                 onChange={(e) => {
                   const value = e.target.value;
+                  setResultJob(null);
+                  setResultError("");
+                  setResultMessage("");
                   setResultSessionId(value);
                   const session = resultSessions.find((item) => String(item.id) === value);
                   const term = (session?.terms || []).find((item) => item.is_current) || (session?.terms || [])[0];
@@ -432,7 +464,12 @@ export default function StudentReport() {
               <select
                 id="single-result-term"
                 value={selectedResultTermValue}
-                onChange={(e) => setResultTermId(e.target.value)}
+                onChange={(e) => {
+                  setResultTermId(e.target.value);
+                  setResultJob(null);
+                  setResultError("");
+                  setResultMessage("");
+                }}
                 disabled={resultLoadingOptions}
               >
                 {(selectedResultSession?.terms || []).map((item) => (
@@ -451,13 +488,19 @@ export default function StudentReport() {
             </button>
             <button
               className="payx-btn student-report-download-btn"
-              onClick={downloadStudentResult}
-              disabled={resultDownloading || resultLoadingOptions || !resultEmail.trim()}
+              onClick={handleStudentResultPdfAction}
+              disabled={!canResultDownload || resultLoadingOptions || resultRequesting || resultDownloading || resultIsProcessing}
             >
-              {resultDownloading ? "Downloading..." : "Download Result"}
+              {studentResultActionLabel}
             </button>
           </div>
 
+          {resultJob?.status === "pending" || resultJob?.status === "processing" ? (
+            <p className="student-report-message">
+              {resultJob.status === "processing" ? "Student result PDF is being prepared for this school." : "Student result PDF request is queued."}
+            </p>
+          ) : null}
+          {resultJob?.status === "failed" ? <p className="student-report-error">{resultJob.error_message || "Student result PDF generation failed."}</p> : null}
           {resultError ? <p className="student-report-error">{resultError}</p> : null}
           {resultMessage ? <p className="student-report-message">{resultMessage}</p> : null}
 
@@ -547,7 +590,16 @@ export default function StudentReport() {
           <div className="student-report-grid">
             <div className="student-report-field">
               <label htmlFor="student-report-term">Term</label>
-              <select id="student-report-term" value={selectedTermValue} onChange={(e) => setTermId(e.target.value)}>
+              <select
+                id="student-report-term"
+                value={selectedTermValue}
+                onChange={(e) => {
+                  setTermId(e.target.value);
+                  setReportJob(null);
+                  setReportError("");
+                  setReportMessage("");
+                }}
+              >
                 {(context?.terms || []).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} {t.is_current ? "(Current)" : ""}
@@ -558,7 +610,16 @@ export default function StudentReport() {
 
             <div className="student-report-field">
               <label htmlFor="student-report-class">Class</label>
-              <select id="student-report-class" value={selectedClassValue} onChange={(e) => setClassId(e.target.value)}>
+              <select
+                id="student-report-class"
+                value={selectedClassValue}
+                onChange={(e) => {
+                  setClassId(e.target.value);
+                  setReportJob(null);
+                  setReportError("");
+                  setReportMessage("");
+                }}
+              >
                 <option value="">All Classes</option>
                 {(context?.classes || []).map((item) => (
                   <option key={item.id} value={item.id}>
@@ -573,10 +634,22 @@ export default function StudentReport() {
             <button className="payx-btn payx-btn--soft" onClick={() => downloadCsv(rows, context)} disabled={loading || rows.length === 0}>
               Download CSV
             </button>
-            <button className="payx-btn student-report-download-btn" onClick={downloadPdf} disabled={loading || downloadingPdf || rows.length === 0}>
-              {downloadingPdf ? "Downloading PDF..." : "Download PDF"}
+            <button
+              className="payx-btn student-report-download-btn"
+              onClick={handleStudentReportPdfAction}
+              disabled={loading || rows.length === 0 || reportRequesting || reportDownloading || reportIsProcessing}
+            >
+              {studentReportActionLabel}
             </button>
           </div>
+          {reportJob?.status === "pending" || reportJob?.status === "processing" ? (
+            <p className="student-report-message">
+              {reportJob.status === "processing" ? "Student report PDF is being prepared for this school." : "Student report PDF request is queued."}
+            </p>
+          ) : null}
+          {reportJob?.status === "failed" ? <p className="student-report-error">{reportJob.error_message || "Student report PDF generation failed."}</p> : null}
+          {reportError ? <p className="student-report-error">{reportError}</p> : null}
+          {reportMessage ? <p className="student-report-message">{reportMessage}</p> : null}
 
           {loading ? (
             <p className="student-report-loading">Loading report...</p>

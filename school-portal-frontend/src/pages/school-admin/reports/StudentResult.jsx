@@ -3,29 +3,8 @@ import api from "../../../services/api";
 import examPrepArt from "../../../assets/results/exam-prep.svg";
 import onlineSurveyArt from "../../../assets/results/online-survey.svg";
 import certificateArt from "../../../assets/results/certificate.svg";
+import { useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/ResultsShowcase.css";
-
-function fileNameFromHeaders(headers, fallback) {
-  const contentDisposition = headers?.["content-disposition"] || "";
-  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!match?.[1]) return fallback || "student_result.pdf";
-  return decodeURIComponent(match[1].replace(/"/g, "").trim());
-}
-
-async function messageFromBlobError(blob, fallback) {
-  try {
-    const text = await blob.text();
-    if (!text) return fallback;
-    try {
-      const parsed = JSON.parse(text);
-      return parsed?.message || fallback;
-    } catch {
-      return text;
-    }
-  } catch {
-    return fallback;
-  }
-}
 
 const asDash = (value) => (value == null || value === "" ? "-" : value);
 
@@ -45,9 +24,9 @@ export default function StudentResult() {
   const [context, setContext] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
 
   const selectedSession = useMemo(() => {
     if (sessions.length === 0) return null;
@@ -61,6 +40,12 @@ export default function StudentResult() {
   }, [selectedSession, termId]);
 
   const canDownload = studentSearch.trim().length > 0 && selectedSession && selectedTerm;
+
+  const resetPdfState = () => {
+    setJob(null);
+    setError("");
+    setMessage("");
+  };
 
   const loadOptions = async () => {
     setLoadingOptions(true);
@@ -145,44 +130,54 @@ export default function StudentResult() {
     }
   };
 
-  const downloadPdf = async () => {
+  const startPdfGeneration = async () => {
     if (!canDownload) return;
-    setDownloading(true);
+
+    setRequesting(true);
     setError("");
     setMessage("");
     try {
-      const res = await api.get("/api/school-admin/reports/student-result/download", {
-        params: requestParams(),
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const msg = await messageFromBlobError(res.data, "Failed to download student result PDF.");
-        throw new Error(msg);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, "student_result.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
-      setMessage("Student result downloaded successfully.");
+      const res = await api.post("/api/school-admin/reports/student-result/download-jobs", requestParams());
+      setJob(res.data?.data || null);
+      setMessage("Student result PDF generation started.");
     } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const msg = await messageFromBlobError(e.response.data, "Failed to download student result PDF.");
-        setError(msg);
-      } else {
-        setError(e?.response?.data?.message || e?.message || "Failed to download student result PDF.");
-      }
+      setError(e?.response?.data?.message || e?.message || "Failed to start student result PDF generation.");
     } finally {
-      setDownloading(false);
+      setRequesting(false);
     }
   };
+
+  const downloadGeneratedResult = async () => {
+    if (!canDownload) return;
+
+    setError("");
+    setMessage("");
+    try {
+      await downloadGeneratedFile("student_result.pdf");
+      setMessage("Student result downloaded successfully.");
+    } catch (e) {
+      setError(e?.message || "Failed to download student result PDF.");
+    }
+  };
+
+  const handlePdfAction = async () => {
+    if (job?.status === "completed") {
+      await downloadGeneratedResult();
+      return;
+    }
+
+    await startPdfGeneration();
+  };
+
+  const pdfActionLabel = (() => {
+    if (requesting) return "Starting...";
+    if (downloading) return "Downloading...";
+    if (job?.status === "completed") return "Download Result";
+    if (job?.status === "failed") return "Retry Result PDF";
+    if (job?.status === "processing") return "Processing Result...";
+    if (job?.status === "pending") return "Queued...";
+    return "Generate Result PDF";
+  })();
 
   return (
     <div className="rs-page rs-page--staff">
@@ -220,7 +215,10 @@ export default function StudentResult() {
               type="text"
               placeholder="student@example.com or full name"
               value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
+              onChange={(e) => {
+                setStudentSearch(e.target.value);
+                resetPdfState();
+              }}
               style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", boxSizing: "border-box" }}
             />
           </div>
@@ -231,6 +229,7 @@ export default function StudentResult() {
               value={sessionId}
               onChange={(e) => {
                 const value = e.target.value;
+                resetPdfState();
                 setSessionId(value);
                 const next = sessions.find((item) => String(item.id) === value) || null;
                 const preferred = (next?.terms || []).find((item) => item.is_current) || (next?.terms || [])[0];
@@ -252,7 +251,10 @@ export default function StudentResult() {
             <h3 className="rs-card-title">Term</h3>
             <select
               value={String(selectedTerm?.id || "")}
-              onChange={(e) => setTermId(e.target.value)}
+              onChange={(e) => {
+                setTermId(e.target.value);
+                resetPdfState();
+              }}
               disabled={loadingOptions}
               style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", boxSizing: "border-box" }}
             >
@@ -272,13 +274,19 @@ export default function StudentResult() {
             <button className="rs-btn" onClick={searchResult} disabled={!canDownload || searching || loadingOptions}>
               {searching ? "Searching..." : "Search"}
             </button>
-            <button className="rs-btn" onClick={downloadPdf} disabled={!canDownload || downloading || loadingOptions}>
-              {downloading ? "Downloading..." : "Download Result"}
+            <button className="rs-btn" onClick={handlePdfAction} disabled={!canDownload || loadingOptions || requesting || downloading || isProcessing}>
+              {pdfActionLabel}
             </button>
           </div>
         </div>
 
         {loadingOptions ? <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading filters...</p> : null}
+        {job?.status === "pending" || job?.status === "processing" ? (
+          <p className="rs-state rs-state--empty" style={{ marginTop: 10 }}>
+            {job.status === "processing" ? "Student result PDF is being prepared for this school." : "Student result PDF request is queued."}
+          </p>
+        ) : null}
+        {job?.status === "failed" ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{job.error_message || "Student result PDF generation failed."}</p> : null}
         {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
         {message ? <p className="rs-state rs-state--empty" style={{ marginTop: 10 }}>{message}</p> : null}
 

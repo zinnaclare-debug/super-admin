@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\SchoolAdmin\AcademicStructureController;
 use App\Http\Controllers\Api\SchoolAdmin\DashboardController as SchoolAdminDashboardController;
 use App\Http\Controllers\Api\SchoolAdmin\SchoolSubscriptionController as SchoolAdminSubscriptionController;
 use App\Http\Controllers\Api\SchoolAdmin\SchoolWebsiteController as SchoolAdminWebsiteController;
+use App\Http\Controllers\Api\SchoolAdmin\GeneratedDocumentController as SchoolAdminGeneratedDocumentController;
 use App\Http\Controllers\Api\School\FeatureAccessController;
 use App\Http\Controllers\Api\SchoolAdmin\ClassManagementController;
 use App\Http\Controllers\Api\SchoolAdmin\EnrollmentController;
@@ -139,6 +140,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
 */
 Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/stats', [SchoolAdminDashboardController::class, 'stats']);
+    Route::get('/school-admin/generated-documents/{generatedDocument}', [SchoolAdminGeneratedDocumentController::class, 'show']);
+    Route::get('/school-admin/generated-documents/{generatedDocument}/file', [SchoolAdminGeneratedDocumentController::class, 'download']);
     Route::post('/school-admin/logo', [SchoolAdminDashboardController::class, 'uploadLogo']);
     Route::post('/school-admin/branding', [SchoolAdminDashboardController::class, 'upsertBranding']);
     Route::get('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'examRecord']);
@@ -310,9 +313,13 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:teacher_report');
     Route::get('/school-admin/reports/teacher/download', [ReportsController::class, 'teacherDownload'])
         ->middleware('feature:teacher_report');
+    Route::post('/school-admin/reports/teacher/download-jobs', [ReportsController::class, 'requestTeacherReportDownloadJob'])
+        ->middleware('feature:teacher_report');
     Route::get('/school-admin/reports/student', [ReportsController::class, 'student'])
         ->middleware('feature:student_report');
     Route::get('/school-admin/reports/student/download', [ReportsController::class, 'studentDownload'])
+        ->middleware('feature:student_report');
+    Route::post('/school-admin/reports/student/download-jobs', [ReportsController::class, 'requestStudentReportDownloadJob'])
         ->middleware('feature:student_report');
     Route::get('/school-admin/reports/student-result/options', [ReportsController::class, 'studentResultOptions'])
         ->middleware('feature:student_result');
@@ -320,17 +327,23 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:student_result');
     Route::get('/school-admin/reports/student-result/download', [ReportsController::class, 'studentResultDownload'])
         ->middleware('feature:student_result');
+    Route::post('/school-admin/reports/student-result/download-jobs', [ReportsController::class, 'requestStudentResultDownloadJob'])
+        ->middleware('feature:student_result');
     Route::get('/school-admin/reports/broadsheet/options', [ReportsController::class, 'broadsheetOptions'])
         ->middleware('feature:broadsheet');
     Route::get('/school-admin/reports/broadsheet', [ReportsController::class, 'broadsheet'])
         ->middleware('feature:broadsheet');
     Route::get('/school-admin/reports/broadsheet/download', [ReportsController::class, 'broadsheetDownload'])
         ->middleware('feature:broadsheet');
+    Route::post('/school-admin/reports/broadsheet/download-jobs', [ReportsController::class, 'requestBroadsheetDownloadJob'])
+        ->middleware('feature:broadsheet');
     Route::get('/school-admin/transcript/options', [TranscriptController::class, 'options'])
         ->middleware('feature:transcript');
     Route::get('/school-admin/transcript', [TranscriptController::class, 'show'])
         ->middleware('feature:transcript');
     Route::get('/school-admin/transcript/download', [TranscriptController::class, 'download'])
+        ->middleware('feature:transcript');
+    Route::post('/school-admin/transcript/download-jobs', [TranscriptController::class, 'requestDownloadJob'])
         ->middleware('feature:transcript');
 
        
@@ -526,6 +539,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 

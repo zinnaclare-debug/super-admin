@@ -3,30 +3,9 @@ import api from "../../../services/api";
 import researchingArt from "../../../assets/transcript/researching.svg";
 import savingNotesArt from "../../../assets/transcript/saving-notes.svg";
 import documentWarningArt from "../../../assets/transcript/document-warning.svg";
+import { fileNameFromHeaders, messageFromBlobError, useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/PaymentsShowcase.css";
 import "./Transcript.css";
-
-function fileNameFromHeaders(headers, fallback) {
-  const contentDisposition = headers?.["content-disposition"] || "";
-  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!match?.[1]) return fallback || "transcript.pdf";
-  return decodeURIComponent(match[1].replace(/"/g, "").trim());
-}
-
-async function messageFromBlobError(blob, fallback) {
-  try {
-    const text = await blob.text();
-    if (!text) return fallback;
-    try {
-      const parsed = JSON.parse(text);
-      return parsed?.message || fallback;
-    } catch {
-      return text;
-    }
-  } catch {
-    return fallback;
-  }
-}
 
 function gradeFromAverage(avg) {
   if (avg >= 70) return "A";
@@ -112,9 +91,9 @@ export default function Transcript() {
   const [entries, setEntries] = useState([]);
   const [context, setContext] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
 
   const canSearch = email.trim().length > 0;
   const groupedEntries = useMemo(() => groupTermEntries(entries), [entries]);
@@ -146,32 +125,25 @@ export default function Transcript() {
     }
   };
 
-  const downloadTranscript = async () => {
+  const startTranscriptPdf = async () => {
     if (!canSearch) return;
-    setDownloading(true);
+    setRequesting(true);
     setError("");
     setMessage("");
     try {
-      const res = await api.get("/api/school-admin/transcript/download", {
-        params: requestParams(),
-        responseType: "blob",
-      });
+      const res = await api.post("/api/school-admin/transcript/download-jobs", requestParams());
+      setJob(res.data?.data || null);
+      setMessage("Transcript PDF generation started.");
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "Failed to start transcript PDF generation.");
+    } finally {
+      setRequesting(false);
+    }
+  };
 
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const msg = await messageFromBlobError(res.data, "Failed to download transcript PDF.");
-        throw new Error(msg);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, "student_transcript.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+  const downloadTranscript = async () => {
+    try {
+      await downloadGeneratedFile("student_transcript.pdf");
       setMessage("Transcript downloaded successfully.");
     } catch (e) {
       if (e?.response?.data instanceof Blob) {
@@ -180,10 +152,27 @@ export default function Transcript() {
       } else {
         setError(e?.response?.data?.message || e?.message || "Failed to download transcript PDF.");
       }
-    } finally {
-      setDownloading(false);
     }
   };
+
+  const handleTranscriptPdfAction = async () => {
+    if (job?.status === "completed") {
+      await downloadTranscript();
+      return;
+    }
+
+    await startTranscriptPdf();
+  };
+
+  const transcriptActionLabel = (() => {
+    if (requesting) return "Starting...";
+    if (downloading) return "Downloading...";
+    if (job?.status === "completed") return "Download Transcript";
+    if (job?.status === "failed") return "Retry Transcript PDF";
+    if (job?.status === "processing") return "Processing Transcript...";
+    if (job?.status === "pending") return "Queued...";
+    return "Generate Transcript PDF";
+  })();
 
   return (
     <div className="payx-page payx-page--admin transcript-page">
@@ -224,7 +213,10 @@ export default function Transcript() {
                 type="email"
                 placeholder="student@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setJob(null);
+                }}
               />
             </div>
           </div>
@@ -233,8 +225,8 @@ export default function Transcript() {
             <button className="payx-btn" onClick={searchTranscript} disabled={!canSearch || searching}>
               {searching ? "Searching..." : "Search"}
             </button>
-            <button className="payx-btn transcript-download-btn" onClick={downloadTranscript} disabled={!canSearch || downloading}>
-              {downloading ? "Downloading..." : "Download Transcript"}
+            <button className="payx-btn transcript-download-btn" onClick={handleTranscriptPdfAction} disabled={!canSearch || requesting || downloading || isProcessing}>
+              {transcriptActionLabel}
             </button>
           </div>
 
@@ -244,6 +236,12 @@ export default function Transcript() {
             </p>
           ) : null}
 
+          {job?.status === "pending" || job?.status === "processing" ? (
+            <p className="transcript-message">
+              {job.status === "processing" ? "Transcript PDF is being prepared for this school." : "Transcript PDF request is queued."}
+            </p>
+          ) : null}
+          {job?.status === "failed" ? <p className="transcript-error">{job.error_message || "Transcript PDF generation failed."}</p> : null}
           {error ? <p className="transcript-error">{error}</p> : null}
           {message ? <p className="transcript-message">{message}</p> : null}
         </div>

@@ -4,33 +4,12 @@ import { getStoredUser } from "../../../utils/authStorage";
 import dataReportsArt from "../../../assets/teacher-report/data-reports.svg";
 import meetingArt from "../../../assets/teacher-report/meeting.svg";
 import reportArt from "../../../assets/teacher-report/report.svg";
+import { useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/PaymentsShowcase.css";
 import "./TeacherReport.css";
 
 const isMissingCurrentSessionTerm = (message = "") =>
   String(message).toLowerCase().includes("no current academic session/term configured");
-
-const fileNameFromHeaders = (headers, fallback) => {
-  const contentDisposition = headers?.["content-disposition"] || "";
-  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!match?.[1]) return fallback || "teacher_report.pdf";
-  return decodeURIComponent(match[1].replace(/"/g, "").trim());
-};
-
-const messageFromBlobError = async (blob, fallback) => {
-  try {
-    const text = await blob.text();
-    if (!text) return fallback;
-    try {
-      const parsed = JSON.parse(text);
-      return parsed?.message || fallback;
-    } catch {
-      return text;
-    }
-  } catch {
-    return fallback;
-  }
-};
 
 const toCsvCell = (value) => {
   const raw = value == null ? "" : String(value);
@@ -85,8 +64,10 @@ export default function TeacherReport() {
   const [context, setContext] = useState(null);
   const [termId, setTermId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [sessionConfigError, setSessionConfigError] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
 
   const schoolName = useMemo(() => {
     const u = getStoredUser();
@@ -103,11 +84,11 @@ export default function TeacherReport() {
       setRows(res.data?.data || []);
       setContext(res.data?.context || null);
     } catch (e) {
-      const message = e?.response?.data?.message || "Failed to load teacher report.";
-      if (isMissingCurrentSessionTerm(message)) {
-        setSessionConfigError(message);
+      const loadedMessage = e?.response?.data?.message || "Failed to load teacher report.";
+      if (isMissingCurrentSessionTerm(loadedMessage)) {
+        setSessionConfigError(loadedMessage);
       } else {
-        alert(message);
+        alert(loadedMessage);
       }
       setRows([]);
       setContext(null);
@@ -122,45 +103,54 @@ export default function TeacherReport() {
 
   const selectedTermValue = termId || String(context?.selected_term?.id || "");
 
-  const downloadPdf = async () => {
+  const startPdfGeneration = async () => {
     if (rows.length === 0) return;
 
-    setDownloadingPdf(true);
+    setRequesting(true);
+    setError("");
+    setMessage("");
     try {
-      const params = {};
-      if (selectedTermValue) params.term_id = selectedTermValue;
-
-      const res = await api.get("/api/school-admin/reports/teacher/download", {
-        params,
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const message = await messageFromBlobError(res.data, "Failed to download teacher report PDF.");
-        throw new Error(message);
+      const payload = {};
+      if (selectedTermValue) {
+        payload.term_id = Number(selectedTermValue);
       }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, "teacher_report.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      const res = await api.post("/api/school-admin/reports/teacher/download-jobs", payload);
+      setJob(res.data?.data || null);
+      setMessage("Teacher report PDF generation started.");
     } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const message = await messageFromBlobError(e.response.data, "Failed to download teacher report PDF.");
-        alert(message);
-      } else {
-        alert(e?.response?.data?.message || e?.message || "Failed to download teacher report PDF.");
-      }
+      setError(e?.response?.data?.message || e?.message || "Failed to start teacher report PDF generation.");
     } finally {
-      setDownloadingPdf(false);
+      setRequesting(false);
     }
   };
+
+  const downloadPdf = async () => {
+    try {
+      await downloadGeneratedFile("teacher_report.pdf");
+      setMessage("Teacher report downloaded successfully.");
+    } catch (e) {
+      setError(e?.message || "Failed to download teacher report PDF.");
+    }
+  };
+
+  const handlePdfAction = async () => {
+    if (job?.status === "completed") {
+      await downloadPdf();
+      return;
+    }
+
+    await startPdfGeneration();
+  };
+
+  const pdfActionLabel = (() => {
+    if (requesting) return "Starting...";
+    if (downloading) return "Downloading...";
+    if (job?.status === "completed") return "Download PDF";
+    if (job?.status === "failed") return "Retry PDF";
+    if (job?.status === "processing") return "Processing PDF...";
+    if (job?.status === "pending") return "Queued...";
+    return "Generate PDF";
+  })();
 
   return (
     <div className="payx-page payx-page--admin teacher-report-page">
@@ -198,7 +188,16 @@ export default function TeacherReport() {
           <div className="teacher-report-grid">
             <div className="teacher-report-field">
               <label htmlFor="teacher-report-term">Term</label>
-              <select id="teacher-report-term" value={selectedTermValue} onChange={(e) => setTermId(e.target.value)}>
+              <select
+                id="teacher-report-term"
+                value={selectedTermValue}
+                onChange={(e) => {
+                  setTermId(e.target.value);
+                  setJob(null);
+                  setError("");
+                  setMessage("");
+                }}
+              >
                 {(context?.terms || []).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} {t.is_current ? "(Current)" : ""}
@@ -212,14 +211,26 @@ export default function TeacherReport() {
             <button className="payx-btn payx-btn--soft" onClick={() => downloadCsv(rows, context)} disabled={loading || rows.length === 0}>
               Download CSV
             </button>
-            <button className="payx-btn teacher-report-download-btn" onClick={downloadPdf} disabled={loading || downloadingPdf || rows.length === 0}>
-              {downloadingPdf ? "Downloading PDF..." : "Download PDF"}
+            <button
+              className="payx-btn teacher-report-download-btn"
+              onClick={handlePdfAction}
+              disabled={loading || rows.length === 0 || requesting || downloading || isProcessing}
+            >
+              {pdfActionLabel}
             </button>
           </div>
 
           <p className="teacher-report-meta">
             {schoolName} | Session: {context?.current_session?.session_name || context?.current_session?.academic_year || "-"} | Term: {context?.selected_term?.name || "-"}
           </p>
+          {job?.status === "pending" || job?.status === "processing" ? (
+            <p className="teacher-report-message">
+              {job.status === "processing" ? "Teacher report PDF is being prepared for this school." : "Teacher report PDF request is queued."}
+            </p>
+          ) : null}
+          {job?.status === "failed" ? <p className="teacher-report-error">{job.error_message || "Teacher report PDF generation failed."}</p> : null}
+          {error ? <p className="teacher-report-error">{error}</p> : null}
+          {message ? <p className="teacher-report-message">{message}</p> : null}
         </div>
 
         <div className="payx-card teacher-report-table-card">

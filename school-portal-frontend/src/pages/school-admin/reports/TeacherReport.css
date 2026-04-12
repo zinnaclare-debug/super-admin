@@ -66,6 +66,16 @@
   color: #b45309;
 }
 
+.teacher-report-error {
+  margin: 10px 0 0;
+  color: #b91c1c;
+}
+
+.teacher-report-message {
+  margin: 10px 0 0;
+  color: #1f2937;
+}
+
 .teacher-report-loading {
   margin: 0;
   color: #334155;

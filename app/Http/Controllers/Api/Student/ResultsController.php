@@ -641,6 +641,82 @@ class ResultsController extends Controller
         );
     }
 
+
+    public function generateSchoolAdminStudentResultPdfDocumentForJob(
+        int $requestingUserId,
+        int $schoolId,
+        string $identifier,
+        int $academicSessionId,
+        int $termId
+    ): array {
+        $actor = User::where('id', $requestingUserId)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$actor || $actor->role !== 'school_admin') {
+            throw new \RuntimeException('School admin user not found for result generation.');
+        }
+
+        $school = $actor->school ?: $actor->school()->first();
+        if (!$school || !$school->results_published) {
+            throw new \RuntimeException('Results are not yet published for your school.');
+        }
+
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            throw new \RuntimeException('Provide student email or name.');
+        }
+
+        $resolved = $this->resolveStudentByIdentifier($schoolId, $identifier);
+        if (!$resolved) {
+            throw new \RuntimeException('Student not found for the supplied search value.');
+        }
+        [$studentUser, $student] = $resolved;
+
+        $session = AcademicSession::where('id', $academicSessionId)
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$session) {
+            throw new \RuntimeException('Academic session not found.');
+        }
+
+        $term = Term::where('id', $termId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$term) {
+            throw new \RuntimeException('Term not found for selected session.');
+        }
+
+        $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
+        if (!$classId) {
+            throw new \RuntimeException('No class enrollment/result found for the selected student, session and term.');
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$class) {
+            $class = SchoolClass::where('id', $classId)
+                ->where('school_id', $schoolId)
+                ->first();
+        }
+        if (!$class) {
+            throw new \RuntimeException('Class not found.');
+        }
+
+        return $this->buildStudentResultPdfForResolvedStudent(
+            $actor,
+            $studentUser,
+            $student,
+            $session,
+            $term,
+            $class,
+            (int) $class->id,
+            (int) $term->id
+        );
+    }
     // GET /api/school-admin/reports/student-result?student=...&academic_session_id=...&term_id=...
     public function showForSchoolAdmin(Request $request)
     {
@@ -1700,6 +1776,7 @@ class ResultsController extends Controller
         return $dompdf->output();
     }
 }
+
 
 
 

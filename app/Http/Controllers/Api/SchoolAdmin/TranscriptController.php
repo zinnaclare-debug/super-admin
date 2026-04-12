@@ -186,8 +186,36 @@ class TranscriptController extends Controller
             ],
         ]);
     }
-
     public function download(Request $request)
+    {
+        $payload = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        try {
+            $generated = $this->buildTranscriptPdfDocument(
+                (int) $request->user()->school_id,
+                $request->user()->school()->first(),
+                strtolower(trim((string) $payload['email']))
+            );
+
+            return response($generated['pdf_output'], 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $generated['file_name'] . '"',
+            ]);
+        } catch (\RuntimeException $e) {
+            $status = $e->getCode();
+            if (!is_int($status) || $status < 400 || $status > 599) {
+                $status = 422;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $status);
+        }
+    }
+
+    public function requestDownloadJob(Request $request)
     {
         $payload = $request->validate([
             'email' => 'required|email',
@@ -197,18 +225,76 @@ class TranscriptController extends Controller
         $schoolId = (int) $request->user()->school_id;
         $school = $request->user()->school()->first();
 
+        try {
+            $sessions = $this->sessionsWithTerms($schoolId);
+            if ($sessions->isEmpty()) {
+                throw new \RuntimeException('No academic session configured for this school.', 422);
+            }
+
+            $resolved = $this->resolveStudent($schoolId, $email);
+            if (!$resolved) {
+                throw new \RuntimeException('No student found for the supplied email address.', 404);
+            }
+
+            [$studentUser] = $resolved;
+
+            $document = GeneratedDocument::create([
+                'school_id' => $schoolId,
+                'requested_by_user_id' => (int) $request->user()->id,
+                'type' => 'school_admin_transcript_pdf',
+                'status' => GeneratedDocument::STATUS_PENDING,
+                'disk' => 'local',
+                'payload' => [
+                    'email' => $email,
+                ],
+                'file_name' => Str::slug((string) ($studentUser->name ?: 'student')) . '_full_transcript.pdf',
+            ]);
+
+            GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
+
+            return response()->json([
+                'message' => 'Transcript PDF generation started.',
+                'data' => GeneratedDocumentData::payload($document),
+            ], 202);
+        } catch (\RuntimeException $e) {
+            $status = $e->getCode();
+            if (!is_int($status) || $status < 400 || $status > 599) {
+                $status = 422;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $status);
+        }
+    }
+
+    public function generateTranscriptPdfDocumentForJob(int $requestingUserId, int $schoolId, string $email): array
+    {
+        $user = User::where('id', $requestingUserId)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$user || $user->role !== 'school_admin') {
+            throw new \RuntimeException('School admin user not found for transcript generation.');
+        }
+
+        return $this->buildTranscriptPdfDocument(
+            $schoolId,
+            $user->school ?: $user->school()->first(),
+            strtolower(trim($email))
+        );
+    }
+
+    private function buildTranscriptPdfDocument(int $schoolId, ?School $school, string $email): array
+    {
         $sessions = $this->sessionsWithTerms($schoolId);
         if ($sessions->isEmpty()) {
-            return response()->json([
-                'message' => 'No academic session configured for this school.',
-            ], 422);
+            throw new \RuntimeException('No academic session configured for this school.', 422);
         }
 
         $resolved = $this->resolveStudent($schoolId, $email);
         if (!$resolved) {
-            return response()->json([
-                'message' => 'No student found for the supplied email address.',
-            ], 404);
+            throw new \RuntimeException('No student found for the supplied email address.', 404);
         }
 
         [$studentUser, $student] = $resolved;
@@ -224,9 +310,7 @@ class TranscriptController extends Controller
         $entries = $this->filterGradedEntries($entries);
 
         if (empty($entries)) {
-            return response()->json([
-                'message' => 'No result records found for the selected criteria.',
-            ], 404);
+            throw new \RuntimeException('No result records found for the selected criteria.', 404);
         }
 
         try {
@@ -234,14 +318,6 @@ class TranscriptController extends Controller
             @ini_set('memory_limit', '512M');
 
             $pdfOutput = $this->renderTranscriptPdfFromEntries($entries);
-
-            $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-            $filename = "{$safeStudent}_full_transcript.pdf";
-
-            return response($pdfOutput, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            ]);
         } catch (Throwable $e) {
             Log::warning('Transcript PDF generation failed with embedded assets, retrying without assets', [
                 'school_id' => $schoolId,
@@ -251,31 +327,22 @@ class TranscriptController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            $entriesNoAssets = $this->buildTranscriptEntriesAcrossSessions(
+                $schoolId,
+                $sessions,
+                $student,
+                $studentUser,
+                $school,
+                false
+            );
+            $entriesNoAssets = $this->filterGradedEntries($entriesNoAssets);
+
+            if (empty($entriesNoAssets)) {
+                throw new \RuntimeException('No result records found for the selected criteria.', 404);
+            }
+
             try {
-                $entriesNoAssets = $this->buildTranscriptEntriesAcrossSessions(
-                    $schoolId,
-                    $sessions,
-                    $student,
-                    $studentUser,
-                    $school,
-                    false
-                );
-                $entriesNoAssets = $this->filterGradedEntries($entriesNoAssets);
-
-                if (empty($entriesNoAssets)) {
-                    return response()->json([
-                        'message' => 'No result records found for the selected criteria.',
-                    ], 404);
-                }
-
                 $pdfOutput = $this->renderTranscriptPdfFromEntries($entriesNoAssets);
-                $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-                $filename = "{$safeStudent}_full_transcript.pdf";
-
-                return response($pdfOutput, 200, [
-                    'Content-Type' => 'application/pdf',
-                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                ]);
             } catch (Throwable $fallbackError) {
                 Log::warning('Transcript PDF generation failed after no-asset fallback, trying simplified transcript renderer', [
                     'school_id' => $schoolId,
@@ -286,14 +353,7 @@ class TranscriptController extends Controller
                 ]);
 
                 try {
-                    $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entries);
-                    $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-                    $filename = "{$safeStudent}_full_transcript.pdf";
-
-                    return response($simplePdfOutput, 200, [
-                        'Content-Type' => 'application/pdf',
-                        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                    ]);
+                    $pdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entries);
                 } catch (Throwable $simpleFallbackError) {
                     Log::warning('Transcript simplified renderer with assets failed, retrying without assets', [
                         'school_id' => $schoolId,
@@ -304,14 +364,7 @@ class TranscriptController extends Controller
                     ]);
 
                     try {
-                        $simplePdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entriesNoAssets);
-                        $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
-                        $filename = "{$safeStudent}_full_transcript.pdf";
-
-                        return response($simplePdfOutput, 200, [
-                            'Content-Type' => 'application/pdf',
-                            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                        ]);
+                        $pdfOutput = $this->renderSimpleTranscriptPdfFromEntries($entriesNoAssets);
                     } catch (Throwable $simpleNoAssetError) {
                         Log::error('Transcript PDF generation failed after simplified no-asset fallback', [
                             'school_id' => $schoolId,
@@ -321,13 +374,18 @@ class TranscriptController extends Controller
                             'error' => $simpleNoAssetError->getMessage(),
                         ]);
 
-                        return response()->json([
-                            'message' => 'Unable to generate transcript PDF. Please check student/session data and branding images.',
-                        ], 500);
+                        throw new \RuntimeException('Unable to generate transcript PDF. Please check student/session data and branding images.', 500);
                     }
                 }
             }
         }
+
+        $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
+
+        return [
+            'pdf_output' => $pdfOutput,
+            'file_name' => "{$safeStudent}_full_transcript.pdf",
+        ];
     }
 
     private function renderTranscriptPdfFromEntries(array $entries): string
@@ -1360,6 +1418,7 @@ class TranscriptController extends Controller
         }
     }
 }
+
 
 
 

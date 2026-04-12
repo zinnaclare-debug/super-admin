@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Student\ResultsController as StudentResultsController;
+use App\Jobs\GenerateSchoolAdminDocumentJob;
+use App\Models\GeneratedDocument;
+use App\Support\GeneratedDocumentData;
 use App\Models\AcademicSession;
 use App\Models\Term;
 use Dompdf\Dompdf;
@@ -446,6 +449,318 @@ class ReportsController extends Controller
             $rows,
             'student_report'
         );
+    }
+    public function requestStudentResultDownloadJob(Request $request)
+    {
+        if (!$this->resultsPublished($request)) {
+            return response()->json([
+                'message' => 'Results are not yet published for your school.',
+            ], 403);
+        }
+
+        $payload = $request->validate([
+            'student' => 'nullable|string',
+            'email' => 'nullable|string',
+            'academic_session_id' => 'required|integer',
+            'term_id' => 'required|integer',
+        ]);
+
+        $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
+        if ($identifier === '') {
+            return response()->json(['message' => 'Provide student email or name'], 422);
+        }
+
+        $document = GeneratedDocument::create([
+            'school_id' => (int) $request->user()->school_id,
+            'requested_by_user_id' => (int) $request->user()->id,
+            'type' => 'school_admin_student_result_pdf',
+            'status' => GeneratedDocument::STATUS_PENDING,
+            'disk' => 'local',
+            'payload' => [
+                'student' => $payload['student'] ?? null,
+                'email' => $payload['email'] ?? null,
+                'academic_session_id' => (int) $payload['academic_session_id'],
+                'term_id' => (int) $payload['term_id'],
+            ],
+            'file_name' => Str::slug($identifier) . '_student_result.pdf',
+        ]);
+
+        GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
+
+        return response()->json([
+            'message' => 'Student result PDF generation started.',
+            'data' => GeneratedDocumentData::payload($document),
+        ], 202);
+    }
+
+    public function requestBroadsheetDownloadJob(Request $request)
+    {
+        $payload = $request->validate([
+            'academic_session_id' => 'nullable|integer',
+            'level' => 'nullable|string|max:60',
+            'department' => 'nullable|string|max:100',
+            'class_id' => 'nullable|integer',
+            'report_scope' => 'nullable|string|in:annual,first_term,second_term,third_term',
+        ]);
+
+        $document = GeneratedDocument::create([
+            'school_id' => (int) $request->user()->school_id,
+            'requested_by_user_id' => (int) $request->user()->id,
+            'type' => 'school_admin_broadsheet_pdf',
+            'status' => GeneratedDocument::STATUS_PENDING,
+            'disk' => 'local',
+            'payload' => [
+                'academic_session_id' => (int) ($payload['academic_session_id'] ?? 0),
+                'level' => (string) ($payload['level'] ?? ''),
+                'department' => (string) ($payload['department'] ?? ''),
+                'class_id' => (int) ($payload['class_id'] ?? 0),
+                'report_scope' => (string) ($payload['report_scope'] ?? 'annual'),
+            ],
+            'file_name' => 'broadsheet.pdf',
+        ]);
+
+        GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
+
+        return response()->json([
+            'message' => 'Broadsheet PDF generation started.',
+            'data' => GeneratedDocumentData::payload($document),
+        ], 202);
+    }
+
+    public function requestTeacherReportDownloadJob(Request $request)
+    {
+        $payload = $request->validate([
+            'term_id' => 'nullable|integer',
+        ]);
+
+        $document = GeneratedDocument::create([
+            'school_id' => (int) $request->user()->school_id,
+            'requested_by_user_id' => (int) $request->user()->id,
+            'type' => 'school_admin_teacher_report_pdf',
+            'status' => GeneratedDocument::STATUS_PENDING,
+            'disk' => 'local',
+            'payload' => [
+                'term_id' => (int) ($payload['term_id'] ?? 0),
+            ],
+            'file_name' => 'teacher_report.pdf',
+        ]);
+
+        GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
+
+        return response()->json([
+            'message' => 'Teacher report PDF generation started.',
+            'data' => GeneratedDocumentData::payload($document),
+        ], 202);
+    }
+
+    public function requestStudentReportDownloadJob(Request $request)
+    {
+        $payload = $request->validate([
+            'term_id' => 'nullable|integer',
+            'class_id' => 'nullable|integer',
+        ]);
+
+        $document = GeneratedDocument::create([
+            'school_id' => (int) $request->user()->school_id,
+            'requested_by_user_id' => (int) $request->user()->id,
+            'type' => 'school_admin_student_report_pdf',
+            'status' => GeneratedDocument::STATUS_PENDING,
+            'disk' => 'local',
+            'payload' => [
+                'term_id' => (int) ($payload['term_id'] ?? 0),
+                'class_id' => (int) ($payload['class_id'] ?? 0),
+            ],
+            'file_name' => 'student_report.pdf',
+        ]);
+
+        GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
+
+        return response()->json([
+            'message' => 'Student report PDF generation started.',
+            'data' => GeneratedDocumentData::payload($document),
+        ], 202);
+    }
+
+    public function generateStudentResultPdfDocumentForJob(int $requestingUserId, int $schoolId, array $payload): array
+    {
+        $user = $this->resolveSchoolAdminDocumentUser($requestingUserId, $schoolId);
+        if (!($user->school?->results_published ?? $user->school()->value('results_published'))) {
+            throw new \RuntimeException('Results are not yet published for your school.');
+        }
+
+        return app(StudentResultsController::class)->generateSchoolAdminStudentResultPdfDocumentForJob(
+            $requestingUserId,
+            $schoolId,
+            (string) ($payload['student'] ?? $payload['email'] ?? ''),
+            (int) ($payload['academic_session_id'] ?? 0),
+            (int) ($payload['term_id'] ?? 0)
+        );
+    }
+
+    public function generateBroadsheetPdfDocumentForJob(int $requestingUserId, int $schoolId, array $payload): array
+    {
+        $user = $this->resolveSchoolAdminDocumentUser($requestingUserId, $schoolId);
+        return $this->buildBroadsheetPdfDocument(
+            $schoolId,
+            (string) ($user->school?->name ?? 'School'),
+            $payload
+        );
+    }
+
+    public function generateTeacherReportPdfDocumentForJob(int $requestingUserId, int $schoolId, array $payload): array
+    {
+        $user = $this->resolveSchoolAdminDocumentUser($requestingUserId, $schoolId);
+        [$session, $term, $terms] = $this->resolveCurrentSessionAndSelectedTermFromPayload($schoolId, $payload);
+        if (!$session || !$term) {
+            throw new \RuntimeException('No current academic session/term configured.', 422);
+        }
+
+        $rows = $this->teacherRows($schoolId, (int) $term->id);
+        $context = $this->contextPayload($session, $term, $terms);
+
+        return $this->buildFlatReportPdfDocument(
+            'Teacher Report',
+            (string) ($user->school?->name ?? 'School'),
+            $context,
+            $rows,
+            'teacher_report'
+        );
+    }
+
+    public function generateStudentReportPdfDocumentForJob(int $requestingUserId, int $schoolId, array $payload): array
+    {
+        $user = $this->resolveSchoolAdminDocumentUser($requestingUserId, $schoolId);
+        [$session, $term, $terms] = $this->resolveCurrentSessionAndSelectedTermFromPayload($schoolId, $payload);
+        if (!$session || !$term) {
+            throw new \RuntimeException('No current academic session/term configured.', 422);
+        }
+
+        $classOptions = $this->sessionReportClassOptions($schoolId, (int) $session->id);
+        $selectedClassId = $this->resolveClassFilter((int) ($payload['class_id'] ?? 0), $classOptions);
+        $rows = $this->studentRows($schoolId, (int) $term->id, $selectedClassId);
+        $context = $this->contextPayload($session, $term, $terms, $classOptions, $selectedClassId);
+
+        return $this->buildFlatReportPdfDocument(
+            'Student Report',
+            (string) ($user->school?->name ?? 'School'),
+            $context,
+            $rows,
+            'student_report'
+        );
+    }
+
+    private function resolveCurrentSessionAndSelectedTermFromPayload(int $schoolId, array $payload): array
+    {
+        $request = new Request($payload);
+        return $this->resolveCurrentSessionAndSelectedTerm($request, $schoolId);
+    }
+
+    private function resolveSchoolAdminDocumentUser(int $requestingUserId, int $schoolId)
+    {
+        $user = DB::table('users')
+            ->where('id', $requestingUserId)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$user || ($user->role ?? null) !== 'school_admin') {
+            throw new \RuntimeException('School admin user not found for document generation.');
+        }
+
+        return \App\Models\User::find($requestingUserId);
+    }
+
+    private function buildBroadsheetPdfDocument(int $schoolId, string $schoolName, array $payload): array
+    {
+        $session = $this->resolveBroadsheetSession($schoolId, (int) ($payload['academic_session_id'] ?? 0));
+        if (!$session) {
+            throw new \RuntimeException('No academic session configured for this school.', 422);
+        }
+
+        $levels = $this->sessionLevelOptions($schoolId, (int) $session->id);
+        if (empty($levels)) {
+            throw new \RuntimeException('No class level found for the selected academic session.', 422);
+        }
+
+        $level = strtolower((string) ($payload['level'] ?? $levels[0]));
+        if (!in_array($level, $levels, true)) {
+            $level = $levels[0];
+        }
+
+        $departments = $this->sessionDepartmentOptions($schoolId, (int) $session->id, $level);
+        $selectedDepartment = $this->resolveDepartmentFilter((string) ($payload['department'] ?? ''), $departments);
+        if (($payload['department'] ?? null) && $selectedDepartment === null) {
+            throw new \RuntimeException('Invalid department selected for the chosen level.', 422);
+        }
+
+        $classes = $this->sessionClassOptions($schoolId, (int) $session->id, $level, $selectedDepartment);
+        $selectedClassId = $this->resolveClassFilter((int) ($payload['class_id'] ?? 0), $classes);
+        if (($payload['class_id'] ?? null) && $selectedClassId === null) {
+            throw new \RuntimeException('Invalid class selected for the chosen filters.', 422);
+        }
+
+        $reportScope = $this->normalizeBroadsheetReportScope((string) ($payload['report_scope'] ?? 'annual'));
+        $broadsheet = $this->buildBroadsheetData($schoolId, (int) $session->id, $level, $selectedDepartment, $selectedClassId, $reportScope);
+        if (empty($broadsheet['subjects']) || empty($broadsheet['rows'])) {
+            throw new \RuntimeException('No broadsheet result data found for the selected filters.', 404);
+        }
+
+        $selectedClassName = collect($classes)->firstWhere('id', $selectedClassId)['name'] ?? null;
+        $html = view('pdf.school_admin_broadsheet', [
+            'schoolName' => $schoolName,
+            'session' => $session,
+            'level' => $level,
+            'department' => $selectedDepartment,
+            'className' => $selectedClassName,
+            'reportScope' => $reportScope,
+            'reportScopeLabel' => $this->broadsheetReportScopeLabel($reportScope),
+            'selectedTermName' => $broadsheet['selected_term_name'] ?? null,
+            'subjects' => $broadsheet['subjects'],
+            'rows' => $broadsheet['rows'],
+        ])->render();
+
+        @set_time_limit(120);
+        @ini_set('memory_limit', '512M');
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
+
+        $subjectCount = count($broadsheet['subjects'] ?? []);
+        $paper = 'A4';
+        if ($subjectCount >= 16) {
+            $paper = 'A3';
+        }
+        if ($subjectCount >= 28) {
+            $paper = 'A2';
+        }
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($paper, 'landscape');
+        $dompdf->render();
+
+        $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+        $filename = sprintf(
+            'broadsheet_%s_%s%s%s_%s.pdf',
+            Str::slug($reportScope),
+            Str::slug($level),
+            $selectedDepartment ? ('_' . Str::slug($selectedDepartment)) : '',
+            $selectedClassName ? ('_' . Str::slug($selectedClassName)) : '',
+            $safeSession
+        );
+
+        return [
+            'pdf_output' => $dompdf->output(),
+            'file_name' => $filename,
+        ];
     }
 
     private function resolveCurrentSessionAndSelectedTerm(Request $request, int $schoolId): array
@@ -1887,49 +2202,58 @@ class ReportsController extends Controller
             default => $position . 'th',
         };
     }
+    private function buildFlatReportPdfDocument(string $title, string $schoolName, array $context, $rows, string $prefix): array
+    {
+        @set_time_limit(120);
+        @ini_set('memory_limit', '512M');
+
+        $html = view('pdf.school_admin_report', [
+            'title' => $title,
+            'schoolName' => $schoolName,
+            'context' => $context,
+            'rows' => $rows,
+        ])->render();
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+        $options->set('chroot', base_path());
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $sessionName = $context['current_session']['session_name'] ?? $context['current_session']['academic_year'] ?? 'session';
+        $termName = $context['selected_term']['name'] ?? 'term';
+        $filename = sprintf(
+            '%s_%s_%s.pdf',
+            Str::slug($prefix),
+            Str::slug((string) $sessionName),
+            Str::slug((string) $termName)
+        );
+
+        return [
+            'pdf_output' => $dompdf->output(),
+            'file_name' => $filename,
+        ];
+    }
 
     private function pdfResponse(string $title, string $schoolName, array $context, $rows, string $prefix)
     {
         try {
-            @set_time_limit(120);
-            @ini_set('memory_limit', '512M');
+            $generated = $this->buildFlatReportPdfDocument($title, $schoolName, $context, $rows, $prefix);
 
-            $html = view('pdf.school_admin_report', [
-                'title' => $title,
-                'schoolName' => $schoolName,
-                'context' => $context,
-                'rows' => $rows,
-            ])->render();
-
-            $options = new Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
-            if (!is_dir($dompdfTempDir)) {
-                @mkdir($dompdfTempDir, 0775, true);
-            }
-            $options->set('tempDir', $dompdfTempDir);
-            $options->set('fontDir', $dompdfTempDir);
-            $options->set('fontCache', $dompdfTempDir);
-            $options->set('chroot', base_path());
-
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-
-            $sessionName = $context['current_session']['session_name'] ?? $context['current_session']['academic_year'] ?? 'session';
-            $termName = $context['selected_term']['name'] ?? 'term';
-            $filename = sprintf(
-                '%s_%s_%s.pdf',
-                Str::slug($prefix),
-                Str::slug((string) $sessionName),
-                Str::slug((string) $termName)
-            );
-
-            return response($dompdf->output(), 200, [
+            return response($generated['pdf_output'], 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="' . $generated['file_name'] . '"',
             ]);
         } catch (Throwable $e) {
             Log::error('School admin report PDF generation failed', [
@@ -1950,5 +2274,8 @@ class ReportsController extends Controller
         return (bool) ($school?->results_published);
     }
 }
+
+
+
 
 

@@ -3,30 +3,9 @@ import api from "../../../services/api";
 import photocopyArt from "../../../assets/broadsheet/photocopy.svg";
 import dataAtWorkArt from "../../../assets/broadsheet/data-at-work.svg";
 import spreadsheetsArt from "../../../assets/broadsheet/spreadsheets.svg";
+import { messageFromBlobError, useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/PaymentsShowcase.css";
 import "./Broadsheet.css";
-
-function fileNameFromHeaders(headers, fallback) {
-  const contentDisposition = headers?.["content-disposition"] || "";
-  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!match?.[1]) return fallback || "broadsheet.pdf";
-  return decodeURIComponent(match[1].replace(/"/g, "").trim());
-}
-
-async function messageFromBlobError(blob, fallback) {
-  try {
-    const text = await blob.text();
-    if (!text) return fallback;
-    try {
-      const parsed = JSON.parse(text);
-      return parsed?.message || fallback;
-    } catch {
-      return text;
-    }
-  } catch {
-    return fallback;
-  }
-}
 
 const levelLabel = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
@@ -66,7 +45,7 @@ export default function Broadsheet() {
   const [context, setContext] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -77,6 +56,12 @@ export default function Broadsheet() {
   }, [sessions, sessionId]);
 
   const canSearch = Boolean(selectedSession) && Boolean(level);
+
+  const resetPdfState = () => {
+    setJob(null);
+    setError("");
+    setMessage("");
+  };
 
   const loadOptions = async ({
     nextSessionId = "",
@@ -176,42 +161,49 @@ export default function Broadsheet() {
     }
   };
 
-  const downloadBroadsheet = async () => {
+  const startBroadsheetPdfGeneration = async () => {
     if (!canSearch) return;
-    setDownloading(true);
+    setRequesting(true);
     setError("");
+    setMessage("");
     try {
-      const res = await api.get("/api/school-admin/reports/broadsheet/download", {
-        params: requestParams(),
-        responseType: "blob",
-      });
-
-      const contentType = String(res?.headers?.["content-type"] || res?.data?.type || "").toLowerCase();
-      if (contentType.includes("application/json")) {
-        const msg = await messageFromBlobError(res.data, "Failed to download broadsheet PDF.");
-        throw new Error(msg);
-      }
-
-      const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, `${reportScope}_broadsheet.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      const res = await api.post("/api/school-admin/reports/broadsheet/download-jobs", requestParams());
+      setJob(res.data?.data || null);
+      setMessage("Broadsheet PDF generation started.");
     } catch (e) {
-      if (e?.response?.data instanceof Blob) {
-        const msg = await messageFromBlobError(e.response.data, "Failed to download broadsheet PDF.");
-        setError(msg);
-      } else {
-        setError(e?.response?.data?.message || e?.message || "Failed to download broadsheet PDF.");
-      }
+      setError(e?.response?.data?.message || e?.message || "Failed to start broadsheet PDF generation.");
     } finally {
-      setDownloading(false);
+      setRequesting(false);
     }
   };
+
+  const downloadBroadsheet = async () => {
+    try {
+      await downloadGeneratedFile(`${reportScope}_broadsheet.pdf`);
+      setMessage("Broadsheet downloaded successfully.");
+    } catch (e) {
+      setError(e?.message || "Failed to download broadsheet PDF.");
+    }
+  };
+
+  const handleBroadsheetPdfAction = async () => {
+    if (job?.status === "completed") {
+      await downloadBroadsheet();
+      return;
+    }
+
+    await startBroadsheetPdfGeneration();
+  };
+
+  const broadsheetActionLabel = (() => {
+    if (requesting) return "Starting...";
+    if (downloading) return "Downloading...";
+    if (job?.status === "completed") return "Download Broadsheet";
+    if (job?.status === "failed") return "Retry Broadsheet PDF";
+    if (job?.status === "processing") return "Processing PDF...";
+    if (job?.status === "pending") return "Queued...";
+    return "Generate Broadsheet PDF";
+  })();
 
   const previewBroadsheetPdf = async () => {
     if (!canSearch) return;
@@ -286,6 +278,7 @@ export default function Broadsheet() {
                 value={sessionId}
                 onChange={(e) => {
                   const value = e.target.value;
+                  resetPdfState();
                   setSessionId(value);
                   setDepartment("");
                   setClassId("");
@@ -309,6 +302,7 @@ export default function Broadsheet() {
                 value={level}
                 onChange={(e) => {
                   const nextLevel = e.target.value;
+                  resetPdfState();
                   setLevel(nextLevel);
                   setDepartment("");
                   setClassId("");
@@ -335,6 +329,7 @@ export default function Broadsheet() {
                 value={department}
                 onChange={(e) => {
                   const nextDepartment = e.target.value;
+                  resetPdfState();
                   setDepartment(nextDepartment);
                   setClassId("");
                   loadOptions({
@@ -360,7 +355,10 @@ export default function Broadsheet() {
               <select
                 id="broadsheet-class"
                 value={classId}
-                onChange={(e) => setClassId(e.target.value)}
+                onChange={(e) => {
+                  resetPdfState();
+                  setClassId(e.target.value);
+                }}
                 disabled={loadingOptions}
               >
                 <option value="">All Classes</option>
@@ -379,6 +377,7 @@ export default function Broadsheet() {
                 value={reportScope}
                 onChange={(e) => {
                   const nextReportScope = e.target.value;
+                  resetPdfState();
                   setReportScope(nextReportScope);
                   loadOptions({
                     nextSessionId: sessionId || selectedSession?.id || "",
@@ -406,8 +405,8 @@ export default function Broadsheet() {
             <button className="payx-btn payx-btn--soft" onClick={previewBroadsheetPdf} disabled={!canSearch || previewing}>
               {previewing ? "Opening Preview..." : "Preview PDF"}
             </button>
-            <button className="payx-btn broadsheet-download-btn" onClick={downloadBroadsheet} disabled={!canSearch || downloading}>
-              {downloading ? "Downloading..." : "Download Broadsheet"}
+            <button className="payx-btn broadsheet-download-btn" onClick={handleBroadsheetPdfAction} disabled={!canSearch || requesting || downloading || isProcessing}>
+              {broadsheetActionLabel}
             </button>
           </div>
 
@@ -419,6 +418,8 @@ export default function Broadsheet() {
             </p>
           ) : null}
 
+          {job?.status === "pending" || job?.status === "processing" ? <p className="broadsheet-message">{job.status === "processing" ? "Broadsheet PDF is being prepared for this school." : "Broadsheet PDF request is queued."}</p> : null}
+          {job?.status === "failed" ? <p className="broadsheet-error">{job.error_message || "Broadsheet PDF generation failed."}</p> : null}
           {error ? <p className="broadsheet-error">{error}</p> : null}
           {message ? <p className="broadsheet-message">{message}</p> : null}
         </div>
