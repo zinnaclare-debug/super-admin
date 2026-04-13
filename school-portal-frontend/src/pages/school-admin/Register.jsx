@@ -64,6 +64,7 @@ export default function Register() {
   const [bulkPreviewing, setBulkPreviewing] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+  const [bulkImportType, setBulkImportType] = useState("student");
 
   const [form, setForm] = useState({
     role: "",
@@ -92,9 +93,19 @@ export default function Register() {
 
   const isStudent = form.role === "student";
   const isStaff = form.role === "staff";
+  const isBulkStudent = bulkImportType === "student";
+  const bulkTypeLabel = isBulkStudent ? "Student" : "Staff";
+  const bulkTemplateFallback = isBulkStudent ? "student_bulk_template.csv" : "staff_bulk_template.csv";
+  const bulkPlacementLabel = isBulkStudent ? "Class" : "Position";
   const studentClasses = enrollmentContext?.classes || [];
   const selectedClass = studentClasses.find((c) => String(c.id) === String(form.class_id));
   const selectedDepartments = selectedClass?.departments || [];
+
+  useEffect(() => {
+    setBulkCsv(null);
+    setBulkPreviewData(null);
+    setBulkResult(null);
+  }, [bulkImportType]);
 
   useEffect(() => {
     let mounted = true;
@@ -419,9 +430,10 @@ export default function Register() {
   const downloadBulkTemplate = async () => {
     try {
       const res = await api.get("/api/school-admin/register/bulk/template", {
+        params: { import_type: bulkImportType },
         responseType: "blob",
       });
-      const fileName = parseFileName(res.headers, "student_bulk_template.csv");
+      const fileName = parseFileName(res.headers, bulkTemplateFallback);
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
@@ -445,6 +457,7 @@ export default function Register() {
 
     const fd = new FormData();
     fd.append("csv", bulkCsv);
+    fd.append("import_type", bulkImportType);
 
     setBulkPreviewing(true);
     setBulkResult(null);
@@ -467,6 +480,7 @@ export default function Register() {
 
     const fd = new FormData();
     fd.append("csv", bulkCsv);
+    fd.append("import_type", bulkImportType);
 
     setBulkImporting(true);
     try {
@@ -474,7 +488,7 @@ export default function Register() {
       setBulkResult(res.data?.data || null);
       setBulkPreviewData(null);
       setBulkCsv(null);
-      alert(res.data?.message || "Bulk student registration completed");
+      alert(res.data?.message || `Bulk ${bulkTypeLabel.toLowerCase()} registration completed`);
     } catch (err) {
       const responseData = err?.response?.data?.data;
       if (responseData) {
@@ -493,7 +507,7 @@ export default function Register() {
           <span className="reg-pill">School Admin Register</span>
           <h2>Create student and staff records with a cleaner onboarding flow.</h2>
           <p>
-            Manage single registration, photo upload, username generation, and bulk student CSV import from one polished workspace.
+            Manage single registration, photo upload, username generation, and bulk student or staff CSV import from one polished workspace.
           </p>
           <div className="reg-meta">
             <span>Single create</span>
@@ -787,14 +801,24 @@ export default function Register() {
 
       {!isEditMode && (
         <div className="reg-bulk">
-          <h3>Bulk Student CSV Upload</h3>
+          <h3>Bulk {bulkTypeLabel} CSV Upload</h3>
           <p style={{ marginTop: 4, opacity: 0.8 }}>
-            Use the template. Include password and optional username per row.
+            {isBulkStudent
+              ? "Use the student template. Include password, class placement, and optional guardian details per row."
+              : "Use the staff template. Include email, password, and staff details per row. Guardian fields are not used for staff uploads."}
           </p>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end", marginTop: 10 }}>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span>Bulk Upload Type</span>
+              <select value={bulkImportType} onChange={(e) => setBulkImportType(e.target.value)} style={{ minWidth: 180 }}>
+                <option value="student">Student CSV</option>
+                <option value="staff">Staff CSV</option>
+              </select>
+            </label>
+
             <button type="button" onClick={downloadBulkTemplate}>
-              Download CSV Template
+              Download {bulkTypeLabel} CSV Template
             </button>
             <input
               type="file"
@@ -840,7 +864,7 @@ export default function Register() {
                     <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Status</th>
                     <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Name</th>
                     <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Username</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Class</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>{bulkPlacementLabel}</th>
                     <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Errors</th>
                   </tr>
                 </thead>
@@ -863,7 +887,7 @@ export default function Register() {
                         {row.data?.username || "-"}
                       </td>
                       <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
-                        {row.data?.class_name || "-"}
+                        {isBulkStudent ? row.data?.class_name || "-" : row.data?.staff_position || "-"}
                       </td>
                       <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
                         {Array.isArray(row.errors) && row.errors.length > 0 ? row.errors.join(", ") : "-"}
@@ -882,7 +906,7 @@ export default function Register() {
 
           {Array.isArray(bulkResult?.credentials) && bulkResult.credentials.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <h4>Imported Login Credentials</h4>
+              <h4>Imported {bulkTypeLabel} Login Credentials</h4>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
@@ -909,11 +933,14 @@ export default function Register() {
           )}
         </div>
       )}
+
         </div>
       </section>
     </div>
   );
 }
+
+
 
 
 

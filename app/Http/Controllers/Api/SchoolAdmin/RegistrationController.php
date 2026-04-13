@@ -220,47 +220,12 @@ class RegistrationController extends Controller
 
     public function bulkTemplate(Request $request)
     {
-        $headers = [
-            'name',
-            'email',
-            'password',
-            'username',
-            'education_level',
-            'class_name',
-            'department_name',
-            'sex',
-            'religion',
-            'dob',
-            'address',
-            'guardian_name',
-            'guardian_email',
-            'guardian_mobile',
-            'guardian_location',
-            'guardian_state_of_origin',
-            'guardian_occupation',
-            'guardian_relationship',
-        ];
+        $payload = $request->validate([
+            'import_type' => 'nullable|in:student,staff',
+        ]);
 
-        $example = [
-            'Amina Yusuf',
-            'amina@example.com',
-            'Pass1234',
-            '',
-            'secondary',
-            'SS 1',
-            'Science',
-            'F',
-            'Islam',
-            '2012-01-15',
-            '12 School Road',
-            'Hafsat Yusuf',
-            'hafsat@example.com',
-            '08030000000',
-            'Lagos',
-            'Kano',
-            'Trader',
-            'mother',
-        ];
+        $importType = $payload['import_type'] ?? 'student';
+        ['headers' => $headers, 'example' => $example, 'filename' => $filename] = $this->bulkTemplateDefinition($importType);
 
         $encode = fn (array $row) => implode(',', array_map(function ($value) {
             $text = (string) $value;
@@ -272,16 +237,18 @@ class RegistrationController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="student_bulk_template.csv"',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 
     public function bulkPreview(Request $request)
     {
-        $request->validate([
+        $payload = $request->validate([
             'csv' => 'required|file|mimes:csv,txt|max:150',
+            'import_type' => 'nullable|in:student,staff',
         ]);
 
+        $importType = $payload['import_type'] ?? 'student';
         $school = $request->user()->school;
         $schoolId = (int) $school->id;
         $currentSession = AcademicSession::query()
@@ -289,13 +256,14 @@ class RegistrationController extends Controller
             ->where('status', 'current')
             ->first();
 
-        $parsed = $this->parseBulkCsv($request->file('csv'));
+        $parsed = $this->parseBulkCsv($request->file('csv'), $importType);
         $rows = $parsed['rows'];
 
         if (empty($rows)) {
             return response()->json([
                 'message' => 'CSV file is empty.',
                 'data' => [
+                    'import_type' => $importType,
                     'summary' => [
                         'total_rows' => 0,
                         'valid_rows' => 0,
@@ -313,14 +281,22 @@ class RegistrationController extends Controller
         $invalidRows = 0;
 
         foreach ($rows as $index => $row) {
-            $validated = $this->validateBulkStudentRow(
-                $school,
-                $schoolId,
-                $currentSession,
-                $row,
-                $usedUsernames,
-                $usedEmails
-            );
+            $validated = $importType === 'student'
+                ? $this->validateBulkStudentRow(
+                    $school,
+                    $schoolId,
+                    $currentSession,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                )
+                : $this->validateBulkStaffRow(
+                    $school,
+                    $schoolId,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                );
 
             if ($validated['ok']) {
                 $validRows++;
@@ -328,24 +304,13 @@ class RegistrationController extends Controller
                 $invalidRows++;
             }
 
-            $previewRows[] = [
-                'row_number' => $index + 2,
-                'status' => $validated['ok'] ? 'valid' : 'invalid',
-                'errors' => $validated['errors'],
-                'data' => [
-                    'name' => $validated['data']['name'] ?? null,
-                    'email' => $validated['data']['email'] ?? null,
-                    'username' => $validated['data']['username'] ?? null,
-                    'education_level' => $validated['data']['education_level'] ?? null,
-                    'class_name' => $validated['data']['class_name'] ?? null,
-                    'department_name' => $validated['data']['department_name'] ?? null,
-                ],
-            ];
+            $previewRows[] = $this->buildBulkPreviewRow($validated, $index + 2, $importType);
         }
 
         return response()->json([
             'message' => 'Bulk preview generated.',
             'data' => [
+                'import_type' => $importType,
                 'summary' => [
                     'total_rows' => count($rows),
                     'valid_rows' => $validRows,
@@ -358,10 +323,12 @@ class RegistrationController extends Controller
 
     public function bulkConfirm(Request $request)
     {
-        $request->validate([
+        $payload = $request->validate([
             'csv' => 'required|file|mimes:csv,txt|max:150',
+            'import_type' => 'nullable|in:student,staff',
         ]);
 
+        $importType = $payload['import_type'] ?? 'student';
         $school = $request->user()->school;
         $schoolId = (int) $school->id;
         $currentSession = AcademicSession::query()
@@ -369,7 +336,7 @@ class RegistrationController extends Controller
             ->where('status', 'current')
             ->first();
 
-        $parsed = $this->parseBulkCsv($request->file('csv'));
+        $parsed = $this->parseBulkCsv($request->file('csv'), $importType);
         $rows = $parsed['rows'];
         if (empty($rows)) {
             return response()->json([
@@ -384,28 +351,24 @@ class RegistrationController extends Controller
         $invalidRows = 0;
 
         foreach ($rows as $index => $row) {
-            $validated = $this->validateBulkStudentRow(
-                $school,
-                $schoolId,
-                $currentSession,
-                $row,
-                $usedUsernames,
-                $usedEmails
-            );
+            $validated = $importType === 'student'
+                ? $this->validateBulkStudentRow(
+                    $school,
+                    $schoolId,
+                    $currentSession,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                )
+                : $this->validateBulkStaffRow(
+                    $school,
+                    $schoolId,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                );
 
-            $previewRows[] = [
-                'row_number' => $index + 2,
-                'status' => $validated['ok'] ? 'valid' : 'invalid',
-                'errors' => $validated['errors'],
-                'data' => [
-                    'name' => $validated['data']['name'] ?? null,
-                    'email' => $validated['data']['email'] ?? null,
-                    'username' => $validated['data']['username'] ?? null,
-                    'education_level' => $validated['data']['education_level'] ?? null,
-                    'class_name' => $validated['data']['class_name'] ?? null,
-                    'department_name' => $validated['data']['department_name'] ?? null,
-                ],
-            ];
+            $previewRows[] = $this->buildBulkPreviewRow($validated, $index + 2, $importType);
 
             if ($validated['ok']) {
                 $validPayloads[] = [
@@ -421,6 +384,7 @@ class RegistrationController extends Controller
             return response()->json([
                 'message' => 'CSV has invalid rows. Fix errors and preview again before confirm.',
                 'data' => [
+                    'import_type' => $importType,
                     'summary' => [
                         'total_rows' => count($rows),
                         'valid_rows' => count($validPayloads),
@@ -434,7 +398,7 @@ class RegistrationController extends Controller
         $actorUserId = (int) $request->user()->id;
         $createdRows = [];
 
-        DB::transaction(function () use ($schoolId, $actorUserId, $validPayloads, &$createdRows) {
+        DB::transaction(function () use ($schoolId, $actorUserId, $validPayloads, $importType, &$createdRows) {
             foreach ($validPayloads as $item) {
                 $data = $item['data'];
 
@@ -444,47 +408,59 @@ class RegistrationController extends Controller
                     'username' => $data['username'],
                     'email' => $data['email'],
                     'password' => Hash::make($data['password']),
-                    'role' => 'student',
+                    'role' => $importType,
                 ]);
 
                 UserCredentialStore::sync($user, $data['password'], $actorUserId);
 
-                $studentPayload = [
-                    'user_id' => $user->id,
-                    'school_id' => $schoolId,
-                    'sex' => $data['sex'],
-                    'religion' => $data['religion'],
-                    'dob' => $data['dob'],
-                    'address' => $data['address'],
-                ];
-                if (Schema::hasColumn('students', 'education_level')) {
-                    $studentPayload['education_level'] = $data['education_level'];
-                }
-
-                $student = Student::create($studentPayload);
-                $class = SchoolClass::query()
-                    ->where('school_id', $schoolId)
-                    ->where('id', (int) $data['class_id'])
-                    ->firstOrFail();
-                $this->enrollStudentInClassSession(
-                    $schoolId,
-                    $student,
-                    $class,
-                    $data['session_term_ids'],
-                    $data['department_id']
-                );
-
-                if (!empty($data['guardian_name'])) {
-                    Guardian::create([
-                        'school_id' => $schoolId,
+                if ($importType === 'student') {
+                    $studentPayload = [
                         'user_id' => $user->id,
-                        'name' => $data['guardian_name'],
-                        'email' => $data['guardian_email'],
-                        'mobile' => $data['guardian_mobile'],
-                        'location' => $data['guardian_location'],
-                        'state_of_origin' => $data['guardian_state_of_origin'],
-                        'occupation' => $data['guardian_occupation'],
-                        'relationship' => $data['guardian_relationship'],
+                        'school_id' => $schoolId,
+                        'sex' => $data['sex'],
+                        'religion' => $data['religion'],
+                        'dob' => $data['dob'],
+                        'address' => $data['address'],
+                    ];
+                    if (Schema::hasColumn('students', 'education_level')) {
+                        $studentPayload['education_level'] = $data['education_level'];
+                    }
+
+                    $student = Student::create($studentPayload);
+                    $class = SchoolClass::query()
+                        ->where('school_id', $schoolId)
+                        ->where('id', (int) $data['class_id'])
+                        ->firstOrFail();
+                    $this->enrollStudentInClassSession(
+                        $schoolId,
+                        $student,
+                        $class,
+                        $data['session_term_ids'],
+                        $data['department_id']
+                    );
+
+                    if (!empty($data['guardian_name'])) {
+                        Guardian::create([
+                            'school_id' => $schoolId,
+                            'user_id' => $user->id,
+                            'name' => $data['guardian_name'],
+                            'email' => $data['guardian_email'],
+                            'mobile' => $data['guardian_mobile'],
+                            'location' => $data['guardian_location'],
+                            'state_of_origin' => $data['guardian_state_of_origin'],
+                            'occupation' => $data['guardian_occupation'],
+                            'relationship' => $data['guardian_relationship'],
+                        ]);
+                    }
+                } else {
+                    Staff::create([
+                        'user_id' => $user->id,
+                        'school_id' => $schoolId,
+                        'sex' => $data['sex'],
+                        'dob' => $data['dob'],
+                        'address' => $data['address'],
+                        'position' => $data['staff_position'],
+                        'education_level' => $data['education_level'],
                     ]);
                 }
 
@@ -493,15 +469,21 @@ class RegistrationController extends Controller
                     'name' => $data['name'],
                     'username' => $data['username'],
                     'password' => $data['password'],
-                    'class_name' => $data['class_name'],
-                    'department_name' => $data['department_name'],
+                    'class_name' => $data['class_name'] ?? null,
+                    'department_name' => $data['department_name'] ?? null,
+                    'staff_position' => $data['staff_position'] ?? null,
                 ];
             }
         });
 
+        $message = $importType === 'student'
+            ? 'Bulk student registration completed successfully.'
+            : 'Bulk staff registration completed successfully.';
+
         return response()->json([
-            'message' => 'Bulk student registration completed successfully.',
+            'message' => $message,
             'data' => [
+                'import_type' => $importType,
                 'summary' => [
                     'imported_rows' => count($createdRows),
                 ],
@@ -510,7 +492,106 @@ class RegistrationController extends Controller
         ], 201);
     }
 
-    private function parseBulkCsv(UploadedFile $file): array
+    private function bulkTemplateDefinition(string $importType): array
+    {
+        if ($importType === 'staff') {
+            return [
+                'headers' => [
+                    'name',
+                    'email',
+                    'password',
+                    'username',
+                    'education_level',
+                    'staff_position',
+                    'sex',
+                    'dob',
+                    'address',
+                ],
+                'example' => [
+                    'Samuel Adeyemi',
+                    'samuel.ade@example.com',
+                    'Pass1234',
+                    '',
+                    'secondary',
+                    'Mathematics Teacher',
+                    'M',
+                    '1990-08-12',
+                    '12 School Road',
+                ],
+                'filename' => 'staff_bulk_template.csv',
+            ];
+        }
+
+        return [
+            'headers' => [
+                'name',
+                'email',
+                'password',
+                'username',
+                'education_level',
+                'class_name',
+                'department_name',
+                'sex',
+                'religion',
+                'dob',
+                'address',
+                'guardian_name',
+                'guardian_email',
+                'guardian_mobile',
+                'guardian_location',
+                'guardian_state_of_origin',
+                'guardian_occupation',
+                'guardian_relationship',
+            ],
+            'example' => [
+                'Amina Yusuf',
+                'amina@example.com',
+                'Pass1234',
+                '',
+                'secondary',
+                'SS 1',
+                'Science',
+                'F',
+                'Islam',
+                '2012-01-15',
+                '12 School Road',
+                'Hafsat Yusuf',
+                'hafsat@example.com',
+                '08030000000',
+                'Lagos',
+                'Kano',
+                'Trader',
+                'mother',
+            ],
+            'filename' => 'student_bulk_template.csv',
+        ];
+    }
+
+    private function buildBulkPreviewRow(array $validated, int $rowNumber, string $importType): array
+    {
+        $row = [
+            'row_number' => $rowNumber,
+            'status' => $validated['ok'] ? 'valid' : 'invalid',
+            'errors' => $validated['errors'],
+            'data' => [
+                'name' => $validated['data']['name'] ?? null,
+                'email' => $validated['data']['email'] ?? null,
+                'username' => $validated['data']['username'] ?? null,
+                'education_level' => $validated['data']['education_level'] ?? null,
+            ],
+        ];
+
+        if ($importType === 'student') {
+            $row['data']['class_name'] = $validated['data']['class_name'] ?? null;
+            $row['data']['department_name'] = $validated['data']['department_name'] ?? null;
+        } else {
+            $row['data']['staff_position'] = $validated['data']['staff_position'] ?? null;
+        }
+
+        return $row;
+    }
+
+    private function parseBulkCsv(UploadedFile $file, string $importType): array
     {
         $path = $file->getRealPath();
         if (!$path) {
@@ -535,24 +616,7 @@ class RegistrationController extends Controller
             }
 
             $headers = array_map(fn ($value) => $this->normalizeCsvHeader((string) $value), $headerRow);
-            if (!$this->csvHasHeader($headers, ['name', 'full_name', 'student_name'])) {
-                throw ValidationException::withMessages([
-                    'csv' => ['CSV header must include "name".'],
-                ]);
-            }
-            if (!$this->csvHasHeader($headers, ['password', 'passcode'])) {
-                throw ValidationException::withMessages([
-                    'csv' => ['CSV header must include "password".'],
-                ]);
-            }
-            if (
-                !$this->csvHasHeader($headers, ['class_name', 'class']) &&
-                !$this->csvHasHeader($headers, ['class_id'])
-            ) {
-                throw ValidationException::withMessages([
-                    'csv' => ['CSV header must include "class_name" or "class_id".'],
-                ]);
-            }
+            $this->validateBulkHeaders($headers, $importType);
 
             $rows = [];
             while (($values = fgetcsv($handle)) !== false) {
@@ -582,6 +646,40 @@ class RegistrationController extends Controller
             'headers' => $headers,
             'rows' => $rows,
         ];
+    }
+
+    private function validateBulkHeaders(array $headers, string $importType): void
+    {
+        if (!$this->csvHasHeader($headers, ['name', 'full_name', 'student_name', 'staff_name'])) {
+            throw ValidationException::withMessages([
+                'csv' => ['CSV header must include "name".'],
+            ]);
+        }
+
+        if (!$this->csvHasHeader($headers, ['password', 'passcode'])) {
+            throw ValidationException::withMessages([
+                'csv' => ['CSV header must include "password".'],
+            ]);
+        }
+
+        if ($importType === 'student') {
+            if (
+                !$this->csvHasHeader($headers, ['class_name', 'class']) &&
+                !$this->csvHasHeader($headers, ['class_id'])
+            ) {
+                throw ValidationException::withMessages([
+                    'csv' => ['Student CSV header must include "class_name" or "class_id".'],
+                ]);
+            }
+
+            return;
+        }
+
+        if (!$this->csvHasHeader($headers, ['email', 'staff_email'])) {
+            throw ValidationException::withMessages([
+                'csv' => ['Staff CSV header must include "email".'],
+            ]);
+        }
     }
 
     private function validateBulkStudentRow(
@@ -790,6 +888,126 @@ class RegistrationController extends Controller
             'guardian_state_of_origin' => $this->csvValue($row, ['guardian_state_of_origin']),
             'guardian_occupation' => $this->csvValue($row, ['guardian_occupation']),
             'guardian_relationship' => $this->csvValue($row, ['guardian_relationship']),
+        ];
+
+        $ok = empty($errors);
+        if ($ok) {
+            if ($username !== null) {
+                $usedUsernames[] = strtolower($username);
+            }
+            if ($normalizedEmail !== null) {
+                $usedEmails[] = $normalizedEmail;
+            }
+        }
+
+        return [
+            'ok' => $ok,
+            'errors' => $errors,
+            'data' => $data,
+        ];
+    }
+
+    private function validateBulkStaffRow(
+        School $school,
+        int $schoolId,
+        array $row,
+        array &$usedUsernames,
+        array &$usedEmails
+    ): array {
+        $errors = [];
+
+        $name = $this->csvValue($row, ['name', 'full_name', 'staff_name']);
+        if (!$name) {
+            $errors[] = 'Name is required.';
+        }
+
+        $password = $this->csvValue($row, ['password', 'passcode']);
+        if (!$password) {
+            $errors[] = 'Password is required.';
+        } elseif (mb_strlen($password) < 6) {
+            $errors[] = 'Password must be at least 6 characters.';
+        }
+
+        $email = $this->csvValue($row, ['email', 'staff_email']);
+        $normalizedEmail = null;
+        if ($email === null) {
+            $errors[] = 'Email is required for staff.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Email format is invalid.';
+        } else {
+            $normalizedEmail = strtolower($email);
+            if (in_array($normalizedEmail, $usedEmails, true)) {
+                $errors[] = 'Email is duplicated in CSV.';
+            } elseif (
+                User::query()
+                    ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                    ->exists()
+            ) {
+                $errors[] = 'Email already exists.';
+            }
+        }
+
+        $educationLevel = $this->normalizeEducationLevel($this->csvValue($row, ['education_level', 'level']));
+        if ($educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
+            $errors[] = 'Education level is invalid.';
+        }
+
+        $username = $this->csvValue($row, ['username', 'user_name', 'login_username']);
+        if ($username !== null) {
+            if (!preg_match('/^[A-Za-z0-9._-]+$/', $username)) {
+                $errors[] = 'Username may only contain letters, numbers, dot, underscore, and hyphen.';
+            } else {
+                $normalizedUsername = strtolower($username);
+                if (in_array($normalizedUsername, $usedUsernames, true)) {
+                    $errors[] = 'Username is duplicated in CSV.';
+                } elseif (
+                    User::query()
+                        ->whereRaw('LOWER(username) = ?', [$normalizedUsername])
+                        ->exists()
+                ) {
+                    $errors[] = 'Username already exists.';
+                }
+            }
+        } elseif ($name) {
+            $username = $this->generateBulkUsername($school, $name, $usedUsernames);
+        }
+
+        $sex = $this->csvValue($row, ['sex', 'gender']);
+        if ($sex === null) {
+            $errors[] = 'Sex is required for staff.';
+        } else {
+            $sexKey = strtolower($sex);
+            if (in_array($sexKey, ['m', 'male'], true)) {
+                $sex = 'M';
+            } elseif (in_array($sexKey, ['f', 'female'], true)) {
+                $sex = 'F';
+            } else {
+                $errors[] = 'Sex must be M, F, male, or female.';
+            }
+        }
+
+        $dob = $this->csvValue($row, ['dob', 'date_of_birth']);
+        if ($dob === null) {
+            $errors[] = 'Date of birth is required for staff.';
+        } else {
+            $timestamp = strtotime($dob);
+            if ($timestamp === false) {
+                $errors[] = 'Date of birth is invalid.';
+            } else {
+                $dob = date('Y-m-d', $timestamp);
+            }
+        }
+
+        $data = [
+            'name' => $name,
+            'email' => $email,
+            'password' => $password,
+            'username' => $username,
+            'education_level' => $educationLevel,
+            'sex' => $sex,
+            'dob' => $dob,
+            'address' => $this->csvValue($row, ['address']),
+            'staff_position' => $this->csvValue($row, ['staff_position', 'position']),
         ];
 
         $ok = empty($errors);
@@ -1325,4 +1543,7 @@ class RegistrationController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
+
+
 
