@@ -508,16 +508,30 @@
 
 .school-site-content-toggle {
   margin-top: 12px;
-  border: 0;
-  background: transparent;
-  color: var(--school-accent);
+  border: 1px solid color-mix(in srgb, var(--school-primary) 45%, white 55%);
+  background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-accent) 100%);
+  color: #ffffff;
   font-weight: 800;
   cursor: pointer;
-  padding: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
 
 .school-site-content-toggle:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.16);
+  filter: saturate(1.05) brightness(1.02);
+}
+
+.school-site-content-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--school-accent) 55%, white 45%);
+  outline-offset: 2px;
 }
 
 .school-site-content-empty {
@@ -985,6 +999,7 @@
     min-height: 0;
   }
 }
+
 
 
 
