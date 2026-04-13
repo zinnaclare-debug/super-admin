@@ -230,6 +230,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:register');
     Route::post('/school-admin/register/bulk/preview', [RegistrationController::class, 'bulkPreview'])
         ->middleware('feature:register');
+    Route::get('/school-admin/register/bulk/preview-page', [RegistrationController::class, 'bulkPreviewPage'])
+        ->middleware('feature:register');
     Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
         ->middleware('feature:register');
 
@@ -541,6 +543,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
+
 
 
 

@@ -62,6 +62,7 @@ export default function Register() {
   const [bulkCsv, setBulkCsv] = useState(null);
   const [bulkPreviewData, setBulkPreviewData] = useState(null);
   const [bulkPreviewing, setBulkPreviewing] = useState(false);
+  const [bulkPreviewPageLoading, setBulkPreviewPageLoading] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkImportType, setBulkImportType] = useState("student");
@@ -97,6 +98,8 @@ export default function Register() {
   const bulkTypeLabel = isBulkStudent ? "Student" : "Staff";
   const bulkTemplateFallback = isBulkStudent ? "student_bulk_template.csv" : "staff_bulk_template.csv";
   const bulkPlacementLabel = isBulkStudent ? "Class" : "Position";
+  const bulkPreviewRows = Array.isArray(bulkPreviewData?.rows) ? bulkPreviewData.rows : [];
+  const bulkPreviewPagination = bulkPreviewData?.pagination || null;
   const studentClasses = enrollmentContext?.classes || [];
   const selectedClass = studentClasses.find((c) => String(c.id) === String(form.class_id));
   const selectedDepartments = selectedClass?.departments || [];
@@ -104,6 +107,7 @@ export default function Register() {
   useEffect(() => {
     setBulkCsv(null);
     setBulkPreviewData(null);
+    setBulkPreviewPageLoading(false);
     setBulkResult(null);
   }, [bulkImportType]);
 
@@ -460,6 +464,7 @@ export default function Register() {
     fd.append("import_type", bulkImportType);
 
     setBulkPreviewing(true);
+    setBulkPreviewPageLoading(false);
     setBulkResult(null);
     try {
       const res = await api.post("/api/school-admin/register/bulk/preview", fd);
@@ -472,6 +477,29 @@ export default function Register() {
       alert(err?.response?.data?.message || err.message || "Bulk preview failed");
     } finally {
       setBulkPreviewing(false);
+    }
+  };
+
+  const loadBulkPreviewPage = async (page) => {
+    const previewToken = bulkPreviewData?.preview_token;
+    if (!previewToken || bulkPreviewPageLoading) return;
+
+    setBulkPreviewPageLoading(true);
+    try {
+      const res = await api.get("/api/school-admin/register/bulk/preview-page", {
+        params: {
+          preview_token: previewToken,
+          page,
+        },
+      });
+      setBulkPreviewData((current) => ({
+        ...(current || {}),
+        ...(res.data?.data || {}),
+      }));
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message || "Failed to load preview page");
+    } finally {
+      setBulkPreviewPageLoading(false);
     }
   };
 
@@ -826,10 +854,11 @@ export default function Register() {
               onChange={(e) => {
                 setBulkCsv(e.target.files?.[0] || null);
                 setBulkPreviewData(null);
+                setBulkPreviewPageLoading(false);
                 setBulkResult(null);
               }}
             />
-            <button type="button" onClick={previewBulkCsv} disabled={!bulkCsv || bulkPreviewing || bulkImporting}>
+            <button type="button" onClick={previewBulkCsv} disabled={!bulkCsv || bulkPreviewing || bulkPreviewPageLoading || bulkImporting}>
               {bulkPreviewing ? "Previewing..." : "Preview CSV"}
             </button>
             <button
@@ -838,6 +867,7 @@ export default function Register() {
               disabled={
                 !bulkCsv ||
                 bulkPreviewing ||
+                bulkPreviewPageLoading ||
                 bulkImporting ||
                 (bulkPreviewData?.summary?.invalid_rows || 0) > 0 ||
                 (bulkPreviewData?.summary?.valid_rows || 0) === 0
@@ -855,55 +885,94 @@ export default function Register() {
             </p>
           )}
 
-          {Array.isArray(bulkPreviewData?.rows) && bulkPreviewData.rows.length > 0 && (
-            <div style={{ marginTop: 8, overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Row</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Status</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Name</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Username</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>{bulkPlacementLabel}</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Errors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bulkPreviewData.rows.slice(0, 200).map((row) => (
-                    <tr key={`${row.row_number}-${row.data?.username || row.data?.name || "row"}`}>
-                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.row_number}</td>
-                      <td
-                        style={{
-                          borderBottom: "1px solid #f1f1f1",
-                          padding: "6px",
-                          color: row.status === "valid" ? "#0f766e" : "#b91c1c",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {row.status}
-                      </td>
-                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.data?.name || "-"}</td>
-                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
-                        {row.data?.username || "-"}
-                      </td>
-                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
-                        {isBulkStudent ? row.data?.class_name || "-" : row.data?.staff_position || "-"}
-                      </td>
-                      <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
-                        {Array.isArray(row.errors) && row.errors.length > 0 ? row.errors.join(", ") : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {bulkPreviewData.rows.length > 200 && (
-                <p style={{ marginTop: 6, opacity: 0.7 }}>
-                  Showing first 200 rows. Fix errors and re-preview before confirm.
-                </p>
+          {bulkPreviewRows.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              {bulkPreviewPagination && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    marginBottom: 8,
+                  }}
+                >
+                  <p style={{ margin: 0, opacity: 0.75 }}>
+                    Showing {bulkPreviewPagination.from}-{bulkPreviewPagination.to} of {bulkPreviewPagination.total_rows} rows (Page {bulkPreviewPagination.page} of {bulkPreviewPagination.total_pages})
+                  </p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => loadBulkPreviewPage(bulkPreviewPagination.page - 1)}
+                      disabled={
+                        !bulkPreviewPagination.has_prev ||
+                        bulkPreviewPageLoading ||
+                        bulkPreviewing ||
+                        bulkImporting
+                      }
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadBulkPreviewPage(bulkPreviewPagination.page + 1)}
+                      disabled={
+                        !bulkPreviewPagination.has_next ||
+                        bulkPreviewPageLoading ||
+                        bulkPreviewing ||
+                        bulkImporting
+                      }
+                    >
+                      {bulkPreviewPageLoading ? "Loading..." : "Next"}
+                    </button>
+                  </div>
+                </div>
               )}
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Row</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Status</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Name</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Username</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>{bulkPlacementLabel}</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "6px" }}>Errors</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkPreviewRows.map((row) => (
+                      <tr key={`${row.row_number}-${row.data?.username || row.data?.name || "row"}`}>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.row_number}</td>
+                        <td
+                          style={{
+                            borderBottom: "1px solid #f1f1f1",
+                            padding: "6px",
+                            color: row.status === "valid" ? "#0f766e" : "#b91c1c",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {row.status}
+                        </td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>{row.data?.name || "-"}</td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                          {row.data?.username || "-"}
+                        </td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                          {isBulkStudent ? row.data?.class_name || "-" : row.data?.staff_position || "-"}
+                        </td>
+                        <td style={{ borderBottom: "1px solid #f1f1f1", padding: "6px" }}>
+                          {Array.isArray(row.errors) && row.errors.length > 0 ? row.errors.join(", ") : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-
           {Array.isArray(bulkResult?.credentials) && bulkResult.credentials.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <h4>Imported {bulkTypeLabel} Login Credentials</h4>

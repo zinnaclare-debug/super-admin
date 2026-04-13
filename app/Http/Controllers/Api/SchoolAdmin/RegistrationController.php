@@ -18,14 +18,19 @@ use App\Support\DepartmentTemplateSync;
 use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
+    private const BULK_PREVIEW_PAGE_SIZE = 200;
+    private const BULK_PREVIEW_CACHE_TTL_MINUTES = 30;
+
     public function enrollmentOptions(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
@@ -260,17 +265,15 @@ class RegistrationController extends Controller
         $rows = $parsed['rows'];
 
         if (empty($rows)) {
+            $summary = [
+                'total_rows' => 0,
+                'valid_rows' => 0,
+                'invalid_rows' => 0,
+            ];
+
             return response()->json([
                 'message' => 'CSV file is empty.',
-                'data' => [
-                    'import_type' => $importType,
-                    'summary' => [
-                        'total_rows' => 0,
-                        'valid_rows' => 0,
-                        'invalid_rows' => 0,
-                    ],
-                    'rows' => [],
-                ],
+                'data' => $this->buildBulkPreviewResponseData(null, $importType, $summary, [], 1),
             ], 422);
         }
 
@@ -307,17 +310,61 @@ class RegistrationController extends Controller
             $previewRows[] = $this->buildBulkPreviewRow($validated, $index + 2, $importType);
         }
 
+        $summary = [
+            'total_rows' => count($rows),
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+        ];
+
+        $previewToken = $this->storeBulkPreviewCache($request, $importType, $summary, $previewRows);
+
         return response()->json([
             'message' => 'Bulk preview generated.',
-            'data' => [
-                'import_type' => $importType,
-                'summary' => [
-                    'total_rows' => count($rows),
-                    'valid_rows' => $validRows,
-                    'invalid_rows' => $invalidRows,
+            'data' => $this->buildBulkPreviewResponseData($previewToken, $importType, $summary, $previewRows, 1),
+        ]);
+    }
+
+    public function bulkPreviewPage(Request $request)
+    {
+        $payload = $request->validate([
+            'preview_token' => 'required|string',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
+        $userId = (int) $request->user()->id;
+        $schoolId = (int) $request->user()->school_id;
+        $page = (int) ($payload['page'] ?? 1);
+        $cacheKey = $this->bulkPreviewCacheKey($userId, $schoolId, (string) $payload['preview_token']);
+        $cachedPreview = Cache::get($cacheKey);
+
+        if (!is_array($cachedPreview)) {
+            return response()->json([
+                'message' => 'Bulk preview session expired. Upload the CSV again.',
+            ], 404);
+        }
+
+        if (
+            (int) ($cachedPreview['requested_by_user_id'] ?? 0) !== $userId ||
+            (int) ($cachedPreview['school_id'] ?? 0) !== $schoolId
+        ) {
+            return response()->json([
+                'message' => 'You are not allowed to view this bulk preview.',
+            ], 403);
+        }
+
+        return response()->json([
+            'message' => 'Bulk preview page loaded.',
+            'data' => $this->buildBulkPreviewResponseData(
+                (string) $payload['preview_token'],
+                (string) ($cachedPreview['import_type'] ?? 'student'),
+                $cachedPreview['summary'] ?? [
+                    'total_rows' => 0,
+                    'valid_rows' => 0,
+                    'invalid_rows' => 0,
                 ],
-                'rows' => $previewRows,
-            ],
+                $cachedPreview['rows'] ?? [],
+                $page
+            ),
         ]);
     }
 
@@ -490,6 +537,66 @@ class RegistrationController extends Controller
                 'credentials' => $createdRows,
             ],
         ], 201);
+    }
+
+    private function storeBulkPreviewCache(Request $request, string $importType, array $summary, array $previewRows): string
+    {
+        $userId = (int) $request->user()->id;
+        $schoolId = (int) $request->user()->school_id;
+        $previewToken = (string) Str::uuid();
+
+        Cache::put(
+            $this->bulkPreviewCacheKey($userId, $schoolId, $previewToken),
+            [
+                'requested_by_user_id' => $userId,
+                'school_id' => $schoolId,
+                'import_type' => $importType,
+                'summary' => $summary,
+                'rows' => $previewRows,
+            ],
+            now()->addMinutes(self::BULK_PREVIEW_CACHE_TTL_MINUTES)
+        );
+
+        return $previewToken;
+    }
+
+    private function bulkPreviewCacheKey(int $userId, int $schoolId, string $previewToken): string
+    {
+        return sprintf('bulk-preview:%d:%d:%s', $schoolId, $userId, $previewToken);
+    }
+
+    private function buildBulkPreviewResponseData(?string $previewToken, string $importType, array $summary, array $previewRows, int $page): array
+    {
+        $pagination = $this->buildBulkPreviewPagination(count($previewRows), $page);
+        $offset = ($pagination['page'] - 1) * self::BULK_PREVIEW_PAGE_SIZE;
+
+        return [
+            'import_type' => $importType,
+            'preview_token' => $previewToken,
+            'summary' => $summary,
+            'pagination' => $pagination,
+            'rows' => array_values(array_slice($previewRows, $offset, self::BULK_PREVIEW_PAGE_SIZE)),
+        ];
+    }
+
+    private function buildBulkPreviewPagination(int $totalRows, int $page): array
+    {
+        $perPage = self::BULK_PREVIEW_PAGE_SIZE;
+        $totalPages = $totalRows > 0 ? (int) ceil($totalRows / $perPage) : 1;
+        $currentPage = min(max($page, 1), $totalPages);
+        $from = $totalRows === 0 ? 0 : (($currentPage - 1) * $perPage) + 1;
+        $to = $totalRows === 0 ? 0 : min($totalRows, $currentPage * $perPage);
+
+        return [
+            'page' => $currentPage,
+            'per_page' => $perPage,
+            'total_rows' => $totalRows,
+            'total_pages' => $totalPages,
+            'from' => $from,
+            'to' => $to,
+            'has_prev' => $currentPage > 1,
+            'has_next' => $currentPage < $totalPages,
+        ];
     }
 
     private function bulkTemplateDefinition(string $importType): array
@@ -1543,6 +1650,7 @@ class RegistrationController extends Controller
             : url($relativeOrAbsolute);
     }
 }
+
 
 
 
