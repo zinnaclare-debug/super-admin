@@ -96,16 +96,16 @@ class SchoolFeesController extends Controller
                     'id' => $term->id,
                     'name' => $term->name,
                 ],
-                'fee' => [
+                'fee' => array_merge([
                     'student_level' => $studentLevel,
                     'configured_level' => $feeSource['configured_level'],
                     'amount_due' => $amountDue,
                     'total_paid' => $totalPaid,
                     'outstanding' => $outstanding,
-                    'is_fully_paid' => $outstanding <= 0.00001,
                     'source' => $feeSource['source'],
                     'line_items' => $feeSource['line_items'],
-                ],
+                    'invoice_download_url' => '/api/student/school-fees/invoice',
+                ], $this->buildFeeStatusPayload($amountDue, $totalPaid, $outstanding)),
                 'student' => [
                     'id' => $student->id,
                     'name' => $user->name,
@@ -148,10 +148,9 @@ class SchoolFeesController extends Controller
         );
         $amountDue = (float) $feeSource['amount_due'];
         if ($amountDue <= 0) {
-            $message = $studentLevel
-                ? "School fees have not been configured for {$studentLevel} level yet."
-                : 'School fees have not been configured yet.';
-            return response()->json(['message' => $message], 422);
+            return response()->json([
+                'message' => 'School fees online payment has not been inputed for this term. Please contact your school admin.',
+            ], 422);
         }
 
         $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
@@ -359,6 +358,125 @@ class SchoolFeesController extends Controller
         ]);
     }
 
+    public function invoice(Request $request)
+    {
+        $user = $request->user();
+        $schoolId = (int) $user->school_id;
+
+        $student = Student::query()
+            ->where('school_id', $schoolId)
+            ->where('user_id', (int) $user->id)
+            ->firstOrFail();
+
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$term) {
+            return response()->json([
+                'message' => 'No current academic session/term configured for your school.',
+            ], 422);
+        }
+
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $studentLevel = $this->resolveStudentLevel(
+            $schoolId,
+            (int) $student->id,
+            (int) $session->id,
+            (int) $term->id
+        );
+        $feeSource = $this->resolveStudentFeeSource(
+            $schoolId,
+            (int) $student->id,
+            (int) $session->id,
+            (int) $term->id,
+            $studentLevel
+        );
+        $amountDue = (float) $feeSource['amount_due'];
+        if ($amountDue <= 0) {
+            return response()->json([
+                'message' => 'School fees online payment has not been inputed for this term. Please contact your school admin.',
+            ], 422);
+        }
+
+        $lineItems = $feeSource['line_items'];
+        if (empty($lineItems)) {
+            $lineItems = [[
+                'description' => 'School Fees',
+                'amount' => $amountDue,
+            ]];
+        }
+
+        $totalPaid = (float) SchoolFeePayment::query()
+            ->where('school_id', $schoolId)
+            ->where('student_id', (int) $student->id)
+            ->where('academic_session_id', (int) $session->id)
+            ->where('term_id', (int) $term->id)
+            ->where('status', 'success')
+            ->sum('amount_paid');
+        $outstanding = max($amountDue - $totalPaid, 0);
+        $status = $this->buildFeeStatusPayload($amountDue, $totalPaid, $outstanding);
+
+        $placement = $this->resolveStudentPlacement((int) $student->id, (int) $term->id);
+        $logoDataUri = $this->logoDataUri($school->logo_path);
+        $invoiceNumber = 'INV-' . $schoolId . '-' . $student->id . '-' . $session->id . '-' . $term->id;
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.school_fee_invoice', [
+                'school' => $school,
+                'logoDataUri' => $logoDataUri,
+                'studentUser' => $user,
+                'student' => $student,
+                'studentLevel' => $studentLevel,
+                'className' => $placement['class_name'],
+                'departmentName' => $placement['department_name'],
+                'session' => $session,
+                'term' => $term,
+                'lineItems' => $lineItems,
+                'amountDue' => $amountDue,
+                'totalPaid' => $totalPaid,
+                'outstanding' => $outstanding,
+                'statusLabel' => $status['payment_status_label'],
+                'statusMessage' => $status['status_message'],
+                'invoiceNumber' => $invoiceNumber,
+                'generatedAt' => Date::now(),
+            ])->render();
+
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $filename = 'school_fee_invoice_' . $session->id . '_' . $term->id . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate school fee invoice PDF.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function receipt(Request $request, SchoolFeePayment $payment)
     {
         $user = $request->user();
@@ -479,6 +597,55 @@ class SchoolFeesController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function buildFeeStatusPayload(float $amountDue, float $totalPaid, float $outstanding): array
+    {
+        if ($amountDue <= 0.00001) {
+            return [
+                'has_invoice' => false,
+                'can_pay' => false,
+                'is_fully_paid' => false,
+                'payment_made' => false,
+                'payment_status' => 'awaiting_invoice',
+                'payment_status_label' => 'Awaiting Invoice',
+                'status_message' => 'School fees online payment has not been inputed for this term. Please contact your school admin.',
+            ];
+        }
+
+        if ($outstanding <= 0.00001 && $totalPaid > 0.00001) {
+            return [
+                'has_invoice' => true,
+                'can_pay' => false,
+                'is_fully_paid' => true,
+                'payment_made' => true,
+                'payment_status' => 'paid',
+                'payment_status_label' => 'Payment Made',
+                'status_message' => 'School fees payment has been completed for this term.',
+            ];
+        }
+
+        if ($totalPaid > 0.00001) {
+            return [
+                'has_invoice' => true,
+                'can_pay' => true,
+                'is_fully_paid' => false,
+                'payment_made' => true,
+                'payment_status' => 'partially_paid',
+                'payment_status_label' => 'Partially Paid',
+                'status_message' => 'Part payment has been received. Outstanding balance is still pending.',
+            ];
+        }
+
+        return [
+            'has_invoice' => true,
+            'can_pay' => true,
+            'is_fully_paid' => false,
+            'payment_made' => false,
+            'payment_status' => 'payment_pending',
+            'payment_status_label' => 'Payment Pending',
+            'status_message' => 'Invoice is available for this term. No payment has been made yet.',
+        ];
     }
 
     private function resolveCurrentSessionAndTerm(int $schoolId): array
@@ -679,3 +846,6 @@ class SchoolFeesController extends Controller
         return 'data:' . $mime . ';base64,' . base64_encode($data);
     }
 }
+
+
+

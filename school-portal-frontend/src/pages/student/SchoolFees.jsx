@@ -17,20 +17,46 @@ const parseFileName = (headers, fallback = "fee_receipt.pdf") => {
   return decodeURIComponent(match[1].replace(/"/g, "").trim());
 };
 
+function stateClass(status) {
+  if (status === "paid") return "payx-state payx-state--ok";
+  if (status === "awaiting_invoice") return "payx-state payx-state--warn";
+  return "payx-state payx-state--loading";
+}
+
 export default function StudentSchoolFees() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState(null);
   const [amount, setAmount] = useState("");
 
   const fee = summary?.fee || {};
   const outstanding = Number(fee?.outstanding || 0);
+  const amountDue = Number(fee?.amount_due || 0);
+  const totalPaid = Number(fee?.total_paid || 0);
+  const hasInvoice = !!fee?.has_invoice;
   const isFullyPaid = !!fee?.is_fully_paid;
+  const canPay = !!fee?.can_pay;
+  const paymentStatus = fee?.payment_status || "awaiting_invoice";
+  const paymentStatusLabel = fee?.payment_status_label || "Awaiting Invoice";
+  const statusMessage =
+    fee?.status_message ||
+    "School fees online payment has not been inputed for this term. Please contact your school admin.";
   const referenceFromQuery = searchParams.get("reference");
+
+  const invoiceItems = useMemo(() => {
+    if (Array.isArray(fee?.line_items) && fee.line_items.length > 0) {
+      return fee.line_items;
+    }
+    if (hasInvoice && amountDue > 0) {
+      return [{ description: "School Fees", amount: amountDue }];
+    }
+    return [];
+  }, [fee?.line_items, hasInvoice, amountDue]);
 
   const load = async () => {
     setLoading(true);
@@ -53,12 +79,12 @@ export default function StudentSchoolFees() {
 
   useEffect(() => {
     if (!summary) return;
-    if (outstanding > 0) {
+    if (canPay && outstanding > 0) {
       setAmount(String(outstanding));
     } else {
       setAmount("");
     }
-  }, [summary, outstanding]);
+  }, [summary, outstanding, canPay]);
 
   const verifyPayment = async (reference) => {
     if (!reference) return;
@@ -83,6 +109,10 @@ export default function StudentSchoolFees() {
   }, [referenceFromQuery]);
 
   const payNow = async () => {
+    if (!canPay) {
+      return alert("School fees online payment is not available until your invoice is ready.");
+    }
+
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       return alert("Enter a valid amount.");
@@ -121,24 +151,45 @@ export default function StudentSchoolFees() {
     }
   };
 
-  const statusLabel = useMemo(() => {
-    if (isFullyPaid) return "School Fees Paid";
-    return `Outstanding: NGN ${outstanding.toFixed(2)}`;
-  }, [isFullyPaid, outstanding]);
+  const downloadInvoice = async () => {
+    if (!hasInvoice) {
+      return alert("Invoice is not available yet. Please contact your school admin.");
+    }
+
+    setDownloadingInvoice(true);
+    try {
+      const res = await api.get(fee?.invoice_download_url || "/api/student/school-fees/invoice", {
+        responseType: "blob",
+      });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, "school_fee_invoice.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download invoice.");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
 
   return (
     <div className="payx-page payx-page--student">
       <section className="payx-hero">
         <div>
           <span className="payx-pill">Student School Fees</span>
-          <h2 className="payx-title">Pay securely and track your fee status</h2>
+          <h2 className="payx-title">Review your invoice and track fee payments</h2>
           <p className="payx-subtitle">
-            Check outstanding balance, make partial or full payments, and monitor each transaction in your history.
+            See the invoice your school has prepared for this term, confirm whether payment has been made, and pay online only when the invoice is available.
           </p>
           <div className="payx-meta">
-            <span>{summary?.current_session?.session_name || summary?.current_session?.academic_year || "Session - "}</span>
+            <span>{summary?.current_session?.session_name || summary?.current_session?.academic_year || "Session -"}</span>
             <span>{summary?.current_term?.name || "Term -"}</span>
-            <span>{isFullyPaid ? "Fully Paid" : `Outstanding: NGN ${formatMoney(outstanding)}`}</span>
+            <span>{paymentStatusLabel}</span>
           </div>
         </div>
 
@@ -176,47 +227,97 @@ export default function StudentSchoolFees() {
                     <span className="payx-value">{summary?.current_term?.name || "-"}</span>
                   </div>
                   <div className="payx-row">
-                    <span className="payx-label">Amount Payable</span>
-                    <span className="payx-value">NGN {formatMoney(fee?.amount_due)}</span>
+                    <span className="payx-label">Invoice Total</span>
+                    <span className="payx-value">
+                      {hasInvoice ? `NGN ${formatMoney(amountDue)}` : "Awaiting invoice"}
+                    </span>
                   </div>
                   <div className="payx-row">
                     <span className="payx-label">Total Paid</span>
-                    <span className="payx-value">NGN {formatMoney(fee?.total_paid)}</span>
+                    <span className="payx-value">NGN {formatMoney(totalPaid)}</span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Outstanding</span>
+                    <span className="payx-value">
+                      {hasInvoice ? `NGN ${formatMoney(outstanding)}` : "Awaiting invoice"}
+                    </span>
                   </div>
                   <div className="payx-row">
                     <span className="payx-label">Status</span>
-                    <span className="payx-value">{statusLabel}</span>
+                    <span className="payx-value">{paymentStatusLabel}</span>
                   </div>
                 </div>
               </article>
 
               <article className="payx-card">
-                <h3>Pay School Fees</h3>
-                {isFullyPaid ? (
-                  <p className="payx-state payx-state--ok">No outstanding fee for this term.</p>
-                ) : (
+                <h3>Invoice</h3>
+                <p className={stateClass(paymentStatus)}>{statusMessage}</p>
+
+                {hasInvoice ? (
                   <>
-                    <div className="payx-actions">
-                      <input
-                        className="payx-input"
-                        type="number"
-                        min="100"
-                        step="0.01"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="Enter amount"
-                        style={{ width: 220 }}
-                        disabled={paying || verifying}
-                      />
-                      <button className="payx-btn" onClick={payNow} disabled={paying || verifying}>
-                        {paying ? "Redirecting..." : "Pay with Paystack"}
-                      </button>
-                      {verifying ? <span className="payx-label">Verifying payment...</span> : null}
+                    <div className="payx-kv" style={{ marginTop: 12 }}>
+                      {invoiceItems.map((item, index) => (
+                        <div className="payx-fee-row" key={`${item.description}-${index}`}>
+                          <span className="payx-label">{item.description}</span>
+                          <span className="payx-value">NGN {formatMoney(item.amount)}</span>
+                        </div>
+                      ))}
                     </div>
-                    <small className="payx-small">
-                      You can pay partially. Remaining balance will keep showing as outstanding.
-                    </small>
+
+                    <div className="payx-kv" style={{ marginTop: 12 }}>
+                      <div className="payx-row">
+                        <span className="payx-label">Total Invoice</span>
+                        <span className="payx-value">NGN {formatMoney(amountDue)}</span>
+                      </div>
+                      <div className="payx-row">
+                        <span className="payx-label">Payment Made</span>
+                        <span className="payx-value">NGN {formatMoney(totalPaid)}</span>
+                      </div>
+                      <div className="payx-row">
+                        <span className="payx-label">Outstanding Balance</span>
+                        <span className="payx-value">NGN {formatMoney(outstanding)}</span>
+                      </div>
+                    </div>
+
+                    <div className="payx-actions">
+                      <button
+                        className="payx-btn payx-btn--soft"
+                        onClick={downloadInvoice}
+                        disabled={downloadingInvoice || paying || verifying}
+                      >
+                        {downloadingInvoice ? "Preparing Invoice..." : "Download School Fee Invoice"}
+                      </button>
+                    </div>
+
+                    {canPay ? (
+                      <>
+                        <div className="payx-actions">
+                          <input
+                            className="payx-input"
+                            type="number"
+                            min="100"
+                            step="0.01"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="Enter amount"
+                            style={{ width: 220 }}
+                            disabled={paying || verifying}
+                          />
+                          <button className="payx-btn" onClick={payNow} disabled={paying || verifying}>
+                            {paying ? "Redirecting..." : "Pay with Paystack"}
+                          </button>
+                          {verifying ? <span className="payx-label">Verifying payment...</span> : null}
+                        </div>
+                        <small className="payx-small">
+                          You can pay partially. Remaining balance will continue to show until the invoice is fully settled.
+                        </small>
+                      </>
+                    ) : null}
                   </>
+                ) : (
+                  <small className="payx-small">
+                    Once your school admin inputs online school fees for the current term, your invoice will appear here and the payment button will become available.
+                  </small>
                 )}
               </article>
             </div>

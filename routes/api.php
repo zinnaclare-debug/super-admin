@@ -516,6 +516,8 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
         ->middleware('feature:school fees');
     Route::get('/student/school-fees/verify', [StudentSchoolFeesController::class, 'verify'])
         ->middleware('feature:school fees');
+    Route::get('/student/school-fees/invoice', [StudentSchoolFeesController::class, 'invoice'])
+        ->middleware('feature:school fees');
     Route::get('/student/school-fees/payments/{payment}/receipt', [StudentSchoolFeesController::class, 'receipt'])
         ->middleware('feature:school fees');
     Route::get('/student/results/classes', [StudentResultsController::class, 'classes']);
