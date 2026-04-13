@@ -212,6 +212,14 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     [website.primary_color, website.accent_color]
   );
 
+  const shellStyle = useMemo(
+    () => ({
+      ...themeStyle,
+      "--school-home-watermark": logoUrl ? `url("${logoUrl}")` : "none",
+    }),
+    [themeStyle, logoUrl]
+  );
+
   useEffect(() => {
     if (Array.isArray(entranceExam.available_classes) && entranceExam.available_classes.length > 0 && !applyForm.applying_for_class) {
       const firstEnabled = entranceExam.available_classes.find((item) => item.enabled) || entranceExam.available_classes[0];
@@ -484,7 +492,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   };
 
   return (
-    <div className="school-site-shell" style={themeStyle}>
+    <div className="school-site-shell" style={shellStyle}>
       {!hideExamChrome ? (
         <header className="school-site-nav">
         <div className="school-site-brand">
@@ -511,7 +519,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
       {error ? <p className="school-site-state school-site-state--error">{error}</p> : null}
 
       {page === "home" ? (
-        <main className="school-site-main">
+        <main className="school-site-main school-site-main--home">
           <section className="school-site-hero">
             <div>
               <h1>{website.hero_title || `Welcome to ${school.name}`}</h1>
@@ -950,6 +958,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     </div>
   );
 }
+
 
 
 

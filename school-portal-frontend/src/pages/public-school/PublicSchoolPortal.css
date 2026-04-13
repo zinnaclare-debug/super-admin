@@ -89,6 +89,32 @@
   padding-bottom: 40px;
 }
 
+.school-site-main--home {
+  position: relative;
+  isolation: isolate;
+  --school-home-watermark-size: min(58vw, 300px);
+  --school-home-watermark-opacity: 0.035;
+  --school-home-watermark-offset: 68px;
+}
+
+.school-site-main--home::before {
+  content: "";
+  position: absolute;
+  inset: var(--school-home-watermark-offset) 0 0;
+  background-image: var(--school-home-watermark);
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: var(--school-home-watermark-size);
+  opacity: var(--school-home-watermark-opacity);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.school-site-main--home > * {
+  position: relative;
+  z-index: 1;
+}
+
 .school-site-hero {
   display: grid;
   grid-template-columns: 1fr;
@@ -316,6 +342,21 @@
   color: #475569;
 }
 
+@media (min-width: 1024px) {
+  .school-site-main--home {
+    --school-home-watermark-size: min(34vw, 460px);
+    --school-home-watermark-opacity: 0.065;
+    --school-home-watermark-offset: 36px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .school-site-main--home {
+    --school-home-watermark-size: min(30vw, 520px);
+    --school-home-watermark-opacity: 0.075;
+  }
+}
+
 @media (max-width: 820px) {
   .school-site-nav,
   .school-site-hero {
@@ -338,6 +379,14 @@
 
   .school-site-contact-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .school-site-main--home {
+    --school-home-watermark-size: min(72vw, 220px);
+    --school-home-watermark-opacity: 0.022;
+    --school-home-watermark-offset: 92px;
   }
 }
 
@@ -903,4 +952,7 @@
     min-height: 0;
   }
 }
+
+
+
 
