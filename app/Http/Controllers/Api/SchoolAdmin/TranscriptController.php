@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateSchoolAdminDocumentJob;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
+use App\Models\GeneratedDocument;
 use App\Models\SchoolClass;
 use App\Models\School;
 use App\Models\Student;
@@ -14,6 +16,7 @@ use App\Models\Term;
 use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
+use App\Support\GeneratedDocumentData;
 use App\Support\GradingSchema;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -1418,6 +1421,7 @@ class TranscriptController extends Controller
         }
     }
 }
+
 
 
 

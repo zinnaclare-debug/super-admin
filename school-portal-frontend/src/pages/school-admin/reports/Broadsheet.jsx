@@ -165,11 +165,9 @@ export default function Broadsheet() {
     if (!canSearch) return;
     setRequesting(true);
     setError("");
-    setMessage("");
     try {
       const res = await api.post("/api/school-admin/reports/broadsheet/download-jobs", requestParams());
       setJob(res.data?.data || null);
-      setMessage("Broadsheet PDF generation started.");
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to start broadsheet PDF generation.");
     } finally {
@@ -180,7 +178,6 @@ export default function Broadsheet() {
   const downloadBroadsheet = async () => {
     try {
       await downloadGeneratedFile(`${reportScope}_broadsheet.pdf`);
-      setMessage("Broadsheet downloaded successfully.");
     } catch (e) {
       setError(e?.message || "Failed to download broadsheet PDF.");
     }
@@ -418,7 +415,6 @@ export default function Broadsheet() {
             </p>
           ) : null}
 
-          {job?.status === "pending" || job?.status === "processing" ? <p className="broadsheet-message">{job.status === "processing" ? "Broadsheet PDF is being prepared for this school." : "Broadsheet PDF request is queued."}</p> : null}
           {job?.status === "failed" ? <p className="broadsheet-error">{job.error_message || "Broadsheet PDF generation failed."}</p> : null}
           {error ? <p className="broadsheet-error">{error}</p> : null}
           {message ? <p className="broadsheet-message">{message}</p> : null}

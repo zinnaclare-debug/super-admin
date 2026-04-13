@@ -135,11 +135,9 @@ export default function StudentResult() {
 
     setRequesting(true);
     setError("");
-    setMessage("");
     try {
       const res = await api.post("/api/school-admin/reports/student-result/download-jobs", requestParams());
       setJob(res.data?.data || null);
-      setMessage("Student result PDF generation started.");
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to start student result PDF generation.");
     } finally {
@@ -151,10 +149,8 @@ export default function StudentResult() {
     if (!canDownload) return;
 
     setError("");
-    setMessage("");
     try {
       await downloadGeneratedFile("student_result.pdf");
-      setMessage("Student result downloaded successfully.");
     } catch (e) {
       setError(e?.message || "Failed to download student result PDF.");
     }
@@ -281,11 +277,6 @@ export default function StudentResult() {
         </div>
 
         {loadingOptions ? <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading filters...</p> : null}
-        {job?.status === "pending" || job?.status === "processing" ? (
-          <p className="rs-state rs-state--empty" style={{ marginTop: 10 }}>
-            {job.status === "processing" ? "Student result PDF is being prepared for this school." : "Student result PDF request is queued."}
-          </p>
-        ) : null}
         {job?.status === "failed" ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{job.error_message || "Student result PDF generation failed."}</p> : null}
         {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
         {message ? <p className="rs-state rs-state--empty" style={{ marginTop: 10 }}>{message}</p> : null}

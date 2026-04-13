@@ -103,7 +103,6 @@ export default function StudentReport() {
   const [resultError, setResultError] = useState("");
   const [resultMessage, setResultMessage] = useState("");
   const [reportError, setReportError] = useState("");
-  const [reportMessage, setReportMessage] = useState("");
   const [summaryPage, setSummaryPage] = useState(1);
   const {
     job: resultJob,
@@ -280,11 +279,9 @@ export default function StudentReport() {
 
     setResultRequesting(true);
     setResultError("");
-    setResultMessage("");
     try {
       const res = await api.post("/api/school-admin/reports/student-result/download-jobs", resultParams());
       setResultJob(res.data?.data || null);
-      setResultMessage("Student result PDF generation started.");
     } catch (e) {
       setResultError(e?.response?.data?.message || e?.message || "Failed to start student result PDF generation.");
     } finally {
@@ -300,7 +297,6 @@ export default function StudentReport() {
 
     try {
       await downloadResultGeneratedFile("student_result.pdf");
-      setResultMessage("Student result downloaded successfully.");
     } catch (e) {
       setResultError(e?.message || "Failed to download student result PDF.");
     }
@@ -330,7 +326,6 @@ export default function StudentReport() {
 
     setReportRequesting(true);
     setReportError("");
-    setReportMessage("");
     try {
       const payload = {};
       if (selectedTermValue) {
@@ -342,7 +337,6 @@ export default function StudentReport() {
 
       const res = await api.post("/api/school-admin/reports/student/download-jobs", payload);
       setReportJob(res.data?.data || null);
-      setReportMessage("Student report PDF generation started.");
     } catch (e) {
       setReportError(e?.response?.data?.message || e?.message || "Failed to start student report PDF generation.");
     } finally {
@@ -355,7 +349,6 @@ export default function StudentReport() {
 
     try {
       await downloadReportGeneratedFile("student_report.pdf");
-      setReportMessage("Student report downloaded successfully.");
     } catch (e) {
       setReportError(e?.message || "Failed to download student report PDF.");
     }
@@ -495,11 +488,6 @@ export default function StudentReport() {
             </button>
           </div>
 
-          {resultJob?.status === "pending" || resultJob?.status === "processing" ? (
-            <p className="student-report-message">
-              {resultJob.status === "processing" ? "Student result PDF is being prepared for this school." : "Student result PDF request is queued."}
-            </p>
-          ) : null}
           {resultJob?.status === "failed" ? <p className="student-report-error">{resultJob.error_message || "Student result PDF generation failed."}</p> : null}
           {resultError ? <p className="student-report-error">{resultError}</p> : null}
           {resultMessage ? <p className="student-report-message">{resultMessage}</p> : null}
@@ -597,7 +585,6 @@ export default function StudentReport() {
                   setTermId(e.target.value);
                   setReportJob(null);
                   setReportError("");
-                  setReportMessage("");
                 }}
               >
                 {(context?.terms || []).map((t) => (
@@ -617,7 +604,6 @@ export default function StudentReport() {
                   setClassId(e.target.value);
                   setReportJob(null);
                   setReportError("");
-                  setReportMessage("");
                 }}
               >
                 <option value="">All Classes</option>
@@ -642,14 +628,8 @@ export default function StudentReport() {
               {studentReportActionLabel}
             </button>
           </div>
-          {reportJob?.status === "pending" || reportJob?.status === "processing" ? (
-            <p className="student-report-message">
-              {reportJob.status === "processing" ? "Student report PDF is being prepared for this school." : "Student report PDF request is queued."}
-            </p>
-          ) : null}
           {reportJob?.status === "failed" ? <p className="student-report-error">{reportJob.error_message || "Student report PDF generation failed."}</p> : null}
           {reportError ? <p className="student-report-error">{reportError}</p> : null}
-          {reportMessage ? <p className="student-report-message">{reportMessage}</p> : null}
 
           {loading ? (
             <p className="student-report-loading">Loading report...</p>

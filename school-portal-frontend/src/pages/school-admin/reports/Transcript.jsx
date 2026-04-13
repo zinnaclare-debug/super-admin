@@ -3,7 +3,7 @@ import api from "../../../services/api";
 import researchingArt from "../../../assets/transcript/researching.svg";
 import savingNotesArt from "../../../assets/transcript/saving-notes.svg";
 import documentWarningArt from "../../../assets/transcript/document-warning.svg";
-import { fileNameFromHeaders, messageFromBlobError, useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
+import { messageFromBlobError, useGeneratedDocumentJob } from "../../../hooks/useGeneratedDocumentJob";
 import "../../shared/PaymentsShowcase.css";
 import "./Transcript.css";
 
@@ -129,11 +129,9 @@ export default function Transcript() {
     if (!canSearch) return;
     setRequesting(true);
     setError("");
-    setMessage("");
     try {
       const res = await api.post("/api/school-admin/transcript/download-jobs", requestParams());
       setJob(res.data?.data || null);
-      setMessage("Transcript PDF generation started.");
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to start transcript PDF generation.");
     } finally {
@@ -144,7 +142,6 @@ export default function Transcript() {
   const downloadTranscript = async () => {
     try {
       await downloadGeneratedFile("student_transcript.pdf");
-      setMessage("Transcript downloaded successfully.");
     } catch (e) {
       if (e?.response?.data instanceof Blob) {
         const msg = await messageFromBlobError(e.response.data, "Failed to download transcript PDF.");
@@ -236,11 +233,6 @@ export default function Transcript() {
             </p>
           ) : null}
 
-          {job?.status === "pending" || job?.status === "processing" ? (
-            <p className="transcript-message">
-              {job.status === "processing" ? "Transcript PDF is being prepared for this school." : "Transcript PDF request is queued."}
-            </p>
-          ) : null}
           {job?.status === "failed" ? <p className="transcript-error">{job.error_message || "Transcript PDF generation failed."}</p> : null}
           {error ? <p className="transcript-error">{error}</p> : null}
           {message ? <p className="transcript-message">{message}</p> : null}

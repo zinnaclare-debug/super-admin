@@ -66,7 +66,6 @@ export default function TeacherReport() {
   const [loading, setLoading] = useState(true);
   const [sessionConfigError, setSessionConfigError] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
 
   const schoolName = useMemo(() => {
@@ -108,7 +107,6 @@ export default function TeacherReport() {
 
     setRequesting(true);
     setError("");
-    setMessage("");
     try {
       const payload = {};
       if (selectedTermValue) {
@@ -116,7 +114,6 @@ export default function TeacherReport() {
       }
       const res = await api.post("/api/school-admin/reports/teacher/download-jobs", payload);
       setJob(res.data?.data || null);
-      setMessage("Teacher report PDF generation started.");
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to start teacher report PDF generation.");
     } finally {
@@ -127,7 +124,6 @@ export default function TeacherReport() {
   const downloadPdf = async () => {
     try {
       await downloadGeneratedFile("teacher_report.pdf");
-      setMessage("Teacher report downloaded successfully.");
     } catch (e) {
       setError(e?.message || "Failed to download teacher report PDF.");
     }
@@ -195,7 +191,6 @@ export default function TeacherReport() {
                   setTermId(e.target.value);
                   setJob(null);
                   setError("");
-                  setMessage("");
                 }}
               >
                 {(context?.terms || []).map((t) => (
@@ -223,14 +218,8 @@ export default function TeacherReport() {
           <p className="teacher-report-meta">
             {schoolName} | Session: {context?.current_session?.session_name || context?.current_session?.academic_year || "-"} | Term: {context?.selected_term?.name || "-"}
           </p>
-          {job?.status === "pending" || job?.status === "processing" ? (
-            <p className="teacher-report-message">
-              {job.status === "processing" ? "Teacher report PDF is being prepared for this school." : "Teacher report PDF request is queued."}
-            </p>
-          ) : null}
           {job?.status === "failed" ? <p className="teacher-report-error">{job.error_message || "Teacher report PDF generation failed."}</p> : null}
           {error ? <p className="teacher-report-error">{error}</p> : null}
-          {message ? <p className="teacher-report-message">{message}</p> : null}
         </div>
 
         <div className="payx-card teacher-report-table-card">
