@@ -61,7 +61,7 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
   return (
     <div
       style={{
-        marginTop: 20,
+        marginTop: 0,
         border: "1px solid #ddd",
         padding: 16,
         borderRadius: 8,
@@ -100,3 +100,4 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
     </div>
   );
 }
+
