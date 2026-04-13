@@ -92,9 +92,9 @@
 .school-site-main--home {
   position: relative;
   isolation: isolate;
-  --school-home-watermark-size: min(58vw, 300px);
-  --school-home-watermark-opacity: 0.035;
-  --school-home-watermark-offset: 68px;
+  --school-home-watermark-size: min(82vw, 420px);
+  --school-home-watermark-opacity: 0.07;
+  --school-home-watermark-offset: 56px;
 }
 
 .school-site-main--home::before {
@@ -113,6 +113,29 @@
 .school-site-main--home > * {
   position: relative;
   z-index: 1;
+}
+
+.school-site-main--home .school-site-motto-box {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.school-site-main--home .school-site-section {
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(148, 163, 184, 0.24);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.school-site-main--home .school-site-content-card,
+.school-site-main--home .school-site-contact-widget {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(148, 163, 184, 0.24);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .school-site-hero {
@@ -344,16 +367,16 @@
 
 @media (min-width: 1024px) {
   .school-site-main--home {
-    --school-home-watermark-size: min(34vw, 460px);
-    --school-home-watermark-opacity: 0.065;
-    --school-home-watermark-offset: 36px;
+    --school-home-watermark-size: min(48vw, 640px);
+    --school-home-watermark-opacity: 0.09;
+    --school-home-watermark-offset: 28px;
   }
 }
 
 @media (min-width: 1400px) {
   .school-site-main--home {
-    --school-home-watermark-size: min(30vw, 520px);
-    --school-home-watermark-opacity: 0.075;
+    --school-home-watermark-size: min(44vw, 760px);
+    --school-home-watermark-opacity: 0.11;
   }
 }
 
@@ -384,9 +407,19 @@
 
 @media (max-width: 640px) {
   .school-site-main--home {
-    --school-home-watermark-size: min(72vw, 220px);
-    --school-home-watermark-opacity: 0.022;
-    --school-home-watermark-offset: 92px;
+    --school-home-watermark-size: min(96vw, 320px);
+    --school-home-watermark-opacity: 0.05;
+    --school-home-watermark-offset: 96px;
+  }
+
+  .school-site-main--home .school-site-section {
+    background: rgba(255, 255, 255, 0.34);
+  }
+
+  .school-site-main--home .school-site-content-card,
+  .school-site-main--home .school-site-contact-widget,
+  .school-site-main--home .school-site-motto-box {
+    background: rgba(255, 255, 255, 0.24);
   }
 }
 
@@ -952,6 +985,7 @@
     min-height: 0;
   }
 }
+
 
 
 
