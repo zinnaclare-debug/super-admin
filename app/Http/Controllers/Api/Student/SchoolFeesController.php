@@ -420,6 +420,7 @@ class SchoolFeesController extends Controller
 
         $placement = $this->resolveStudentPlacement((int) $student->id, (int) $term->id);
         $logoDataUri = $this->logoDataUri($school->logo_path);
+        $headSignatureDataUri = $this->imageDataUri($school->head_signature_path);
         $invoiceNumber = 'INV-' . $schoolId . '-' . $student->id . '-' . $session->id . '-' . $term->id;
 
         try {
@@ -429,6 +430,7 @@ class SchoolFeesController extends Controller
             $html = view('pdf.school_fee_invoice', [
                 'school' => $school,
                 'logoDataUri' => $logoDataUri,
+                'headSignatureDataUri' => $headSignatureDataUri,
                 'studentUser' => $user,
                 'student' => $student,
                 'studentLevel' => $studentLevel,
@@ -543,6 +545,7 @@ class SchoolFeesController extends Controller
         $amountDue = (float) $payment->amount_due_snapshot;
         $outstanding = max($amountDue - $totalPaid, 0);
 
+        $headSignatureDataUri = $this->imageDataUri($school->head_signature_path);
         $logoDataUri = $this->logoDataUri($school->logo_path);
 
         try {
@@ -551,6 +554,7 @@ class SchoolFeesController extends Controller
 
             $html = view('pdf.school_fee_receipt', [
                 'school' => $school,
+                'headSignatureDataUri' => $headSignatureDataUri,
                 'logoDataUri' => $logoDataUri,
                 'studentUser' => $user,
                 'student' => $student,
@@ -832,11 +836,16 @@ class SchoolFeesController extends Controller
 
     private function logoDataUri(?string $logoPath): ?string
     {
-        if (!$logoPath || !Storage::disk('public')->exists($logoPath)) {
+        return $this->imageDataUri($logoPath);
+    }
+
+    private function imageDataUri(?string $storagePath): ?string
+    {
+        if (!$storagePath || !Storage::disk('public')->exists($storagePath)) {
             return null;
         }
 
-        $fullPath = Storage::disk('public')->path($logoPath);
+        $fullPath = Storage::disk('public')->path($storagePath);
         $mime = @mime_content_type($fullPath) ?: 'image/png';
         $data = @file_get_contents($fullPath);
         if ($data === false) {
@@ -846,6 +855,7 @@ class SchoolFeesController extends Controller
         return 'data:' . $mime . ';base64,' . base64_encode($data);
     }
 }
+
 
 
 

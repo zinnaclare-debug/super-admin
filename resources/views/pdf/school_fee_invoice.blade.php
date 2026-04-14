@@ -78,11 +78,22 @@
             font-size: 10px;
         }
         .money { text-align: right; }
-        .summary-table {
-            width: 44%;
-            margin-left: auto;
-            border-collapse: collapse;
+        .summary-signature-layout {
+            width: 100%;
             margin-top: 10px;
+            border-collapse: collapse;
+        }
+        .summary-signature-layout td {
+            vertical-align: top;
+        }
+        .summary-signature-layout .signature-cell {
+            width: 56%;
+            padding-right: 18px;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0;
         }
         .summary-table td {
             border: 1px solid #0f172a;
@@ -96,6 +107,34 @@
             background: #0f766e;
             color: #fff;
             font-weight: bold;
+        }
+        .signature-card {
+            min-height: 106px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            padding: 12px;
+        }
+        .signature-label {
+            color: #475569;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .signature-image-wrap {
+            margin-top: 8px;
+            min-height: 58px;
+        }
+        .signature-image {
+            max-width: 180px;
+            max-height: 64px;
+            object-fit: contain;
+        }
+        .signature-line {
+            margin-top: 8px;
+            border-top: 1px solid #475569;
+            padding-top: 4px;
+            font-size: 10px;
+            color: #334155;
         }
         .status-box {
             margin-top: 12px;
@@ -209,18 +248,35 @@
     </tbody>
 </table>
 
-<table class="summary-table">
+<table class="summary-signature-layout">
     <tr>
-        <td>Total Invoice</td>
-        <td class="money">{{ number_format((float) ($amountDue ?? 0), 2) }}</td>
-    </tr>
-    <tr>
-        <td>Total Paid So Far</td>
-        <td class="money">{{ number_format((float) ($totalPaid ?? 0), 2) }}</td>
-    </tr>
-    <tr class="total-row">
-        <td>Outstanding Balance</td>
-        <td class="money">{{ number_format((float) ($outstanding ?? 0), 2) }}</td>
+        <td class="signature-cell">
+            <div class="signature-card">
+                <div class="signature-label">Authorized Signature</div>
+                @if(!empty($headSignatureDataUri))
+                    <div class="signature-image-wrap">
+                        <img class="signature-image" src="{{ $headSignatureDataUri }}" alt="Head Signature" />
+                    </div>
+                @endif
+                <div class="signature-line">{{ $school?->head_of_school_name ?: 'Head of School' }}</div>
+            </div>
+        </td>
+        <td>
+            <table class="summary-table">
+                <tr>
+                    <td>Total Invoice</td>
+                    <td class="money">{{ number_format((float) ($amountDue ?? 0), 2) }}</td>
+                </tr>
+                <tr>
+                    <td>Total Paid So Far</td>
+                    <td class="money">{{ number_format((float) ($totalPaid ?? 0), 2) }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>Outstanding Balance</td>
+                    <td class="money">{{ number_format((float) ($outstanding ?? 0), 2) }}</td>
+                </tr>
+            </table>
+        </td>
     </tr>
 </table>
 
@@ -229,3 +285,4 @@
 </div>
 </body>
 </html>
+
