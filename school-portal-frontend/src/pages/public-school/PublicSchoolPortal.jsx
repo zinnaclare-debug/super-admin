@@ -65,6 +65,39 @@ function PhoneIcon() {
   );
 }
 
+function XIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 4 20 20" />
+      <path d="M20 4 4 20" />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M13.5 21v-7h2.4l.4-2.8h-2.8V9.4c0-.8.3-1.4 1.5-1.4H16V5.5c-.4-.1-1.2-.1-2.1-.1-2.1 0-3.5 1.3-3.5 3.6v2.1H8V14h2.3v7h3.2Z" />
+    </svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M14.6 3c.4 2.2 1.7 3.7 3.9 4v2.6a7 7 0 0 1-3.5-1v6.1A5.7 5.7 0 1 1 9.3 9v2.8a3 3 0 1 0 2.9 3V3h2.4Z" />
+    </svg>
+  );
+}
+
+function WhatsAppSocialIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.7 15l-1.3 5 5.2-1.3A10 10 0 1 0 12 2Zm5.4 14.2c-.2.6-1.3 1.2-1.8 1.3-.5.1-1 .2-1.6 0-.4-.1-1-.3-1.7-.6-3-1.3-5-4.4-5.2-4.6-.2-.2-1.2-1.5-1.2-2.9s.7-2.1.9-2.4c.2-.3.5-.4.7-.4h.5c.1 0 .4 0 .5.4.2.5.7 1.8.8 2 .1.2.1.4 0 .6-.1.2-.2.4-.4.6l-.5.6c-.2.2-.3.4-.1.7.2.4 1 1.6 2.1 2.5 1.5 1.2 2.6 1.5 3 1.7.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.3.7-.2l1.8.8c.3.1.5.2.5.4.1.1.1.8-.1 1.4Z" />
+    </svg>
+  );
+}
+
 function ContactWidget({ icon, title, value, children }) {
   return (
     <article className="school-site-contact-widget">
@@ -80,6 +113,47 @@ function ContactWidget({ icon, title, value, children }) {
 
 const CONTENT_PREVIEW_LIMIT = 100;
 const QUESTIONS_PER_PAGE = 4;
+const SOCIAL_PLATFORM_META = {
+  x: {
+    label: "Follow on X",
+    hint: "School updates and announcements",
+    icon: <XIcon />,
+  },
+  facebook: {
+    label: "Find us on Facebook",
+    hint: "School page and community posts",
+    icon: <FacebookIcon />,
+  },
+  tiktok: {
+    label: "Watch on TikTok",
+    hint: "Short videos and campus moments",
+    icon: <TikTokIcon />,
+  },
+  whatsapp: {
+    label: "Join on WhatsApp",
+    hint: "Group, channel, or direct school link",
+    icon: <WhatsAppSocialIcon />,
+  },
+};
+
+function buildSocialLinks(socialLinks) {
+  if (!socialLinks || typeof socialLinks !== "object") return [];
+
+  return Object.entries(SOCIAL_PLATFORM_META)
+    .map(([key, meta]) => {
+      const current = socialLinks?.[key];
+      const url = String(current?.url || "").trim();
+
+      if (!current?.enabled || !url) return null;
+
+      return {
+        key,
+        url,
+        ...meta,
+      };
+    })
+    .filter(Boolean);
+}
 
 function sanitizeExamQuestion(question, index) {
   if (!question || typeof question !== "object") return null;
@@ -203,6 +277,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const phoneHref = normalizePhoneNumber(contactPhone);
   const whatsappHref = whatsappLink(contactPhone);
   const mapHref = mapsLink(contactAddress);
+  const socialLinks = useMemo(() => buildSocialLinks(website.social_links), [website.social_links]);
 
   const themeStyle = useMemo(
     () => ({
@@ -649,6 +724,35 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
               </div>
             </ContactWidget>
           </section>
+
+          {socialLinks.length ? (
+            <section className="school-site-social-section school-site-section">
+              <div className="school-site-content-head">
+                <div>
+                  <h2>Social Media</h2>
+                  <p>Follow the school on the official channels activated by the school admin.</p>
+                </div>
+              </div>
+
+              <div className="school-site-social-grid">
+                {socialLinks.map((item) => (
+                  <a
+                    key={item.key}
+                    className={`school-site-social-card school-site-social-card--${item.key}`}
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span className="school-site-social-icon" aria-hidden="true">{item.icon}</span>
+                    <div className="school-site-social-copy">
+                      <strong>{item.label}</strong>
+                      <span>{item.hint}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </main>
       ) : null}
 

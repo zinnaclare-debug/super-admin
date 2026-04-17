@@ -49,6 +49,31 @@ class SchoolWebsiteController extends Controller
             'website_content.show_apply_now' => ['nullable', 'boolean'],
             'website_content.show_entrance_exam' => ['nullable', 'boolean'],
             'website_content.show_verify_score' => ['nullable', 'boolean'],
+            'website_content.social_links' => ['nullable', 'array'],
+            'website_content.social_links.x.enabled' => ['nullable', 'boolean'],
+            'website_content.social_links.x.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! SchoolPublicWebsiteData::validateSocialLink('x', $value)) {
+                    $fail('X link must be a valid x.com or twitter.com URL.');
+                }
+            }],
+            'website_content.social_links.facebook.enabled' => ['nullable', 'boolean'],
+            'website_content.social_links.facebook.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! SchoolPublicWebsiteData::validateSocialLink('facebook', $value)) {
+                    $fail('Facebook link must be a valid facebook.com URL.');
+                }
+            }],
+            'website_content.social_links.tiktok.enabled' => ['nullable', 'boolean'],
+            'website_content.social_links.tiktok.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! SchoolPublicWebsiteData::validateSocialLink('tiktok', $value)) {
+                    $fail('TikTok link must be a valid tiktok.com URL.');
+                }
+            }],
+            'website_content.social_links.whatsapp.enabled' => ['nullable', 'boolean'],
+            'website_content.social_links.whatsapp.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! SchoolPublicWebsiteData::validateSocialLink('whatsapp', $value)) {
+                    $fail('WhatsApp link must be a valid wa.me, chat.whatsapp.com, or whatsapp.com URL.');
+                }
+            }],
             'entrance_exam_config' => ['sometimes', 'array'],
             'entrance_exam_config.enabled' => ['nullable', 'boolean'],
             'entrance_exam_config.application_open' => ['nullable', 'boolean'],

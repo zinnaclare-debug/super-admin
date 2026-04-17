@@ -72,7 +72,18 @@ class SchoolPublicWebsiteData
             'show_apply_now' => self::bool($value['show_apply_now'] ?? true, true),
             'show_entrance_exam' => self::bool($value['show_entrance_exam'] ?? true, true),
             'show_verify_score' => self::bool($value['show_verify_score'] ?? true, true),
+            'social_links' => self::normalizeSocialLinks($value['social_links'] ?? []),
         ];
+    }
+
+    public static function validateSocialLink(string $platform, mixed $value): bool
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return true;
+        }
+
+        return self::socialUrl($platform, $value) !== '';
     }
 
     public static function normalizeEntranceExamConfig(?array $value, array $availableClasses = []): array
@@ -275,6 +286,71 @@ class SchoolPublicWebsiteData
         }
 
         return array_values($normalized);
+    }
+
+    private static function normalizeSocialLinks(mixed $value): array
+    {
+        $value = is_array($value) ? $value : [];
+        $normalized = [];
+
+        foreach (self::supportedSocialPlatforms() as $platform => $meta) {
+            $platformValue = is_array($value[$platform] ?? null) ? $value[$platform] : [];
+            $normalized[$platform] = [
+                'enabled' => self::bool($platformValue['enabled'] ?? false, false),
+                'url' => self::socialUrl($platform, $platformValue['url'] ?? null),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private static function socialUrl(string $platform, mixed $value): string
+    {
+        $url = trim((string) $value);
+        if ($url === '') {
+            return '';
+        }
+
+        if (! preg_match('#^[a-z][a-z0-9+.-]*://#i', $url)) {
+            $url = 'https://' . ltrim($url, '/');
+        }
+
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            return '';
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host === '') {
+            return '';
+        }
+
+        $allowedHosts = self::supportedSocialPlatforms()[$platform]['hosts'] ?? [];
+        foreach ($allowedHosts as $allowedHost) {
+            $allowedHost = strtolower((string) $allowedHost);
+            if ($host === $allowedHost || str_ends_with($host, '.' . $allowedHost)) {
+                return $url;
+            }
+        }
+
+        return '';
+    }
+
+    private static function supportedSocialPlatforms(): array
+    {
+        return [
+            'x' => [
+                'hosts' => ['x.com', 'twitter.com'],
+            ],
+            'facebook' => [
+                'hosts' => ['facebook.com', 'fb.com'],
+            ],
+            'tiktok' => [
+                'hosts' => ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'],
+            ],
+            'whatsapp' => [
+                'hosts' => ['wa.me', 'chat.whatsapp.com', 'api.whatsapp.com', 'whatsapp.com'],
+            ],
+        ];
     }
 
     private static function string(mixed $value, string $fallback = '', int $max = 255): string

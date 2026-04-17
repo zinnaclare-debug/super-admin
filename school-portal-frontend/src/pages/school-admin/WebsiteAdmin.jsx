@@ -6,6 +6,58 @@ import heatmapArt from "../../assets/website-admin/heatmap.svg";
 import landingPageArt from "../../assets/website-admin/landing-page.svg";
 import "./WebsiteAdmin.css";
 
+const SOCIAL_PLATFORM_CONFIG = [
+  {
+    key: "x",
+    label: "X (Twitter)",
+    badge: "X",
+    placeholder: "https://x.com/your_school",
+    help: "Use your official X profile link.",
+  },
+  {
+    key: "facebook",
+    label: "Facebook",
+    badge: "f",
+    placeholder: "https://www.facebook.com/your_school",
+    help: "Use your official Facebook page link.",
+  },
+  {
+    key: "tiktok",
+    label: "TikTok",
+    badge: "T",
+    placeholder: "https://www.tiktok.com/@your_school",
+    help: "Use your official TikTok profile link.",
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp",
+    badge: "W",
+    placeholder: "https://chat.whatsapp.com/...",
+    help: "You can use a WhatsApp group, channel, or wa.me link.",
+  },
+];
+
+function emptySocialLinks() {
+  return SOCIAL_PLATFORM_CONFIG.reduce((acc, platform) => {
+    acc[platform.key] = { enabled: false, url: "" };
+    return acc;
+  }, {});
+}
+
+function normalizeSocialLinks(value = {}) {
+  const normalized = emptySocialLinks();
+
+  SOCIAL_PLATFORM_CONFIG.forEach((platform) => {
+    const current = value?.[platform.key] || {};
+    normalized[platform.key] = {
+      enabled: Boolean(current.enabled),
+      url: String(current.url || ""),
+    };
+  });
+
+  return normalized;
+}
+
 const emptyWebsiteContent = {
   hero_title: "",
   hero_subtitle: "",
@@ -26,6 +78,7 @@ const emptyWebsiteContent = {
   show_apply_now: true,
   show_entrance_exam: true,
   show_verify_score: true,
+  social_links: emptySocialLinks(),
 };
 
 const emptyContentForm = {
@@ -38,8 +91,14 @@ const emptyContentForm = {
 };
 
 function normalizeData(payload = {}) {
+  const incomingWebsiteContent = payload.website_content || {};
+
   return {
-    websiteContent: { ...emptyWebsiteContent, ...(payload.website_content || {}) },
+    websiteContent: {
+      ...emptyWebsiteContent,
+      ...incomingWebsiteContent,
+      social_links: normalizeSocialLinks(incomingWebsiteContent.social_links),
+    },
   };
 }
 
@@ -124,6 +183,19 @@ export default function WebsiteAdmin() {
 
   const updateWebsiteContent = (field, value) => {
     setWebsiteContent((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateSocialLink = (platform, field, value) => {
+    setWebsiteContent((prev) => ({
+      ...prev,
+      social_links: {
+        ...(prev.social_links || {}),
+        [platform]: {
+          ...(prev.social_links?.[platform] || {}),
+          [field]: value,
+        },
+      },
+    }));
   };
 
   const saveWebsite = async () => {
@@ -361,6 +433,51 @@ export default function WebsiteAdmin() {
           <label><input type="checkbox" checked={websiteContent.show_apply_now} onChange={(e) => updateWebsiteContent("show_apply_now", e.target.checked)} /> Show Apply Now</label>
           <label><input type="checkbox" checked={websiteContent.show_entrance_exam} onChange={(e) => updateWebsiteContent("show_entrance_exam", e.target.checked)} /> Show Entrance Exam</label>
           <label><input type="checkbox" checked={websiteContent.show_verify_score} onChange={(e) => updateWebsiteContent("show_verify_score", e.target.checked)} /> Show Verify Score</label>
+        </div>
+
+        <div className="website-admin-social-card">
+          <div className="website-admin-social-head">
+            <div>
+              <h3>Social Media Widgets</h3>
+              <p>Activate only the social links you want to show on the public school homepage.</p>
+            </div>
+          </div>
+
+          <div className="website-admin-social-list">
+            {SOCIAL_PLATFORM_CONFIG.map((platform) => {
+              const socialValue = websiteContent.social_links?.[platform.key] || { enabled: false, url: "" };
+
+              return (
+                <div key={platform.key} className="website-admin-social-row">
+                  <div className="website-admin-social-meta">
+                    <span className={`website-admin-social-badge website-admin-social-badge--${platform.key}`}>{platform.badge}</span>
+                    <div>
+                      <strong>{platform.label}</strong>
+                      <p>{platform.help}</p>
+                    </div>
+                  </div>
+
+                  <div className="website-admin-social-controls">
+                    <label className="website-admin-social-toggle">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(socialValue.enabled)}
+                        onChange={(e) => updateSocialLink(platform.key, "enabled", e.target.checked)}
+                      />
+                      <span>Show on homepage</span>
+                    </label>
+
+                    <input
+                      type="text"
+                      value={socialValue.url || ""}
+                      onChange={(e) => updateSocialLink(platform.key, "url", e.target.value)}
+                      placeholder={platform.placeholder}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 

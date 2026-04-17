@@ -130,7 +130,8 @@
 }
 
 .school-site-main--home .school-site-content-card,
-.school-site-main--home .school-site-contact-widget {
+.school-site-main--home .school-site-contact-widget,
+.school-site-main--home .school-site-social-card {
   background: rgba(255, 255, 255, 0.28);
   border-color: rgba(148, 163, 184, 0.24);
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
@@ -295,6 +296,97 @@
   border-color: rgba(34, 197, 94, 0.16);
 }
 
+.school-site-social-section {
+  margin-top: 24px;
+}
+
+.school-site-social-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.school-site-social-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-height: 100%;
+  padding: 16px 18px;
+  border-radius: 20px;
+  text-decoration: none;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.07);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.school-site-social-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.11);
+}
+
+.school-site-social-card--x:hover {
+  border-color: rgba(15, 23, 42, 0.22);
+}
+
+.school-site-social-card--facebook:hover {
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.school-site-social-card--tiktok:hover {
+  border-color: rgba(219, 39, 119, 0.24);
+}
+
+.school-site-social-card--whatsapp:hover {
+  border-color: rgba(34, 197, 94, 0.24);
+}
+
+.school-site-social-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.school-site-social-card--x .school-site-social-icon {
+  background: linear-gradient(135deg, #111827 0%, #334155 100%);
+}
+
+.school-site-social-card--facebook .school-site-social-icon {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.school-site-social-card--tiktok .school-site-social-icon {
+  background: linear-gradient(135deg, #111827 0%, #db2777 100%);
+}
+
+.school-site-social-card--whatsapp .school-site-social-icon {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+}
+
+.school-site-social-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.school-site-social-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.school-site-social-copy strong {
+  color: var(--school-primary);
+}
+
+.school-site-social-copy span {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .school-site-cards {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -403,6 +495,10 @@
   .school-site-contact-row {
     grid-template-columns: 1fr;
   }
+
+  .school-site-social-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -418,8 +514,13 @@
 
   .school-site-main--home .school-site-content-card,
   .school-site-main--home .school-site-contact-widget,
+  .school-site-main--home .school-site-social-card,
   .school-site-main--home .school-site-motto-box {
     background: rgba(255, 255, 255, 0.24);
+  }
+
+  .school-site-social-grid {
+    grid-template-columns: 1fr;
   }
 }
 

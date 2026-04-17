@@ -1094,7 +1094,7 @@ class ResultsController extends Controller
             'behaviourTraits' => $behaviourTraits,
             'assessmentSchema' => $assessmentSchema,
             'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
-            'studentPhotoDataUri' => $this->toDataUri($studentPhotoPath),
+            'studentPhotoDataUri' => $this->studentPhotoDataUri($studentPhotoPath),
             'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
         ];
 
@@ -1527,6 +1527,12 @@ class ResultsController extends Controller
         };
     }
 
+    private function studentPhotoDataUri(?string $storagePath): ?string
+    {
+        return $this->toDataUri($storagePath)
+            ?: $this->localImageToDataUri(base_path('public/defaults/student-photo-placeholder.svg'));
+    }
+
     private function toDataUri(?string $storagePath): ?string
     {
         try {
@@ -1535,29 +1541,7 @@ class ResultsController extends Controller
             }
 
             $fullPath = Storage::disk('public')->path($storagePath);
-            if (!is_file($fullPath)) {
-                return null;
-            }
-
-            $size = @filesize($fullPath);
-            if (is_int($size) && $size > 700 * 1024) {
-                return null;
-            }
-
-            $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
-            $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
-            if (!in_array($mime, $allowedMimes, true)) {
-                return null;
-            }
-
-            $binary = @file_get_contents($fullPath);
-            if (!is_string($binary) || $binary === '') {
-                return null;
-            }
-
-            $base64 = base64_encode($binary);
-
-            return "data:{$mime};base64,{$base64}";
+            return $this->localImageToDataUri($fullPath);
         } catch (Throwable $e) {
             Log::warning('Failed to build image data URI for student result PDF', [
                 'path' => $storagePath,
@@ -1565,6 +1549,34 @@ class ResultsController extends Controller
             ]);
             return null;
         }
+    }
+
+    private function localImageToDataUri(string $fullPath): ?string
+    {
+        if (!is_file($fullPath)) {
+            return null;
+        }
+
+        $size = @filesize($fullPath);
+        if (is_int($size) && $size > 700 * 1024) {
+            return null;
+        }
+
+        $mime = strtolower((string) (mime_content_type($fullPath) ?: ''));
+        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/svg+xml', 'text/plain'];
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+
+        $binary = @file_get_contents($fullPath);
+        if (!is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        $mime = str_ends_with(strtolower($fullPath), '.svg') ? 'image/svg+xml' : $mime;
+        $base64 = base64_encode($binary);
+
+        return "data:{$mime};base64,{$base64}";
     }
 
     private function renderStudentResultPdf(array $viewData): string
