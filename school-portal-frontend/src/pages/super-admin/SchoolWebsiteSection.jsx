@@ -1,6 +1,58 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 
+const SOCIAL_PLATFORM_CONFIG = [
+  {
+    key: "x",
+    label: "X (Twitter)",
+    badge: "X",
+    placeholder: "https://x.com/your_school",
+    help: "Use your official X profile link.",
+  },
+  {
+    key: "facebook",
+    label: "Facebook",
+    badge: "f",
+    placeholder: "https://www.facebook.com/your_school",
+    help: "Use your official Facebook page link.",
+  },
+  {
+    key: "tiktok",
+    label: "TikTok",
+    badge: "T",
+    placeholder: "https://www.tiktok.com/@your_school",
+    help: "Use your official TikTok profile link.",
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp",
+    badge: "W",
+    placeholder: "https://chat.whatsapp.com/...",
+    help: "You can use a WhatsApp group, channel, or wa.me link.",
+  },
+];
+
+function emptySocialLinks() {
+  return SOCIAL_PLATFORM_CONFIG.reduce((acc, platform) => {
+    acc[platform.key] = { enabled: false, url: "" };
+    return acc;
+  }, {});
+}
+
+function normalizeSocialLinks(value = {}) {
+  const normalized = emptySocialLinks();
+
+  SOCIAL_PLATFORM_CONFIG.forEach((platform) => {
+    const current = value?.[platform.key] || {};
+    normalized[platform.key] = {
+      enabled: Boolean(current.enabled),
+      url: String(current.url || ""),
+    };
+  });
+
+  return normalized;
+}
+
 const emptyWebsiteContent = {
   hero_title: "",
   hero_subtitle: "",
@@ -20,6 +72,7 @@ const emptyWebsiteContent = {
   show_apply_now: true,
   show_entrance_exam: true,
   show_verify_score: true,
+  social_links: emptySocialLinks(),
 };
 
 const emptyExamConfig = {
@@ -66,9 +119,15 @@ function normalizeClassExam(className, exam = {}) {
 }
 
 function normalizeData(payload = {}) {
+  const incomingWebsiteContent = payload.website_content || {};
+
   return {
     availableClasses: Array.isArray(payload.available_classes) ? payload.available_classes : [],
-    websiteContent: { ...emptyWebsiteContent, ...(payload.website_content || {}) },
+    websiteContent: {
+      ...emptyWebsiteContent,
+      ...incomingWebsiteContent,
+      social_links: normalizeSocialLinks(incomingWebsiteContent.social_links),
+    },
     entranceExamConfig: {
       ...emptyExamConfig,
       ...(payload.entrance_exam_config || {}),
@@ -138,6 +197,19 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
 
   const updateWebsiteContent = (field, value) => {
     setWebsiteContent((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateSocialLink = (platform, field, value) => {
+    setWebsiteContent((prev) => ({
+      ...prev,
+      social_links: {
+        ...(prev.social_links || {}),
+        [platform]: {
+          ...(prev.social_links?.[platform] || {}),
+          [field]: value,
+        },
+      },
+    }));
   };
 
   const updateExamConfig = (field, value) => {
@@ -315,6 +387,45 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
               <input type="checkbox" checked={websiteContent.show_verify_score} onChange={(e) => updateWebsiteContent("show_verify_score", e.target.checked)} />
               <span>Show Verify Score</span>
             </label>
+          </div>
+        </div>
+
+        <div className="sai-field sai-field--wide">
+          <label>Social Media Widgets</label>
+          <div className="sai-social-list">
+            {SOCIAL_PLATFORM_CONFIG.map((platform) => {
+              const socialValue = websiteContent.social_links?.[platform.key] || { enabled: false, url: "" };
+
+              return (
+                <div key={platform.key} className="sai-social-row">
+                  <div className="sai-social-meta">
+                    <span className={`sai-social-badge sai-social-badge--${platform.key}`}>{platform.badge}</span>
+                    <div>
+                      <strong>{platform.label}</strong>
+                      <p className="sai-note">{platform.help}</p>
+                    </div>
+                  </div>
+
+                  <div className="sai-social-controls">
+                    <label className="sai-check-card sai-check-card--compact">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(socialValue.enabled)}
+                        onChange={(e) => updateSocialLink(platform.key, "enabled", e.target.checked)}
+                      />
+                      <span>Show on homepage</span>
+                    </label>
+
+                    <input
+                      type="text"
+                      value={socialValue.url || ""}
+                      onChange={(e) => updateSocialLink(platform.key, "url", e.target.value)}
+                      placeholder={platform.placeholder}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

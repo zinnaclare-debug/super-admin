@@ -539,6 +539,66 @@
   background: #f8fbff;
 }
 
+.sai-social-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sai-social-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.sai-social-meta {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sai-social-meta strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.sai-social-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.sai-social-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+}
+
+.sai-social-badge--x {
+  background: linear-gradient(135deg, #111827 0%, #334155 100%);
+}
+
+.sai-social-badge--facebook {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.sai-social-badge--tiktok {
+  background: linear-gradient(135deg, #111827 0%, #db2777 100%);
+}
+
+.sai-social-badge--whatsapp {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+}
+
 .sai-class-exam-head,
 .sai-question-head {
   display: flex;
@@ -546,6 +606,12 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+  .sai-social-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .sai-class-exam-head h5 {
