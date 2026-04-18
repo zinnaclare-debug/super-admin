@@ -1928,6 +1928,9 @@ class ResultsController extends Controller
             . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average)
             . ($showResultPosition ? (' | POS: ' . e($classPositionDisplay)) : '')
             . '</td></tr>'
+            . ($showResultPosition
+                ? '<tr><th>Position</th><td>' . e($classPositionDisplay) . '</td><th>Class Size</th><td>' . e((string) data_get($viewData, 'classSize', '-')) . '</td></tr>'
+                : '')
             . '<tr><th>Gender</th><td>' . e($studentSex) . '</td><th>Next Term Begins</th><td>' . e($nextTermBeginLabel) . '</td></tr>'
             . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Number of School Open</th><td>' . $timesSchoolOpened . '</td></tr>'
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'

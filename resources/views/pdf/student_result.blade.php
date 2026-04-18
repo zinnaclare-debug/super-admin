@@ -273,6 +273,14 @@
                     @endif
                 </td>
             </tr>
+            @if($showResultPosition ?? true)
+                <tr>
+                    <th>POSITION</th>
+                    <td>{{ $classPositionDisplay ?? '-' }}</td>
+                    <th>CLASS SIZE</th>
+                    <td>{{ $classSize ?? '-' }}</td>
+                </tr>
+            @endif
             <tr>
                 <th>TIMES PRESENT</th>
                 <td>{{ $timesPresent }}</td>
