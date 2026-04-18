@@ -1044,6 +1044,7 @@ class ResultsController extends Controller
         );
 
         $school = $actor->school ?: $actor->school()->first();
+        $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
         $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
@@ -1052,6 +1053,15 @@ class ResultsController extends Controller
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
         $averageDisplay = $summary['average_display'];
+        $showResultPosition = (bool) ($schoolWebsiteContent['show_result_position'] ?? true);
+        $classPositionStats = $showResultPosition
+            ? $this->buildClassPositionStats($schoolId, $classId, $termId)
+            : ['positions' => [], 'class_count' => 0];
+        $classPosition = $classPositionStats['positions'][(int) $student->id] ?? null;
+        $classSize = (int) ($classPositionStats['class_count'] ?? 0);
+        $classPositionDisplay = ($classPosition !== null && $classSize > 0)
+            ? ($classPosition . ' of ' . $classSize)
+            : '-';
 
         $teacherComment = (string) ($attendance?->comment ?? '');
         if ($teacherComment === '') {
@@ -1084,6 +1094,10 @@ class ResultsController extends Controller
             'totalScore' => $totalScore,
             'averageScore' => $averageScore,
             'averageDisplay' => $averageDisplay,
+            'showResultPosition' => $showResultPosition,
+            'classPosition' => $classPosition,
+            'classSize' => $classSize,
+            'classPositionDisplay' => $classPositionDisplay,
             'overallGrade' => $overallGrade,
             'attendance' => $attendance,
             'attendanceSetting' => $attendanceSetting,
@@ -1419,6 +1433,185 @@ class ResultsController extends Controller
         ];
     }
 
+    private function buildClassPositionStats(int $schoolId, int $classId, int $termId): array
+    {
+        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+        $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
+
+        $enrolledStudentIdsQuery = Enrollment::query()
+            ->where('enrollments.class_id', $classId)
+            ->where('enrollments.term_id', $termId)
+            ->select('enrollments.student_id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrolledStudentIdsQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $enrolledStudentIds = $enrolledStudentIdsQuery
+            ->distinct()
+            ->pluck('enrollments.student_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $termSubjects = TermSubject::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('term_id', $termId)
+            ->get(['id', 'subject_id']);
+
+        if ($termSubjects->isEmpty()) {
+            return [
+                'class_count' => count($enrolledStudentIds),
+                'positions' => [],
+            ];
+        }
+
+        $termSubjectIds = $termSubjects
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $subjectIdByTermSubjectId = $termSubjects
+            ->mapWithKeys(fn ($termSubject) => [(int) $termSubject->id => (int) $termSubject->subject_id])
+            ->all();
+
+        $excludedSubjectsByStudent = [];
+        if (
+            $termSessionId > 0
+            && !empty($enrolledStudentIds)
+            && Schema::hasTable('student_subject_exclusions')
+        ) {
+            $exclusionRows = DB::table('student_subject_exclusions')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $termSessionId)
+                ->where('class_id', $classId)
+                ->whereIn('student_id', $enrolledStudentIds)
+                ->whereIn('subject_id', array_values(array_unique($subjectIdByTermSubjectId)))
+                ->get(['student_id', 'subject_id']);
+
+            foreach ($exclusionRows as $row) {
+                $excludedSubjectsByStudent[(int) $row->student_id][(int) $row->subject_id] = true;
+            }
+        }
+
+        $resultsQuery = DB::table('results')
+            ->where('results.school_id', $schoolId)
+            ->whereIn('results.term_subject_id', $termSubjectIds);
+
+        if (!empty($enrolledStudentIds)) {
+            $resultsQuery->whereIn('results.student_id', $enrolledStudentIds);
+        }
+
+        $resultRows = $resultsQuery
+            ->select([
+                'results.id',
+                'results.student_id',
+                'results.term_subject_id',
+                'results.ca',
+                'results.ca_breakdown',
+                'results.exam',
+                'results.created_at',
+                'results.updated_at',
+            ])
+            ->get();
+
+        $totalsByStudentAndSubject = [];
+        foreach ($resultRows as $row) {
+            if (!$this->isResultRecordGraded(
+                $row->id ?? null,
+                $row->ca ?? null,
+                $row->exam ?? null,
+                $row->created_at ?? null,
+                $row->updated_at ?? null
+            )) {
+                continue;
+            }
+
+            $caBreakdown = AssessmentSchema::normalizeBreakdown(
+                $row->ca_breakdown ?? null,
+                $assessmentSchema,
+                (int) ($row->ca ?? 0)
+            );
+            $exam = max(0, min((int) ($assessmentSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+            $totalsByStudentAndSubject[(int) $row->student_id][(int) $row->term_subject_id] =
+                AssessmentSchema::breakdownTotal($caBreakdown) + $exam;
+        }
+
+        $studentIds = !empty($enrolledStudentIds)
+            ? $enrolledStudentIds
+            : array_keys($totalsByStudentAndSubject);
+
+        $rows = [];
+        foreach ($studentIds as $studentId) {
+            $total = 0.0;
+            $scoredCount = 0;
+
+            foreach ($termSubjectIds as $termSubjectId) {
+                $subjectId = (int) ($subjectIdByTermSubjectId[$termSubjectId] ?? 0);
+                if (
+                    $subjectId > 0
+                    && !empty($excludedSubjectsByStudent[$studentId][$subjectId])
+                ) {
+                    continue;
+                }
+
+                if (!array_key_exists($termSubjectId, $totalsByStudentAndSubject[$studentId] ?? [])) {
+                    continue;
+                }
+
+                $total += (float) $totalsByStudentAndSubject[$studentId][$termSubjectId];
+                $scoredCount++;
+            }
+
+            $rows[] = [
+                'student_id' => (int) $studentId,
+                'average' => $scoredCount > 0 ? round($total / $scoredCount, 2) : null,
+            ];
+        }
+
+        $ranking = $rows;
+        usort($ranking, function (array $a, array $b) {
+            if ($a['average'] === null && $b['average'] === null) {
+                return ((int) $a['student_id']) <=> ((int) $b['student_id']);
+            }
+            if ($a['average'] === null) {
+                return 1;
+            }
+            if ($b['average'] === null) {
+                return -1;
+            }
+            if ((float) $a['average'] === (float) $b['average']) {
+                return ((int) $a['student_id']) <=> ((int) $b['student_id']);
+            }
+            return ((float) $b['average']) <=> ((float) $a['average']);
+        });
+
+        $positions = [];
+        $previousAverage = null;
+        $previousRank = 0;
+        foreach ($ranking as $index => $item) {
+            if ($item['average'] === null) {
+                continue;
+            }
+
+            $average = (float) $item['average'];
+            $rank = ($previousAverage !== null && abs($average - $previousAverage) < 0.00001)
+                ? $previousRank
+                : ($index + 1);
+
+            $positions[(int) $item['student_id']] = $rank;
+            $previousAverage = $average;
+            $previousRank = $rank;
+        }
+
+        return [
+            'class_count' => count($studentIds),
+            'positions' => $positions,
+        ];
+    }
+
     private function isResultRecordGraded(
         $resultId,
         $ca,
@@ -1604,6 +1797,8 @@ class ResultsController extends Controller
             'averageDisplay',
             number_format((float) data_get($viewData, 'averageScore', 0), 2)
         );
+        $showResultPosition = (bool) data_get($viewData, 'showResultPosition', true);
+        $classPositionDisplay = (string) data_get($viewData, 'classPositionDisplay', '-');
         $total = (int) data_get($viewData, 'totalScore', 0);
         $schoolLogoDataUri = (string) data_get($viewData, 'schoolLogoDataUri', '');
         $studentPhotoDataUri = (string) data_get($viewData, 'studentPhotoDataUri', '');
@@ -1730,7 +1925,9 @@ class ResultsController extends Controller
             . '</td><td style="width:80px;text-align:right;">' . $schoolLogoBlock . '</td></tr></table>'
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
-            . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
+            . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average)
+            . ($showResultPosition ? (' | POS: ' . e($classPositionDisplay)) : '')
+            . '</td></tr>'
             . '<tr><th>Gender</th><td>' . e($studentSex) . '</td><th>Next Term Begins</th><td>' . e($nextTermBeginLabel) . '</td></tr>'
             . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Number of School Open</th><td>' . $timesSchoolOpened . '</td></tr>'
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'

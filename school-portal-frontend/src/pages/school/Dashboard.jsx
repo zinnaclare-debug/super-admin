@@ -22,6 +22,7 @@ function SchoolDashboard() {
     school_location: "",
     contact_email: "",
     contact_phone: "",
+    show_result_position: true,
     paystack_subaccount_code: "",
     students: 0,
     male_students: 0,
@@ -35,6 +36,7 @@ function SchoolDashboard() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [schoolMotto, setSchoolMotto] = useState("");
+  const [showResultPosition, setShowResultPosition] = useState(true);
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [departmentTemplates, setDepartmentTemplates] = useState([]);
@@ -54,6 +56,7 @@ function SchoolDashboard() {
           contact_email: res.data?.contact_email ?? "",
           contact_phone: res.data?.contact_phone ?? "",
           school_motto: res.data?.school_motto ?? "",
+          show_result_position: Boolean(res.data?.show_result_position ?? true),
           paystack_subaccount_code: res.data?.paystack_subaccount_code ?? "",
           students: res.data?.students ?? 0,
           male_students: res.data?.male_students ?? 0,
@@ -66,6 +69,7 @@ function SchoolDashboard() {
         setContactEmail(res.data?.contact_email ?? "");
         setContactPhone(res.data?.contact_phone ?? "");
         setSchoolMotto(res.data?.school_motto ?? "");
+        setShowResultPosition(Boolean(res.data?.show_result_position ?? true));
         setPaystackSubaccountCode(res.data?.paystack_subaccount_code ?? "");
 
         const departmentsFromStats = Array.isArray(res.data?.department_templates) ? res.data.department_templates : [];
@@ -78,6 +82,7 @@ function SchoolDashboard() {
           contact_email: "",
           contact_phone: "",
           school_motto: "",
+          show_result_position: true,
           paystack_subaccount_code: "",
           students: 0,
           male_students: 0,
@@ -90,6 +95,7 @@ function SchoolDashboard() {
         setContactEmail("");
         setContactPhone("");
         setSchoolMotto("");
+        setShowResultPosition(true);
         setPaystackSubaccountCode("");
         setDepartmentTemplates([]);
         setEnabledFeatures([]);
@@ -111,14 +117,16 @@ function SchoolDashboard() {
     const existingContactEmail = (stats.contact_email || "").trim();
     const existingContactPhone = (stats.contact_phone || "").trim();
     const existingSchoolMotto = (stats.school_motto || "").trim();
+    const existingShowResultPosition = Boolean(stats.show_result_position ?? true);
     const existingSubaccountCode = (stats.paystack_subaccount_code || "").trim();
     const hasLocationChange = normalizedLocation !== existingLocation;
     const hasContactEmailChange = normalizedContactEmail !== existingContactEmail;
     const hasContactPhoneChange = normalizedContactPhone !== existingContactPhone;
     const hasSchoolMottoChange = normalizedSchoolMotto !== existingSchoolMotto;
+    const hasShowResultPositionChange = Boolean(showResultPosition) !== existingShowResultPosition;
     const hasSubaccountCodeChange = normalizedSubaccountCode !== existingSubaccountCode;
 
-    if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSchoolMottoChange && !hasSubaccountCodeChange) {
+    if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSchoolMottoChange && !hasShowResultPositionChange && !hasSubaccountCodeChange) {
       return alert("No contact information changes to save.");
     }
 
@@ -129,6 +137,7 @@ function SchoolDashboard() {
       fd.append("contact_email", normalizedContactEmail);
       fd.append("contact_phone", normalizedContactPhone);
       fd.append("school_motto", normalizedSchoolMotto);
+      fd.append("show_result_position", showResultPosition ? "1" : "0");
       fd.append("paystack_subaccount_code", normalizedSubaccountCode);
 
       const res = await api.post("/api/school-admin/branding", fd, {
@@ -149,6 +158,9 @@ function SchoolDashboard() {
           school_motto: Object.prototype.hasOwnProperty.call(data, "school_motto")
             ? (data.school_motto ?? "")
             : prev.school_motto,
+          show_result_position: Object.prototype.hasOwnProperty.call(data, "show_result_position")
+            ? Boolean(data.show_result_position)
+            : prev.show_result_position,
           paystack_subaccount_code: Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
             ? (data.paystack_subaccount_code ?? "")
             : prev.paystack_subaccount_code,
@@ -168,6 +180,11 @@ function SchoolDashboard() {
         Object.prototype.hasOwnProperty.call(data, "school_motto")
           ? (data.school_motto ?? "")
           : normalizedSchoolMotto
+      );
+      setShowResultPosition(
+        Object.prototype.hasOwnProperty.call(data, "show_result_position")
+          ? Boolean(data.show_result_position)
+          : Boolean(showResultPosition)
       );
       setPaystackSubaccountCode(
         Object.prototype.hasOwnProperty.call(data, "paystack_subaccount_code")
@@ -352,6 +369,18 @@ function SchoolDashboard() {
                 onChange={(e) => setPaystackSubaccountCode(e.target.value)}
                 placeholder="ACCT_xxxxxxxxx"
               />
+            </div>
+
+            <div className="sd-field">
+              <label>Result PDF Position</label>
+              <label className="sd-checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={showResultPosition}
+                  onChange={(e) => setShowResultPosition(e.target.checked)}
+                />
+                <span>Show position on student result PDF</span>
+              </label>
             </div>
 
             <div className="sd-field">

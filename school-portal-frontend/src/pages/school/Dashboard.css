@@ -208,6 +208,27 @@
   background: #fff;
 }
 
+.sd-checkbox-field {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.sd-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #0f766e;
+}
+
 .sd-upload-box {
   border: 1px dashed #cbd5e1;
   border-radius: 10px;

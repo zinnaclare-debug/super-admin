@@ -55,6 +55,7 @@ class DashboardController extends Controller
             'school_location' => $school?->location,
             'contact_email' => $school?->contact_email,
             'contact_phone' => $school?->contact_phone,
+            'show_result_position' => (bool) ($websiteContent['show_result_position'] ?? true),
             'paystack_subaccount_code' => $school?->paystack_subaccount_code,
             'school_logo_url' => $this->storageUrl($school?->logo_path),
             'head_of_school_name' => $school?->head_of_school_name,
@@ -124,6 +125,7 @@ class DashboardController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:30',
             'school_motto' => 'nullable|string|max:255',
+            'show_result_position' => 'nullable|boolean',
             'paystack_subaccount_code' => [
                 'nullable',
                 'string',
@@ -136,6 +138,7 @@ class DashboardController extends Controller
         $hasContactEmailField = $request->has('contact_email');
         $hasContactPhoneField = $request->has('contact_phone');
         $hasSchoolMottoField = $request->has('school_motto');
+        $hasShowResultPositionField = $request->has('show_result_position');
         $hasPaystackSubaccountField = $request->has('paystack_subaccount_code');
 
         if (
@@ -143,10 +146,11 @@ class DashboardController extends Controller
             && !$hasContactEmailField
             && !$hasContactPhoneField
             && !$hasSchoolMottoField
+            && !$hasShowResultPositionField
             && !$hasPaystackSubaccountField
         ) {
             return response()->json([
-                'message' => 'Provide school_location, contact_email, contact_phone, school_motto, or paystack_subaccount_code.',
+                'message' => 'Provide school_location, contact_email, contact_phone, school_motto, show_result_position, or paystack_subaccount_code.',
             ], 422);
         }
 
@@ -169,6 +173,14 @@ class DashboardController extends Controller
             $websiteContent['motto'] = trim((string) ($payload['school_motto'] ?? ''));
             $school->website_content = SchoolPublicWebsiteData::normalizeWebsiteContent($websiteContent, $school);
         }
+        if ($hasShowResultPositionField) {
+            $websiteContent = is_array($school->website_content) ? $school->website_content : [];
+            $websiteContent['show_result_position'] = filter_var(
+                $payload['show_result_position'] ?? false,
+                FILTER_VALIDATE_BOOL
+            );
+            $school->website_content = SchoolPublicWebsiteData::normalizeWebsiteContent($websiteContent, $school);
+        }
         if ($hasPaystackSubaccountField) {
             $subaccountCode = trim((string) ($payload['paystack_subaccount_code'] ?? ''));
             $school->paystack_subaccount_code = $subaccountCode !== '' ? $subaccountCode : null;
@@ -184,6 +196,7 @@ class DashboardController extends Controller
                 'contact_email' => $school->contact_email,
                 'contact_phone' => $school->contact_phone,
                 'school_motto' => SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school)['motto'] ?? '',
+                'show_result_position' => (bool) (SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school)['show_result_position'] ?? true),
                 'paystack_subaccount_code' => $school->paystack_subaccount_code,
                 'school_logo_url' => $this->storageUrl($school->logo_path),
                 'head_of_school_name' => $school->head_of_school_name,

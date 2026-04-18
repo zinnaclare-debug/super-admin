@@ -190,6 +190,20 @@
             padding: 6px;
             text-align: center;
         }
+        .metric-combo {
+            white-space: nowrap;
+        }
+        .metric-combo .divider {
+            display: inline-block;
+            width: 1px;
+            height: 10px;
+            background: #111;
+            margin: 0 8px;
+            vertical-align: middle;
+        }
+        .metric-combo .position-text {
+            font-weight: bold;
+        }
     </style>
 @if(!$embedded)
 </head>
@@ -265,7 +279,17 @@
                 <th>GENDER</th>
                 <td>{{ strtoupper((string)($student?->sex ?? '-')) }}</td>
                 <th>AVERAGE</th>
-                <td>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</td>
+                <td>
+                    @if($showResultPosition ?? true)
+                        <span class="metric-combo">
+                            <span>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</span>
+                            <span class="divider"></span>
+                            <span class="position-text">POS: {{ $classPositionDisplay ?? '-' }}</span>
+                        </span>
+                    @else
+                        <span>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</span>
+                    @endif
+                </td>
             </tr>
             <tr>
                 <th>TIMES PRESENT</th>

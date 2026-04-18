@@ -72,6 +72,7 @@ class SchoolPublicWebsiteData
             'show_apply_now' => self::bool($value['show_apply_now'] ?? true, true),
             'show_entrance_exam' => self::bool($value['show_entrance_exam'] ?? true, true),
             'show_verify_score' => self::bool($value['show_verify_score'] ?? true, true),
+            'show_result_position' => self::bool($value['show_result_position'] ?? true, true),
             'social_links' => self::normalizeSocialLinks($value['social_links'] ?? []),
         ];
     }
