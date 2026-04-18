@@ -4,6 +4,7 @@
   flex-direction: column;
   background: #ffffff;
   color: #0f172a;
+  overflow-x: clip;
 }
 
 .school-site-nav,
@@ -92,6 +93,7 @@
 .school-site-main--home {
   position: relative;
   isolation: isolate;
+  overflow-x: clip;
   --school-home-watermark-size: min(82vw, 420px);
   --school-home-watermark-opacity: 0.07;
   --school-home-watermark-offset: 56px;
@@ -209,6 +211,8 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
   padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .school-site-contact-row {
@@ -310,6 +314,7 @@
   display: flex;
   gap: 14px;
   align-items: center;
+  min-width: 0;
   min-height: 100%;
   padding: 16px 18px;
   border-radius: 20px;
@@ -318,6 +323,8 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.07);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .school-site-social-card:hover {
@@ -375,16 +382,19 @@
 .school-site-social-copy {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .school-site-social-copy strong {
   color: var(--school-primary);
+  overflow-wrap: anywhere;
 }
 
 .school-site-social-copy span {
   color: #475569;
   font-size: 13px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .school-site-cards {
