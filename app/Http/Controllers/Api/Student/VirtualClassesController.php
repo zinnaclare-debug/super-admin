@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\Term;
 use App\Models\TermSubject;
 use App\Models\VirtualClass;
+use App\Services\Hms\HmsRoomService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -147,6 +148,8 @@ class VirtualClassesController extends Controller
         $data = $request->validate([
             'term_subject_id' => 'nullable|integer',
             'subject_id' => 'nullable|integer',
+            'class_type' => 'nullable|string|in:virtual,live',
+            'status' => 'nullable|string|in:scheduled,live,ended',
         ]);
 
         $allowed = $this->allowedTermSubjectIds($request);
@@ -169,16 +172,46 @@ class VirtualClassesController extends Controller
             ->when(!empty($data['subject_id']), function ($q) use ($data) {
                 $q->where('term_subjects.subject_id', (int) $data['subject_id']);
             })
+            ->when(!empty($data['class_type']), function ($q) use ($data) {
+                $q->where('virtual_classes.class_type', $data['class_type']);
+            })
+            ->when(!empty($data['status']), function ($q) use ($data) {
+                $q->where('virtual_classes.status', $data['status']);
+            })
             ->orderByDesc('virtual_classes.id')
             ->get([
                 'virtual_classes.*',
                 'subjects.id as subject_id',
                 'subjects.name as subject_name',
+                'subjects.code as subject_code',
                 'classes.name as class_name',
                 'classes.level as class_level',
                 'terms.name as term_name',
             ]);
 
         return response()->json(['data' => $items]);
+    }
+
+    // GET /api/student/virtual-classes/{virtualClass}/session
+    public function session(Request $request, VirtualClass $virtualClass, HmsRoomService $hmsRoomService)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'student', 403);
+        abort_unless((int) $virtualClass->school_id === (int) $user->school_id, 403);
+
+        $allowed = $this->allowedTermSubjectIds($request);
+        abort_unless(in_array((int) $virtualClass->term_subject_id, $allowed, true), 403);
+
+        if ($virtualClass->class_type !== 'live' || $virtualClass->provider !== '100ms') {
+            return response()->json(['message' => 'This class is not configured for 100ms live sessions'], 422);
+        }
+
+        if ($virtualClass->status !== 'live') {
+            return response()->json(['message' => 'This live class is not active yet'], 403);
+        }
+
+        return response()->json([
+            'data' => $hmsRoomService->buildSessionPayload($virtualClass, $user, 'student'),
+        ]);
     }
 }

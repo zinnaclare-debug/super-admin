@@ -52,5 +52,14 @@ return [
         'connect_timeout' => (int) env('AI_CONNECT_TIMEOUT', 10),
     ],
 
+    'hms' => [
+        'base_url' => env('HMS_BASE_URL', 'https://api.100ms.live/v2'),
+        'app_access_key' => env('HMS_APP_ACCESS_KEY'),
+        'app_secret' => env('HMS_APP_SECRET'),
+        'template_id' => env('HMS_TEMPLATE_ID'),
+        'staff_role' => env('HMS_STAFF_ROLE', 'teacher'),
+        'student_role' => env('HMS_STUDENT_ROLE', 'student'),
+    ],
+
 ];
 

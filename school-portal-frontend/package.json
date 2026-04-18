@@ -7,6 +7,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@100mslive/hms-video-store": "^0.13.3",
     "@tailwindcss/forms": "^0.5.2",
     "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^5.1.2",

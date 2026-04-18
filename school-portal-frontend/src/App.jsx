@@ -1,4 +1,5 @@
 // App.jsx
+import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 // Public
@@ -101,6 +102,13 @@ import StudentFeatureLayout from "./pages/student/StudentFeatureLayout";
 
 
 
+
+const StaffLiveClassRoom = lazy(() => import("./pages/staff/virtual-class/StaffLiveClassRoom"));
+const StudentLiveClassRoom = lazy(() => import("./pages/student/virtual-class/StudentLiveClassRoom"));
+
+function LiveClassRouteFallback() {
+  return <div style={{ padding: 24 }}>Loading live classroom...</div>;
+}
 
 function App() {
   return (
@@ -238,6 +246,14 @@ function App() {
         <Route path="e-library" element={<ELibraryHome />} />
         <Route path="class-activities" element={<ClassActivitiesHome />} />
         <Route path="virtual-class" element={<VirtualClassHome />} />
+        <Route
+          path="virtual-class/live/:virtualClassId"
+          element={
+            <Suspense fallback={<LiveClassRouteFallback />}>
+              <StaffLiveClassRoom />
+            </Suspense>
+          }
+        />
         <Route path="question-bank" element={<QuestionBankHome />} />
         <Route path="cbt" element={<CBTHome />} />
         <Route path="cbt/:examId/questions" element={<StaffCbtExamQuestions />} />
@@ -265,6 +281,14 @@ function App() {
           <Route path="e-library" element={<StudentELibrary />} />
           <Route path="class-activities" element={<StudentClassActivitiesHome />} />
           <Route path="virtual-class" element={<StudentVirtualClassHome />} />
+          <Route
+            path="virtual-class/live/:virtualClassId"
+            element={
+              <Suspense fallback={<LiveClassRouteFallback />}>
+                <StudentLiveClassRoom />
+              </Suspense>
+            }
+          />
           <Route path="cbt" element={<StudentCBTHome />} />
           <Route path="school-fees" element={<StudentSchoolFees />} />
           <Route path=":featureKey" element={<FeaturePage />} />

@@ -469,6 +469,9 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/virtual-classes/assigned-subjects', [StaffVirtualClassesController::class, 'assignedSubjects']);
     Route::get('/staff/virtual-classes', [StaffVirtualClassesController::class, 'index']);
     Route::post('/staff/virtual-classes', [StaffVirtualClassesController::class, 'store']);
+    Route::get('/staff/virtual-classes/{virtualClass}/session', [StaffVirtualClassesController::class, 'session']);
+    Route::post('/staff/virtual-classes/{virtualClass}/start', [StaffVirtualClassesController::class, 'start']);
+    Route::post('/staff/virtual-classes/{virtualClass}/end', [StaffVirtualClassesController::class, 'end']);
     Route::delete('/staff/virtual-classes/{virtualClass}', [StaffVirtualClassesController::class, 'destroy']);
     Route::get('/staff/question-bank/subjects', [StaffQuestionBankController::class, 'subjects']);
     Route::get('/staff/question-bank', [StaffQuestionBankController::class, 'index']);
@@ -533,6 +536,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/e-library/subjects', [StudentELibraryController::class, 'mySubjects']);
     Route::get('/student/virtual-classes/subjects', [StudentVirtualClassesController::class, 'mySubjects']);
     Route::get('/student/virtual-classes', [StudentVirtualClassesController::class, 'index']);
+    Route::get('/student/virtual-classes/{virtualClass}/session', [StudentVirtualClassesController::class, 'session']);
     Route::get('/student/cbt/subjects', [StudentCbtController::class, 'subjects']);
     Route::get('/student/cbt/exams', [StudentCbtController::class, 'exams']);
     Route::get('/student/cbt/exams/{exam}/questions', [StudentCbtController::class, 'questions']);

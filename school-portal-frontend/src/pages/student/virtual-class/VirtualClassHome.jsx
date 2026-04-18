@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../../../services/api";
 import aiResponseArt from "../../../assets/virtual-class/ai-response.svg";
 import onlineMeetingsArt from "../../../assets/virtual-class/online-meetings.svg";
@@ -12,6 +13,16 @@ function formatDate(value) {
   } catch {
     return value;
   }
+}
+
+function typeLabel(value) {
+  return value === "live" ? "Live Class" : "Virtual Class";
+}
+
+function statusLabel(value) {
+  if (value === "scheduled") return "Scheduled";
+  if (value === "ended") return "Ended";
+  return "Live";
 }
 
 export default function StudentVirtualClassHome() {
@@ -67,13 +78,13 @@ export default function StudentVirtualClassHome() {
       <section className="vcx-hero">
         <div>
           <span className="vcx-pill">Student Virtual Class</span>
-          <h2 className="vcx-title">Join your online classes on time</h2>
+          <h2 className="vcx-title">Join your virtual classes and live subject sessions</h2>
           <p className="vcx-subtitle">
-            Pick a subject and access active class meeting links shared by your teachers for this term.
+            Pick a subject and see which sessions are live now, scheduled for later, or already ended.
           </p>
           <div className="vcx-meta">
             <span>{loading ? "Loading..." : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}</span>
-            <span>{`${items.length} virtual class${items.length === 1 ? "" : "es"}`}</span>
+            <span>{`${items.length} session${items.length === 1 ? "" : "s"}`}</span>
           </div>
         </div>
 
@@ -91,7 +102,7 @@ export default function StudentVirtualClassHome() {
       </section>
 
       <section className="vcx-panel">
-        {loading ? <p className="vcx-state vcx-state--loading">Loading virtual classes...</p> : null}
+        {loading ? <p className="vcx-state vcx-state--loading">Loading class sessions...</p> : null}
         {!loading && subjects.length === 0 ? (
           <p className="vcx-state vcx-state--empty">No virtual class subjects available for your current class and current term.</p>
         ) : null}
@@ -107,9 +118,9 @@ export default function StudentVirtualClassHome() {
                 onChange={(e) => setTermSubjectId(e.target.value)}
                 style={{ minWidth: 260 }}
               >
-                {subjects.map((s) => (
-                  <option key={s.term_subject_id} value={s.term_subject_id}>
-                    {s.subject_name}
+                {subjects.map((subject) => (
+                  <option key={subject.term_subject_id} value={subject.term_subject_id}>
+                    {subject.subject_name}
                   </option>
                 ))}
               </select>
@@ -121,26 +132,50 @@ export default function StudentVirtualClassHome() {
                   <tr>
                     <th style={{ width: 70 }}>S/N</th>
                     <th>Title</th>
+                    <th>Type</th>
+                    <th>Status</th>
                     <th>Start Time</th>
+                    <th>End Time</th>
                     <th style={{ width: 160 }}>Join</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((x, idx) => (
-                    <tr key={x.id}>
-                      <td>{idx + 1}</td>
-                      <td>{x.title}</td>
-                      <td>{formatDate(x.starts_at)}</td>
-                      <td>
-                        <a className="vcx-link" href={x.meeting_link} target="_blank" rel="noreferrer">
-                          Join Class
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
+                  {items.map((item, idx) => {
+                    const canJoin = item.status === "live";
+
+                    return (
+                      <tr key={item.id}>
+                        <td>{idx + 1}</td>
+                        <td>{item.title}</td>
+                        <td>
+                          <span className={`vcx-badge vcx-badge--${item.class_type || "virtual"}`}>{typeLabel(item.class_type)}</span>
+                        </td>
+                        <td>
+                          <span className={`vcx-badge vcx-badge--${item.status || "live"}`}>{statusLabel(item.status)}</span>
+                        </td>
+                        <td>{formatDate(item.starts_at || item.live_started_at)}</td>
+                        <td>{formatDate(item.ends_at || item.live_ended_at)}</td>
+                        <td>
+                          {canJoin ? (
+                            item.provider === "100ms" && item.class_type === "live" ? (
+                              <Link className="vcx-link" to={`/student/virtual-class/live/${item.id}`}>
+                                Enter Classroom
+                              </Link>
+                            ) : (
+                              <a className="vcx-link" href={item.meeting_link} target="_blank" rel="noreferrer">
+                                Join Class
+                              </a>
+                            )
+                          ) : (
+                            <span className="vcx-muted">{item.status === "ended" ? "Class ended" : "Waiting to go live"}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan="4">No virtual class links posted yet.</td>
+                      <td colSpan="7">No virtual or live class sessions posted yet.</td>
                     </tr>
                   ) : null}
                 </tbody>
