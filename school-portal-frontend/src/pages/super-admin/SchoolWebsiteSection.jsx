@@ -24,11 +24,11 @@ const SOCIAL_PLATFORM_CONFIG = [
     help: "Use your official TikTok profile link.",
   },
   {
-    key: "whatsapp",
-    label: "WhatsApp",
-    badge: "W",
-    placeholder: "https://chat.whatsapp.com/...",
-    help: "You can use a WhatsApp group, channel, or wa.me link.",
+    key: "instagram",
+    label: "Instagram",
+    badge: "I",
+    placeholder: "https://www.instagram.com/your_school",
+    help: "Use your official Instagram profile link.",
   },
 ];
 

@@ -90,10 +90,10 @@ function TikTokIcon() {
   );
 }
 
-function WhatsAppSocialIcon() {
+function InstagramIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2a10 10 0 0 0-8.7 15l-1.3 5 5.2-1.3A10 10 0 1 0 12 2Zm5.4 14.2c-.2.6-1.3 1.2-1.8 1.3-.5.1-1 .2-1.6 0-.4-.1-1-.3-1.7-.6-3-1.3-5-4.4-5.2-4.6-.2-.2-1.2-1.5-1.2-2.9s.7-2.1.9-2.4c.2-.3.5-.4.7-.4h.5c.1 0 .4 0 .5.4.2.5.7 1.8.8 2 .1.2.1.4 0 .6-.1.2-.2.4-.4.6l-.5.6c-.2.2-.3.4-.1.7.2.4 1 1.6 2.1 2.5 1.5 1.2 2.6 1.5 3 1.7.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.3.7-.2l1.8.8c.3.1.5.2.5.4.1.1.1.8-.1 1.4Z" />
+      <path d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2Zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4h-9ZM17.7 5.8a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
     </svg>
   );
 }
@@ -129,10 +129,10 @@ const SOCIAL_PLATFORM_META = {
     hint: "Short videos and campus moments",
     icon: <TikTokIcon />,
   },
-  whatsapp: {
-    label: "Join on WhatsApp",
-    hint: "Group, channel, or direct school link",
-    icon: <WhatsAppSocialIcon />,
+  instagram: {
+    label: "See us on Instagram",
+    hint: "Photos, stories, and school highlights",
+    icon: <InstagramIcon />,
   },
 };
 

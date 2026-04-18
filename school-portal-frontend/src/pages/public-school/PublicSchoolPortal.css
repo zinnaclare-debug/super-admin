@@ -337,8 +337,8 @@
   border-color: rgba(219, 39, 119, 0.24);
 }
 
-.school-site-social-card--whatsapp:hover {
-  border-color: rgba(34, 197, 94, 0.24);
+.school-site-social-card--instagram:hover {
+  border-color: rgba(236, 72, 153, 0.24);
 }
 
 .school-site-social-icon {
@@ -363,8 +363,8 @@
   background: linear-gradient(135deg, #111827 0%, #db2777 100%);
 }
 
-.school-site-social-card--whatsapp .school-site-social-icon {
-  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+.school-site-social-card--instagram .school-site-social-icon {
+  background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%);
 }
 
 .school-site-social-icon svg {

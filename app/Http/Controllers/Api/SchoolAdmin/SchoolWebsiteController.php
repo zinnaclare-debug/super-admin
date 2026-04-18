@@ -109,10 +109,10 @@ class SchoolWebsiteController extends Controller
                     $fail('TikTok link must be a valid tiktok.com URL.');
                 }
             }],
-            'website_content.social_links.whatsapp.enabled' => ['nullable', 'boolean'],
-            'website_content.social_links.whatsapp.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
-                if (! SchoolPublicWebsiteData::validateSocialLink('whatsapp', $value)) {
-                    $fail('WhatsApp link must be a valid wa.me, chat.whatsapp.com, or whatsapp.com URL.');
+            'website_content.social_links.instagram.enabled' => ['nullable', 'boolean'],
+            'website_content.social_links.instagram.url' => ['nullable', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! SchoolPublicWebsiteData::validateSocialLink('instagram', $value)) {
+                    $fail('Instagram link must be a valid instagram.com URL.');
                 }
             }],
         ]);

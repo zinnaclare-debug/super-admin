@@ -347,8 +347,8 @@ class SchoolPublicWebsiteData
             'tiktok' => [
                 'hosts' => ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'],
             ],
-            'whatsapp' => [
-                'hosts' => ['wa.me', 'chat.whatsapp.com', 'api.whatsapp.com', 'whatsapp.com'],
+            'instagram' => [
+                'hosts' => ['instagram.com'],
             ],
         ];
     }
