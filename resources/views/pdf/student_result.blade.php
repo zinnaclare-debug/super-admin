@@ -190,20 +190,6 @@
             padding: 6px;
             text-align: center;
         }
-        .metric-combo {
-            white-space: nowrap;
-        }
-        .metric-combo .divider {
-            display: inline-block;
-            width: 1px;
-            height: 10px;
-            background: #111;
-            margin: 0 8px;
-            vertical-align: middle;
-        }
-        .metric-combo .position-text {
-            font-weight: bold;
-        }
     </style>
 @if(!$embedded)
 </head>
@@ -281,13 +267,9 @@
                 <th>AVERAGE</th>
                 <td>
                     @if($showResultPosition ?? true)
-                        <span class="metric-combo">
-                            <span>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</span>
-                            <span class="divider"></span>
-                            <span class="position-text">POS: {{ $classPositionDisplay ?? '-' }}</span>
-                        </span>
+                        {{ $averageDisplay ?? number_format((float) $averageScore, 2) }} | POS: {{ $classPositionDisplay ?? '-' }}
                     @else
-                        <span>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</span>
+                        {{ $averageDisplay ?? number_format((float) $averageScore, 2) }}
                     @endif
                 </td>
             </tr>

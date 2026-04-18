@@ -227,7 +227,7 @@ export default function StudentResultsHome() {
   const pdfActionLabel = (() => {
     if (requestingPdf) return "Starting...";
     if (downloading) return "Downloading...";
-    if (pdfJob?.status === "completed") return "Download Ready PDF";
+    if (pdfJob?.status === "completed") return "Generate Fresh Result PDF";
     if (pdfJob?.status === "failed") return "Retry Result PDF";
     if (pdfJob?.status === "processing") return "Processing PDF...";
     if (pdfJob?.status === "pending") return "Queued...";
@@ -235,8 +235,7 @@ export default function StudentResultsHome() {
   })();
 
   const handlePdfAction = () => {
-    if (pdfJob?.status === "completed") {
-      downloadGeneratedResultPdf();
+    if (isPdfProcessing || requestingPdf) {
       return;
     }
 
@@ -313,6 +312,15 @@ export default function StudentResultsHome() {
               >
                 {pdfActionLabel}
               </button>
+              {pdfJob?.status === "completed" ? (
+                <button
+                  className="rs-btn"
+                  onClick={downloadGeneratedResultPdf}
+                  disabled={requestingPdf || downloading}
+                >
+                  {downloading ? "Downloading..." : "Download Current PDF"}
+                </button>
+              ) : null}
             </div>
 
             {pdfJob?.status === "pending" || pdfJob?.status === "processing" ? (
