@@ -1054,9 +1054,7 @@ class ResultsController extends Controller
         $overallGrade = $summary['overall_grade'];
         $averageDisplay = $summary['average_display'];
         $showResultPosition = (bool) ($schoolWebsiteContent['show_result_position'] ?? true);
-        $classPositionStats = $showResultPosition
-            ? $this->buildClassPositionStats($schoolId, $classId, $termId)
-            : ['positions' => [], 'class_count' => 0];
+        $classPositionStats = $this->buildClassPositionStats($schoolId, $classId, $termId);
         $classPosition = $classPositionStats['positions'][(int) $student->id] ?? null;
         $classSize = (int) ($classPositionStats['class_count'] ?? 0);
         $classPositionDisplay = $classPosition !== null
@@ -1927,10 +1925,10 @@ class ResultsController extends Controller
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
             . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
             . ($showResultPosition
-                ? '<tr><th>Position</th><td>' . e($classPositionDisplay) . '</td><th>Number of Students</th><td>' . e((string) data_get($viewData, 'classSize', '-')) . '</td></tr>'
+                ? '<tr><th>Position</th><td colspan="3">' . e($classPositionDisplay) . '</td></tr>'
                 : '')
             . '<tr><th>Gender</th><td>' . e($studentSex) . '</td><th>Next Term Begins</th><td>' . e($nextTermBeginLabel) . '</td></tr>'
-            . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Number of School Open</th><td>' . $timesSchoolOpened . '</td></tr>'
+            . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Students</th><td>' . e((string) data_get($viewData, 'classSize', '-')) . '</td></tr>'
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
             . '<tr><th>Assessment Pattern</th><td colspan="3">' . e($assessmentSummary) . '</td></tr>'
             . '</table>'

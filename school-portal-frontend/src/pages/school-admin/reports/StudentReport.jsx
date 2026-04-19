@@ -307,13 +307,18 @@ export default function StudentReport() {
       return;
     }
 
+    if (resultJob?.status === "completed") {
+      await downloadStudentResult();
+      return;
+    }
+
     await startStudentResultPdf();
   };
 
   const studentResultActionLabel = (() => {
     if (resultRequesting) return "Starting...";
     if (resultDownloading) return "Downloading...";
-    if (resultJob?.status === "completed") return "Generate Result PDF";
+    if (resultJob?.status === "completed") return "Download Result PDF";
     if (resultJob?.status === "failed") return "Retry Result PDF";
     if (resultJob?.status === "processing") return "Processing Result...";
     if (resultJob?.status === "pending") return "Queued...";
@@ -485,15 +490,6 @@ export default function StudentReport() {
             >
               {studentResultActionLabel}
             </button>
-            {resultJob?.status === "completed" ? (
-              <button
-                className="payx-btn student-report-download-btn"
-                onClick={downloadStudentResult}
-                disabled={resultDownloading || resultRequesting}
-              >
-                {resultDownloading ? "Downloading..." : "Download Current PDF"}
-              </button>
-            ) : null}
           </div>
 
           {resultJob?.status === "failed" ? <p className="student-report-error">{resultJob.error_message || "Student result PDF generation failed."}</p> : null}

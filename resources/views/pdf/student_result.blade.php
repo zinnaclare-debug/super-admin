@@ -270,16 +270,14 @@
             @if($showResultPosition ?? true)
                 <tr>
                     <th>POSITION</th>
-                    <td>{{ $classPositionDisplay ?? '-' }}</td>
-                    <th>NUMBER OF STUDENTS</th>
-                    <td>{{ $classSize ?? '-' }}</td>
+                    <td colspan="3">{{ $classPositionDisplay ?? '-' }}</td>
                 </tr>
             @endif
             <tr>
-                <th>TIMES PRESENT</th>
-                <td>{{ $timesPresent }}</td>
-                <th>TIMES SCHOOL OPENED</th>
-                <td>{{ $timesOpened }}</td>
+                <th>ATTENDANCE</th>
+                <td>{{ $timesPresent }}/{{ $timesOpened }}</td>
+                <th>TOTAL STUDENTS</th>
+                <td>{{ $classSize ?? '-' }}</td>
             </tr>
             <tr>
                 <th>TOTAL OBTAINED</th>
