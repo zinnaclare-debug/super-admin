@@ -313,7 +313,7 @@ export default function StudentReport() {
   const studentResultActionLabel = (() => {
     if (resultRequesting) return "Starting...";
     if (resultDownloading) return "Downloading...";
-    if (resultJob?.status === "completed") return "Generate Fresh Result PDF";
+    if (resultJob?.status === "completed") return "Generate Result PDF";
     if (resultJob?.status === "failed") return "Retry Result PDF";
     if (resultJob?.status === "processing") return "Processing Result...";
     if (resultJob?.status === "pending") return "Queued...";

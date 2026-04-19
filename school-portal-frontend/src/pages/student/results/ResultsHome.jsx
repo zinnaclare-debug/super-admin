@@ -227,7 +227,7 @@ export default function StudentResultsHome() {
   const pdfActionLabel = (() => {
     if (requestingPdf) return "Starting...";
     if (downloading) return "Downloading...";
-    if (pdfJob?.status === "completed") return "Generate Fresh Result PDF";
+    if (pdfJob?.status === "completed") return "Generate Result PDF";
     if (pdfJob?.status === "failed") return "Retry Result PDF";
     if (pdfJob?.status === "processing") return "Processing PDF...";
     if (pdfJob?.status === "pending") return "Queued...";

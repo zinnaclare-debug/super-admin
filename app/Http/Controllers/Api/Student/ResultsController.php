@@ -1059,8 +1059,8 @@ class ResultsController extends Controller
             : ['positions' => [], 'class_count' => 0];
         $classPosition = $classPositionStats['positions'][(int) $student->id] ?? null;
         $classSize = (int) ($classPositionStats['class_count'] ?? 0);
-        $classPositionDisplay = ($classPosition !== null && $classSize > 0)
-            ? ($classPosition . ' of ' . $classSize)
+        $classPositionDisplay = $classPosition !== null
+            ? (string) $classPosition
             : '-';
 
         $teacherComment = (string) ($attendance?->comment ?? '');
@@ -1925,11 +1925,9 @@ class ResultsController extends Controller
             . '</td><td style="width:80px;text-align:right;">' . $schoolLogoBlock . '</td></tr></table>'
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
-            . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average)
-            . ($showResultPosition ? (' | POS: ' . e($classPositionDisplay)) : '')
-            . '</td></tr>'
+            . '<tr><th>Class</th><td>' . e($className) . '</td><th>Average</th><td>' . e($average) . '</td></tr>'
             . ($showResultPosition
-                ? '<tr><th>Position</th><td>' . e($classPositionDisplay) . '</td><th>Class Size</th><td>' . e((string) data_get($viewData, 'classSize', '-')) . '</td></tr>'
+                ? '<tr><th>Position</th><td>' . e($classPositionDisplay) . '</td><th>Number of Students</th><td>' . e((string) data_get($viewData, 'classSize', '-')) . '</td></tr>'
                 : '')
             . '<tr><th>Gender</th><td>' . e($studentSex) . '</td><th>Next Term Begins</th><td>' . e($nextTermBeginLabel) . '</td></tr>'
             . '<tr><th>Attendance</th><td>' . e($attendanceSummary) . '</td><th>Total Number of School Open</th><td>' . $timesSchoolOpened . '</td></tr>'

@@ -39,7 +39,6 @@ function SchoolDashboard() {
   const [showResultPosition, setShowResultPosition] = useState(true);
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
-  const [departmentTemplates, setDepartmentTemplates] = useState([]);
   const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
 
   useEffect(() => {
@@ -72,9 +71,7 @@ function SchoolDashboard() {
         setShowResultPosition(Boolean(res.data?.show_result_position ?? true));
         setPaystackSubaccountCode(res.data?.paystack_subaccount_code ?? "");
 
-        const departmentsFromStats = Array.isArray(res.data?.department_templates) ? res.data.department_templates : [];
         setEnabledFeatures(Array.isArray(featuresRes?.data?.data) ? featuresRes.data.data : []);
-        setDepartmentTemplates(Array.from(new Set(departmentsFromStats.map((x) => String(x).trim()).filter(Boolean))));
       } catch {
         setStats({
           school_name: "",
@@ -97,7 +94,6 @@ function SchoolDashboard() {
         setSchoolMotto("");
         setShowResultPosition(true);
         setPaystackSubaccountCode("");
-        setDepartmentTemplates([]);
         setEnabledFeatures([]);
       } finally {
         setLoading(false);
@@ -127,7 +123,7 @@ function SchoolDashboard() {
     const hasSubaccountCodeChange = normalizedSubaccountCode !== existingSubaccountCode;
 
     if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSchoolMottoChange && !hasShowResultPositionChange && !hasSubaccountCodeChange) {
-      return alert("No contact information changes to save.");
+      return alert("No school information changes to save.");
     }
 
     setSavingBranding(true);
@@ -191,7 +187,7 @@ function SchoolDashboard() {
           ? (data.paystack_subaccount_code ?? "")
           : normalizedSubaccountCode
       );
-      alert("Contact information updated");
+      alert("School information updated");
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
       const firstValidationError = Object.values(err?.response?.data?.errors || {})
@@ -383,25 +379,6 @@ function SchoolDashboard() {
               </label>
             </div>
 
-            <div className="sd-field">
-              <label>Department Templates</label>
-              <div className="sd-dept-box">
-                <p className="sd-note" style={{ marginTop: 8 }}>
-                  Department creation and edit are now controlled in Super Admin / School / Information / Class Templates.
-                </p>
-                <div className="sd-dept-tags">
-                  {departmentTemplates.length === 0 ? (
-                    <span className="sd-empty">No departments added yet.</span>
-                  ) : (
-                    departmentTemplates.map((name) => (
-                      <span key={name} className="sd-dept-tag">
-                        <span>{name}</span>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="sd-actions">

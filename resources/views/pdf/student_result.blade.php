@@ -265,19 +265,13 @@
                 <th>GENDER</th>
                 <td>{{ strtoupper((string)($student?->sex ?? '-')) }}</td>
                 <th>AVERAGE</th>
-                <td>
-                    @if($showResultPosition ?? true)
-                        {{ $averageDisplay ?? number_format((float) $averageScore, 2) }} | POS: {{ $classPositionDisplay ?? '-' }}
-                    @else
-                        {{ $averageDisplay ?? number_format((float) $averageScore, 2) }}
-                    @endif
-                </td>
+                <td>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</td>
             </tr>
             @if($showResultPosition ?? true)
                 <tr>
                     <th>POSITION</th>
                     <td>{{ $classPositionDisplay ?? '-' }}</td>
-                    <th>CLASS SIZE</th>
+                    <th>NUMBER OF STUDENTS</th>
                     <td>{{ $classSize ?? '-' }}</td>
                 </tr>
             @endif
