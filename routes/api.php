@@ -197,6 +197,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::delete('/school-admin/entrance-exam/classes/{className}/questions/{questionId}', [SchoolAdminWebsiteController::class, 'destroyClassQuestion'])
         ->middleware('feature:entrance_exam');
     Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
+    Route::get('/school-admin/subscription/invoice', [SchoolAdminSubscriptionController::class, 'invoice']);
     Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
     Route::post('/school-admin/subscription/bank-transfer', [SchoolAdminSubscriptionController::class, 'submitBankTransfer']);
     Route::get('/school-admin/subscription/verify', [SchoolAdminSubscriptionController::class, 'verify']);

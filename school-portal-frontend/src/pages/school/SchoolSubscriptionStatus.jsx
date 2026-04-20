@@ -39,6 +39,7 @@ export default function SchoolSubscriptionStatus() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [busyCycle, setBusyCycle] = useState("");
+  const [invoiceCycle, setInvoiceCycle] = useState("");
   const [bankCycle, setBankCycle] = useState("");
   const [bankForms, setBankForms] = useState({});
 
@@ -132,6 +133,34 @@ export default function SchoolSubscriptionStatus() {
       alert(firstValidationError || err?.response?.data?.message || "Failed to submit bank transfer receipt.");
     } finally {
       setBusyCycle("");
+    }
+  };
+
+  const downloadInvoice = async (cycle) => {
+    setInvoiceCycle(cycle);
+    try {
+      const res = await api.get("/api/school-admin/subscription/invoice", {
+        params: { billing_cycle: cycle },
+        responseType: "blob",
+      });
+
+      const disposition = String(res.headers?.["content-disposition"] || "");
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] || `school_subscription_invoice_${cycle}.pdf`;
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download subscription invoice.");
+    } finally {
+      setInvoiceCycle("");
     }
   };
 
@@ -262,6 +291,14 @@ export default function SchoolSubscriptionStatus() {
                         disabled={summary.status === "free"}
                       >
                         Pay With Bank
+                      </button>
+                      <button
+                        type="button"
+                        className="sd-subscription-alt"
+                        onClick={() => downloadInvoice(cycle)}
+                        disabled={invoiceCycle === cycle || summary.status === "free"}
+                      >
+                        {invoiceCycle === cycle ? "Preparing..." : "Download Invoice"}
                       </button>
                     </div>
 
