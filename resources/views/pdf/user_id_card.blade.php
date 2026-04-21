@@ -17,20 +17,20 @@
             overflow: hidden;
             background: #ffffff;
         }
-        .row {
+        .sheet-table {
             width: 306pt;
             height: 243pt;
             border-collapse: collapse;
             table-layout: fixed;
         }
-        .row td {
+        .sheet-table td {
             width: 153pt;
             height: 243pt;
             padding: 0;
             vertical-align: top;
         }
         .divider {
-            border-left: 1pt solid #d6dce8;
+            border-left: 1pt solid #d7ddea;
         }
         .card {
             position: relative;
@@ -77,10 +77,10 @@
         }
         .school-name {
             margin: 0;
-            font-size: 9.2pt;
+            font-size: 9.8pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.3pt;
+            letter-spacing: 0.32pt;
         }
         .school-motto {
             margin-top: 1pt;
@@ -166,7 +166,7 @@
         }
         .back-panel {
             position: absolute;
-            top: 28pt;
+            top: 20pt;
             left: 18pt;
             right: 16pt;
             z-index: 2;
@@ -188,7 +188,7 @@
             margin-bottom: 4pt;
         }
         .middle-block {
-            margin-top: 68pt;
+            margin-top: 50pt;
         }
         .middle-title {
             font-size: 4.6pt;
@@ -223,25 +223,25 @@
         }
         .watermark {
             position: absolute;
-            top: 86pt;
+            top: 92pt;
             left: 50%;
-            width: 42pt;
-            height: 42pt;
-            margin-left: -21pt;
-            opacity: 0.12;
+            width: 56pt;
+            height: 56pt;
+            margin-left: -28pt;
+            opacity: 0.1;
             z-index: 1;
             text-align: center;
         }
         .watermark img {
-            max-width: 42pt;
-            max-height: 42pt;
+            max-width: 56pt;
+            max-height: 56pt;
         }
         .qr-code {
             position: absolute;
             right: 10pt;
             bottom: 10pt;
-            width: 26pt;
-            height: 26pt;
+            width: 24pt;
+            height: 24pt;
             z-index: 2;
             background: #ffffff;
             padding: 2pt;
@@ -249,8 +249,8 @@
             border: 0.8pt solid #cfd7e6;
         }
         .qr-code img {
-            width: 22pt;
-            height: 22pt;
+            width: 20pt;
+            height: 20pt;
         }
     </style>
 </head>
@@ -279,7 +279,7 @@
 @endphp
 
 <div class="sheet">
-    <table class="row">
+    <table class="sheet-table">
         <tr>
             <td>
                 <div class="card">
@@ -363,17 +363,17 @@
                             <div class="middle-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
 
                             <div class="contact-list">
-                                <div class="contact-row"><span class="contact-icon">⌂</span>{{ $contactAddress ?: '-' }}</div>
-                                <div class="contact-row"><span class="contact-icon">✉</span>{{ $contactEmail ?: '-' }}</div>
-                                <div class="contact-row"><span class="contact-icon">☎</span>{{ $contactPhone ?: '-' }}</div>
-                                <div class="contact-row"><span class="contact-icon">◎</span>{{ $websiteUrl ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">A</span>{{ $contactAddress ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">E</span>{{ $contactEmail ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">P</span>{{ $contactPhone ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">W</span>{{ $websiteUrl ?: '-' }}</div>
                             </div>
                         </div>
                     </div>
 
-                    @if(!empty($qrCodeUrl))
+                    @if(!empty($qrCodeDataUri))
                         <div class="qr-code">
-                            <img src="{{ $qrCodeUrl }}" alt="School QR">
+                            <img src="{{ $qrCodeDataUri }}" alt="School QR">
                         </div>
                     @endif
                 </div>
