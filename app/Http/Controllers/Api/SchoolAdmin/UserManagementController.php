@@ -301,6 +301,7 @@ class UserManagementController extends Controller
                 'accentColor' => $accentColor,
                 'primarySoft' => $this->blendHexColor($primaryColor, '#ffffff', 0.82),
                 'accentSoft' => $this->blendHexColor($accentColor, '#ffffff', 0.84),
+                'schoolMotto' => (string) ($websiteContent['motto'] ?? ''),
                 'contactAddress' => (string) ($websiteContent['address'] ?? $school->location ?? ''),
                 'contactEmail' => (string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''),
                 'contactPhone' => (string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''),
@@ -322,7 +323,7 @@ class UserManagementController extends Controller
 
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html);
-            $dompdf->setPaper([0, 0, 243, 153]);
+            $dompdf->setPaper('A4', 'landscape');
             $dompdf->render();
 
             $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($user->name ?: $user->username ?: $user->id));
