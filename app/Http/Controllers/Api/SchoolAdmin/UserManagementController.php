@@ -278,6 +278,8 @@ class UserManagementController extends Controller
             ? ($placement['department_name'] ?? null)
             : ($staffAssignment['departments'][0] ?? null);
         $displayPosition = $user->role === 'staff' ? ($staff?->position ?: 'Staff Member') : null;
+        $websiteUrl = $this->resolveSchoolWebsiteUrl($request, $school);
+        $qrCodeUrl = 'https://quickchart.io/qr?size=90&text=' . rawurlencode($websiteUrl);
 
         try {
             @set_time_limit(120);
@@ -305,7 +307,8 @@ class UserManagementController extends Controller
                 'contactAddress' => (string) ($websiteContent['address'] ?? $school->location ?? ''),
                 'contactEmail' => (string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''),
                 'contactPhone' => (string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''),
-                'websiteUrl' => $this->resolveSchoolWebsiteUrl($request, $school),
+                'websiteUrl' => $websiteUrl,
+                'qrCodeUrl' => $qrCodeUrl,
             ])->render();
 
             $options = new Options();
@@ -323,7 +326,7 @@ class UserManagementController extends Controller
 
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->setPaper([0, 0, 306, 243]);
             $dompdf->render();
 
             $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($user->name ?: $user->username ?: $user->id));

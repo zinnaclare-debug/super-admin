@@ -15,21 +15,22 @@
             width: 306pt;
             height: 243pt;
             overflow: hidden;
+            background: #ffffff;
         }
-        .sheet-table {
+        .row {
             width: 306pt;
             height: 243pt;
             border-collapse: collapse;
             table-layout: fixed;
         }
-        .sheet-table td {
+        .row td {
             width: 153pt;
             height: 243pt;
             padding: 0;
             vertical-align: top;
         }
         .divider {
-            border-left: 1pt solid #d9dee9;
+            border-left: 1pt solid #d6dce8;
         }
         .card {
             position: relative;
@@ -38,15 +39,14 @@
             overflow: hidden;
             background: #ffffff;
         }
-        .front-shape,
-        .back-shape {
+        .shape {
             position: absolute;
             inset: 0;
             width: 153pt;
             height: 243pt;
             z-index: 0;
         }
-        .logo-center {
+        .front-head {
             position: absolute;
             top: 12pt;
             left: 0;
@@ -55,25 +55,25 @@
             text-align: center;
             color: #ffffff;
         }
-        .logo-badge {
+        .front-logo {
             width: 26pt;
             height: 26pt;
             margin: 0 auto 4pt;
             text-align: center;
         }
-        .logo-badge img,
-        .back-bottom-logo img,
-        .watermark img {
+        .front-logo img,
+        .watermark img,
+        .qr-code img {
             max-width: 24pt;
             max-height: 24pt;
         }
-        .logo-badge span,
-        .back-bottom-logo span {
+        .front-logo span {
             display: inline-block;
+            line-height: 24pt;
             font-size: 10pt;
             font-weight: 700;
-            line-height: 24pt;
             text-transform: uppercase;
+            color: #ffffff;
         }
         .school-name {
             margin: 0;
@@ -84,60 +84,58 @@
         }
         .school-motto {
             margin-top: 1pt;
-            font-size: 4.5pt;
-            opacity: 0.95;
+            font-size: 4.4pt;
+            opacity: 0.96;
+        }
+        .user-type {
+            margin-top: 4pt;
+            display: inline-block;
+            padding: 2pt 7pt;
+            border-radius: 999pt;
+            background: rgba(255,255,255,0.16);
+            border: 0.8pt solid rgba(255,255,255,0.25);
+            font-size: 4.4pt;
+            font-weight: 700;
+            letter-spacing: 0.45pt;
+            text-transform: uppercase;
         }
         .photo-ring {
             position: absolute;
-            top: 78pt;
-            left: 54pt;
-            width: 76pt;
-            height: 76pt;
+            top: 84pt;
+            left: 56pt;
+            width: 72pt;
+            height: 72pt;
             border-radius: 50%;
-            background: {{ $primaryColor ?? '#1c2554' }};
+            background: {{ $primaryColor ?? '#1b2554' }};
             z-index: 2;
-            box-shadow: 0 8pt 18pt rgba(10, 20, 44, 0.12);
+            box-shadow: 0 8pt 14pt rgba(15, 23, 42, 0.13);
         }
         .photo-inner {
             position: absolute;
             inset: 5pt;
-            border-radius: 50%;
             overflow: hidden;
+            border-radius: 50%;
             background: #ffffff;
         }
         .photo-inner img {
-            width: 66pt;
-            height: 66pt;
+            width: 62pt;
+            height: 62pt;
         }
         .photo-placeholder {
-            padding-top: 27pt;
+            padding-top: 26pt;
+            font-size: 4.4pt;
             text-align: center;
-            font-size: 4.6pt;
             color: #64748b;
             text-transform: uppercase;
         }
-        .role-chip {
-            position: absolute;
-            top: 161pt;
-            left: 16pt;
-            z-index: 2;
-            padding: 2.2pt 8pt;
-            border-radius: 999pt;
-            background: {{ $primaryColor ?? '#1c2554' }};
-            color: #ffffff;
-            font-size: 4.5pt;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.4pt;
-        }
         .front-info {
             position: absolute;
-            left: 14pt;
-            right: 48pt;
-            bottom: 22pt;
+            left: 15pt;
+            right: 46pt;
+            bottom: 20pt;
             z-index: 2;
         }
-        .front-accent {
+        .front-line {
             position: absolute;
             top: 2pt;
             left: 0;
@@ -150,36 +148,37 @@
             padding-left: 7pt;
         }
         .field {
-            margin-bottom: 6pt;
+            margin-bottom: 5.5pt;
         }
         .label {
             display: block;
-            font-size: 4.3pt;
-            color: #334155;
+            font-size: 4.1pt;
+            color: #475569;
         }
         .value {
             display: block;
-            margin-top: 1.4pt;
-            font-size: 6.4pt;
+            margin-top: 1.2pt;
+            font-size: 6.2pt;
             font-weight: 700;
             line-height: 1.15;
+            color: #0f172a;
             word-break: break-word;
         }
         .back-panel {
             position: absolute;
-            top: 48pt;
+            top: 28pt;
             left: 18pt;
             right: 16pt;
             z-index: 2;
         }
         .terms-title {
-            margin: 0 0 10pt;
-            font-size: 8.8pt;
+            margin: 0 0 8pt;
+            font-size: 8.7pt;
             font-weight: 700;
-            color: #102047;
+            color: #0f1f46;
         }
         .terms-list {
-            margin: 0 0 14pt 8pt;
+            margin: 0 0 18pt 8pt;
             padding: 0;
             font-size: 4.6pt;
             line-height: 1.55;
@@ -188,76 +187,76 @@
         .terms-list li {
             margin-bottom: 4pt;
         }
-        .head-title {
-            font-size: 4.7pt;
+        .middle-block {
+            margin-top: 68pt;
+        }
+        .middle-title {
+            font-size: 4.6pt;
             font-weight: 700;
-            color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 0.35pt;
+            color: #102047;
         }
-        .head-name {
+        .middle-name {
             margin-top: 2pt;
             font-size: 6pt;
             font-weight: 700;
-            color: {{ $primaryColor ?? '#1c2554' }};
+            color: {{ $primaryColor ?? '#1b2554' }};
             text-transform: uppercase;
-            line-height: 1.2;
+            line-height: 1.15;
         }
         .contact-list {
-            margin-top: 16pt;
+            margin-top: 12pt;
         }
         .contact-row {
-            margin-bottom: 5pt;
-            font-size: 4.8pt;
+            margin-bottom: 4.4pt;
+            font-size: 4.7pt;
             line-height: 1.35;
-            color: #0f172a;
+            color: #1f2937;
+            word-break: break-word;
         }
         .contact-icon {
             display: inline-block;
             width: 8pt;
-            color: {{ $primaryColor ?? '#1c2554' }};
+            color: {{ $primaryColor ?? '#1b2554' }};
             font-weight: 700;
         }
         .watermark {
             position: absolute;
-            top: 14pt;
-            right: 16pt;
-            width: 26pt;
-            height: 26pt;
+            top: 86pt;
+            left: 50%;
+            width: 42pt;
+            height: 42pt;
+            margin-left: -21pt;
             opacity: 0.12;
             z-index: 1;
+            text-align: center;
         }
-        .back-bottom {
+        .watermark img {
+            max-width: 42pt;
+            max-height: 42pt;
+        }
+        .qr-code {
             position: absolute;
-            left: 0;
-            right: 0;
+            right: 10pt;
             bottom: 10pt;
+            width: 26pt;
+            height: 26pt;
             z-index: 2;
-            text-align: center;
-            color: #ffffff;
+            background: #ffffff;
+            padding: 2pt;
+            box-sizing: border-box;
+            border: 0.8pt solid #cfd7e6;
         }
-        .back-bottom-logo {
-            width: 24pt;
-            height: 24pt;
-            margin: 0 auto 3pt;
-            text-align: center;
-        }
-        .back-bottom-name {
-            font-size: 8pt;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.3pt;
-        }
-        .back-bottom-motto {
-            margin-top: 1pt;
-            font-size: 4.2pt;
-            opacity: 0.95;
+        .qr-code img {
+            width: 22pt;
+            height: 22pt;
         }
     </style>
 </head>
 <body>
 @php
-    $schoolName = strtoupper((string) ($school?->name ?? 'SCHOOL LOGO'));
+    $schoolName = strtoupper((string) ($school?->name ?? 'SCHOOL NAME'));
     $motto = trim((string) ($schoolMotto ?? ''));
     $motto = $motto !== '' ? $motto : 'school slogan text line here';
     $logoFallback = collect(explode(' ', (string) ($school?->name ?? 'SC')))
@@ -265,7 +264,7 @@
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
         ->take(2)
         ->implode('');
-    $roleName = strtoupper((string) ($user?->role ?? 'user'));
+    $roleName = strtoupper((string) ($user?->role ?? 'USER'));
     $classOrPosition = $user?->role === 'student'
         ? ($displayClass ?: ($displayLevel ?: '-'))
         : ($displayPosition ?: 'STAFF MEMBER');
@@ -280,24 +279,24 @@
 @endphp
 
 <div class="sheet">
-    <table class="sheet-table">
+    <table class="row">
         <tr>
             <td>
                 <div class="card">
-                    <svg class="front-shape" viewBox="0 0 153 243" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+                    <svg class="shape" viewBox="0 0 153 243" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
                         <rect width="153" height="243" fill="#ffffff"/>
-                        <ellipse cx="76.5" cy="-2" rx="62" ry="52" fill="{{ $primaryColor ?? '#1c2554' }}"/>
-                        <path d="M6 0 C13 52, 11 131, 6 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3.4"/>
-                        <path d="M147 0 C140 52, 142 131, 147 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3.4"/>
-                        <path d="M0 0 C13 86, 10 182, 0 243 L106 243 C88 236, 72 226, 58 211 C41 191, 34 167, 39 141 C44 115, 61 90, 88 65 C107 48, 123 26, 133 0 Z" fill="#ffffff"/>
-                        <path d="M0 0 C12 89, 12 181, 4 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="2.2"/>
-                        <path d="M147 0 C140 50, 139 125, 147 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="2.2"/>
-                        <path d="M0 243 L106 243 C88 236, 72 226, 58 211 C41 191, 34 167, 39 141 C44 115, 61 90, 88 65 C107 48, 122 27, 132 0" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="2.8"/>
-                        <rect x="111" y="160" width="42" height="83" fill="{{ $primaryColor ?? '#1c2554' }}"/>
+                        <ellipse cx="76.5" cy="2" rx="64" ry="56" fill="{{ $primaryColor ?? '#1b2554' }}"/>
+                        <path d="M6 0 C12 68, 10 150, 6 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3.6"/>
+                        <path d="M147 0 C141 68, 143 150, 147 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3.6"/>
+                        <path d="M0 0 C13 90, 10 183, 0 243 L107 243 C89 236, 74 226, 60 210 C43 191, 36 168, 40 143 C45 117, 63 90, 91 64 C109 47, 123 26, 133 0 Z" fill="#ffffff"/>
+                        <path d="M0 243 L107 243 C89 236, 74 226, 60 210 C43 191, 36 168, 40 143 C45 117, 63 90, 91 64 C109 47, 123 26, 133 0" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3"/>
+                        <path d="M0 0 C10 90, 11 179, 5 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="1.9"/>
+                        <path d="M148 0 C140 67, 139 150, 147 243" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="1.9"/>
+                        <rect x="112" y="160" width="41" height="83" fill="{{ $primaryColor ?? '#1b2554' }}"/>
                     </svg>
 
-                    <div class="logo-center">
-                        <div class="logo-badge">
+                    <div class="front-head">
+                        <div class="front-logo">
                             @if(!empty($logoDataUri))
                                 <img src="{{ $logoDataUri }}" alt="School Logo">
                             @else
@@ -306,6 +305,7 @@
                         </div>
                         <h1 class="school-name">{{ $schoolName }}</h1>
                         <div class="school-motto">{{ $motto }}</div>
+                        <div class="user-type">{{ $roleName }}</div>
                     </div>
 
                     <div class="photo-ring">
@@ -318,10 +318,8 @@
                         </div>
                     </div>
 
-                    <div class="role-chip">{{ $roleName }}</div>
-
                     <div class="front-info">
-                        <div class="front-accent"></div>
+                        <div class="front-line"></div>
                         <div class="front-copy">
                             <div class="field">
                                 <span class="label">Name:</span>
@@ -341,10 +339,11 @@
             </td>
             <td class="divider">
                 <div class="card">
-                    <svg class="back-shape" viewBox="0 0 153 243" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+                    <svg class="shape" viewBox="0 0 153 243" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
                         <rect width="153" height="243" fill="#ffffff"/>
-                        <path d="M0 0 L153 0 L153 18 C119 20, 93 27, 71 40 C48 54, 24 56, 0 49 Z" fill="{{ $primaryColor ?? '#1c2554' }}"/>
-                        <path d="M0 243 C13 214, 32 194, 58 181 C78 171, 101 164, 127 158 C141 154, 149 148, 153 139 L153 243 Z" fill="{{ $accentColor ?? '#ef7d00' }}"/>
+                        <path d="M0 0 L153 0 L153 20 C116 21, 88 30, 64 44 C43 56, 22 58, 0 51 Z" fill="{{ $primaryColor ?? '#1b2554' }}"/>
+                        <path d="M0 243 C16 215, 39 196, 67 183 C84 175, 105 169, 129 162 C143 158, 150 151, 153 143 L153 243 Z" fill="{{ $accentColor ?? '#ef7d00' }}"/>
+                        <path d="M0 243 C22 214, 45 200, 74 190 C96 182, 118 176, 137 169" fill="none" stroke="#ffffff" stroke-width="1.8"/>
                     </svg>
 
                     @if(!empty($logoDataUri))
@@ -359,28 +358,24 @@
                             @endforeach
                         </ul>
 
-                        <div class="head-title">Head of School</div>
-                        <div class="head-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
+                        <div class="middle-block">
+                            <div class="middle-title">Head of School</div>
+                            <div class="middle-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
 
-                        <div class="contact-list">
-                            <div class="contact-row"><span class="contact-icon">⌂</span>{{ $contactAddress ?: '-' }}</div>
-                            <div class="contact-row"><span class="contact-icon">✉</span>{{ $contactEmail ?: '-' }}</div>
-                            <div class="contact-row"><span class="contact-icon">☎</span>{{ $contactPhone ?: '-' }}</div>
-                            <div class="contact-row"><span class="contact-icon">◎</span>{{ $websiteUrl ?: '-' }}</div>
+                            <div class="contact-list">
+                                <div class="contact-row"><span class="contact-icon">⌂</span>{{ $contactAddress ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">✉</span>{{ $contactEmail ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">☎</span>{{ $contactPhone ?: '-' }}</div>
+                                <div class="contact-row"><span class="contact-icon">◎</span>{{ $websiteUrl ?: '-' }}</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="back-bottom">
-                        <div class="back-bottom-logo">
-                            @if(!empty($logoDataUri))
-                                <img src="{{ $logoDataUri }}" alt="School Logo">
-                            @else
-                                <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                            @endif
+                    @if(!empty($qrCodeUrl))
+                        <div class="qr-code">
+                            <img src="{{ $qrCodeUrl }}" alt="School QR">
                         </div>
-                        <div class="back-bottom-name">{{ $schoolName }}</div>
-                        <div class="back-bottom-motto">{{ $motto }}</div>
-                    </div>
+                    @endif
                 </div>
             </td>
         </tr>
