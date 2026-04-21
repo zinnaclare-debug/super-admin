@@ -195,7 +195,7 @@ class UserManagementController extends Controller
 
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->setPaper([0, 0, 486, 153]);
             $dompdf->render();
 
             $fileName = 'users_' . $status . '_' . now()->format('Ymd_His') . '.pdf';

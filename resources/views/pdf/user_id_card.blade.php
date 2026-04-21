@@ -4,38 +4,51 @@
     <meta charset="UTF-8">
     <title>{{ strtoupper((string) ($roleLabel ?? 'ID CARD')) }}</title>
     <style>
-        @page { margin: 14px; }
-        body {
+        @page {
             margin: 0;
+            size: 486pt 153pt;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #0f172a;
         }
-        .board {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 12px 0;
+        .spread {
+            width: 486pt;
+            height: 153pt;
+            overflow: hidden;
         }
-        .board > tbody > tr > td {
-            width: 50%;
+        .spread-table {
+            width: 486pt;
+            height: 153pt;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .spread-table td {
+            width: 243pt;
+            height: 153pt;
+            padding: 0;
             vertical-align: top;
         }
         .card {
             position: relative;
-            height: 500px;
+            width: 243pt;
+            height: 153pt;
             overflow: hidden;
             background: #ffffff;
-            border: 1px solid #d7deea;
         }
-        .shape-svg {
+        .front-svg,
+        .back-svg {
             position: absolute;
             inset: 0;
-            width: 100%;
-            height: 100%;
+            width: 243pt;
+            height: 153pt;
             z-index: 0;
         }
         .front-top {
             position: absolute;
-            top: 18px;
+            top: 8pt;
             left: 0;
             right: 0;
             z-index: 2;
@@ -43,362 +56,344 @@
             color: #ffffff;
         }
         .front-logo {
-            width: 72px;
-            height: 72px;
-            margin: 0 auto 12px;
-            background: #ffffff;
-            border-radius: 50%;
-            display: table;
+            width: 26pt;
+            height: 26pt;
+            margin: 0 auto 3pt;
             text-align: center;
         }
-        .front-logo span {
-            display: table-cell;
-            vertical-align: middle;
-            font-weight: 700;
-            font-size: 20px;
-            color: {{ $primaryColor ?? '#1a2756' }};
-            text-transform: uppercase;
-        }
         .front-logo img,
-        .back-logo img {
-            max-width: 44px;
-            max-height: 44px;
-            margin-top: 14px;
+        .back-bottom-logo img {
+            max-width: 24pt;
+            max-height: 24pt;
         }
-        .front-school-name {
+        .front-logo span,
+        .back-bottom-logo span {
+            display: inline-block;
+            font-size: 10pt;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 24pt;
+            text-transform: uppercase;
+        }
+        .school-name {
             margin: 0;
-            font-size: 18px;
+            font-size: 10.5pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.3pt;
         }
-        .front-school-motto {
-            margin-top: 4px;
-            font-size: 11px;
+        .school-motto {
+            margin-top: 1pt;
+            font-size: 4.8pt;
+            line-height: 1.25;
             opacity: 0.95;
         }
-        .photo-ring {
+        .photo-wrap {
             position: absolute;
-            top: 118px;
-            left: 144px;
-            width: 168px;
-            height: 168px;
+            top: 44pt;
+            left: 98pt;
+            width: 78pt;
+            height: 78pt;
             border-radius: 50%;
-            background: {{ $primaryColor ?? '#1a2756' }};
+            background: {{ $primaryColor ?? '#1d2758' }};
             z-index: 2;
-            overflow: hidden;
-            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
         }
-        .photo-ring-inner {
+        .photo-inner {
             position: absolute;
-            inset: 11px;
-            border-radius: 50%;
+            inset: 5pt;
             overflow: hidden;
+            border-radius: 50%;
             background: #ffffff;
         }
-        .photo-ring-inner img {
-            width: 146px;
-            height: 146px;
+        .photo-inner img {
+            width: 68pt;
+            height: 68pt;
         }
-        .front-info {
-            position: absolute;
-            left: 36px;
-            right: 176px;
-            bottom: 58px;
-            z-index: 2;
-        }
-        .id-strip {
-            position: absolute;
-            top: 4px;
-            left: 0;
-            width: 8px;
-            height: 128px;
-            border-radius: 999px;
-            background: {{ $accentColor ?? '#0f766e' }};
-        }
-        .front-info-inner {
-            padding-left: 18px;
-        }
-        .field {
-            margin-bottom: 12px;
-        }
-        .field-label {
-            display: block;
-            font-size: 10px;
-            color: #334155;
-        }
-        .field-value {
-            display: block;
-            margin-top: 4px;
-            font-size: 16px;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        .field-value--small {
-            font-size: 14px;
+        .photo-placeholder {
+            padding-top: 27pt;
+            text-align: center;
+            font-size: 5pt;
+            color: #64748b;
+            text-transform: uppercase;
         }
         .front-role {
             position: absolute;
-            top: 298px;
-            left: 36px;
+            top: 117pt;
+            left: 20pt;
             z-index: 2;
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: {{ $primaryColor ?? '#1a2756' }};
+            padding: 2pt 7pt;
+            border-radius: 999pt;
+            background: {{ $primaryColor ?? '#1d2758' }};
             color: #ffffff;
-            font-size: 11px;
+            font-size: 4.6pt;
             font-weight: 700;
-            letter-spacing: 0.5px;
             text-transform: uppercase;
+            letter-spacing: 0.5pt;
         }
-        .back-inner {
-            position: relative;
+        .front-info {
+            position: absolute;
+            top: 121pt;
+            left: 21pt;
             z-index: 2;
-            padding: 122px 38px 36px 44px;
+            width: 108pt;
         }
-        .back-heading {
-            margin: 0 0 18px;
-            font-size: 22px;
-            font-weight: 500;
-            color: #111827;
+        .front-accent-line {
+            position: absolute;
+            top: 4pt;
+            left: 0;
+            width: 3pt;
+            height: 44pt;
+            border-radius: 999pt;
+            background: {{ $accentColor ?? '#ef7d00' }};
         }
-        .back-list {
-            margin: 0 0 28px 22px;
-            padding: 0;
-            font-size: 12px;
-            line-height: 1.55;
-            color: #1f2937;
+        .front-info-inner {
+            padding-left: 8pt;
         }
-        .back-list li {
-            margin-bottom: 8px;
+        .front-field {
+            margin-bottom: 4.5pt;
         }
-        .signature-block {
-            margin-top: 6px;
-            display: table;
-            width: 100%;
+        .front-label {
+            display: block;
+            font-size: 4.3pt;
+            color: #334155;
         }
-        .signature-col {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-            padding-right: 18px;
-        }
-        .signature-line {
-            margin-top: 26px;
-            border-top: 1px solid #0f172a;
-            height: 12px;
-        }
-        .signature-title {
-            margin-top: 4px;
-            font-size: 12px;
+        .front-value {
+            display: block;
+            margin-top: 1pt;
+            font-size: 6pt;
             font-weight: 700;
+            line-height: 1.15;
+            color: #0f172a;
         }
-        .signature-sub {
-            font-size: 11px;
+        .back-panel {
+            position: absolute;
+            z-index: 2;
+            top: 26pt;
+            left: 32pt;
+            right: 20pt;
+        }
+        .terms-title {
+            margin: 0 0 9pt;
+            font-size: 8.8pt;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .terms-list {
+            margin: 0 0 10pt 9pt;
+            padding: 0;
+            font-size: 4.6pt;
+            line-height: 1.5;
+            color: #0f172a;
+        }
+        .terms-list li {
+            margin-bottom: 3pt;
+        }
+        .head-block {
+            margin-top: 10pt;
+            font-size: 4.6pt;
             color: #475569;
         }
+        .head-label {
+            font-size: 4.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4pt;
+            color: #0f172a;
+        }
+        .head-name {
+            margin-top: 2pt;
+            font-size: 6pt;
+            font-weight: 700;
+            color: {{ $primaryColor ?? '#1d2758' }};
+            text-transform: uppercase;
+        }
         .contact-list {
-            margin-top: 28px;
+            margin-top: 12pt;
         }
         .contact-row {
-            display: table;
-            width: 100%;
-            margin-bottom: 12px;
-            font-size: 12px;
+            margin-bottom: 4pt;
+            font-size: 4.8pt;
             color: #1f2937;
-        }
-        .contact-icon,
-        .contact-text {
-            display: table-cell;
-            vertical-align: top;
+            line-height: 1.35;
         }
         .contact-icon {
-            width: 20px;
-            font-size: 14px;
-            color: {{ $primaryColor ?? '#1a2756' }};
+            display: inline-block;
+            width: 8pt;
+            font-weight: 700;
+            color: {{ $primaryColor ?? '#1d2758' }};
         }
-        .back-logo {
+        .back-bottom {
             position: absolute;
             left: 0;
             right: 0;
-            bottom: 18px;
-            text-align: center;
+            bottom: 8pt;
             z-index: 2;
+            text-align: center;
             color: #ffffff;
         }
-        .back-logo-badge {
-            width: 84px;
-            height: 84px;
-            margin: 0 auto 10px;
-            background: #ffffff;
-            border-radius: 50%;
-            display: table;
+        .back-bottom-logo {
+            width: 28pt;
+            height: 28pt;
+            margin: 0 auto 2pt;
             text-align: center;
         }
-        .back-logo-badge span {
-            display: table-cell;
-            vertical-align: middle;
-            font-weight: 700;
-            font-size: 22px;
-            color: {{ $primaryColor ?? '#1a2756' }};
-            text-transform: uppercase;
-        }
-        .back-logo-name {
-            font-size: 18px;
+        .back-bottom-name {
+            font-size: 8pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3pt;
         }
-        .back-logo-motto {
-            margin-top: 4px;
-            font-size: 11px;
+        .back-bottom-motto {
+            margin-top: 1pt;
+            font-size: 4.5pt;
+            line-height: 1.2;
+        }
+        .watermark {
+            position: absolute;
+            top: 9pt;
+            right: 13pt;
+            width: 26pt;
+            height: 26pt;
+            opacity: 0.14;
+            z-index: 1;
+        }
+        .watermark img {
+            max-width: 26pt;
+            max-height: 26pt;
         }
     </style>
 </head>
 <body>
 @php
-    $schoolName = strtoupper((string) ($school?->name ?? 'SCHOOL'));
+    $schoolName = strtoupper((string) ($school?->name ?? 'SCHOOL NAME'));
     $motto = trim((string) ($schoolMotto ?? ''));
-    $motto = $motto !== '' ? $motto : strtoupper((string) ($roleLabel ?? 'ID CARD'));
+    $motto = $motto !== '' ? $motto : 'school slogan text line here';
     $logoFallback = collect(explode(' ', (string) ($school?->name ?? 'SC')))
         ->filter()
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
         ->take(2)
         ->implode('');
-    $frontSecondaryLabel = $user?->role === 'student' ? 'Class' : 'Position';
-    $frontSecondaryValue = $user?->role === 'student'
+    $classOrPosition = $user?->role === 'student'
         ? ($displayClass ?: ($displayLevel ?: '-'))
         : ($displayPosition ?: 'Staff Member');
-    $frontTertiaryLabel = $user?->role === 'student' ? 'ID Number' : 'Staff Number';
-    $frontTertiaryValue = $identityNumber ?? '-';
-    $backBullets = [
+    $idNumber = $identityNumber ?: '-';
+    $bullets = [
         $user?->role === 'student'
             ? 'This card identifies the student and should be presented on request.'
             : 'This card identifies the staff member and should be presented on request.',
-        $user?->role === 'student'
-            ? 'Replacement is required if the card is damaged or lost.'
-            : 'This card remains school property and must be returned when requested.',
+        'Replacement is required if the card is damaged or lost.',
         'Unauthorized use of this card is not allowed.',
     ];
 @endphp
 
-<table class="board">
-    <tr>
-        <td>
-            <div class="card">
-                <svg class="shape-svg" viewBox="0 0 330 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
-                    <rect width="330" height="500" fill="{{ $primaryColor ?? '#1a2756' }}" />
-                    <ellipse cx="165" cy="-25" rx="158" ry="156" fill="{{ $primaryColor ?? '#1a2756' }}" />
-                    <path d="M-10 32 C30 118, 28 262, -10 502 L275 502 C218 446, 172 404, 138 344 C108 292, 142 232, 214 170 C286 108, 319 68, 334 0 L334 502 L-10 502 Z" fill="#ffffff"/>
-                    <path d="M11 41 C46 128, 42 251, 12 470 L262 470 C216 426, 178 392, 150 342 C124 296, 154 243, 220 185 C282 130, 311 92, 322 22" fill="none" stroke="{{ $accentColor ?? '#0f766e' }}" stroke-width="8" />
-                </svg>
+<div class="spread">
+    <table class="spread-table">
+        <tr>
+            <td>
+                <div class="card">
+                    <svg class="front-svg" viewBox="0 0 243 153" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+                        <rect width="243" height="153" fill="#ffffff"/>
+                        <ellipse cx="121.5" cy="-18" rx="98" ry="58" fill="{{ $primaryColor ?? '#1d2758' }}"/>
+                        <path d="M9 0 C18 48, 16 93, 10 153" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="4"/>
+                        <path d="M234 0 C225 48, 227 93, 233 153" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="4"/>
+                        <path d="M0 0 C18 64, 12 118, 0 153 L168 153 C137 140, 112 121, 92 96 C74 74, 80 51, 110 26 C133 7, 148 0, 243 0 L243 153 L0 153 Z" fill="#ffffff"/>
+                        <path d="M0 0 C19 66, 16 118, 8 153" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="2.8"/>
+                        <path d="M235 0 C225 44, 223 93, 233 153" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="2.8"/>
+                        <path d="M0 153 L167 153 C137 141, 112 122, 92 98 C74 76, 80 52, 110 28 C133 8, 147 0, 243 0" fill="none" stroke="{{ $accentColor ?? '#ef7d00' }}" stroke-width="3.4"/>
+                        <rect x="179" y="92" width="64" height="61" fill="{{ $primaryColor ?? '#1d2758' }}"/>
+                    </svg>
 
-                <div class="front-top">
-                    <div class="front-logo">
-                        @if(!empty($logoDataUri))
-                            <img src="{{ $logoDataUri }}" alt="School Logo">
-                        @else
-                            <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                        @endif
+                    <div class="front-top">
+                        <div class="front-logo">
+                            @if(!empty($logoDataUri))
+                                <img src="{{ $logoDataUri }}" alt="School Logo">
+                            @else
+                                <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
+                            @endif
+                        </div>
+                        <h1 class="school-name">{{ $schoolName }}</h1>
+                        <div class="school-motto">{{ $motto }}</div>
                     </div>
-                    <h1 class="front-school-name">{{ $schoolName }}</h1>
-                    <div class="front-school-motto">{{ $motto }}</div>
-                </div>
 
-                <div class="photo-ring">
-                    <div class="photo-ring-inner">
-                        @if(!empty($userPhotoDataUri))
-                            <img src="{{ $userPhotoDataUri }}" alt="Profile Photo">
-                        @endif
-                    </div>
-                </div>
-
-                <div class="front-role">{{ strtoupper((string) ($user?->role ?? 'user')) }}</div>
-
-                <div class="front-info">
-                    <div class="id-strip"></div>
-                    <div class="front-info-inner">
-                        <div class="field">
-                            <span class="field-label">Name:</span>
-                            <span class="field-value">{{ $user?->name ?? '-' }}</span>
-                        </div>
-                        <div class="field">
-                            <span class="field-label">{{ $frontSecondaryLabel }}:</span>
-                            <span class="field-value field-value--small">{{ $frontSecondaryValue }}</span>
-                        </div>
-                        <div class="field">
-                            <span class="field-label">{{ $frontTertiaryLabel }}:</span>
-                            <span class="field-value field-value--small">{{ $frontTertiaryValue }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </td>
-        <td>
-            <div class="card">
-                <svg class="shape-svg" viewBox="0 0 330 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
-                    <rect width="330" height="500" fill="#ffffff" />
-                    <path d="M0 0 L330 0 L330 54 C252 58, 176 94, 116 150 C78 185, 36 186, 0 180 Z" fill="{{ $primaryColor ?? '#1a2756' }}" />
-                    <circle cx="288" cy="58" r="34" fill="{{ $primarySoft ?? '#dbeafe' }}" opacity="0.55" />
-                    <path d="M52 500 C72 438, 124 406, 198 396 C258 388, 303 350, 330 296 L330 500 Z" fill="{{ $primaryColor ?? '#1a2756' }}" />
-                    <path d="M0 500 L0 430 C52 404, 116 392, 186 396 C244 400, 292 382, 330 346 L330 500 Z" fill="#ffffff" opacity="0.98" />
-                </svg>
-
-                <div class="back-inner">
-                    <h2 class="back-heading">Terms &amp; Conditions</h2>
-                    <ul class="back-list">
-                        @foreach($backBullets as $bullet)
-                            <li>{{ $bullet }}</li>
-                        @endforeach
-                    </ul>
-
-                    <div class="signature-block">
-                        <div class="signature-col">
-                            <div class="signature-line"></div>
-                            <div class="signature-title">Signature Authority</div>
-                        </div>
-                        <div class="signature-col">
-                            <div class="signature-line"></div>
-                            <div class="signature-title">Principal</div>
-                            <div class="signature-sub">{{ $principalName ?? 'Principal' }}</div>
+                    <div class="photo-wrap">
+                        <div class="photo-inner">
+                            @if(!empty($userPhotoDataUri))
+                                <img src="{{ $userPhotoDataUri }}" alt="User Photo">
+                            @else
+                                <div class="photo-placeholder">Photo</div>
+                            @endif
                         </div>
                     </div>
 
-                    <div class="contact-list">
-                        <div class="contact-row">
-                            <div class="contact-icon">⌂</div>
-                            <div class="contact-text">{{ $contactAddress ?: '-' }}</div>
-                        </div>
-                        <div class="contact-row">
-                            <div class="contact-icon">✉</div>
-                            <div class="contact-text">{{ $contactEmail ?: '-' }}</div>
-                        </div>
-                        <div class="contact-row">
-                            <div class="contact-icon">☎</div>
-                            <div class="contact-text">{{ $contactPhone ?: '-' }}</div>
-                        </div>
-                        <div class="contact-row">
-                            <div class="contact-icon">◎</div>
-                            <div class="contact-text">{{ $websiteUrl ?: '-' }}</div>
+                    <div class="front-role">{{ strtoupper((string) ($user?->role ?? 'user')) }}</div>
+
+                    <div class="front-info">
+                        <div class="front-accent-line"></div>
+                        <div class="front-info-inner">
+                            <div class="front-field">
+                                <span class="front-label">Name:</span>
+                                <span class="front-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
+                            </div>
+                            <div class="front-field">
+                                <span class="front-label">{{ $user?->role === 'student' ? 'Class:' : 'Position:' }}</span>
+                                <span class="front-value">{{ strtoupper((string) $classOrPosition) }}</span>
+                            </div>
+                            <div class="front-field">
+                                <span class="front-label">ID Number:</span>
+                                <span class="front-value">{{ $idNumber }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </td>
+            <td>
+                <div class="card">
+                    <svg class="back-svg" viewBox="0 0 243 153" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+                        <rect width="243" height="153" fill="#ffffff"/>
+                        <path d="M0 0 L243 0 L243 16 C187 18, 139 31, 100 55 C66 77, 32 77, 0 68 Z" fill="{{ $primaryColor ?? '#1d2758' }}"/>
+                        <path d="M0 153 C23 128, 62 115, 117 111 C165 108, 205 93, 243 64 L243 153 Z" fill="{{ $accentColor ?? '#ef7d00' }}"/>
+                    </svg>
 
-                <div class="back-logo">
-                    <div class="back-logo-badge">
-                        @if(!empty($logoDataUri))
-                            <img src="{{ $logoDataUri }}" alt="School Logo">
-                        @else
-                            <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                        @endif
+                    @if(!empty($logoDataUri))
+                        <div class="watermark"><img src="{{ $logoDataUri }}" alt=""></div>
+                    @endif
+
+                    <div class="back-panel">
+                        <h2 class="terms-title">Terms &amp; Conditions</h2>
+                        <ul class="terms-list">
+                            @foreach($bullets as $bullet)
+                                <li>{{ $bullet }}</li>
+                            @endforeach
+                        </ul>
+
+                        <div class="head-block">
+                            <div class="head-label">Head of School</div>
+                            <div class="head-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
+                        </div>
+
+                        <div class="contact-list">
+                            <div class="contact-row"><span class="contact-icon">⌂</span>{{ $contactAddress ?: '-' }}</div>
+                            <div class="contact-row"><span class="contact-icon">✉</span>{{ $contactEmail ?: '-' }}</div>
+                            <div class="contact-row"><span class="contact-icon">☎</span>{{ $contactPhone ?: '-' }}</div>
+                            <div class="contact-row"><span class="contact-icon">◎</span>{{ $websiteUrl ?: '-' }}</div>
+                        </div>
                     </div>
-                    <div class="back-logo-name">{{ $schoolName }}</div>
-                    <div class="back-logo-motto">{{ $motto }}</div>
+
+                    <div class="back-bottom">
+                        <div class="back-bottom-logo">
+                            @if(!empty($logoDataUri))
+                                <img src="{{ $logoDataUri }}" alt="School Logo">
+                            @else
+                                <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
+                            @endif
+                        </div>
+                        <div class="back-bottom-name">{{ $schoolName }}</div>
+                        <div class="back-bottom-motto">{{ $motto }}</div>
+                    </div>
                 </div>
-            </div>
-        </td>
-    </tr>
-</table>
+            </td>
+        </tr>
+    </table>
+</div>
 </body>
 </html>
