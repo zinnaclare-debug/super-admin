@@ -62,6 +62,7 @@ export default function ActiveUsers() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingIdCardId, setDownloadingIdCardId] = useState(null);
 
   useEffect(() => {
     const nextFilters = readStoredFilters(role, "active");
@@ -200,6 +201,34 @@ export default function ActiveUsers() {
     }
   };
 
+  const downloadIdCard = async (user) => {
+    if (!user?.id) return;
+
+    setDownloadingIdCardId(user.id);
+    try {
+      const res = await api.get(`/api/school-admin/users/${user.id}/id-card`, {
+        responseType: "blob",
+      });
+
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(
+        res.headers,
+        `${user.role || "user"}_id_card_${user.username || user.id}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download ID card.");
+    } finally {
+      setDownloadingIdCardId(null);
+    }
+  };
+
   const visibleIds = useMemo(() => rows.map((u) => u.id), [rows]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
@@ -330,6 +359,9 @@ export default function ActiveUsers() {
                             Set Payment
                           </button>
                         ) : null}
+                        <button style={{ marginLeft: 8 }} onClick={() => downloadIdCard(u)} disabled={downloadingIdCardId === u.id}>
+                          {downloadingIdCardId === u.id ? "Preparing ID..." : "ID"}
+                        </button>
                       </td>
                     </tr>
                     {selectedUserId === u.id && (

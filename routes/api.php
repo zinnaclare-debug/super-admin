@@ -248,6 +248,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:users');
     Route::get('/school-admin/users/download/pdf', [UserManagementController::class, 'downloadPdf'])
         ->middleware('feature:users');
+    Route::get('/school-admin/users/{user}/id-card', [UserManagementController::class, 'downloadIdCard'])
+        ->middleware('feature:users');
 
     Route::delete('/school-admin/users/bulk-delete', [UserManagementController::class, 'bulkDestroy'])
         ->middleware('feature:users');

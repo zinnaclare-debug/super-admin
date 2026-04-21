@@ -15,6 +15,7 @@ use App\Models\Term;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
+use App\Support\SchoolPublicWebsiteData;
 use App\Support\UserCredentialStore;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -206,6 +207,134 @@ class UserManagementController extends Controller
         } catch (Throwable $e) {
             return response()->json([
                 'message' => 'Failed to generate users PDF download.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // GET /api/school-admin/users/{user}/id-card
+    public function downloadIdCard(Request $request, User $user)
+    {
+        $schoolId = (int) $request->user()->school_id;
+
+        if ((int) $user->school_id !== $schoolId) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if (!in_array($user->role, ['student', 'staff'], true)) {
+            return response()->json(['message' => 'Only student and staff ID cards are available here.'], 422);
+        }
+
+        $school = School::query()->find($schoolId);
+        if (!$school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $student = null;
+        $staff = null;
+        $placement = [
+            'class_id' => null,
+            'department_id' => null,
+            'class_name' => null,
+            'department_name' => null,
+        ];
+        $staffAssignment = [
+            'levels' => [],
+            'classes' => [],
+            'departments' => [],
+        ];
+
+        if ($user->role === 'student') {
+            $student = Student::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', (int) $user->id)
+                ->first();
+
+            if ($student) {
+                $placement = $this->resolveStudentCurrentPlacement($schoolId, (int) $student->id);
+            }
+        } else {
+            $staff = Staff::query()
+                ->where('school_id', $schoolId)
+                ->where('user_id', (int) $user->id)
+                ->first();
+
+            $staffAssignment = $this->resolveStaffAssignmentsForUsers($schoolId, [(int) $user->id])[(int) $user->id] ?? $staffAssignment;
+        }
+
+        $websiteContent = SchoolPublicWebsiteData::normalizeWebsiteContent($school->website_content, $school);
+        $photoPath = $student?->photo_path ?? $staff?->photo_path ?? $user->photo_path;
+        $primaryColor = (string) ($websiteContent['primary_color'] ?? '#0f172a');
+        $accentColor = (string) ($websiteContent['accent_color'] ?? '#0f766e');
+
+        $frontRoleLabel = $user->role === 'student' ? 'Student ID Card' : 'Staff ID Card';
+        $displayLevel = $user->role === 'student'
+            ? $this->normalizeEducationLevel($student?->education_level ?? null)
+            : ($this->normalizeEducationLevel($staff?->education_level ?? null) ?: ($staffAssignment['levels'][0] ?? null));
+        $displayClass = $user->role === 'student'
+            ? ($placement['class_name'] ?? null)
+            : ($staffAssignment['classes'][0] ?? null);
+        $displayDepartment = $user->role === 'student'
+            ? ($placement['department_name'] ?? null)
+            : ($staffAssignment['departments'][0] ?? null);
+        $displayPosition = $user->role === 'staff' ? ($staff?->position ?: 'Staff Member') : null;
+
+        try {
+            @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+
+            $html = view('pdf.user_id_card', [
+                'school' => $school,
+                'user' => $user,
+                'student' => $student,
+                'staff' => $staff,
+                'roleLabel' => $frontRoleLabel,
+                'identityNumber' => $user->username ?: ('ID-' . (int) $user->id),
+                'displayLevel' => $displayLevel ? strtoupper(str_replace('_', ' ', (string) $displayLevel)) : null,
+                'displayClass' => $displayClass,
+                'displayDepartment' => $displayDepartment,
+                'displayPosition' => $displayPosition,
+                'principalName' => $school->head_of_school_name ?: 'Principal',
+                'logoDataUri' => $this->imageDataUri($school->logo_path),
+                'userPhotoDataUri' => $this->imageDataUri($photoPath) ?: $this->assetImageDataUri(public_path('defaults/student-photo-placeholder.svg')),
+                'primaryColor' => $primaryColor,
+                'accentColor' => $accentColor,
+                'primarySoft' => $this->blendHexColor($primaryColor, '#ffffff', 0.82),
+                'accentSoft' => $this->blendHexColor($accentColor, '#ffffff', 0.84),
+                'contactAddress' => (string) ($websiteContent['address'] ?? $school->location ?? ''),
+                'contactEmail' => (string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''),
+                'contactPhone' => (string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''),
+                'websiteUrl' => $this->resolveSchoolWebsiteUrl($request, $school),
+            ])->render();
+
+            $options = new Options();
+            $options->set('defaultFont', 'DejaVu Sans');
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+            if (!is_dir($dompdfTempDir)) {
+                @mkdir($dompdfTempDir, 0775, true);
+            }
+            $options->set('tempDir', $dompdfTempDir);
+            $options->set('fontDir', $dompdfTempDir);
+            $options->set('fontCache', $dompdfTempDir);
+            $options->set('chroot', base_path());
+
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper([0, 0, 243, 153]);
+            $dompdf->render();
+
+            $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($user->name ?: $user->username ?: $user->id));
+            $filename = strtolower($user->role) . '_id_card_' . trim((string) $safeName, '_') . '.pdf';
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to generate ID card PDF.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -1253,6 +1382,83 @@ class UserManagementController extends Controller
             || str_starts_with($relativeOrAbsolute, 'https://')
             ? $relativeOrAbsolute
             : url($relativeOrAbsolute);
+    }
+
+    private function imageDataUri(?string $storagePath): ?string
+    {
+        if (!$storagePath || !Storage::disk('public')->exists($storagePath)) {
+            return null;
+        }
+
+        $fullPath = Storage::disk('public')->path($storagePath);
+        return $this->assetImageDataUri($fullPath);
+    }
+
+    private function assetImageDataUri(?string $absolutePath): ?string
+    {
+        if (!$absolutePath || !is_file($absolutePath)) {
+            return null;
+        }
+
+        $mime = @mime_content_type($absolutePath) ?: 'image/png';
+        $data = @file_get_contents($absolutePath);
+        if ($data === false) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($data);
+    }
+
+    private function resolveSchoolWebsiteUrl(Request $request, School $school): string
+    {
+        $subdomain = trim((string) ($school->subdomain ?? ''));
+        if ($subdomain !== '') {
+            $candidate = preg_match('#^https?://#i', $subdomain) ? $subdomain : 'https://' . $subdomain;
+            return $candidate;
+        }
+
+        $origin = trim((string) $request->headers->get('origin', ''));
+        if ($origin !== '') {
+            return rtrim($origin, '/');
+        }
+
+        $frontendUrl = trim((string) env('FRONTEND_URL', ''));
+        if ($frontendUrl !== '') {
+            return rtrim($frontendUrl, '/');
+        }
+
+        return rtrim((string) $request->getSchemeAndHttpHost(), '/');
+    }
+
+    private function blendHexColor(string $baseHex, string $targetHex, float $targetWeight): string
+    {
+        $base = $this->hexToRgb($baseHex);
+        $target = $this->hexToRgb($targetHex);
+        $weight = max(0, min(1, $targetWeight));
+
+        return sprintf(
+            '#%02x%02x%02x',
+            (int) round(($base['r'] * (1 - $weight)) + ($target['r'] * $weight)),
+            (int) round(($base['g'] * (1 - $weight)) + ($target['g'] * $weight)),
+            (int) round(($base['b'] * (1 - $weight)) + ($target['b'] * $weight))
+        );
+    }
+
+    private function hexToRgb(string $hex): array
+    {
+        $normalized = ltrim(trim($hex), '#');
+        if (strlen($normalized) === 3) {
+            $normalized = preg_replace('/(.)/', '$1$1', $normalized) ?: '000000';
+        }
+        if (!preg_match('/^[0-9a-fA-F]{6}$/', $normalized)) {
+            $normalized = '000000';
+        }
+
+        return [
+            'r' => hexdec(substr($normalized, 0, 2)),
+            'g' => hexdec(substr($normalized, 2, 2)),
+            'b' => hexdec(substr($normalized, 4, 2)),
+        ];
     }
 
     private function normalizeEducationLevel(?string $value): ?string
