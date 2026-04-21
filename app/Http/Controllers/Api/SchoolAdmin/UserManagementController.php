@@ -23,7 +23,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -280,8 +279,6 @@ class UserManagementController extends Controller
             : ($staffAssignment['departments'][0] ?? null);
         $displayPosition = $user->role === 'staff' ? ($staff?->position ?: 'Staff Member') : null;
         $websiteUrl = $this->resolveSchoolWebsiteUrl($request, $school);
-        $qrCodeUrl = 'https://quickchart.io/qr?size=90&text=' . rawurlencode($websiteUrl);
-        $qrCodeDataUri = $this->remoteImageDataUri($qrCodeUrl);
 
         try {
             @set_time_limit(120);
@@ -310,7 +307,6 @@ class UserManagementController extends Controller
                 'contactEmail' => (string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''),
                 'contactPhone' => (string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''),
                 'websiteUrl' => $websiteUrl,
-                'qrCodeDataUri' => $qrCodeDataUri,
             ])->render();
 
             $options = new Options();
@@ -1413,31 +1409,6 @@ class UserManagementController extends Controller
         }
 
         return 'data:' . $mime . ';base64,' . base64_encode($data);
-    }
-
-    private function remoteImageDataUri(?string $url): ?string
-    {
-        $url = trim((string) $url);
-        if ($url === '') {
-            return null;
-        }
-
-        try {
-            $response = Http::timeout(15)
-                ->withOptions([
-                    'verify' => false,
-                ])
-                ->get($url);
-
-            if (!$response->successful()) {
-                return null;
-            }
-
-            $mime = $response->header('Content-Type') ?: 'image/png';
-            return 'data:' . $mime . ';base64,' . base64_encode((string) $response->body());
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     private function resolveSchoolWebsiteUrl(Request $request, School $school): string

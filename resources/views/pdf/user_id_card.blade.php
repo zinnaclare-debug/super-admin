@@ -236,22 +236,6 @@
             max-width: 56pt;
             max-height: 56pt;
         }
-        .qr-code {
-            position: absolute;
-            right: 10pt;
-            bottom: 10pt;
-            width: 24pt;
-            height: 24pt;
-            z-index: 2;
-            background: #ffffff;
-            padding: 2pt;
-            box-sizing: border-box;
-            border: 0.8pt solid #cfd7e6;
-        }
-        .qr-code img {
-            width: 20pt;
-            height: 20pt;
-        }
     </style>
 </head>
 <body>
@@ -371,11 +355,6 @@
                         </div>
                     </div>
 
-                    @if(!empty($qrCodeDataUri))
-                        <div class="qr-code">
-                            <img src="{{ $qrCodeDataUri }}" alt="School QR">
-                        </div>
-                    @endif
                 </div>
             </td>
         </tr>
