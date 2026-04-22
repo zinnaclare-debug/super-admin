@@ -231,33 +231,20 @@
             color: {{ $primaryColor ?? '#1b2554' }};
         }
         .contact-row {
-            margin-bottom: 4pt;
-            overflow: hidden;
-            white-space: nowrap;
+            margin-bottom: 4.5pt;
         }
-        .contact-icon-badge {
-            display: inline-block;
-            width: 11pt;
-            height: 11pt;
-            line-height: 11pt;
-            border-radius: 50%;
-            text-align: center;
-            font-size: 5.5pt;
-            font-weight: 700;
-            color: #ffffff;
-            background: {{ $primaryColor ?? '#1b2554' }};
-            vertical-align: top;
+        .contact-label {
+            display: block;
+            font-size: 4.1pt;
+            color: #374151;
         }
         .contact-text {
-            display: inline-block;
-            width: 100pt;
-            margin-left: 3pt;
+            display: block;
+            margin-top: 1pt;
             font-size: 5pt;
-            line-height: 1.35;
+            line-height: 1.3;
             color: #000000;
             word-break: break-word;
-            vertical-align: top;
-            white-space: normal;
         }
         .watermark {
             position: absolute;
@@ -384,15 +371,15 @@
                             <div class="contact-card">
                                 <div class="contact-card-title">School Contact</div>
                                 <div class="contact-row">
-                                    <span class="contact-icon-badge">&#8962;</span>
+                                    <span class="contact-label">Address</span>
                                     <span class="contact-text">{{ $contactAddress }}</span>
                                 </div>
                                 <div class="contact-row">
-                                    <span class="contact-icon-badge">&#9993;</span>
+                                    <span class="contact-label">Email</span>
                                     <span class="contact-text">{{ $contactEmail }}</span>
                                 </div>
                                 <div class="contact-row">
-                                    <span class="contact-icon-badge">&#9742;</span>
+                                    <span class="contact-label">Phone</span>
                                     <span class="contact-text">{{ $contactPhone }}</span>
                                 </div>
                             </div>
