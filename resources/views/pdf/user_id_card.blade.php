@@ -53,17 +53,12 @@
             right: 14pt;
             z-index: 2;
             color: #ffffff;
-        }
-        .front-brand {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .front-brand td {
-            vertical-align: middle;
+            text-align: center;
         }
         .front-logo {
             width: 28pt;
             height: 28pt;
+            margin: 0 auto 6pt;
             text-align: center;
         }
         .front-logo img,
@@ -80,8 +75,7 @@
             color: #ffffff;
         }
         .brand-copy {
-            padding-left: 7pt;
-            text-align: left;
+            text-align: center;
         }
         .school-name {
             margin: 0;
@@ -197,7 +191,8 @@
             margin-bottom: 3.5pt;
         }
         .middle-block {
-            margin-top: 18pt;
+            margin-top: 22pt;
+            text-align: center;
         }
         .middle-title {
             font-size: 4.6pt;
@@ -207,15 +202,32 @@
             color: #102047;
         }
         .middle-name {
-            margin-top: 2pt;
-            font-size: 6pt;
+            margin-top: 3pt;
+            font-size: 6.4pt;
             font-weight: 700;
             color: {{ $primaryColor ?? '#1b2554' }};
             text-transform: uppercase;
             line-height: 1.15;
         }
-        .contact-wrap {
-            margin-top: 10pt;
+        .contact-card {
+            position: absolute;
+            left: 12pt;
+            right: 12pt;
+            bottom: 14pt;
+            z-index: 2;
+            background: linear-gradient(135deg, {{ $primarySoft ?? '#eef2ff' }} 0%, {{ $accentSoft ?? '#fdf1e8' }} 100%);
+            border: 1pt solid rgba(15, 23, 42, 0.08);
+            border-radius: 10pt;
+            padding: 8pt 9pt;
+            box-sizing: border-box;
+        }
+        .contact-card-title {
+            margin: 0 0 6pt;
+            font-size: 4.3pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.42pt;
+            color: {{ $primaryColor ?? '#1b2554' }};
         }
         .contact-table {
             width: 100%;
@@ -226,55 +238,29 @@
             padding-bottom: 5pt;
         }
         .contact-icon-cell {
-            width: 12pt;
+            width: 13pt;
         }
         .contact-icon-badge {
             display: inline-block;
-            width: 9pt;
-            height: 9pt;
-            line-height: 9pt;
+            width: 10pt;
+            height: 10pt;
+            line-height: 10pt;
             border-radius: 50%;
             text-align: center;
-            font-size: 5pt;
+            font-size: 5.2pt;
             font-weight: 700;
             color: #ffffff;
             background: {{ $primaryColor ?? '#1b2554' }};
         }
         .contact-text {
-            font-size: 4.7pt;
+            font-size: 4.75pt;
             line-height: 1.35;
             color: #1f2937;
             word-break: break-word;
         }
-        .location-card {
-            position: absolute;
-            left: 12pt;
-            right: 12pt;
-            bottom: 14pt;
-            z-index: 2;
-            background: {{ $accentSoft ?? '#fdf1e8' }};
-            border: 1pt solid rgba(15, 23, 42, 0.08);
-            border-radius: 8pt;
-            padding: 7pt 8pt;
-            box-sizing: border-box;
-        }
-        .location-label {
-            font-size: 4.2pt;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.4pt;
-            color: {{ $primaryColor ?? '#1b2554' }};
-        }
-        .location-value {
-            margin-top: 2pt;
-            font-size: 4.8pt;
-            line-height: 1.35;
-            color: #0f172a;
-            word-break: break-word;
-        }
         .watermark {
             position: absolute;
-            top: 84pt;
+            top: 88pt;
             left: 50%;
             width: 78pt;
             height: 78pt;
@@ -329,26 +315,18 @@
                     </svg>
 
                     <div class="front-head">
-                        <table class="front-brand">
-                            <tr>
-                                <td style="width: 30pt;">
-                                    <div class="front-logo">
-                                        @if(!empty($logoDataUri))
-                                            <img src="{{ $logoDataUri }}" alt="School Logo">
-                                        @else
-                                            <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="brand-copy">
-                                        <h1 class="school-name">{{ $schoolName }}</h1>
-                                        <div class="school-motto">{{ $motto }}</div>
-                                        <div class="user-type">{{ $roleName }}</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
+                        <div class="front-logo">
+                            @if(!empty($logoDataUri))
+                                <img src="{{ $logoDataUri }}" alt="School Logo">
+                            @else
+                                <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
+                            @endif
+                        </div>
+                        <div class="brand-copy">
+                            <h1 class="school-name">{{ $schoolName }}</h1>
+                            <div class="school-motto">{{ $motto }}</div>
+                            <div class="user-type">{{ $roleName }}</div>
+                        </div>
                     </div>
 
                     <div class="photo-ring">
@@ -401,29 +379,25 @@
                         <div class="middle-block">
                             <div class="middle-title">Head of School</div>
                             <div class="middle-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
-
-                            <div class="contact-wrap">
-                                <table class="contact-table">
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#9993;</span></td>
-                                        <td class="contact-text">{{ $contactEmail ?: '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#9742;</span></td>
-                                        <td class="contact-text">{{ $contactPhone ?: '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#127760;</span></td>
-                                        <td class="contact-text">{{ $websiteUrl ?: '-' }}</td>
-                                    </tr>
-                                </table>
-                            </div>
                         </div>
                     </div>
 
-                    <div class="location-card">
-                        <div class="location-label">School Location</div>
-                        <div class="location-value">{{ $contactAddress ?: '-' }}</div>
+                    <div class="contact-card">
+                        <div class="contact-card-title">School Contact</div>
+                        <table class="contact-table">
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#8962;</span></td>
+                                <td class="contact-text">{{ $contactAddress ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#9993;</span></td>
+                                <td class="contact-text">{{ $contactEmail ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#9742;</span></td>
+                                <td class="contact-text">{{ $contactPhone ?: '-' }}</td>
+                            </tr>
+                        </table>
                     </div>
 
                 </div>
