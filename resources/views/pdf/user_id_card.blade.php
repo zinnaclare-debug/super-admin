@@ -212,6 +212,27 @@
             text-transform: uppercase;
             line-height: 1.15;
         }
+        .authority-proof {
+            margin: 8pt auto 0;
+            width: 90pt;
+            text-align: center;
+        }
+        .authority-proof img {
+            max-width: 90pt;
+            max-height: 28pt;
+            object-fit: contain;
+        }
+        .authority-proof-line {
+            margin-top: 4pt;
+            border-top: 0.8pt solid rgba(15, 23, 42, 0.35);
+        }
+        .authority-proof-label {
+            margin-top: 2pt;
+            font-size: 4.2pt;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.35pt;
+        }
         .contact-card {
             margin-top: 12pt;
             background: linear-gradient(135deg, {{ $primarySoft ?? '#eef2ff' }} 0%, {{ $accentSoft ?? '#fdf1e8' }} 100%);
@@ -365,8 +386,16 @@
                         </ul>
 
                         <div class="middle-block">
-                            <div class="middle-title">Head of School</div>
+                            <div class="middle-title">School Authority</div>
+                            <div class="middle-title" style="margin-top: 5pt; color: #4b5563;">Head of School</div>
                             <div class="middle-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
+                            @if(!empty($headSignatureDataUri))
+                                <div class="authority-proof">
+                                    <img src="{{ $headSignatureDataUri }}" alt="Head Signature">
+                                    <div class="authority-proof-line"></div>
+                                    <div class="authority-proof-label">Authorized Signature</div>
+                                </div>
+                            @endif
 
                             <div class="contact-card">
                                 <div class="contact-card-title">School Contact</div>

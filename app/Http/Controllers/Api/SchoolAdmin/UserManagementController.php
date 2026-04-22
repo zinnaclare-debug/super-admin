@@ -300,6 +300,7 @@ class UserManagementController extends Controller
                 'displayPosition' => $displayPosition,
                 'principalName' => $school->head_of_school_name ?: 'Principal',
                 'logoDataUri' => $this->imageDataUri($school->logo_path),
+                'headSignatureDataUri' => $this->imageDataUri($school->head_signature_path),
                 'userPhotoDataUri' => $this->imageDataUri($photoPath) ?: $this->assetImageDataUri(public_path('defaults/student-photo-placeholder.svg')),
                 'primaryColor' => $primaryColor,
                 'accentColor' => $accentColor,
