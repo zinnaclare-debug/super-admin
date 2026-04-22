@@ -255,7 +255,7 @@
         .contact-text {
             font-size: 4.6pt;
             line-height: 1.3;
-            color: #1f2937;
+            color: #000000;
             word-break: break-word;
         }
         .watermark {
@@ -279,7 +279,7 @@
 @php
     $schoolName = strtoupper((string) ($school?->name ?? 'SCHOOL NAME'));
     $motto = trim((string) ($schoolMotto ?? ''));
-    $motto = $motto !== '' ? $motto : 'school slogan text line here';
+    $motto = $motto !== '' ? $motto : '';
     $logoFallback = collect(explode(' ', (string) ($school?->name ?? 'SC')))
         ->filter()
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
