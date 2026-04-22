@@ -48,27 +48,37 @@
         }
         .front-head {
             position: absolute;
-            top: 12pt;
-            left: 14pt;
-            right: 14pt;
+            top: 10pt;
+            left: 12pt;
+            right: 12pt;
             z-index: 2;
             color: #ffffff;
             text-align: center;
         }
+        .front-brand-card {
+            display: inline-block;
+            min-width: 110pt;
+            max-width: 125pt;
+            padding: 7pt 8pt 8pt;
+            border-radius: 12pt;
+            background: rgba(15, 23, 42, 0.28);
+            border: 0.8pt solid rgba(255,255,255,0.18);
+            box-sizing: border-box;
+        }
         .front-logo {
-            width: 28pt;
-            height: 28pt;
-            margin: 0 auto 6pt;
+            width: 30pt;
+            height: 30pt;
+            margin: 0 auto 5pt;
             text-align: center;
         }
         .front-logo img,
         .watermark img {
-            max-width: 26pt;
-            max-height: 26pt;
+            max-width: 28pt;
+            max-height: 28pt;
         }
         .front-logo span {
             display: inline-block;
-            line-height: 26pt;
+            line-height: 28pt;
             font-size: 10pt;
             font-weight: 700;
             text-transform: uppercase;
@@ -79,11 +89,11 @@
         }
         .school-name {
             margin: 0;
-            font-size: 9.4pt;
+            font-size: 8.8pt;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.22pt;
-            line-height: 1.15;
+            line-height: 1.2;
         }
         .school-motto {
             margin-top: 2pt;
@@ -213,13 +223,14 @@
             position: absolute;
             left: 12pt;
             right: 12pt;
-            bottom: 14pt;
+            bottom: 12pt;
             z-index: 2;
             background: linear-gradient(135deg, {{ $primarySoft ?? '#eef2ff' }} 0%, {{ $accentSoft ?? '#fdf1e8' }} 100%);
             border: 1pt solid rgba(15, 23, 42, 0.08);
             border-radius: 10pt;
-            padding: 8pt 9pt;
+            padding: 7pt 8pt;
             box-sizing: border-box;
+            box-shadow: 0 4pt 10pt rgba(15, 23, 42, 0.08);
         }
         .contact-card-title {
             margin: 0 0 6pt;
@@ -235,7 +246,7 @@
         }
         .contact-table td {
             vertical-align: top;
-            padding-bottom: 5pt;
+            padding-bottom: 4pt;
         }
         .contact-icon-cell {
             width: 13pt;
@@ -253,8 +264,8 @@
             background: {{ $primaryColor ?? '#1b2554' }};
         }
         .contact-text {
-            font-size: 4.75pt;
-            line-height: 1.35;
+            font-size: 4.55pt;
+            line-height: 1.28;
             color: #1f2937;
             word-break: break-word;
         }
@@ -315,17 +326,19 @@
                     </svg>
 
                     <div class="front-head">
-                        <div class="front-logo">
-                            @if(!empty($logoDataUri))
-                                <img src="{{ $logoDataUri }}" alt="School Logo">
-                            @else
-                                <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                            @endif
-                        </div>
-                        <div class="brand-copy">
-                            <h1 class="school-name">{{ $schoolName }}</h1>
-                            <div class="school-motto">{{ $motto }}</div>
-                            <div class="user-type">{{ $roleName }}</div>
+                        <div class="front-brand-card">
+                            <div class="front-logo">
+                                @if(!empty($logoDataUri))
+                                    <img src="{{ $logoDataUri }}" alt="School Logo">
+                                @else
+                                    <span>{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
+                                @endif
+                            </div>
+                            <div class="brand-copy">
+                                <h1 class="school-name">{{ $schoolName }}</h1>
+                                <div class="school-motto">{{ $motto }}</div>
+                                <div class="user-type">{{ $roleName }}</div>
+                            </div>
                         </div>
                     </div>
 
