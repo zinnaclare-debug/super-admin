@@ -84,24 +84,26 @@
             text-transform: uppercase;
             letter-spacing: 0.22pt;
             line-height: 1.2;
-            text-shadow: 0 1pt 2pt rgba(15, 23, 42, 0.18);
+            color: #111827;
         }
         .school-motto {
             margin-top: 2pt;
             font-size: 4.4pt;
             opacity: 0.96;
+            color: #1f2937;
         }
         .user-type {
             margin-top: 5pt;
             display: inline-block;
             padding: 2pt 7pt;
             border-radius: 999pt;
-            background: rgba(255,255,255,0.18);
-            border: 0.8pt solid rgba(255,255,255,0.3);
+            background: rgba(17,24,39,0.08);
+            border: 0.8pt solid rgba(17,24,39,0.14);
             font-size: 4.4pt;
             font-weight: 700;
             letter-spacing: 0.45pt;
             text-transform: uppercase;
+            color: #111827;
         }
         .photo-ring {
             position: absolute;
