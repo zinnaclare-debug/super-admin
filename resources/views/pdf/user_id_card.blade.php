@@ -233,6 +233,7 @@
         .contact-row {
             margin-bottom: 4pt;
             overflow: hidden;
+            white-space: nowrap;
         }
         .contact-icon-badge {
             display: inline-block;
@@ -249,13 +250,14 @@
         }
         .contact-text {
             display: inline-block;
-            width: 104pt;
-            margin-left: 4pt;
+            width: 100pt;
+            margin-left: 3pt;
             font-size: 5pt;
             line-height: 1.35;
             color: #000000;
             word-break: break-word;
             vertical-align: top;
+            white-space: normal;
         }
         .watermark {
             position: absolute;
