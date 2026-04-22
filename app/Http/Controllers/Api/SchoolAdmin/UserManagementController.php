@@ -279,6 +279,9 @@ class UserManagementController extends Controller
             : ($staffAssignment['departments'][0] ?? null);
         $displayPosition = $user->role === 'staff' ? ($staff?->position ?: 'Staff Member') : null;
         $websiteUrl = $this->resolveSchoolWebsiteUrl($request, $school);
+        $contactAddress = trim((string) ($websiteContent['address'] ?? $school->location ?? ''));
+        $contactEmail = trim((string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''));
+        $contactPhone = trim((string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''));
 
         try {
             @set_time_limit(120);
@@ -303,9 +306,9 @@ class UserManagementController extends Controller
                 'primarySoft' => $this->blendHexColor($primaryColor, '#ffffff', 0.82),
                 'accentSoft' => $this->blendHexColor($accentColor, '#ffffff', 0.84),
                 'schoolMotto' => (string) ($websiteContent['motto'] ?? ''),
-                'contactAddress' => (string) ($websiteContent['address'] ?? $school->location ?? ''),
-                'contactEmail' => (string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''),
-                'contactPhone' => (string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''),
+                'contactAddress' => $contactAddress !== '' ? $contactAddress : 'School address not set',
+                'contactEmail' => $contactEmail !== '' ? $contactEmail : 'School email not set',
+                'contactPhone' => $contactPhone !== '' ? $contactPhone : 'School phone not set',
                 'websiteUrl' => $websiteUrl,
             ])->render();
 

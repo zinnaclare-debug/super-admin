@@ -213,17 +213,22 @@
             line-height: 1.15;
         }
         .contact-card {
-            margin-top: 10pt;
+            position: absolute;
+            left: 12pt;
+            right: 12pt;
+            top: 138pt;
+            z-index: 2;
             background: linear-gradient(135deg, {{ $primarySoft ?? '#eef2ff' }} 0%, {{ $accentSoft ?? '#fdf1e8' }} 100%);
             border: 1pt solid rgba(15, 23, 42, 0.08);
             border-radius: 10pt;
             padding: 7pt 8pt;
             box-sizing: border-box;
             box-shadow: 0 4pt 10pt rgba(15, 23, 42, 0.08);
+            text-align: left;
         }
         .contact-card-title {
             margin: 0 0 6pt;
-            font-size: 4.3pt;
+            font-size: 4.6pt;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.42pt;
@@ -235,26 +240,26 @@
         }
         .contact-table td {
             vertical-align: top;
-            padding-bottom: 3.5pt;
+            padding-bottom: 4pt;
         }
         .contact-icon-cell {
-            width: 13pt;
+            width: 14pt;
         }
         .contact-icon-badge {
             display: inline-block;
-            width: 10pt;
-            height: 10pt;
-            line-height: 10pt;
+            width: 11pt;
+            height: 11pt;
+            line-height: 11pt;
             border-radius: 50%;
             text-align: center;
-            font-size: 5.2pt;
+            font-size: 5.5pt;
             font-weight: 700;
             color: #ffffff;
             background: {{ $primaryColor ?? '#1b2554' }};
         }
         .contact-text {
-            font-size: 4.6pt;
-            line-height: 1.3;
+            font-size: 5pt;
+            line-height: 1.35;
             color: #000000;
             word-break: break-word;
         }
@@ -379,25 +384,25 @@
                         <div class="middle-block">
                             <div class="middle-title">Head of School</div>
                             <div class="middle-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
-
-                            <div class="contact-card">
-                                <div class="contact-card-title">School Contact</div>
-                                <table class="contact-table">
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#8962;</span></td>
-                                        <td class="contact-text">{{ $contactAddress ?: '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#9993;</span></td>
-                                        <td class="contact-text">{{ $contactEmail ?: '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="contact-icon-cell"><span class="contact-icon-badge">&#9742;</span></td>
-                                        <td class="contact-text">{{ $contactPhone ?: '-' }}</td>
-                                    </tr>
-                                </table>
-                            </div>
                         </div>
+                    </div>
+
+                    <div class="contact-card">
+                        <div class="contact-card-title">School Contact</div>
+                        <table class="contact-table">
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#8962;</span></td>
+                                <td class="contact-text">{{ $contactAddress }}</td>
+                            </tr>
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#9993;</span></td>
+                                <td class="contact-text">{{ $contactEmail }}</td>
+                            </tr>
+                            <tr>
+                                <td class="contact-icon-cell"><span class="contact-icon-badge">&#9742;</span></td>
+                                <td class="contact-text">{{ $contactPhone }}</td>
+                            </tr>
+                        </table>
                     </div>
 
                 </div>
