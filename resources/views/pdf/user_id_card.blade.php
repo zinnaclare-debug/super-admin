@@ -49,7 +49,7 @@
         }
         .front-top-band {
             top: 0;
-            height: 14pt;
+            height: 10pt;
         }
         .front-arch-primary {
             position: absolute;
@@ -77,65 +77,69 @@
         }
         .front-logo {
             position: absolute;
-            top: 12pt;
+            top: 14pt;
             left: 0;
             right: 0;
             text-align: center;
         }
         .front-logo img {
-            max-width: 30pt;
-            max-height: 30pt;
+            max-width: 28pt;
+            max-height: 28pt;
         }
         .logo-fallback {
             display: inline-block;
-            width: 30pt;
-            height: 30pt;
-            line-height: 30pt;
+            width: 28pt;
+            height: 28pt;
+            line-height: 28pt;
             border-radius: 50%;
             background: rgba(255,255,255,0.14);
             color: #ffffff;
             font-size: 10pt;
             font-weight: 700;
         }
-        .school-name {
+        .school-name-band {
             position: absolute;
             top: 46pt;
-            left: 8pt;
-            right: 8pt;
+            left: 10pt;
+            right: 10pt;
+            padding: 4pt 6pt 5pt;
+            border-top: 1.2pt solid {{ $primaryColor ?? '#153f8a' }};
+            border-bottom: 1.2pt solid {{ $primaryColor ?? '#153f8a' }};
             text-align: center;
-            font-size: 9pt;
+            z-index: 3;
+            background: rgba(255,255,255,0.92);
+        }
+        .school-name {
+            margin: 0;
+            font-size: 8.8pt;
             font-weight: 700;
-            line-height: 1.2;
-            letter-spacing: 0.18pt;
+            line-height: 1.15;
+            letter-spacing: 0.12pt;
             color: #0f172a;
             text-transform: uppercase;
-            z-index: 3;
         }
         .motto-line {
-            position: absolute;
-            top: 65pt;
-            left: 18pt;
-            right: 18pt;
+            margin-top: 2pt;
             text-align: center;
             color: {{ $accentColor ?? '#d39b2f' }};
-            font-size: 4.2pt;
+            font-size: 3.9pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.35pt;
+            letter-spacing: 0.28pt;
         }
         .motto-line:before,
         .motto-line:after {
             content: "";
             display: inline-block;
-            width: 26pt;
+            width: 18pt;
             height: 0.8pt;
             vertical-align: middle;
             background: {{ $primaryColor ?? '#153f8a' }};
-            margin: 0 4pt;
+            margin: 0 3pt;
         }
         .photo-ring {
             position: absolute;
-            top: 78pt;
+            top: 92pt;
             left: 29.5pt;
             width: 84pt;
             height: 84pt;
@@ -162,7 +166,7 @@
             position: absolute;
             left: 10pt;
             right: 10pt;
-            top: 168pt;
+            top: 178pt;
             bottom: 34pt;
         }
         .info-accent {
@@ -431,11 +435,12 @@
                             @endif
                         </div>
 
-                        <div class="school-name">{{ $schoolName }}</div>
-
-                        @if($motto !== '')
-                            <div class="motto-line">{{ strtoupper($motto) }}</div>
-                        @endif
+                        <div class="school-name-band">
+                            <div class="school-name">{{ $schoolName }}</div>
+                            @if($motto !== '')
+                                <div class="motto-line">{{ strtoupper($motto) }}</div>
+                            @endif
+                        </div>
 
                         <div class="photo-ring">
                             @if(!empty($userPhotoDataUri))
