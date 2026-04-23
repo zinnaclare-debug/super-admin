@@ -145,7 +145,7 @@
         }
         .info-label {
             display: inline-block;
-            width: 36pt;
+            width: 32pt;
             font-size: 4pt;
             color: #475569;
             text-transform: uppercase;
@@ -153,8 +153,8 @@
         }
         .info-value {
             display: inline-block;
-            width: 80pt;
-            font-size: 5.1pt;
+            width: 84pt;
+            font-size: 4.8pt;
             font-weight: 700;
             color: #111827;
             line-height: 1.2;
@@ -301,6 +301,22 @@
             color: #111827;
             word-break: break-word;
         }
+        .validity-box {
+            margin-top: 6pt;
+            padding-top: 5pt;
+            border-top: 0.8pt solid #dbe3ef;
+        }
+        .validity-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .validity-grid td {
+            width: 50%;
+            vertical-align: top;
+        }
+        .validity-grid td + td {
+            padding-left: 5pt;
+        }
         .school-contact-center {
             margin-top: 8pt;
             text-align: center;
@@ -378,20 +394,12 @@
                     <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">{{ $frontThirdLabel }}</span>
-                    <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
-                </div>
-                <div class="info-row">
                     <span class="info-label">Gender</span>
                     <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Issue Session</span>
-                    <span class="info-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Expiry Session</span>
-                    <span class="info-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                    <span class="info-label">{{ $frontThirdLabel }}</span>
+                    <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
                 </div>
             </div>
         </div>
@@ -463,9 +471,20 @@
                                 <span class="detail-label">Relationship</span>
                                 <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
                             </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Issue / Expiry</span>
-                                <span class="detail-value">{{ strtoupper($issueSessionDisplay) }} / {{ strtoupper($expirySessionDisplay) }}</span>
+                            <div class="validity-box">
+                                <div class="block-heading">Card Validity</div>
+                                <table class="validity-grid">
+                                    <tr>
+                                        <td>
+                                            <span class="detail-label">Issue Session</span>
+                                            <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="detail-label">Expiry Session</span>
+                                            <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                                        </td>
+                                    </tr>
+                                </table>
                             </div>
                         </td>
                     </tr>
@@ -485,9 +504,20 @@
                         <span class="detail-label">Phone</span>
                         <span class="detail-value">{{ $contactPhone }}</span>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Issue / Expiry</span>
-                        <span class="detail-value">{{ strtoupper($issueSessionDisplay) }} / {{ strtoupper($expirySessionDisplay) }}</span>
+                    <div class="validity-box">
+                        <div class="block-heading">Card Validity</div>
+                        <table class="validity-grid">
+                            <tr>
+                                <td>
+                                    <span class="detail-label">Issue Session</span>
+                                    <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                                </td>
+                                <td>
+                                    <span class="detail-label">Expiry Session</span>
+                                    <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
             @endif
