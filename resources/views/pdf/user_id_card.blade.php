@@ -99,16 +99,17 @@
         }
         .school-name {
             position: absolute;
-            top: 44pt;
-            left: 10pt;
-            right: 10pt;
+            top: 46pt;
+            left: 8pt;
+            right: 8pt;
             text-align: center;
-            font-size: 7.8pt;
+            font-size: 9pt;
             font-weight: 700;
             line-height: 1.2;
-            letter-spacing: 0.25pt;
-            color: {{ $primaryColor ?? '#153f8a' }};
+            letter-spacing: 0.18pt;
+            color: #0f172a;
             text-transform: uppercase;
+            z-index: 3;
         }
         .motto-line {
             position: absolute;
