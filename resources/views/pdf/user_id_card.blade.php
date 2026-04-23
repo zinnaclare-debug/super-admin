@@ -10,74 +10,44 @@
             padding: 0;
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #0f172a;
+            width: 306pt;
+            height: 243pt;
         }
         .sheet {
+            position: relative;
             width: 306pt;
             height: 243pt;
-            background: #edf2f8;
+            background: #eef3f8;
             overflow: hidden;
         }
-        .sheet-table {
-            width: 306pt;
-            height: 243pt;
-            border-collapse: separate;
-            border-spacing: 10pt 8pt;
-            table-layout: fixed;
-        }
-        .sheet-table td {
-            width: 143pt;
-            height: 227pt;
-            vertical-align: top;
-            padding: 0;
-        }
         .card-face {
-            position: relative;
+            position: absolute;
+            top: 8pt;
             width: 143pt;
             height: 227pt;
             background: #ffffff;
             border: 0.8pt solid #dbe3ef;
             border-radius: 10pt;
             overflow: hidden;
-        }
-        .front-top-band,
-        .back-top-band {
-            position: absolute;
-            left: 0;
-            right: 0;
-            background: {{ $primaryColor ?? '#153f8a' }};
-            color: #ffffff;
-        }
-        .front-top-band {
-            top: 0;
-            height: 10pt;
-        }
-        .front-arch-primary {
-            position: absolute;
-            top: -24pt;
-            left: -8pt;
-            width: 159pt;
-            height: 98pt;
-            border-radius: 0 0 84pt 84pt;
-            background: {{ $primaryColor ?? '#153f8a' }};
-        }
-        .front-arch-accent {
-            position: absolute;
-            top: -15pt;
-            left: -4pt;
-            width: 151pt;
-            height: 91pt;
-            border-radius: 0 0 80pt 80pt;
-            border: 3pt solid {{ $accentColor ?? '#d39b2f' }};
             box-sizing: border-box;
         }
-        .front-content {
+        .front-face {
+            left: 8pt;
+        }
+        .back-face {
+            left: 155pt;
+        }
+        .front-accent {
             position: absolute;
-            inset: 0;
-            z-index: 2;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6pt;
+            background: {{ $primaryColor ?? '#153f8a' }};
         }
         .front-logo {
             position: absolute;
-            top: 14pt;
+            top: 12pt;
             left: 0;
             right: 0;
             text-align: center;
@@ -92,68 +62,56 @@
             height: 28pt;
             line-height: 28pt;
             border-radius: 50%;
-            background: rgba(255,255,255,0.14);
+            background: {{ $primaryColor ?? '#153f8a' }};
             color: #ffffff;
             font-size: 10pt;
             font-weight: 700;
-        }
-        .school-name-band {
-            position: absolute;
-            top: 46pt;
-            left: 10pt;
-            right: 10pt;
-            padding: 4pt 6pt 5pt;
-            border-top: 1.2pt solid {{ $primaryColor ?? '#153f8a' }};
-            border-bottom: 1.2pt solid {{ $primaryColor ?? '#153f8a' }};
             text-align: center;
-            z-index: 3;
-            background: rgba(255,255,255,0.92);
+        }
+        .school-name-wrap {
+            position: absolute;
+            top: 44pt;
+            left: 9pt;
+            right: 9pt;
+            padding: 4pt 3pt 5pt;
+            text-align: center;
+            border-top: 1pt solid {{ $primaryColor ?? '#153f8a' }};
+            border-bottom: 1pt solid {{ $primaryColor ?? '#153f8a' }};
+            background: #ffffff;
         }
         .school-name {
             margin: 0;
-            font-size: 8.8pt;
+            font-size: 7pt;
             font-weight: 700;
             line-height: 1.15;
-            letter-spacing: 0.12pt;
+            letter-spacing: 0.08pt;
+            text-transform: uppercase;
             color: #0f172a;
-            text-transform: uppercase;
         }
-        .motto-line {
+        .school-motto {
             margin-top: 2pt;
-            text-align: center;
-            color: {{ $accentColor ?? '#d39b2f' }};
-            font-size: 3.9pt;
-            font-weight: 700;
+            font-size: 3.6pt;
+            line-height: 1.2;
             text-transform: uppercase;
-            letter-spacing: 0.28pt;
-        }
-        .motto-line:before,
-        .motto-line:after {
-            content: "";
-            display: inline-block;
-            width: 18pt;
-            height: 0.8pt;
-            vertical-align: middle;
-            background: {{ $primaryColor ?? '#153f8a' }};
-            margin: 0 3pt;
+            color: {{ $accentColor ?? '#d39b2f' }};
+            letter-spacing: 0.2pt;
         }
         .photo-ring {
             position: absolute;
-            top: 92pt;
+            top: 78pt;
             left: 29.5pt;
             width: 84pt;
             height: 84pt;
             border-radius: 50%;
             border: 3pt solid {{ $primaryColor ?? '#153f8a' }};
             background: #ffffff;
-            box-sizing: border-box;
             overflow: hidden;
+            box-sizing: border-box;
         }
         .photo-ring img {
+            display: block;
             width: 78pt;
             height: 78pt;
-            margin: 0;
-            display: block;
         }
         .photo-placeholder {
             padding-top: 30pt;
@@ -162,14 +120,14 @@
             color: #64748b;
             text-transform: uppercase;
         }
-        .info-panel {
+        .front-info {
             position: absolute;
             left: 10pt;
             right: 10pt;
-            top: 178pt;
-            bottom: 34pt;
+            top: 168pt;
+            bottom: 8pt;
         }
-        .info-accent {
+        .info-rail {
             position: absolute;
             left: 0;
             top: 0;
@@ -182,103 +140,76 @@
             margin-left: 8pt;
         }
         .info-row {
-            padding: 2.6pt 0 3pt;
-            border-bottom: 0.8pt dotted #cdd7e5;
+            padding: 2.2pt 0;
+            border-bottom: 0.8pt dotted #d1d9e6;
         }
         .info-label {
             display: inline-block;
             width: 36pt;
-            font-size: 4.4pt;
+            font-size: 4pt;
             color: #475569;
             text-transform: uppercase;
+            vertical-align: top;
         }
         .info-value {
             display: inline-block;
-            width: 78pt;
-            font-size: 5.8pt;
+            width: 80pt;
+            font-size: 5.1pt;
             font-weight: 700;
-            color: #0f172a;
+            color: #111827;
             line-height: 1.2;
-            vertical-align: top;
             text-transform: uppercase;
+            vertical-align: top;
             word-break: break-word;
         }
-        .front-footer {
-            bottom: 0;
-            height: 30pt;
-            padding: 4pt 10pt 0;
-            box-sizing: border-box;
-            background: #ffffff;
-            border-top: 1pt solid #dbe3ef;
-        }
-        .session-table {
-            width: 100%;
-            border-collapse: collapse;
-            color: {{ $primaryColor ?? '#153f8a' }};
-        }
-        .session-table td {
-            width: 50%;
-            vertical-align: top;
-            text-align: center;
-        }
-        .session-table td + td {
-            border-left: 0.8pt solid #dbe3ef;
-        }
-        .session-label {
-            display: block;
-            font-size: 4.1pt;
-            text-transform: uppercase;
-            letter-spacing: 0.28pt;
-            color: #475569;
-        }
-        .session-value {
-            display: block;
-            margin-top: 2pt;
-            font-size: 6.2pt;
-            font-weight: 700;
-            line-height: 1.15;
-            color: {{ $primaryColor ?? '#153f8a' }};
-        }
         .back-top-band {
+            position: absolute;
             top: 0;
+            left: 0;
+            right: 0;
             height: 22pt;
+            background: {{ $primaryColor ?? '#153f8a' }};
+            color: #ffffff;
             text-align: center;
             padding-top: 5pt;
             box-sizing: border-box;
-            font-size: 8pt;
+            font-size: 7.6pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.35pt;
-        }
-        .back-body {
-            position: absolute;
-            inset: 26pt 9pt 10pt;
-            z-index: 2;
+            letter-spacing: 0.3pt;
         }
         .watermark {
             position: absolute;
             top: 34pt;
             left: 50%;
-            width: 78pt;
-            height: 78pt;
-            margin-left: -39pt;
+            width: 74pt;
+            height: 74pt;
+            margin-left: -37pt;
             opacity: 0.08;
             text-align: center;
             z-index: 1;
         }
         .watermark img {
-            max-width: 78pt;
-            max-height: 78pt;
+            max-width: 74pt;
+            max-height: 74pt;
+        }
+        .back-body {
+            position: absolute;
+            top: 28pt;
+            left: 9pt;
+            right: 9pt;
+            bottom: 8pt;
+            z-index: 2;
         }
         .terms-list {
-            margin: 0 0 10pt 0;
+            margin: 0;
             padding: 0;
             list-style: none;
         }
         .terms-item {
             margin-bottom: 5pt;
-            font-size: 5pt;
-            line-height: 1.45;
+            font-size: 4.8pt;
+            line-height: 1.42;
             color: #1f2937;
         }
         .terms-dot {
@@ -289,46 +220,44 @@
         }
         .section-divider {
             height: 1pt;
-            background: {{ $primaryColor ?? '#153f8a' }};
-            opacity: 0.9;
             margin: 8pt 0 7pt;
+            background: {{ $primaryColor ?? '#153f8a' }};
         }
         .authority-title {
-            font-size: 4.8pt;
-            color: #374151;
+            font-size: 4.7pt;
+            color: #475569;
             text-transform: uppercase;
-            letter-spacing: 0.3pt;
+            letter-spacing: 0.25pt;
         }
         .authority-name {
             margin-top: 2pt;
-            font-size: 6.3pt;
+            font-size: 6pt;
             font-weight: 700;
-            color: {{ $primaryColor ?? '#153f8a' }};
-            text-transform: uppercase;
             line-height: 1.15;
+            text-transform: uppercase;
+            color: {{ $primaryColor ?? '#153f8a' }};
         }
         .authority-signature {
             margin-top: 6pt;
-            height: 28pt;
-            text-align: left;
+            height: 27pt;
         }
         .authority-signature img {
             max-width: 82pt;
-            max-height: 24pt;
+            max-height: 22pt;
             object-fit: contain;
         }
         .authority-sign-line {
-            width: 88pt;
-            border-top: 0.8pt solid rgba(15, 23, 42, 0.38);
+            width: 86pt;
             margin-top: 2pt;
+            border-top: 0.8pt solid rgba(15, 23, 42, 0.38);
         }
         .authority-sign-label {
-            width: 88pt;
+            width: 86pt;
             margin-top: 2pt;
-            font-size: 4pt;
+            font-size: 3.8pt;
             color: #475569;
-            text-align: center;
             text-transform: uppercase;
+            text-align: center;
         }
         .bottom-grid {
             margin-top: 8pt;
@@ -336,52 +265,45 @@
             border-collapse: collapse;
         }
         .bottom-grid td {
-            vertical-align: top;
             width: 50%;
-        }
-        .bottom-grid.student td + td {
-            border-left: 0.8pt solid #d4dce8;
-            padding-left: 6pt;
+            vertical-align: top;
         }
         .bottom-grid.student td:first-child {
             padding-right: 6pt;
         }
-        .contact-box,
-        .emergency-box {
-            min-height: 56pt;
+        .bottom-grid.student td + td {
+            padding-left: 6pt;
+            border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
-            font-size: 5.2pt;
+            font-size: 4.9pt;
             font-weight: 700;
             color: {{ $primaryColor ?? '#153f8a' }};
             text-transform: uppercase;
-            letter-spacing: 0.25pt;
-            margin-bottom: 5pt;
+            letter-spacing: 0.2pt;
+            margin-bottom: 4pt;
         }
         .detail-row {
             margin-bottom: 4pt;
         }
         .detail-label {
             display: block;
-            font-size: 4.1pt;
+            font-size: 3.9pt;
             color: #475569;
             text-transform: uppercase;
         }
         .detail-value {
             display: block;
             margin-top: 1pt;
-            font-size: 5pt;
-            line-height: 1.35;
-            color: #111827;
+            font-size: 4.7pt;
             font-weight: 700;
+            line-height: 1.28;
+            color: #111827;
             word-break: break-word;
         }
         .school-contact-center {
             margin-top: 8pt;
             text-align: center;
-        }
-        .school-contact-center .detail-row {
-            margin-bottom: 5pt;
         }
     </style>
 </head>
@@ -418,172 +340,159 @@
 @endphp
 
 <div class="sheet">
-    <table class="sheet-table">
-        <tr>
-            <td>
-                <div class="card-face">
-                    <div class="front-top-band"></div>
-                    <div class="front-arch-primary"></div>
-                    <div class="front-arch-accent"></div>
+    <div class="card-face front-face">
+        <div class="front-accent"></div>
 
-                    <div class="front-content">
-                        <div class="front-logo">
-                            @if(!empty($logoDataUri))
-                                <img src="{{ $logoDataUri }}" alt="School Logo">
-                            @else
-                                <span class="logo-fallback">{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
-                            @endif
-                        </div>
+        <div class="front-logo">
+            @if(!empty($logoDataUri))
+                <img src="{{ $logoDataUri }}" alt="School Logo">
+            @else
+                <span class="logo-fallback">{{ $logoFallback !== '' ? $logoFallback : 'SC' }}</span>
+            @endif
+        </div>
 
-                        <div class="school-name-band">
-                            <div class="school-name">{{ $schoolName }}</div>
-                            @if($motto !== '')
-                                <div class="motto-line">{{ strtoupper($motto) }}</div>
-                            @endif
-                        </div>
+        <div class="school-name-wrap">
+            <p class="school-name">{{ $schoolName }}</p>
+            @if($motto !== '')
+                <div class="school-motto">{{ strtoupper($motto) }}</div>
+            @endif
+        </div>
 
-                        <div class="photo-ring">
-                            @if(!empty($userPhotoDataUri))
-                                <img src="{{ $userPhotoDataUri }}" alt="User Photo">
-                            @else
-                                <div class="photo-placeholder">Photo</div>
-                            @endif
-                        </div>
+        <div class="photo-ring">
+            @if(!empty($userPhotoDataUri))
+                <img src="{{ $userPhotoDataUri }}" alt="User Photo">
+            @else
+                <div class="photo-placeholder">Photo</div>
+            @endif
+        </div>
 
-                        <div class="info-panel">
-                            <div class="info-accent"></div>
-                            <div class="info-list">
-                                <div class="info-row">
-                                    <span class="info-label">Name</span>
-                                    <span class="info-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
-                                    <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label">{{ $frontThirdLabel }}</span>
-                                    <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label">Gender</span>
-                                    <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
-                                </div>
+        <div class="front-info">
+            <div class="info-rail"></div>
+            <div class="info-list">
+                <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
+                    <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">{{ $frontThirdLabel }}</span>
+                    <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Gender</span>
+                    <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Issue Session</span>
+                    <span class="info-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Expiry Session</span>
+                    <span class="info-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-face back-face">
+        <div class="back-top-band">Terms &amp; Conditions</div>
+
+        @if(!empty($logoDataUri))
+            <div class="watermark">
+                <img src="{{ $logoDataUri }}" alt="">
+            </div>
+        @endif
+
+        <div class="back-body">
+            <div class="terms-list">
+                @foreach($bullets as $bullet)
+                    <div class="terms-item">
+                        <span class="terms-dot">&#8226;</span>{{ $bullet }}
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="authority-title">School Authority</div>
+            <div class="detail-label" style="margin-top: 3pt;">Head of School</div>
+            <div class="authority-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
+
+            @if(!empty($headSignatureDataUri))
+                <div class="authority-signature">
+                    <img src="{{ $headSignatureDataUri }}" alt="Head Signature">
+                    <div class="authority-sign-line"></div>
+                    <div class="authority-sign-label">Authorized Signature</div>
+                </div>
+            @endif
+
+            <div class="section-divider"></div>
+
+            @if($showStudentEmergency)
+                <table class="bottom-grid student">
+                    <tr>
+                        <td>
+                            <div class="block-heading">School Contact</div>
+                            <div class="detail-row">
+                                <span class="detail-label">Address</span>
+                                <span class="detail-value">{{ $contactAddress }}</span>
                             </div>
-                        </div>
-
-                        <div class="front-footer">
-                            <table class="session-table">
-                                <tr>
-                                    <td>
-                                        <span class="session-label">Issue Session</span>
-                                        <span class="session-value">{{ $issueSessionDisplay }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="session-label">Expiry Session</span>
-                                        <span class="session-value">{{ $expirySessionDisplay }}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Email</span>
+                                <span class="detail-value">{{ $contactEmail }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $contactPhone }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="block-heading">Guardian Contact</div>
+                            <div class="detail-row">
+                                <span class="detail-label">Name</span>
+                                <span class="detail-value">{{ strtoupper($guardianNameValue !== '' ? $guardianNameValue : '-') }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $guardianPhoneValue !== '' ? $guardianPhoneValue : '-' }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Relationship</span>
+                                <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Issue / Expiry</span>
+                                <span class="detail-value">{{ strtoupper($issueSessionDisplay) }} / {{ strtoupper($expirySessionDisplay) }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            @else
+                <div class="school-contact-center">
+                    <div class="block-heading">School Contact</div>
+                    <div class="detail-row">
+                        <span class="detail-label">Address</span>
+                        <span class="detail-value">{{ $contactAddress }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value">{{ $contactEmail }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Phone</span>
+                        <span class="detail-value">{{ $contactPhone }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Issue / Expiry</span>
+                        <span class="detail-value">{{ strtoupper($issueSessionDisplay) }} / {{ strtoupper($expirySessionDisplay) }}</span>
                     </div>
                 </div>
-            </td>
-            <td>
-                <div class="card-face">
-                    <div class="back-top-band">Terms &amp; Conditions</div>
-                    @if(!empty($logoDataUri))
-                        <div class="watermark">
-                            <img src="{{ $logoDataUri }}" alt="">
-                        </div>
-                    @endif
-
-                    <div class="back-body">
-                        <div class="terms-list">
-                            @foreach($bullets as $bullet)
-                                <div class="terms-item">
-                                    <span class="terms-dot">&#8226;</span>{{ $bullet }}
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="section-divider"></div>
-
-                        <div class="authority-title">School Authority</div>
-                        <div class="detail-label" style="margin-top: 3pt;">Head of School</div>
-                        <div class="authority-name">{{ strtoupper((string) ($principalName ?? 'HEAD OF SCHOOL')) }}</div>
-
-                        @if(!empty($headSignatureDataUri))
-                            <div class="authority-signature">
-                                <img src="{{ $headSignatureDataUri }}" alt="Head Signature">
-                                <div class="authority-sign-line"></div>
-                                <div class="authority-sign-label">Authorized Signature</div>
-                            </div>
-                        @endif
-
-                        <div class="section-divider"></div>
-
-                        @if($showStudentEmergency)
-                            <table class="bottom-grid student">
-                                <tr>
-                                    <td>
-                                        <div class="contact-box">
-                                            <div class="block-heading">School Contact</div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Address</span>
-                                                <span class="detail-value">{{ $contactAddress }}</span>
-                                            </div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Email</span>
-                                                <span class="detail-value">{{ $contactEmail }}</span>
-                                            </div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Phone</span>
-                                                <span class="detail-value">{{ $contactPhone }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="emergency-box">
-                                            <div class="block-heading">Guardian Contact</div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Name</span>
-                                                <span class="detail-value">{{ strtoupper($guardianNameValue !== '' ? $guardianNameValue : '-') }}</span>
-                                            </div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Phone</span>
-                                                <span class="detail-value">{{ $guardianPhoneValue !== '' ? $guardianPhoneValue : '-' }}</span>
-                                            </div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Relationship</span>
-                                                <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
-                        @else
-                            <div class="school-contact-center">
-                                <div class="block-heading">School Contact</div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Address</span>
-                                    <span class="detail-value">{{ $contactAddress }}</span>
-                                </div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Email</span>
-                                    <span class="detail-value">{{ $contactEmail }}</span>
-                                </div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Phone</span>
-                                    <span class="detail-value">{{ $contactPhone }}</span>
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </td>
-        </tr>
-    </table>
+            @endif
+        </div>
+    </div>
 </div>
 </body>
 </html>
