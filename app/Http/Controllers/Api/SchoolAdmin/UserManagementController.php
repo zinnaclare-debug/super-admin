@@ -287,6 +287,9 @@ class UserManagementController extends Controller
         $contactAddress = trim((string) ($websiteContent['address'] ?? $school->location ?? ''));
         $contactEmail = trim((string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''));
         $contactPhone = trim((string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''));
+        $currentStudySessionLabel = $this->resolveClassAcademicSessionLabel((int) ($placement['class_id'] ?? 0))
+            ?: $this->resolveCurrentSession($schoolId)?->session_name
+            ?: null;
         $issueSessionLabel = $this->resolveIdCardIssueSessionLabel(
             $schoolId,
             $user,
@@ -296,6 +299,7 @@ class UserManagementController extends Controller
         );
         $expirySessionLabel = $this->resolveIdCardExpirySessionLabel(
             $issueSessionLabel,
+            $currentStudySessionLabel,
             (string) $user->role,
             $displayClass,
             $displayLevel
@@ -1540,15 +1544,23 @@ class UserManagementController extends Controller
 
     private function resolveIdCardExpirySessionLabel(
         string $issueSessionLabel,
+        ?string $currentStudySessionLabel,
         string $role,
         ?string $displayClass,
         ?string $displayLevel
     ): string {
+        $baseSessionLabel = trim($role === 'student'
+            ? ((string) ($currentStudySessionLabel ?? ''))
+            : $issueSessionLabel);
+        if ($baseSessionLabel === '') {
+            $baseSessionLabel = $issueSessionLabel;
+        }
+
         $yearsToAdd = $role === 'student'
             ? $this->resolveStudentCompletionOffset($displayClass, $displayLevel)
             : 2;
 
-        return $this->addAcademicSessionYears($issueSessionLabel, $yearsToAdd);
+        return $this->addAcademicSessionYears($baseSessionLabel, $yearsToAdd);
     }
 
     private function resolveStudentCompletionOffset(?string $displayClass, ?string $displayLevel): int

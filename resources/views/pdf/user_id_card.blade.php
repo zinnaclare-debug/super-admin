@@ -40,8 +40,7 @@
             overflow: hidden;
         }
         .front-top-band,
-        .back-top-band,
-        .front-footer {
+        .back-top-band {
             position: absolute;
             left: 0;
             right: 0;
@@ -204,11 +203,13 @@
             height: 30pt;
             padding: 4pt 10pt 0;
             box-sizing: border-box;
+            background: #ffffff;
+            border-top: 1pt solid #dbe3ef;
         }
         .session-table {
             width: 100%;
             border-collapse: collapse;
-            color: #ffffff;
+            color: {{ $primaryColor ?? '#153f8a' }};
         }
         .session-table td {
             width: 50%;
@@ -216,14 +217,14 @@
             text-align: center;
         }
         .session-table td + td {
-            border-left: 0.8pt solid rgba(255,255,255,0.35);
+            border-left: 0.8pt solid #dbe3ef;
         }
         .session-label {
             display: block;
             font-size: 4.1pt;
             text-transform: uppercase;
             letter-spacing: 0.28pt;
-            opacity: 0.9;
+            color: #475569;
         }
         .session-value {
             display: block;
@@ -231,6 +232,7 @@
             font-size: 6.2pt;
             font-weight: 700;
             line-height: 1.15;
+            color: {{ $primaryColor ?? '#153f8a' }};
         }
         .back-top-band {
             top: 0;
@@ -375,14 +377,6 @@
         }
         .school-contact-center .detail-row {
             margin-bottom: 5pt;
-        }
-        .back-footer-band {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 12pt;
-            background: {{ $primaryColor ?? '#153f8a' }};
         }
     </style>
 </head>
@@ -580,8 +574,6 @@
                             </div>
                         @endif
                     </div>
-
-                    <div class="back-footer-band"></div>
                 </div>
             </td>
         </tr>
