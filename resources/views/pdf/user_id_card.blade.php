@@ -208,8 +208,8 @@
         }
         .terms-item {
             margin-bottom: 5pt;
-            font-size: 4.8pt;
-            line-height: 1.42;
+            font-size: 4.5pt;
+            line-height: 1.35;
             color: #1f2937;
         }
         .terms-dot {
@@ -220,7 +220,7 @@
         }
         .section-divider {
             height: 1pt;
-            margin: 8pt 0 7pt;
+            margin: 6pt 0 6pt;
             background: {{ $primaryColor ?? '#153f8a' }};
         }
         .authority-title {
@@ -238,12 +238,12 @@
             color: {{ $primaryColor ?? '#153f8a' }};
         }
         .authority-signature {
-            margin-top: 6pt;
-            height: 27pt;
+            margin-top: 4pt;
+            height: 22pt;
         }
         .authority-signature img {
             max-width: 82pt;
-            max-height: 22pt;
+            max-height: 17pt;
             object-fit: contain;
         }
         .authority-sign-line {
@@ -260,7 +260,7 @@
             text-align: center;
         }
         .bottom-grid {
-            margin-top: 8pt;
+            margin-top: 6pt;
             width: 100%;
             border-collapse: collapse;
         }
@@ -276,35 +276,33 @@
             border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
-            font-size: 4.9pt;
+            font-size: 4.6pt;
             font-weight: 700;
             color: {{ $primaryColor ?? '#153f8a' }};
             text-transform: uppercase;
             letter-spacing: 0.2pt;
-            margin-bottom: 4pt;
+            margin-bottom: 3pt;
         }
         .detail-row {
-            margin-bottom: 4pt;
+            margin-bottom: 3pt;
         }
         .detail-label {
             display: block;
-            font-size: 3.9pt;
+            font-size: 3.7pt;
             color: #475569;
             text-transform: uppercase;
         }
         .detail-value {
             display: block;
             margin-top: 1pt;
-            font-size: 4.7pt;
+            font-size: 4.25pt;
             font-weight: 700;
-            line-height: 1.28;
+            line-height: 1.18;
             color: #111827;
             word-break: break-word;
         }
         .validity-box {
-            margin-top: 6pt;
-            padding-top: 5pt;
-            border-top: 0.8pt solid #dbe3ef;
+            margin-top: 0;
         }
         .validity-grid {
             width: 100%;
@@ -316,6 +314,11 @@
         }
         .validity-grid td + td {
             padding-left: 5pt;
+        }
+        .student-guardian {
+            margin-top: 6pt;
+            padding-top: 5pt;
+            border-top: 0.8pt solid #dbe3ef;
         }
         .school-contact-center {
             margin-top: 8pt;
@@ -458,19 +461,6 @@
                             </div>
                         </td>
                         <td>
-                            <div class="block-heading">Guardian Contact</div>
-                            <div class="detail-row">
-                                <span class="detail-label">Name</span>
-                                <span class="detail-value">{{ strtoupper($guardianNameValue !== '' ? $guardianNameValue : '-') }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Phone</span>
-                                <span class="detail-value">{{ $guardianPhoneValue !== '' ? $guardianPhoneValue : '-' }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Relationship</span>
-                                <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
-                            </div>
                             <div class="validity-box">
                                 <div class="block-heading">Card Validity</div>
                                 <table class="validity-grid">
@@ -489,6 +479,22 @@
                         </td>
                     </tr>
                 </table>
+
+                <div class="student-guardian">
+                            <div class="block-heading">Guardian Contact</div>
+                            <div class="detail-row">
+                                <span class="detail-label">Name</span>
+                                <span class="detail-value">{{ strtoupper($guardianNameValue !== '' ? $guardianNameValue : '-') }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $guardianPhoneValue !== '' ? $guardianPhoneValue : '-' }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Relationship</span>
+                                <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
+                            </div>
+                </div>
             @else
                 <div class="school-contact-center">
                     <div class="block-heading">School Contact</div>
