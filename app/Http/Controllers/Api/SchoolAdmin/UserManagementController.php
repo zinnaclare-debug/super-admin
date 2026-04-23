@@ -232,6 +232,7 @@ class UserManagementController extends Controller
 
         $student = null;
         $staff = null;
+        $guardian = null;
         $placement = [
             'class_id' => null,
             'department_id' => null,
@@ -252,6 +253,10 @@ class UserManagementController extends Controller
 
             if ($student) {
                 $placement = $this->resolveStudentCurrentPlacement($schoolId, (int) $student->id);
+                $guardian = Guardian::query()
+                    ->where('school_id', $schoolId)
+                    ->where('user_id', (int) $user->id)
+                    ->first();
             }
         } else {
             $staff = Staff::query()
@@ -282,6 +287,22 @@ class UserManagementController extends Controller
         $contactAddress = trim((string) ($websiteContent['address'] ?? $school->location ?? ''));
         $contactEmail = trim((string) ($websiteContent['contact_email'] ?? $school->contact_email ?? $school->email ?? ''));
         $contactPhone = trim((string) ($websiteContent['contact_phone'] ?? $school->contact_phone ?? ''));
+        $issueSessionLabel = $this->resolveIdCardIssueSessionLabel(
+            $schoolId,
+            $user,
+            $student,
+            $staff,
+            $placement['class_id'] ?? null
+        );
+        $expirySessionLabel = $this->resolveIdCardExpirySessionLabel(
+            $issueSessionLabel,
+            (string) $user->role,
+            $displayClass,
+            $displayLevel
+        );
+        $studentGuardianName = trim((string) ($guardian?->name ?? ''));
+        $studentGuardianPhone = trim((string) ($guardian?->mobile ?? ''));
+        $studentGuardianRelationship = trim((string) ($guardian?->relationship ?? ''));
 
         try {
             @set_time_limit(120);
@@ -311,6 +332,11 @@ class UserManagementController extends Controller
                 'contactEmail' => $contactEmail !== '' ? $contactEmail : 'School email not set',
                 'contactPhone' => $contactPhone !== '' ? $contactPhone : 'School phone not set',
                 'websiteUrl' => $websiteUrl,
+                'issueSessionLabel' => $issueSessionLabel,
+                'expirySessionLabel' => $expirySessionLabel,
+                'guardianName' => $studentGuardianName !== '' ? $studentGuardianName : null,
+                'guardianPhone' => $studentGuardianPhone !== '' ? $studentGuardianPhone : null,
+                'guardianRelationship' => $studentGuardianRelationship !== '' ? $studentGuardianRelationship : null,
             ])->render();
 
             $options = new Options();
@@ -1434,6 +1460,155 @@ class UserManagementController extends Controller
         }
 
         return rtrim((string) $request->getSchemeAndHttpHost(), '/');
+    }
+
+    private function resolveIdCardIssueSessionLabel(
+        int $schoolId,
+        User $user,
+        ?Student $student,
+        ?Staff $staff,
+        mixed $currentClassId = null
+    ): string {
+        if ($student) {
+            $sessionLabel = $this->resolveStudentRegistrationSessionLabel($schoolId, $student);
+            if ($sessionLabel !== null) {
+                return $sessionLabel;
+            }
+
+            $classSessionLabel = $this->resolveClassAcademicSessionLabel((int) ($currentClassId ?? 0));
+            if ($classSessionLabel !== null) {
+                return $classSessionLabel;
+            }
+        }
+
+        return $this->inferAcademicSessionLabel($staff?->created_at ?? $student?->created_at ?? $user->created_at);
+    }
+
+    private function resolveStudentRegistrationSessionLabel(int $schoolId, Student $student): ?string
+    {
+        $enrollmentQuery = Enrollment::query()
+            ->join('terms', 'terms.id', '=', 'enrollments.term_id')
+            ->join('academic_sessions', 'academic_sessions.id', '=', 'terms.academic_session_id')
+            ->where('enrollments.student_id', $student->id)
+            ->where('academic_sessions.school_id', $schoolId)
+            ->orderBy('academic_sessions.id')
+            ->orderBy('enrollments.id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $enrollmentQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $sessionName = $enrollmentQuery->value('academic_sessions.session_name');
+        if (is_string($sessionName) && trim($sessionName) !== '') {
+            return trim($sessionName);
+        }
+
+        if (Schema::hasTable('class_students')) {
+            $classStudentQuery = DB::table('class_students')
+                ->join('academic_sessions', 'academic_sessions.id', '=', 'class_students.academic_session_id')
+                ->where('class_students.student_id', $student->id)
+                ->where('academic_sessions.school_id', $schoolId)
+                ->orderBy('academic_sessions.id')
+                ->orderBy('class_students.id');
+
+            if (Schema::hasColumn('class_students', 'school_id')) {
+                $classStudentQuery->where('class_students.school_id', $schoolId);
+            }
+
+            $classStudentSession = $classStudentQuery->value('academic_sessions.session_name');
+            if (is_string($classStudentSession) && trim($classStudentSession) !== '') {
+                return trim($classStudentSession);
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveClassAcademicSessionLabel(int $classId): ?string
+    {
+        if ($classId <= 0) {
+            return null;
+        }
+
+        $sessionName = SchoolClass::query()
+            ->join('academic_sessions', 'academic_sessions.id', '=', 'classes.academic_session_id')
+            ->where('classes.id', $classId)
+            ->value('academic_sessions.session_name');
+
+        return is_string($sessionName) && trim($sessionName) !== '' ? trim($sessionName) : null;
+    }
+
+    private function resolveIdCardExpirySessionLabel(
+        string $issueSessionLabel,
+        string $role,
+        ?string $displayClass,
+        ?string $displayLevel
+    ): string {
+        $yearsToAdd = $role === 'student'
+            ? $this->resolveStudentCompletionOffset($displayClass, $displayLevel)
+            : 2;
+
+        return $this->addAcademicSessionYears($issueSessionLabel, $yearsToAdd);
+    }
+
+    private function resolveStudentCompletionOffset(?string $displayClass, ?string $displayLevel): int
+    {
+        $className = strtolower(trim((string) $displayClass));
+        $level = strtolower(trim((string) $displayLevel));
+        $matchedYear = null;
+
+        if (preg_match('/(?:^|\\s)(?:jss|js|sss|ss|primary|pry|nursery|kg|grade|year|class)\\s*([1-9])/i', $className, $matches)) {
+            $matchedYear = (int) ($matches[1] ?? 0);
+        } elseif (preg_match('/\\b([1-9])\\b/', $className, $matches)) {
+            $matchedYear = (int) ($matches[1] ?? 0);
+        }
+
+        $cycleLength = 3;
+        if (str_contains($className, 'nursery') || str_contains($className, 'kg') || str_contains($level, 'nursery') || str_contains($level, 'kindergarten')) {
+            $cycleLength = 3;
+        } elseif (str_contains($className, 'primary') || str_contains($className, 'pry') || str_contains($level, 'primary')) {
+            $cycleLength = 6;
+        } elseif (str_contains($className, 'jss') || str_contains($className, 'js') || str_contains($level, 'junior')) {
+            $cycleLength = 3;
+        } elseif (str_contains($className, 'sss') || str_contains($className, 'ss') || str_contains($level, 'senior')) {
+            $cycleLength = 3;
+        }
+
+        if ($matchedYear !== null && $matchedYear > 0) {
+            return max($cycleLength - $matchedYear, 0);
+        }
+
+        return max($cycleLength - 1, 0);
+    }
+
+    private function addAcademicSessionYears(string $sessionLabel, int $yearsToAdd): string
+    {
+        $yearsToAdd = max(0, $yearsToAdd);
+        $normalized = trim($sessionLabel);
+        if (preg_match('/(\\d{4})\\s*\\/\\s*(\\d{4})/', $normalized, $matches)) {
+            $startYear = (int) $matches[1];
+            $endYear = (int) $matches[2];
+            return ($startYear + $yearsToAdd) . '/' . ($endYear + $yearsToAdd);
+        }
+
+        return $normalized !== '' ? $normalized : $this->inferAcademicSessionLabel(null);
+    }
+
+    private function inferAcademicSessionLabel(mixed $timestamp): string
+    {
+        if ($timestamp instanceof \DateTimeInterface) {
+            $year = (int) $timestamp->format('Y');
+            return $year . '/' . ($year + 1);
+        }
+
+        $parsedYear = strtotime((string) $timestamp);
+        if ($parsedYear !== false) {
+            $year = (int) date('Y', $parsedYear);
+            return $year . '/' . ($year + 1);
+        }
+
+        $currentYear = (int) date('Y');
+        return $currentYear . '/' . ($currentYear + 1);
     }
 
     private function blendHexColor(string $baseHex, string $targetHex, float $targetWeight): string
