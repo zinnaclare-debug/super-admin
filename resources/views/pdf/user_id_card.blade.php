@@ -276,33 +276,35 @@
             border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
-            font-size: 4.6pt;
+            font-size: 4.4pt;
             font-weight: 700;
             color: {{ $primaryColor ?? '#153f8a' }};
             text-transform: uppercase;
             letter-spacing: 0.2pt;
-            margin-bottom: 3pt;
+            margin-bottom: 2pt;
         }
         .detail-row {
-            margin-bottom: 3pt;
+            margin-bottom: 2pt;
         }
         .detail-label {
             display: block;
-            font-size: 3.7pt;
+            font-size: 3.5pt;
             color: #475569;
             text-transform: uppercase;
         }
         .detail-value {
             display: block;
             margin-top: 1pt;
-            font-size: 4.25pt;
+            font-size: 4pt;
             font-weight: 700;
-            line-height: 1.18;
+            line-height: 1.14;
             color: #111827;
             word-break: break-word;
         }
         .validity-box {
-            margin-top: 0;
+            margin-top: 4pt;
+            padding-top: 4pt;
+            border-top: 0.8pt solid #dbe3ef;
         }
         .validity-grid {
             width: 100%;
@@ -313,12 +315,7 @@
             vertical-align: top;
         }
         .validity-grid td + td {
-            padding-left: 5pt;
-        }
-        .student-guardian {
-            margin-top: 6pt;
-            padding-top: 5pt;
-            border-top: 0.8pt solid #dbe3ef;
+            padding-left: 4pt;
         }
         .school-contact-center {
             margin-top: 8pt;
@@ -459,8 +456,6 @@
                                 <span class="detail-label">Phone</span>
                                 <span class="detail-value">{{ $contactPhone }}</span>
                             </div>
-                        </td>
-                        <td>
                             <div class="validity-box">
                                 <div class="block-heading">Card Validity</div>
                                 <table class="validity-grid">
@@ -477,10 +472,7 @@
                                 </table>
                             </div>
                         </td>
-                    </tr>
-                </table>
-
-                <div class="student-guardian">
+                        <td>
                             <div class="block-heading">Guardian Contact</div>
                             <div class="detail-row">
                                 <span class="detail-label">Name</span>
@@ -494,7 +486,9 @@
                                 <span class="detail-label">Relationship</span>
                                 <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
                             </div>
-                </div>
+                        </td>
+                    </tr>
+                </table>
             @else
                 <div class="school-contact-center">
                     <div class="block-heading">School Contact</div>
