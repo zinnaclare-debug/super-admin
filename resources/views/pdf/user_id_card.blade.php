@@ -257,22 +257,23 @@
             font-size: 3.8pt;
             color: #475569;
             text-transform: uppercase;
-            text-align: center;
+            text-align: left;
         }
         .bottom-grid {
-            margin-top: 6pt;
+            margin-top: 5pt;
             width: 100%;
             border-collapse: collapse;
         }
         .bottom-grid td {
-            width: 50%;
             vertical-align: top;
         }
         .bottom-grid.student td:first-child {
-            padding-right: 6pt;
+            width: 58%;
+            padding-right: 4pt;
         }
         .bottom-grid.student td + td {
-            padding-left: 6pt;
+            width: 42%;
+            padding-left: 4pt;
             border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
@@ -295,16 +296,29 @@
         .detail-value {
             display: block;
             margin-top: 1pt;
-            font-size: 4pt;
+            font-size: 3.85pt;
             font-weight: 700;
-            line-height: 1.14;
+            line-height: 1.12;
             color: #111827;
             word-break: break-word;
         }
+        .contact-validity-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .contact-validity-grid td {
+            width: 50%;
+            vertical-align: top;
+        }
+        .contact-validity-grid td:first-child {
+            padding-right: 4pt;
+        }
+        .contact-validity-grid td + td {
+            padding-left: 4pt;
+            border-left: 0.8pt solid #dbe3ef;
+        }
         .validity-box {
-            margin-top: 4pt;
-            padding-top: 4pt;
-            border-top: 0.8pt solid #dbe3ef;
+            margin-top: 0;
         }
         .validity-grid {
             width: 100%;
@@ -444,33 +458,37 @@
                     <tr>
                         <td>
                             <div class="block-heading">School Contact</div>
-                            <div class="detail-row">
-                                <span class="detail-label">Address</span>
-                                <span class="detail-value">{{ $contactAddress }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Email</span>
-                                <span class="detail-value">{{ $contactEmail }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Phone</span>
-                                <span class="detail-value">{{ $contactPhone }}</span>
-                            </div>
-                            <div class="validity-box">
-                                <div class="block-heading">Card Validity</div>
-                                <table class="validity-grid">
-                                    <tr>
-                                        <td>
-                                            <span class="detail-label">Issue Session</span>
-                                            <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="detail-label">Expiry Session</span>
-                                            <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
+                            <table class="contact-validity-grid">
+                                <tr>
+                                    <td>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Address</span>
+                                            <span class="detail-value">{{ $contactAddress }}</span>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Email</span>
+                                            <span class="detail-value">{{ $contactEmail }}</span>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Phone</span>
+                                            <span class="detail-value">{{ $contactPhone }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="validity-box">
+                                            <div class="block-heading">Card Validity</div>
+                                            <div class="detail-row">
+                                                <span class="detail-label">Issue Session</span>
+                                                <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                                            </div>
+                                            <div class="detail-row">
+                                                <span class="detail-label">Expiry Session</span>
+                                                <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                         <td>
                             <div class="block-heading">Guardian Contact</div>
@@ -486,39 +504,63 @@
                                 <span class="detail-label">Relationship</span>
                                 <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
                             </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Gender</span>
+                                <span class="detail-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
+                            </div>
+                            @if($frontThirdValue !== '')
+                                <div class="detail-row">
+                                    <span class="detail-label">{{ $isStudent ? 'Department' : 'Department / Role' }}</span>
+                                    <span class="detail-value">{{ strtoupper($frontThirdValue) }}</span>
+                                </div>
+                            @endif
                         </td>
                     </tr>
                 </table>
             @else
                 <div class="school-contact-center">
-                    <div class="block-heading">School Contact</div>
-                    <div class="detail-row">
-                        <span class="detail-label">Address</span>
-                        <span class="detail-value">{{ $contactAddress }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Email</span>
-                        <span class="detail-value">{{ $contactEmail }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Phone</span>
-                        <span class="detail-value">{{ $contactPhone }}</span>
-                    </div>
-                    <div class="validity-box">
-                        <div class="block-heading">Card Validity</div>
-                        <table class="validity-grid">
-                            <tr>
-                                <td>
-                                    <span class="detail-label">Issue Session</span>
-                                    <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                                </td>
-                                <td>
-                                    <span class="detail-label">Expiry Session</span>
-                                    <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
+                    <table class="contact-validity-grid">
+                        <tr>
+                            <td>
+                                <div class="block-heading">School Contact</div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Address</span>
+                                    <span class="detail-value">{{ $contactAddress }}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Email</span>
+                                    <span class="detail-value">{{ $contactEmail }}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Phone</span>
+                                    <span class="detail-value">{{ $contactPhone }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="validity-box">
+                                    <div class="block-heading">Card Validity</div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Issue Session</span>
+                                        <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Expiry Session</span>
+                                        <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Gender</span>
+                                        <span class="detail-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
+                                    </div>
+                                    @if($displayDepartment)
+                                        <div class="detail-row">
+                                            <span class="detail-label">Department</span>
+                                            <span class="detail-value">{{ strtoupper((string) $displayDepartment) }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             @endif
         </div>
