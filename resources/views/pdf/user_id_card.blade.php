@@ -153,10 +153,6 @@
             padding-left: 3pt;
             border-left: 0.8pt solid #dbe3ef;
         }
-        .front-main .block-heading,
-        .front-validity .block-heading {
-            margin-bottom: 2.4pt;
-        }
         .front-main .detail-row {
             margin-bottom: 1.6pt;
             padding-bottom: 1.2pt;
@@ -414,7 +410,6 @@
             <table class="front-grid">
                 <tr>
                     <td class="front-main">
-                        <div class="block-heading">User Info</div>
                         <div class="detail-row">
                             <span class="detail-label">Name</span>
                             <span class="detail-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
@@ -439,7 +434,6 @@
                         @endif
                     </td>
                     <td class="front-validity">
-                        <div class="block-heading">Card Validity</div>
                         <div class="validity-item">
                             <span class="detail-label">Issue</span>
                             <span class="validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
@@ -488,58 +482,21 @@
 
             <div class="section-divider"></div>
 
-            @if($showStudentEmergency)
-                <table class="bottom-grid student">
-                    <tr>
-                        <td>
-                            <div class="block-heading">School Contact</div>
-                            <div class="detail-row">
-                                <span class="detail-label">Address</span>
-                                <span class="detail-value">{{ $contactAddress }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Email</span>
-                                <span class="detail-value">{{ $contactEmail }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Phone</span>
-                                <span class="detail-value">{{ $contactPhone }}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="block-heading">Guardian Contact</div>
-                            <div class="detail-row">
-                                <span class="detail-label">Name</span>
-                                <span class="detail-value">{{ strtoupper($guardianNameValue !== '' ? $guardianNameValue : '-') }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Phone</span>
-                                <span class="detail-value">{{ $guardianPhoneValue !== '' ? $guardianPhoneValue : '-' }}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Relationship</span>
-                                <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-            @else
-                <div class="school-contact-center">
-                    <div class="block-heading">School Contact</div>
-                    <div class="detail-row">
-                        <span class="detail-label">Address</span>
-                        <span class="detail-value">{{ $contactAddress }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Email</span>
-                        <span class="detail-value">{{ $contactEmail }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Phone</span>
-                        <span class="detail-value">{{ $contactPhone }}</span>
-                    </div>
+            <div class="school-contact-center">
+                <div class="block-heading">School Contact</div>
+                <div class="detail-row">
+                    <span class="detail-label">Address</span>
+                    <span class="detail-value">{{ $contactAddress }}</span>
                 </div>
-            @endif
+                <div class="detail-row">
+                    <span class="detail-label">Email</span>
+                    <span class="detail-value">{{ $contactEmail }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phone</span>
+                    <span class="detail-value">{{ $contactPhone }}</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
