@@ -140,27 +140,58 @@
             margin-left: 8pt;
         }
         .info-row {
-            padding: 1.6pt 0;
+            padding: 1.15pt 0;
             border-bottom: 0.8pt dotted #d1d9e6;
         }
         .info-label {
             display: inline-block;
-            width: 29pt;
-            font-size: 3.7pt;
+            width: 26pt;
+            font-size: 3.55pt;
             color: #475569;
             text-transform: uppercase;
             vertical-align: top;
         }
         .info-value {
             display: inline-block;
-            width: 87pt;
-            font-size: 4.15pt;
+            width: 90pt;
+            font-size: 3.95pt;
             font-weight: 700;
             color: #111827;
-            line-height: 1.1;
+            line-height: 1.06;
             text-transform: uppercase;
             vertical-align: top;
             word-break: break-word;
+        }
+        .validity-row .info-label {
+            width: 22pt;
+        }
+        .validity-row .info-value {
+            width: 94pt;
+        }
+        .validity-split {
+            display: inline-table;
+            width: 94pt;
+            border-collapse: collapse;
+            vertical-align: top;
+        }
+        .validity-split td {
+            width: 50%;
+            vertical-align: top;
+        }
+        .validity-split td + td {
+            padding-left: 2.5pt;
+            border-left: 0.8pt solid #dbe3ef;
+        }
+        .validity-split .detail-label {
+            font-size: 3.2pt;
+        }
+        .info-validity-value {
+            display: block;
+            font-size: 3.55pt;
+            font-weight: 700;
+            line-height: 1.06;
+            color: #111827;
+            text-transform: uppercase;
         }
         .back-top-band {
             position: absolute;
@@ -268,12 +299,12 @@
             vertical-align: top;
         }
         .bottom-grid.student td:first-child {
-            width: 58%;
-            padding-right: 4pt;
+            width: 51%;
+            padding-right: 2.5pt;
         }
         .bottom-grid.student td + td {
-            width: 42%;
-            padding-left: 4pt;
+            width: 49%;
+            padding-left: 2.5pt;
             border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
@@ -285,37 +316,22 @@
             margin-bottom: 2pt;
         }
         .detail-row {
-            margin-bottom: 2pt;
+            margin-bottom: 1.2pt;
         }
         .detail-label {
             display: block;
-            font-size: 3.5pt;
+            font-size: 3.3pt;
             color: #475569;
             text-transform: uppercase;
         }
         .detail-value {
             display: block;
-            margin-top: 1pt;
-            font-size: 3.85pt;
+            margin-top: 0.6pt;
+            font-size: 3.55pt;
             font-weight: 700;
-            line-height: 1.12;
+            line-height: 1.05;
             color: #111827;
             word-break: break-word;
-        }
-        .contact-validity-grid {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .contact-validity-grid td {
-            width: 50%;
-            vertical-align: top;
-        }
-        .contact-validity-grid td:first-child {
-            padding-right: 4pt;
-        }
-        .contact-validity-grid td + td {
-            padding-left: 4pt;
-            border-left: 0.8pt solid #dbe3ef;
         }
         .school-contact-center {
             margin-top: 8pt;
@@ -409,13 +425,20 @@
                         <span class="info-value">{{ strtoupper($departmentValue) }}</span>
                     </div>
                 @endif
-                <div class="info-row">
-                    <span class="info-label">Issue Session</span>
-                    <span class="info-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Expiry Session</span>
-                    <span class="info-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                <div class="info-row validity-row">
+                    <span class="info-label">Validity</span>
+                    <table class="validity-split">
+                        <tr>
+                            <td>
+                                <span class="detail-label">Issue</span>
+                                <span class="info-validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                            </td>
+                            <td>
+                                <span class="detail-label">Expiry</span>
+                                <span class="info-validity-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </div>
@@ -460,25 +483,18 @@
                     <tr>
                         <td>
                             <div class="block-heading">School Contact</div>
-                            <table class="contact-validity-grid">
-                                <tr>
-                                    <td>
-                                        <div class="detail-row">
-                                            <span class="detail-label">Address</span>
-                                            <span class="detail-value">{{ $contactAddress }}</span>
-                                        </div>
-                                        <div class="detail-row">
-                                            <span class="detail-label">Email</span>
-                                            <span class="detail-value">{{ $contactEmail }}</span>
-                                        </div>
-                                        <div class="detail-row">
-                                            <span class="detail-label">Phone</span>
-                                            <span class="detail-value">{{ $contactPhone }}</span>
-                                        </div>
-                                    </td>
-                                    <td></td>
-                                </tr>
-                            </table>
+                            <div class="detail-row">
+                                <span class="detail-label">Address</span>
+                                <span class="detail-value">{{ $contactAddress }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Email</span>
+                                <span class="detail-value">{{ $contactEmail }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $contactPhone }}</span>
+                            </div>
                         </td>
                         <td>
                             <div class="block-heading">Guardian Contact</div>
