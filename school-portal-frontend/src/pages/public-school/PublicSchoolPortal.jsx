@@ -218,6 +218,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [examHeadWarnings, setExamHeadWarnings] = useState(0);
   const [verifyResult, setVerifyResult] = useState(null);
   const [busyAction, setBusyAction] = useState("");
+  const [isCompactOverviewScreen, setIsCompactOverviewScreen] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 640 : false));
+  const [expandedOverviewSections, setExpandedOverviewSections] = useState({});
   const securityRef = useRef(null);
   const submittingRef = useRef(false);
 
@@ -258,6 +260,26 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     if (!reference) return;
     verifyEntrancePayment(reference);
   }, [searchParams, page]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const syncCompactOverview = (event) => {
+      setIsCompactOverviewScreen(event.matches);
+      if (!event.matches) {
+        setExpandedOverviewSections({});
+      }
+    };
+
+    syncCompactOverview(mediaQuery);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncCompactOverview);
+      return () => mediaQuery.removeEventListener("change", syncCompactOverview);
+    }
+
+    mediaQuery.addListener(syncCompactOverview);
+    return () => mediaQuery.removeListener(syncCompactOverview);
+  }, []);
   const school = siteData?.school || null;
   const website = school?.website_content || {};
   const entranceExam = school?.entrance_exam || {};
@@ -278,6 +300,11 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const whatsappHref = whatsappLink(contactPhone);
   const mapHref = mapsLink(contactAddress);
   const socialLinks = useMemo(() => buildSocialLinks(website.social_links), [website.social_links]);
+  const overviewSections = useMemo(() => ([
+    { key: "about", title: "About Us", text: website.about_text },
+    { key: "vision", title: "Vision", text: website.vision_text },
+    { key: "mission", title: "Mission", text: website.mission_text },
+  ]), [website.about_text, website.vision_text, website.mission_text]);
 
   const themeStyle = useMemo(
     () => ({
@@ -294,6 +321,13 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     }),
     [themeStyle, logoUrl]
   );
+
+  const toggleOverviewSection = (key) => {
+    setExpandedOverviewSections((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
 
   useEffect(() => {
     if (Array.isArray(entranceExam.available_classes) && entranceExam.available_classes.length > 0 && !applyForm.applying_for_class) {
@@ -608,18 +642,27 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
           </section>
 
           <section className="school-site-section school-site-cards">
-            <article>
-              <h3>About Us</h3>
-              <p>{website.about_text}</p>
-            </article>
-            <article>
-              <h3>Vision</h3>
-              <p>{website.vision_text}</p>
-            </article>
-            <article>
-              <h3>Mission</h3>
-              <p>{website.mission_text}</p>
-            </article>
+            {overviewSections.map((section) => {
+              const isExpanded = !!expandedOverviewSections[section.key];
+              const shouldShowContent = !isCompactOverviewScreen || isExpanded;
+              return (
+                <article key={section.key} className="school-site-overview-card">
+                  <div className="school-site-overview-head">
+                    <h3>{section.title}</h3>
+                    {isCompactOverviewScreen ? (
+                      <button
+                        type="button"
+                        className="school-site-overview-toggle"
+                        onClick={() => toggleOverviewSection(section.key)}
+                      >
+                        {isExpanded ? "Show less" : "See more"}
+                      </button>
+                    ) : null}
+                  </div>
+                  {shouldShowContent ? <p>{section.text}</p> : null}
+                </article>
+              );
+            })}
           </section>
 
           <section className="school-site-content-section school-site-section">

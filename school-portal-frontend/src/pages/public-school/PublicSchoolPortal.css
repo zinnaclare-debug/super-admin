@@ -392,7 +392,38 @@
 }
 
 .school-site-cards {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+}
+
+.school-site-overview-card {
+  display: grid;
+  gap: 10px;
+}
+
+.school-site-overview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.school-site-overview-head h3 {
+  margin: 0;
+}
+
+.school-site-overview-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--school-primary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.school-site-overview-card p {
+  margin: 0;
 }
 
 .school-site-form-page {
@@ -525,6 +556,14 @@
 
   .school-site-social-grid {
     grid-template-columns: 1fr;
+  }
+
+  .school-site-overview-card {
+    gap: 6px;
+  }
+
+  .school-site-overview-head {
+    align-items: flex-start;
   }
 }
 
