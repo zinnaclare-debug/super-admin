@@ -154,8 +154,8 @@
             border-left: 0.8pt solid #dbe3ef;
         }
         .front-main .detail-row {
-            margin-bottom: 1.6pt;
-            padding-bottom: 1.2pt;
+            margin-bottom: 1.3pt;
+            padding-bottom: 1pt;
             border-bottom: 0.8pt dotted #d1d9e6;
         }
         .front-main .detail-row:last-child {
@@ -167,8 +167,8 @@
         }
         .front-main .detail-value {
             margin-top: 0.5pt;
-            font-size: 3.65pt;
-            line-height: 1.04;
+            font-size: 3.45pt;
+            line-height: 1.02;
         }
         .validity-heading {
             font-size: 3.55pt;
@@ -365,6 +365,7 @@
     $showStudentEmergency = $isStudent && ($guardianNameValue !== '' || $guardianPhoneValue !== '' || $guardianRelationshipValue !== '');
     $departmentValue = trim((string) ($displayDepartment ?? ''));
     $showDepartment = $departmentValue !== '' && strtolower($departmentValue) !== strtolower($frontThirdValue);
+    $frontThirdCombinedValue = trim($frontThirdValue . ($showDepartment ? ' ' . $departmentValue : ''));
     $issueSessionDisplay = trim((string) ($issueSessionLabel ?? ''));
     $expirySessionDisplay = trim((string) ($expirySessionLabel ?? ''));
     $issueSessionDisplay = $issueSessionDisplay !== '' ? $issueSessionDisplay : '-';
@@ -424,14 +425,8 @@
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">{{ $frontThirdLabel }}</span>
-                            <span class="detail-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
+                            <span class="detail-value">{{ strtoupper($frontThirdCombinedValue !== '' ? $frontThirdCombinedValue : '-') }}</span>
                         </div>
-                        @if($showDepartment)
-                            <div class="detail-row">
-                                <span class="detail-label">Department</span>
-                                <span class="detail-value">{{ strtoupper($departmentValue) }}</span>
-                            </div>
-                        @endif
                     </td>
                     <td class="front-validity">
                         <div class="validity-item">
