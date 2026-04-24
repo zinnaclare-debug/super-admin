@@ -153,28 +153,26 @@
             padding-left: 3pt;
             border-left: 0.8pt solid #dbe3ef;
         }
-        .info-row {
-            padding: 1pt 0;
+        .front-main .block-heading,
+        .front-validity .block-heading {
+            margin-bottom: 2.4pt;
+        }
+        .front-main .detail-row {
+            margin-bottom: 1.6pt;
+            padding-bottom: 1.2pt;
             border-bottom: 0.8pt dotted #d1d9e6;
         }
-        .info-label {
-            display: inline-block;
-            width: 24pt;
-            font-size: 3.45pt;
-            color: #475569;
-            text-transform: uppercase;
-            vertical-align: top;
+        .front-main .detail-row:last-child {
+            margin-bottom: 0;
         }
-        .info-value {
-            display: inline-block;
-            width: 58pt;
-            font-size: 3.8pt;
-            font-weight: 700;
-            color: #111827;
-            line-height: 1.03;
-            text-transform: uppercase;
-            vertical-align: top;
-            word-break: break-word;
+        .front-main .detail-label,
+        .front-validity .detail-label {
+            font-size: 3.25pt;
+        }
+        .front-main .detail-value {
+            margin-top: 0.5pt;
+            font-size: 3.65pt;
+            line-height: 1.04;
         }
         .validity-heading {
             font-size: 3.55pt;
@@ -416,31 +414,32 @@
             <table class="front-grid">
                 <tr>
                     <td class="front-main">
-                        <div class="info-row">
-                            <span class="info-label">Name</span>
-                            <span class="info-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
+                        <div class="block-heading">User Info</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Name</span>
+                            <span class="detail-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
-                            <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
+                        <div class="detail-row">
+                            <span class="detail-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
+                            <span class="detail-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">Gender</span>
-                            <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
+                        <div class="detail-row">
+                            <span class="detail-label">Gender</span>
+                            <span class="detail-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">{{ $frontThirdLabel }}</span>
-                            <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
+                        <div class="detail-row">
+                            <span class="detail-label">{{ $frontThirdLabel }}</span>
+                            <span class="detail-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
                         </div>
                         @if($showDepartment)
-                            <div class="info-row">
-                                <span class="info-label">Department</span>
-                                <span class="info-value">{{ strtoupper($departmentValue) }}</span>
+                            <div class="detail-row">
+                                <span class="detail-label">Department</span>
+                                <span class="detail-value">{{ strtoupper($departmentValue) }}</span>
                             </div>
                         @endif
                     </td>
                     <td class="front-validity">
-                        <div class="validity-heading">Card Validity</div>
+                        <div class="block-heading">Card Validity</div>
                         <div class="validity-item">
                             <span class="detail-label">Issue</span>
                             <span class="validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
