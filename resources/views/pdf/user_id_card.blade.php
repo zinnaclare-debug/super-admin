@@ -124,7 +124,7 @@
             position: absolute;
             left: 10pt;
             right: 10pt;
-            top: 168pt;
+            top: 162pt;
             bottom: 8pt;
         }
         .info-rail {
@@ -140,24 +140,24 @@
             margin-left: 8pt;
         }
         .info-row {
-            padding: 2.2pt 0;
+            padding: 1.6pt 0;
             border-bottom: 0.8pt dotted #d1d9e6;
         }
         .info-label {
             display: inline-block;
-            width: 32pt;
-            font-size: 4pt;
+            width: 29pt;
+            font-size: 3.7pt;
             color: #475569;
             text-transform: uppercase;
             vertical-align: top;
         }
         .info-value {
             display: inline-block;
-            width: 84pt;
-            font-size: 4.8pt;
+            width: 87pt;
+            font-size: 4.15pt;
             font-weight: 700;
             color: #111827;
-            line-height: 1.2;
+            line-height: 1.1;
             text-transform: uppercase;
             vertical-align: top;
             word-break: break-word;
@@ -317,20 +317,6 @@
             padding-left: 4pt;
             border-left: 0.8pt solid #dbe3ef;
         }
-        .validity-box {
-            margin-top: 0;
-        }
-        .validity-grid {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .validity-grid td {
-            width: 50%;
-            vertical-align: top;
-        }
-        .validity-grid td + td {
-            padding-left: 4pt;
-        }
         .school-contact-center {
             margin-top: 8pt;
             text-align: center;
@@ -356,6 +342,8 @@
     $guardianPhoneValue = trim((string) ($guardianPhone ?? ''));
     $guardianRelationshipValue = trim((string) ($guardianRelationship ?? ''));
     $showStudentEmergency = $isStudent && ($guardianNameValue !== '' || $guardianPhoneValue !== '' || $guardianRelationshipValue !== '');
+    $departmentValue = trim((string) ($displayDepartment ?? ''));
+    $showDepartment = $departmentValue !== '' && strtolower($departmentValue) !== strtolower($frontThirdValue);
     $issueSessionDisplay = trim((string) ($issueSessionLabel ?? ''));
     $expirySessionDisplay = trim((string) ($expirySessionLabel ?? ''));
     $issueSessionDisplay = $issueSessionDisplay !== '' ? $issueSessionDisplay : '-';
@@ -414,6 +402,20 @@
                 <div class="info-row">
                     <span class="info-label">{{ $frontThirdLabel }}</span>
                     <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
+                </div>
+                @if($showDepartment)
+                    <div class="info-row">
+                        <span class="info-label">Department</span>
+                        <span class="info-value">{{ strtoupper($departmentValue) }}</span>
+                    </div>
+                @endif
+                <div class="info-row">
+                    <span class="info-label">Issue Session</span>
+                    <span class="info-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Expiry Session</span>
+                    <span class="info-value">{{ strtoupper($expirySessionDisplay) }}</span>
                 </div>
             </div>
         </div>
@@ -474,19 +476,7 @@
                                             <span class="detail-value">{{ $contactPhone }}</span>
                                         </div>
                                     </td>
-                                    <td>
-                                        <div class="validity-box">
-                                            <div class="block-heading">Card Validity</div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Issue Session</span>
-                                                <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                                            </div>
-                                            <div class="detail-row">
-                                                <span class="detail-label">Expiry Session</span>
-                                                <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
+                                    <td></td>
                                 </tr>
                             </table>
                         </td>
@@ -504,63 +494,24 @@
                                 <span class="detail-label">Relationship</span>
                                 <span class="detail-value">{{ strtoupper($guardianRelationshipValue !== '' ? $guardianRelationshipValue : '-') }}</span>
                             </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Gender</span>
-                                <span class="detail-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
-                            </div>
-                            @if($frontThirdValue !== '')
-                                <div class="detail-row">
-                                    <span class="detail-label">{{ $isStudent ? 'Department' : 'Department / Role' }}</span>
-                                    <span class="detail-value">{{ strtoupper($frontThirdValue) }}</span>
-                                </div>
-                            @endif
                         </td>
                     </tr>
                 </table>
             @else
                 <div class="school-contact-center">
-                    <table class="contact-validity-grid">
-                        <tr>
-                            <td>
-                                <div class="block-heading">School Contact</div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Address</span>
-                                    <span class="detail-value">{{ $contactAddress }}</span>
-                                </div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Email</span>
-                                    <span class="detail-value">{{ $contactEmail }}</span>
-                                </div>
-                                <div class="detail-row">
-                                    <span class="detail-label">Phone</span>
-                                    <span class="detail-value">{{ $contactPhone }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="validity-box">
-                                    <div class="block-heading">Card Validity</div>
-                                    <div class="detail-row">
-                                        <span class="detail-label">Issue Session</span>
-                                        <span class="detail-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                                    </div>
-                                    <div class="detail-row">
-                                        <span class="detail-label">Expiry Session</span>
-                                        <span class="detail-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                                    </div>
-                                    <div class="detail-row">
-                                        <span class="detail-label">Gender</span>
-                                        <span class="detail-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
-                                    </div>
-                                    @if($displayDepartment)
-                                        <div class="detail-row">
-                                            <span class="detail-label">Department</span>
-                                            <span class="detail-value">{{ strtoupper((string) $displayDepartment) }}</span>
-                                        </div>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="block-heading">School Contact</div>
+                    <div class="detail-row">
+                        <span class="detail-label">Address</span>
+                        <span class="detail-value">{{ $contactAddress }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value">{{ $contactEmail }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Phone</span>
+                        <span class="detail-value">{{ $contactPhone }}</span>
+                    </div>
                 </div>
             @endif
         </div>
