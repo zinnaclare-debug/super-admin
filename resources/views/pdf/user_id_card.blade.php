@@ -136,62 +136,73 @@
             border-radius: 999pt;
             background: {{ $accentColor ?? '#d39b2f' }};
         }
-        .info-list {
+        .front-grid {
             margin-left: 8pt;
+            width: 117pt;
+            border-collapse: collapse;
+        }
+        .front-grid td {
+            vertical-align: top;
+        }
+        .front-main {
+            width: 76%;
+            padding-right: 3pt;
+        }
+        .front-validity {
+            width: 24%;
+            padding-left: 3pt;
+            border-left: 0.8pt solid #dbe3ef;
         }
         .info-row {
-            padding: 1.15pt 0;
+            padding: 1pt 0;
             border-bottom: 0.8pt dotted #d1d9e6;
         }
         .info-label {
             display: inline-block;
-            width: 26pt;
-            font-size: 3.55pt;
+            width: 24pt;
+            font-size: 3.45pt;
             color: #475569;
             text-transform: uppercase;
             vertical-align: top;
         }
         .info-value {
             display: inline-block;
-            width: 90pt;
-            font-size: 3.95pt;
+            width: 58pt;
+            font-size: 3.8pt;
             font-weight: 700;
             color: #111827;
-            line-height: 1.06;
+            line-height: 1.03;
             text-transform: uppercase;
             vertical-align: top;
             word-break: break-word;
         }
-        .validity-row .info-label {
-            width: 22pt;
-        }
-        .validity-row .info-value {
-            width: 94pt;
-        }
-        .validity-split {
-            display: inline-table;
-            width: 94pt;
-            border-collapse: collapse;
-            vertical-align: top;
-        }
-        .validity-split td {
-            width: 50%;
-            vertical-align: top;
-        }
-        .validity-split td + td {
-            padding-left: 2.5pt;
-            border-left: 0.8pt solid #dbe3ef;
-        }
-        .validity-split .detail-label {
-            font-size: 3.2pt;
-        }
-        .info-validity-value {
-            display: block;
+        .validity-heading {
             font-size: 3.55pt;
             font-weight: 700;
-            line-height: 1.06;
+            color: {{ $primaryColor ?? '#153f8a' }};
+            text-transform: uppercase;
+            letter-spacing: 0.2pt;
+            margin-bottom: 2pt;
+        }
+        .validity-item {
+            padding-bottom: 2pt;
+            margin-bottom: 2pt;
+            border-bottom: 0.8pt dotted #d1d9e6;
+        }
+        .validity-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .validity-value {
+            display: block;
+            margin-top: 0.6pt;
+            font-size: 3.45pt;
+            font-weight: 700;
+            line-height: 1.04;
             color: #111827;
             text-transform: uppercase;
+            word-break: break-word;
         }
         .back-top-band {
             position: absolute;
@@ -299,12 +310,12 @@
             vertical-align: top;
         }
         .bottom-grid.student td:first-child {
-            width: 51%;
-            padding-right: 2.5pt;
+            width: 58%;
+            padding-right: 4pt;
         }
         .bottom-grid.student td + td {
-            width: 49%;
-            padding-left: 2.5pt;
+            width: 42%;
+            padding-left: 4pt;
             border-left: 0.8pt solid #dbe3ef;
         }
         .block-heading {
@@ -316,20 +327,20 @@
             margin-bottom: 2pt;
         }
         .detail-row {
-            margin-bottom: 1.2pt;
+            margin-bottom: 2pt;
         }
         .detail-label {
             display: block;
-            font-size: 3.3pt;
+            font-size: 3.5pt;
             color: #475569;
             text-transform: uppercase;
         }
         .detail-value {
             display: block;
-            margin-top: 0.6pt;
-            font-size: 3.55pt;
+            margin-top: 1pt;
+            font-size: 3.85pt;
             font-weight: 700;
-            line-height: 1.05;
+            line-height: 1.12;
             color: #111827;
             word-break: break-word;
         }
@@ -402,45 +413,45 @@
 
         <div class="front-info">
             <div class="info-rail"></div>
-            <div class="info-list">
-                <div class="info-row">
-                    <span class="info-label">Name</span>
-                    <span class="info-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
-                    <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Gender</span>
-                    <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">{{ $frontThirdLabel }}</span>
-                    <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
-                </div>
-                @if($showDepartment)
-                    <div class="info-row">
-                        <span class="info-label">Department</span>
-                        <span class="info-value">{{ strtoupper($departmentValue) }}</span>
-                    </div>
-                @endif
-                <div class="info-row validity-row">
-                    <span class="info-label">Validity</span>
-                    <table class="validity-split">
-                        <tr>
-                            <td>
-                                <span class="detail-label">Issue</span>
-                                <span class="info-validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
-                            </td>
-                            <td>
-                                <span class="detail-label">Expiry</span>
-                                <span class="info-validity-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
+            <table class="front-grid">
+                <tr>
+                    <td class="front-main">
+                        <div class="info-row">
+                            <span class="info-label">Name</span>
+                            <span class="info-value">{{ strtoupper((string) ($user?->name ?? '-')) }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">{{ $isStudent ? 'ID Number' : 'Staff ID' }}</span>
+                            <span class="info-value">{{ strtoupper((string) ($identityNumber ?? '-')) }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Gender</span>
+                            <span class="info-value">{{ $displayGender !== '' ? $displayGender : '-' }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">{{ $frontThirdLabel }}</span>
+                            <span class="info-value">{{ strtoupper($frontThirdValue !== '' ? $frontThirdValue : '-') }}</span>
+                        </div>
+                        @if($showDepartment)
+                            <div class="info-row">
+                                <span class="info-label">Department</span>
+                                <span class="info-value">{{ strtoupper($departmentValue) }}</span>
+                            </div>
+                        @endif
+                    </td>
+                    <td class="front-validity">
+                        <div class="validity-heading">Card Validity</div>
+                        <div class="validity-item">
+                            <span class="detail-label">Issue</span>
+                            <span class="validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
+                        </div>
+                        <div class="validity-item">
+                            <span class="detail-label">Expiry</span>
+                            <span class="validity-value">{{ strtoupper($expirySessionDisplay) }}</span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </div>
     </div>
 
