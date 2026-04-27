@@ -582,14 +582,11 @@
     width: 100%;
     margin: 0;
     border-radius: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
+    display: block;
     background: #000000;
     border-color: rgba(255, 255, 255, 0.08);
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
-    padding: 18px 18px 18px;
+    padding: 18px 18px 14px;
   }
 
   .school-site-nav.is-menu-open .school-site-brand strong {
@@ -614,9 +611,12 @@
 
   .school-site-nav.is-menu-open .school-site-brand {
     width: auto;
-    padding-right: 56px;
-    align-items: flex-start;
-    min-height: auto;
+    padding-right: 52px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
+    min-height: 0;
   }
 
   .school-site-nav.is-menu-open .school-site-brand > div {
@@ -649,7 +649,7 @@
     justify-content: flex-start;
     gap: 10px;
     padding: 0;
-    margin-top: -6px;
+    margin-top: 8px;
     box-sizing: border-box;
     border: none;
     border-radius: 0;
