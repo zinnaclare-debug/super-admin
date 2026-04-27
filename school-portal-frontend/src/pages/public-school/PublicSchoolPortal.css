@@ -112,7 +112,7 @@
   inset: 0;
   z-index: 40;
   border: 0;
-  background: rgba(15, 23, 42, 0.38);
+  background: rgba(0, 0, 0, 0.72);
   padding: 0;
   margin: 0;
   cursor: pointer;
@@ -595,26 +595,29 @@
     gap: 10px;
     padding: 16px;
     border-radius: 22px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: linear-gradient(180deg, var(--school-primary) 0%, color-mix(in srgb, var(--school-primary) 82%, black 18%) 100%);
-    box-shadow: 0 24px 44px rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #05070b;
+    box-shadow: 0 26px 52px rgba(0, 0, 0, 0.42);
   }
 
   .school-site-links.is-open a {
     width: 100%;
     text-align: left;
     border-radius: 14px;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.06);
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.04);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.01em;
   }
 
   .school-site-links.is-open a.is-active {
-    background: linear-gradient(135deg, var(--school-accent) 0%, rgba(255, 255, 255, 0.22) 100%);
+    background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
   }
 
   .school-site-links.is-open a:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
   }
 
