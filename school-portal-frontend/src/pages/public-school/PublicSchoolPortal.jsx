@@ -629,7 +629,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   return (
     <div className="school-site-shell" style={shellStyle}>
       {!hideExamChrome ? (
-        <header className="school-site-nav">
+        <header className={`school-site-nav${isPublicMenuOpen ? " is-menu-open" : ""}`}>
         <div className="school-site-brand">
           {logoUrl ? <img src={logoUrl} alt={`${school.name} logo`} /> : <div className="school-site-brand-mark">{school.name?.slice(0, 1) || "S"}</div>}
           <div>

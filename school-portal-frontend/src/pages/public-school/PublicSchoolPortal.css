@@ -95,6 +95,13 @@
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
+.school-site-menu-toggle.is-open {
+  background: #000000;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
 .school-site-menu-toggle.is-open span:nth-child(1) {
   transform: translateY(7px) rotate(45deg);
 }
@@ -568,6 +575,22 @@
     padding: 18px;
   }
 
+  .school-site-nav.is-menu-open {
+    background: #000000;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
+  }
+
+  .school-site-nav.is-menu-open .school-site-brand strong {
+    color: #ffffff;
+  }
+
+  .school-site-nav.is-menu-open .school-site-brand-mark,
+  .school-site-nav.is-menu-open .school-site-brand img {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+  }
+
   .school-site-brand {
     flex: 1;
     min-width: 0;
@@ -596,7 +619,7 @@
     box-sizing: border-box;
     border: none;
     border-radius: 0;
-    background: rgba(0, 0, 0, 0.96);
+    background: #000000;
     box-shadow: none;
     overflow-y: auto;
   }
@@ -606,7 +629,7 @@
     text-align: left;
     border-radius: 16px;
     color: #f8fafc;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.06);
     font-weight: 800;
     font-size: 13px;
     letter-spacing: 0.01em;
