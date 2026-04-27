@@ -610,6 +610,8 @@
   .school-site-nav.is-menu-open .school-site-brand {
     width: auto;
     padding-right: 56px;
+    align-items: center;
+    min-height: 46px;
   }
 
   .school-site-links {
@@ -637,7 +639,7 @@
     align-items: stretch;
     justify-content: flex-start;
     gap: 12px;
-    padding: 28px 0 0;
+    padding: 18px 0 0;
     box-sizing: border-box;
     border: none;
     border-radius: 0;
