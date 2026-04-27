@@ -154,15 +154,15 @@ export default function LoginDetails() {
   const classOptions = useMemo(() => classes || [], [classes]);
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+    <div style={{ marginTop: 12, width: "100%", maxWidth: "100%", minWidth: 0 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", width: "100%" }}>
         <h4 style={{ margin: 0, marginRight: 8 }}>Staff & Student Login Details</h4>
-        <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} style={{ padding: 8 }}>
+        <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 160, flex: "1 1 160px" }}>
           <option value="">All</option>
           <option value="staff">Staff only</option>
           <option value="student">Students only</option>
         </select>
-        <select value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }} style={{ padding: 8 }}>
+        <select value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 160, flex: "1 1 160px" }}>
           <option value="">All levels</option>
           {levels.map((value) => (
             <option key={value} value={value}>
@@ -170,7 +170,7 @@ export default function LoginDetails() {
             </option>
           ))}
         </select>
-        <select value={classId} onChange={(e) => { setClassId(e.target.value); setPage(1); }} style={{ padding: 8 }} disabled={role === "staff"}>
+        <select value={classId} onChange={(e) => { setClassId(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 160, flex: "1 1 160px" }} disabled={role === "staff"}>
           <option value="">All classes</option>
           {classOptions.map((item) => (
             <option key={item.id} value={item.id}>
@@ -178,7 +178,7 @@ export default function LoginDetails() {
             </option>
           ))}
         </select>
-        <select value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1); }} style={{ padding: 8 }} disabled={role === "staff"}>
+        <select value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 160, flex: "1 1 160px" }} disabled={role === "staff"}>
           <option value="">All departments</option>
           {departments.map((value) => (
             <option key={value} value={value}>
@@ -186,7 +186,7 @@ export default function LoginDetails() {
             </option>
           ))}
         </select>
-        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, email, username..." style={{ padding: 8, width: 320 }} />
+        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, email, username..." style={{ padding: 8, minWidth: 220, flex: "2 1 260px", maxWidth: "100%", boxSizing: "border-box" }} />
         <button onClick={download} disabled={downloading}>{downloading ? "Downloading..." : "Download Excel (CSV)"}</button>
         <button onClick={downloadPdf} disabled={downloadingPdf}>{downloadingPdf ? "Downloading..." : "Download PDF"}</button>
       </div>
@@ -200,45 +200,47 @@ export default function LoginDetails() {
       {loading ? (
         <p>Loading login details...</p>
       ) : (
-        <table border="1" cellPadding="10" cellSpacing="0" width="100%">
-          <thead>
-            <tr>
-              <th>S/N</th>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Education Level</th>
-              <th>{role === "staff" ? "Teaching Classes" : "Class"}</th>
-              <th>{role === "staff" ? "Assigned Departments" : "Department"}</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Password</th>
-              <th>Last Password Set</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.user_id}>
-                <td>{row.sn ?? "-"}</td>
-                <td>{row.name || "-"}</td>
-                <td>{row.role || "-"}</td>
-                <td>{prettyLevel(row.level || "") || "-"}</td>
-                <td>{row.class_name || "-"}</td>
-                <td>{row.department || "-"}</td>
-                <td>{row.username || "-"}</td>
-                <td>{row.email || "-"}</td>
-                <td>{row.password || "-"}</td>
-                <td>{row.last_password_set_at || "-"}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
+        <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}>
+          <table border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", background: "#fff" }}>
+            <thead>
               <tr>
-                <td colSpan="10" style={{ textAlign: "center", opacity: 0.7 }}>
-                  No login details found.
-                </td>
+                <th>S/N</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Education Level</th>
+                <th>{role === "staff" ? "Teaching Classes" : "Class"}</th>
+                <th>{role === "staff" ? "Assigned Departments" : "Department"}</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Password</th>
+                <th>Last Password Set</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.user_id}>
+                  <td>{row.sn ?? "-"}</td>
+                  <td>{row.name || "-"}</td>
+                  <td>{row.role || "-"}</td>
+                  <td>{prettyLevel(row.level || "") || "-"}</td>
+                  <td>{row.class_name || "-"}</td>
+                  <td>{row.department || "-"}</td>
+                  <td>{row.username || "-"}</td>
+                  <td>{row.email || "-"}</td>
+                  <td>{row.password || "-"}</td>
+                  <td>{row.last_password_set_at || "-"}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: "center", opacity: 0.7 }}>
+                    No login details found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
