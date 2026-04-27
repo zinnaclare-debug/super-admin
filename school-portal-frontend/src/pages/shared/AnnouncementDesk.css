@@ -5,6 +5,10 @@
   --announce-gold: #f2b52a;
   --announce-coral: #d53b32;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 24px;
   padding: 20px;
   overflow: hidden;

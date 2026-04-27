@@ -1,10 +1,12 @@
 .feature-shell {
   min-height: 100%;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   padding: 16px;
   background: #f4f8ff;
   border-radius: 12px;
+  overflow: hidden;
 }
 
 .feature-shell__header {
@@ -44,11 +46,18 @@
 
 .feature-shell__content {
   margin-top: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.feature-shell__content > * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
   .feature-shell {
-    padding: 12px;
+    padding: 10px;
     border-radius: 10px;
   }
 

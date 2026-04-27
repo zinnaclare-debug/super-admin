@@ -1,6 +1,11 @@
 .cbx-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 24px;
   padding: 20px;
+  overflow: hidden;
   box-shadow: 0 24px 42px rgba(15, 23, 42, 0.22);
 }
 
@@ -146,6 +151,7 @@
   display: grid;
   gap: 10px;
   max-width: 640px;
+  min-width: 0;
 }
 
 .cbx-form--wide {
@@ -163,6 +169,9 @@
 }
 
 .cbx-field {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 9px 11px;
@@ -301,6 +310,10 @@
   .cbx-form-grid--security,
   .cbx-security-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cbx-btn {
+    width: 100%;
   }
 }
 

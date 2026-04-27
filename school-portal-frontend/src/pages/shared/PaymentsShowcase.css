@@ -1,6 +1,11 @@
 .payx-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 24px;
   padding: 20px;
+  overflow: hidden;
   box-shadow: 0 24px 42px rgba(15, 23, 42, 0.22);
 }
 
@@ -112,6 +117,9 @@
 
 .payx-panel {
   margin-top: 18px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 18px;
   background: rgba(248, 250, 252, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.62);
@@ -152,6 +160,8 @@
 }
 
 .payx-card {
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid #dbeafe;
   border-radius: 14px;
   background: #ffffff;
@@ -193,10 +203,13 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .payx-input,
 .payx-select {
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 9px 11px;
@@ -317,6 +330,13 @@
   .payx-row {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+
+  .payx-actions > *,
+  .payx-input,
+  .payx-select,
+  .payx-btn {
+    width: 100%;
   }
 
   .payx-hero-art {
