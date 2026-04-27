@@ -594,10 +594,15 @@
 
   .school-site-nav.is-menu-open .school-site-brand strong {
     color: #ffffff;
+    line-height: 1.15;
   }
 
   .school-site-nav.is-menu-open .school-site-brand-mark,
   .school-site-nav.is-menu-open .school-site-brand img {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    padding: 4px;
     border-color: rgba(255, 255, 255, 0.12);
     box-shadow: none;
   }
@@ -610,8 +615,12 @@
   .school-site-nav.is-menu-open .school-site-brand {
     width: auto;
     padding-right: 56px;
-    align-items: center;
-    min-height: 46px;
+    align-items: flex-start;
+    min-height: 40px;
+  }
+
+  .school-site-nav.is-menu-open .school-site-brand > div {
+    padding-top: 2px;
   }
 
   .school-site-links {
@@ -639,7 +648,7 @@
     align-items: stretch;
     justify-content: flex-start;
     gap: 12px;
-    padding: 18px 0 0;
+    padding: 10px 0 0;
     box-sizing: border-box;
     border: none;
     border-radius: 0;
