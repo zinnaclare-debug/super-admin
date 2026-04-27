@@ -23,24 +23,6 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
     loadProfile();
   }, [userId]);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    const handleEscape = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
   const toggleStatus = async () => {
     try {
       await api.patch(`/api/school-admin/users/${userId}/toggle`);
@@ -78,67 +60,43 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
 
   return (
     <div
-      onClick={onClose}
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        display: "grid",
-        placeItems: "center",
+        marginTop: 0,
+        border: "1px solid #ddd",
         padding: 16,
-        background: "rgba(15, 23, 42, 0.58)",
-        backdropFilter: "blur(4px)",
-        boxSizing: "border-box",
+        borderRadius: 8,
+        background: "#fff",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <div
-          onClick={(event) => event.stopPropagation()}
-          style={{
-            width: "min(560px, 100%)",
-            maxHeight: "min(88vh, 760px)",
-            overflowY: "auto",
-            border: "1px solid #dbeafe",
-            padding: 18,
-            borderRadius: 18,
-            background: "#fff",
-            boxShadow: "0 24px 48px rgba(15, 23, 42, 0.24)",
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <strong>User Profile</strong>
-            <button onClick={onClose}>Close</button>
-          </div>
-
-          {loading ? (
-            <p>Loading profile...</p>
-          ) : (
-            <>
-              <p><strong>Name:</strong> {user?.name}</p>
-              <p><strong>Email:</strong> {user?.email || "-"}</p>
-              <p><strong>Role:</strong> {user?.role}</p>
-              <p>
-                <strong>Status:</strong>{" "}
-                {user?.is_active ? "Active" : "Inactive"}
-              </p>
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={toggleStatus}>
-                  {user?.is_active ? "Disable User" : "Enable User"}
-                </button>
-                <button
-                  onClick={resetPassword}
-                  disabled={resettingPassword}
-                >
-                  {resettingPassword ? "Resetting..." : "Reset Password"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <strong>User Profile</strong>
+        <button onClick={onClose}>Close</button>
       </div>
+
+      {loading ? (
+        <p>Loading profile...</p>
+      ) : (
+        <>
+          <p><strong>Name:</strong> {user?.name}</p>
+          <p><strong>Email:</strong> {user?.email || "-"}</p>
+          <p><strong>Role:</strong> {user?.role}</p>
+          <p>
+            <strong>Status:</strong>{" "}
+            {user?.is_active ? "Active" : "Inactive"}
+          </p>
+
+          <button onClick={toggleStatus}>
+            {user?.is_active ? "Disable User" : "Enable User"}
+          </button>
+          <button
+            onClick={resetPassword}
+            style={{ marginLeft: 8 }}
+            disabled={resettingPassword}
+          >
+            {resettingPassword ? "Resetting..." : "Reset Password"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
-

@@ -326,43 +326,52 @@ export default function ActiveUsers() {
                 const departments = Array.isArray(u.departments) && u.departments.length > 0 ? u.departments : (u.department_name ? [u.department_name] : []);
 
                 return (
-                  <tr key={u.id}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleRow(u.id)} />
-                        <span>{u.sn ?? "-"}</span>
-                      </div>
-                    </td>
-                    <td>{u.name}</td>
-                    <td>{levels.length ? levels.join(", ") : "-"}</td>
-                    <td>{classes.length ? classes.join(", ") : "-"}</td>
-                    <td>{departments.length ? departments.join(", ") : "-"}</td>
-                    <td><strong>{u.status || "active"}</strong></td>
-                    <td>
-                      <button onClick={() => setSelectedUserId((current) => (current === u.id ? null : u.id))}>More</button>
-                      <button
-                        style={{ marginLeft: 8 }}
-                        onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/active`)}`)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        style={{ marginLeft: 8, background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
-                        onClick={() => removeUser(u)}
-                        disabled={deletingId === u.id}
-                      >
-                        {deletingId === u.id ? "Deleting..." : "Delete"}
-                      </button>
-                      {role === "student" ? (
-                        <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
-                          Set Payment
+                  <Fragment key={u.id}>
+                    <tr>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleRow(u.id)} />
+                          <span>{u.sn ?? "-"}</span>
+                        </div>
+                      </td>
+                      <td>{u.name}</td>
+                      <td>{levels.length ? levels.join(", ") : "-"}</td>
+                      <td>{classes.length ? classes.join(", ") : "-"}</td>
+                      <td>{departments.length ? departments.join(", ") : "-"}</td>
+                      <td><strong>{u.status || "active"}</strong></td>
+                      <td>
+                        <button onClick={() => setSelectedUserId((current) => (current === u.id ? null : u.id))}>More</button>
+                        <button
+                          style={{ marginLeft: 8 }}
+                          onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/active`)}`)}
+                        >
+                          Edit
                         </button>
-                      ) : null}
-                      <button style={{ marginLeft: 8 }} onClick={() => downloadIdCard(u)} disabled={downloadingIdCardId === u.id}>
-                        {downloadingIdCardId === u.id ? "Preparing ID..." : "ID"}
-                      </button>
-                    </td>
-                  </tr>
+                        <button
+                          style={{ marginLeft: 8, background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
+                          onClick={() => removeUser(u)}
+                          disabled={deletingId === u.id}
+                        >
+                          {deletingId === u.id ? "Deleting..." : "Delete"}
+                        </button>
+                        {role === "student" ? (
+                          <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
+                            Set Payment
+                          </button>
+                        ) : null}
+                        <button style={{ marginLeft: 8 }} onClick={() => downloadIdCard(u)} disabled={downloadingIdCardId === u.id}>
+                          {downloadingIdCardId === u.id ? "Preparing ID..." : "ID"}
+                        </button>
+                      </td>
+                    </tr>
+                    {selectedUserId === u.id && (
+                      <tr>
+                        <td colSpan="7" style={{ padding: "0 10px 12px", background: "#f8fafc" }}>
+                          <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} onChanged={load} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
 
@@ -387,12 +396,8 @@ export default function ActiveUsers() {
           </button>
         </div>
 
+        
       </div>
-      {selectedUserId ? (
-        <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} onChanged={load} />
-      ) : null}
     </div>
   );
 }
-
-
