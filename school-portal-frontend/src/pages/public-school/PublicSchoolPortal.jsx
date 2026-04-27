@@ -218,6 +218,7 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
   const [examHeadWarnings, setExamHeadWarnings] = useState(0);
   const [verifyResult, setVerifyResult] = useState(null);
   const [busyAction, setBusyAction] = useState("");
+  const [isPublicMenuOpen, setIsPublicMenuOpen] = useState(false);
   const [isCompactOverviewScreen, setIsCompactOverviewScreen] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 640 : false));
   const [expandedOverviewSections, setExpandedOverviewSections] = useState({});
   const securityRef = useRef(null);
@@ -260,6 +261,31 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
     if (!reference) return;
     verifyEntrancePayment(reference);
   }, [searchParams, page]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleResize = () => {
+      if (window.innerWidth > 820) {
+        setIsPublicMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    setIsPublicMenuOpen(false);
+  }, [page]);
+
+  useEffect(() => {
+    if (!isPublicMenuOpen || typeof document === "undefined") return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isPublicMenuOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -610,19 +636,40 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
             <strong>{school.name}</strong>
           </div>
         </div>
-        <nav className="school-site-links">
+        <button
+          type="button"
+          className={`school-site-menu-toggle${isPublicMenuOpen ? " is-open" : ""}`}
+          onClick={() => setIsPublicMenuOpen((current) => !current)}
+          aria-expanded={isPublicMenuOpen}
+          aria-label={isPublicMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <nav className={`school-site-links${isPublicMenuOpen ? " is-open" : ""}`}>
           {navItems.map((item) => (
             <NavLink
               key={item.key}
               to={item.href}
               end={item.key === "home"}
               className={({ isActive }) => (isActive ? "is-active" : "")}
+              onClick={() => setIsPublicMenuOpen(false)}
             >
               {item.label}
             </NavLink>
           ))}
         </nav>
       </header>
+      ) : null}
+
+      {!hideExamChrome && isPublicMenuOpen ? (
+        <button
+          type="button"
+          className="school-site-menu-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setIsPublicMenuOpen(false)}
+        />
       ) : null}
 
       {error ? <p className="school-site-state school-site-state--error">{error}</p> : null}

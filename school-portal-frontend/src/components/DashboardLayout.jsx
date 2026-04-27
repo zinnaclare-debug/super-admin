@@ -35,6 +35,7 @@ function DashboardLayout() {
     if (typeof window === "undefined") return false;
     return window.innerWidth <= 768;
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const onResize = () => {
@@ -44,6 +45,33 @@ function DashboardLayout() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen || typeof document === "undefined") return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isMobileMenuOpen]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen || typeof window === "undefined") return undefined;
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isMobileMenuOpen]);
 
   useEffect(() => {
     if (!user?.role) return;
@@ -136,6 +164,16 @@ function DashboardLayout() {
     navigate("/login", { replace: true });
   };
 
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  const composeNavClick = (handler) => () => {
+    if (typeof handler === "function") {
+      handler();
+    }
+    if (isMobile) {
+      closeMobileMenu();
+    }
+  };
+
   const generalFeatures = useMemo(
     () => features.filter((f) => f.enabled && f.category === "general"),
     [features]
@@ -200,18 +238,18 @@ function DashboardLayout() {
 
   const linkStyle = ({ isActive }) => ({
     display: "block",
-    padding: isMobile ? "10px 8px" : isCompactSidebar ? "8px 6px" : "10px 12px",
+    padding: isMobile ? "11px 12px" : isCompactSidebar ? "8px 6px" : "10px 12px",
     marginBottom: 6,
     borderRadius: 6,
     color: "#fff",
-    textAlign: isMobile || isCompactSidebar ? "center" : "left",
+    textAlign: isMobile ? "left" : isCompactSidebar ? "center" : "left",
     textDecoration: "none",
     background: isActive ? "#2563eb" : "transparent",
     whiteSpace: isMobile || isCompactSidebar ? "normal" : "nowrap",
     overflow: "hidden",
     textOverflow: isMobile || isCompactSidebar ? "clip" : "ellipsis",
-    fontSize: isMobile ? 12 : isCompactSidebar ? 11 : 13,
-    lineHeight: isMobile || isCompactSidebar ? 1.2 : 1.35,
+    fontSize: isMobile ? 13 : isCompactSidebar ? 11 : 13,
+    lineHeight: isMobile || isCompactSidebar ? 1.25 : 1.35,
     wordBreak: isMobile || isCompactSidebar ? "break-word" : "normal",
   });
 
@@ -264,6 +302,204 @@ function DashboardLayout() {
     }
   };
 
+  const sidebarContent = (
+    <>
+      {!isCompactSidebar || isMobile ? (
+        <>
+          <h3 style={{ margin: 0 }}>Welcome, {user?.name}</h3>
+          <p style={{ opacity: 0.8, marginTop: 6 }}>{roleLabel}</p>
+        </>
+      ) : (
+        <h3 style={{ margin: 0, textAlign: "center" }}>SP</h3>
+      )}
+
+      <nav style={{ marginTop: 12 }}>
+        {user?.role === "super_admin" && (
+          <>
+            <NavLink to="/super-admin/dashboard" title="Platform Dashboard" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "PLATFORM DASHBOARD" : "Platform Dashboard"}
+            </NavLink>
+            <NavLink to="/super-admin" title="Overview" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "OVERVIEW" : "Overview"}
+            </NavLink>
+            <NavLink to="/super-admin/schools" title="Schools" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "SCHOOLS" : "Schools"}
+            </NavLink>
+            <NavLink to="/super-admin/users" title="Users" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "USERS" : "Users"}
+            </NavLink>
+            <NavLink to="/super-admin/payments" title="Payments" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "PAYMENTS" : "Payments"}
+            </NavLink>
+          </>
+        )}
+
+        {user?.role === "school_admin" && (
+          <>
+            <NavLink to="/school/dashboard" title="Dashboard" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "DASHBOARD" : "Dashboard"}
+            </NavLink>
+            {schoolAdminPaymentsEnabled ? (
+              <NavLink to="/school/admin/payments" title="Payments" style={linkStyle} onClick={composeNavClick()}>
+                {isCompactSidebar && !isMobile ? "PAYMENTS" : "Payments"}
+              </NavLink>
+            ) : null}
+            {schoolAdminPromotionEnabled ? (
+              <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle} onClick={composeNavClick()}>
+                {isCompactSidebar && !isMobile ? "PROMOTION" : "Promotion"}
+              </NavLink>
+            ) : null}
+
+            {!isCompactSidebar && (
+              <div style={{ marginTop: 20 }}>
+                <strong style={{ fontSize: 13 }}>General Features</strong>
+                <ul style={{ marginTop: 10, paddingLeft: 16 }}>
+                  {generalFeatures.map((f) => (
+                    <li key={f.feature} style={{ fontSize: 13, opacity: 0.7 }}>
+                      {featureLabel(f.feature)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div style={{ marginTop: 20 }}>
+              <button
+                onClick={() => setShowAdminFeatures(!showAdminFeatures)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  background: "#374151",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  textAlign: isMobile ? "left" : "center",
+                }}
+              >
+                {isCompactSidebar && !isMobile ? "ADM" : "Admin Features"}
+              </button>
+
+              {showAdminFeatures &&
+                adminFeatures.map((f) => (
+                  <NavLink
+                    key={String(f.feature || "").trim()}
+                    to={adminFeaturePath(f.feature)}
+                    title={featureLabel(f.feature)}
+                    style={linkStyle}
+                    onClick={composeNavClick()}
+                  >
+                    {featureLabel(f.feature)}
+                  </NavLink>
+                ))}
+            </div>
+          </>
+        )}
+
+        {(user?.role === "staff" || user?.role === "student") && (
+          <>
+            <NavLink to={`/${user.role}/dashboard`} title="Dashboard" style={linkStyle} onClick={composeNavClick()}>
+              {isCompactSidebar && !isMobile ? "DASHBOARD" : "Dashboard"}
+            </NavLink>
+
+            {user?.role === "student" && studentSubjectsEnabled && (
+              <NavLink to="/student/subjects" title="Subjects" style={linkStyle} onClick={composeNavClick()}>
+                {isCompactSidebar && !isMobile ? "SUBJECTS" : "Subjects"}
+              </NavLink>
+            )}
+
+            <div style={{ marginTop: 20 }}>
+              {!isCompactSidebar && <strong style={{ fontSize: 13 }}>Features</strong>}
+              <ul style={{ marginTop: 10, paddingLeft: isCompactSidebar && !isMobile ? 0 : 16 }}>
+                {sidebarFeatures.map((f) => (
+                  <li key={f} style={{ fontSize: 13, opacity: 0.85 }}>
+                    {user?.role === "staff" &&
+                    (f === "attendance" || f === "behaviour rating") &&
+                    !canAccessClassTeacherFeatures ? (
+                      <span
+                        title="Class teacher only"
+                        style={{
+                          display: "block",
+                          padding: isCompactSidebar && !isMobile ? "10px 8px" : "10px 12px",
+                          marginBottom: 6,
+                          borderRadius: 6,
+                          color: "#9ca3af",
+                          cursor: "not-allowed",
+                          background: "transparent",
+                          textAlign: isCompactSidebar && !isMobile ? "center" : "left",
+                        }}
+                      >
+                        {isCompactSidebar && !isMobile ? featureLabel(f) : `${featureLabel(f)}${isMobile ? "" : " (CLASS TEACHER ONLY)"}`}
+                      </span>
+                    ) : (
+                      <NavLink
+                        title={featureLabel(f)}
+                        to={roleFeaturePath(user.role, f)}
+                        style={linkStyle}
+                        onClick={composeNavClick(isAnnouncementFeature(f) ? handleOpenAnnouncements : undefined)}
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>{featureLabel(f)}</span>
+                          {isAnnouncementFeature(f) && announcementUnreadCount > 0 ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                background: "#b91c1c",
+                                borderRadius: 999,
+                                padding: "1px 6px",
+                                fontSize: 10,
+                                color: "#fff",
+                                fontWeight: 700,
+                              }}
+                            >
+                              <span role="img" aria-label="new announcements">
+                                Ã°Å¸â€â€
+                              </span>
+                              {announcementUnreadCount}
+                            </span>
+                          ) : null}
+                        </span>
+                      </NavLink>
+                    )}
+                  </li>
+                ))}
+                {user?.role === "staff" && canAccessClassTeacherFeatures && classProgressEnabled ? (
+                  <li style={{ fontSize: 13, opacity: 0.85 }}>
+                    <NavLink to="/staff/class-progress" title="Class Progress" style={linkStyle} onClick={composeNavClick()}>
+                      {"CLASS PROGRESS"}
+                    </NavLink>
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={() => {
+            closeMobileMenu();
+            handleLogout();
+          }}
+          style={{
+            marginTop: 20,
+            width: "100%",
+            padding: 10,
+            borderRadius: 6,
+            border: "none",
+            background: "#dc2626",
+            color: "#fff",
+            textAlign: isMobile ? "left" : "center",
+            fontSize: 13,
+          }}
+        >
+          {isCompactSidebar && !isMobile ? "OUT" : "Logout"}
+        </button>
+      </nav>
+    </>
+  );
+
   return (
     <div
       style={{
@@ -274,14 +510,111 @@ function DashboardLayout() {
         overflowX: "hidden",
       }}
     >
+      {isMobile ? (
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "12px 14px",
+              background: "#1f2937",
+              color: "#fff",
+              position: "sticky",
+              top: 0,
+              zIndex: 30,
+              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.18)",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ display: "block", fontSize: 15 }}>{roleLabel || "School Portal"}</strong>
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 2,
+                  opacity: 0.8,
+                  fontSize: 12,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user?.name || "Menu"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              aria-expanded={isMobileMenuOpen}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: isMobileMenuOpen ? "#2563eb" : "rgba(255,255,255,0.08)",
+                color: "#fff",
+                fontSize: 22,
+                lineHeight: 1,
+                cursor: "pointer",
+              }}
+            >
+              {isMobileMenuOpen ? "×" : "☰"}
+            </button>
+          </div>
+
+          {isMobileMenuOpen ? (
+            <button
+              type="button"
+              aria-label="Close menu overlay"
+              onClick={closeMobileMenu}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 34,
+                border: "none",
+                background: "rgba(15, 23, 42, 0.42)",
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+              }}
+            />
+          ) : null}
+
+          <aside
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: "min(82vw, 320px)",
+              background: "#1f2937",
+              color: "#fff",
+              padding: "18px 12px 20px",
+              overflowY: "auto",
+              overflowX: "hidden",
+              transform: isMobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+              transition: "transform 0.22s ease",
+              zIndex: 35,
+              boxShadow: "18px 0 32px rgba(15, 23, 42, 0.22)",
+            }}
+          >
+            {sidebarContent}
+          </aside>
+        </>
+      ) : null}
+
+      {!isMobile ? (
       <aside
         style={{
-          width: isMobile ? "100%" : compactSidebarWidth,
-          maxWidth: isMobile ? "100%" : compactSidebarWidth,
-          minHeight: isMobile ? "auto" : "100vh",
+          width: compactSidebarWidth,
+          maxWidth: compactSidebarWidth,
+          minHeight: "100vh",
           background: "#1f2937",
           color: "#fff",
-          padding: isMobile ? "14px 10px" : isCompactSidebar ? "16px 8px" : 20,
+          padding: isCompactSidebar ? "16px 8px" : 20,
           overflowY: "auto",
           overflowX: "hidden",
           flexShrink: 0,
@@ -483,6 +816,7 @@ function DashboardLayout() {
           </button>
         </nav>
       </aside>
+      ) : null}
 
       <main
         style={{

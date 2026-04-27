@@ -69,6 +69,55 @@
   flex-wrap: wrap;
 }
 
+.school-site-menu-toggle {
+  display: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #ffffff;
+  color: var(--school-primary);
+  padding: 0;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.school-site-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.school-site-menu-toggle.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.school-site-menu-toggle.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.school-site-menu-toggle.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.school-site-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: rgba(15, 23, 42, 0.38);
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
 .school-site-links a {
   text-decoration: none;
   color: #0f172a;
@@ -508,23 +557,53 @@
 }
 
 @media (max-width: 820px) {
-  .school-site-nav,
   .school-site-hero {
     grid-template-columns: 1fr;
     display: grid;
   }
 
   .school-site-nav {
-    justify-content: stretch;
+    position: relative;
+    justify-content: space-between;
     padding: 18px;
   }
 
   .school-site-brand {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .school-site-links {
-    justify-content: flex-start;
+    display: none;
+  }
+
+  .school-site-menu-toggle {
+    display: inline-flex;
+    position: relative;
+    z-index: 46;
+  }
+
+  .school-site-links.is-open {
+    position: fixed;
+    top: 88px;
+    left: 16px;
+    right: 16px;
+    z-index: 45;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 22px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: #ffffff;
+    box-shadow: 0 24px 44px rgba(15, 23, 42, 0.16);
+  }
+
+  .school-site-links.is-open a {
+    width: 100%;
+    text-align: left;
+    border-radius: 14px;
   }
 
   .school-site-contact-row {
