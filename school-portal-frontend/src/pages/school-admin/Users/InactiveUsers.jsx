@@ -255,26 +255,28 @@ export default function InactiveUsers() {
 
   const pageStart = meta.total === 0 ? 0 : (meta.current_page - 1) * meta.per_page + 1;
   const pageEnd = meta.total === 0 ? 0 : pageStart + rows.length - 1;
+  const filterControlStyle = { padding: 8, minWidth: 170, flex: "1 1 170px", maxWidth: "100%", boxSizing: "border-box" };
+  const searchStyle = { padding: 8, width: 320, minWidth: 220, flex: "2 1 260px", maxWidth: "100%", boxSizing: "border-box" };
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h4 style={{ margin: 0 }}>Inactive {role === "staff" ? "Staff" : "Students"}</h4>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 560px", width: "100%" }}>
+          <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={filterControlStyle}>
             <option value="">All Levels</option>
             {levelOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
+          <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }} style={filterControlStyle}>
             <option value="">All Classes</option>
             {classOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <select value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} style={{ padding: 8, minWidth: 170 }}>
+          <select value={departmentFilter} onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} style={filterControlStyle}>
             <option value="">All Departments</option>
             {departmentOptions.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, email, username..." style={{ padding: 8, width: 320 }} />
+          <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, email, username..." style={searchStyle} />
         </div>
       </div>
 
@@ -301,89 +303,91 @@ export default function InactiveUsers() {
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <table border="1" cellPadding="10" cellSpacing="0" width="100%">
-            <thead>
-              <tr>
-                <th>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
-                    <span>S/N</span>
-                  </div>
-                </th>
-                <th>Name</th>
-                <th>Level</th>
-                <th>Class</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
+          <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", background: "#fff" }}>
+              <thead>
+                <tr>
+                  <th>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
+                      <span>S/N</span>
+                    </div>
+                  </th>
+                  <th>Name</th>
+                  <th>Level</th>
+                  <th>Class</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {rows.map((u) => {
-                const levels = Array.isArray(u.levels) && u.levels.length > 0 ? u.levels : (u.education_level ? [u.education_level] : []);
-                const classes = Array.isArray(u.classes) && u.classes.length > 0 ? u.classes : (u.class_name ? [u.class_name] : []);
-                const departments = Array.isArray(u.departments) && u.departments.length > 0 ? u.departments : (u.department_name ? [u.department_name] : []);
+              <tbody>
+                {rows.map((u) => {
+                  const levels = Array.isArray(u.levels) && u.levels.length > 0 ? u.levels : (u.education_level ? [u.education_level] : []);
+                  const classes = Array.isArray(u.classes) && u.classes.length > 0 ? u.classes : (u.class_name ? [u.class_name] : []);
+                  const departments = Array.isArray(u.departments) && u.departments.length > 0 ? u.departments : (u.department_name ? [u.department_name] : []);
 
-                return (
-                  <Fragment key={u.id}>
-                    <tr>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleRow(u.id)} />
-                          <span>{u.sn ?? "-"}</span>
-                        </div>
-                      </td>
-                      <td>{u.name}</td>
-                      <td>{levels.length ? levels.join(", ") : "-"}</td>
-                      <td>{classes.length ? classes.join(", ") : "-"}</td>
-                      <td>{departments.length ? departments.join(", ") : "-"}</td>
-                      <td><strong>{u.status || "inactive"}</strong></td>
-                      <td>
-                        <button onClick={() => setSelectedUserId((current) => (current === u.id ? null : u.id))}>More</button>
-                        <button
-                          style={{ marginLeft: 8 }}
-                          onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/inactive`)}`)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          style={{ marginLeft: 8, background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
-                          onClick={() => removeUser(u)}
-                          disabled={deletingId === u.id}
-                        >
-                          {deletingId === u.id ? "Deleting..." : "Delete"}
-                        </button>
-                        {role === "student" ? (
-                          <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
-                            Set Payment
-                          </button>
-                        ) : null}
-                        <button style={{ marginLeft: 8 }} onClick={() => downloadIdCard(u)} disabled={downloadingIdCardId === u.id}>
-                          {downloadingIdCardId === u.id ? "Preparing ID..." : "ID"}
-                        </button>
-                      </td>
-                    </tr>
-                    {selectedUserId === u.id && (
+                  return (
+                    <Fragment key={u.id}>
                       <tr>
-                        <td colSpan="7" style={{ padding: "0 10px 12px", background: "#f8fafc" }}>
-                          <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} onChanged={load} />
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleRow(u.id)} />
+                            <span>{u.sn ?? "-"}</span>
+                          </div>
+                        </td>
+                        <td>{u.name}</td>
+                        <td>{levels.length ? levels.join(", ") : "-"}</td>
+                        <td>{classes.length ? classes.join(", ") : "-"}</td>
+                        <td>{departments.length ? departments.join(", ") : "-"}</td>
+                        <td><strong>{u.status || "inactive"}</strong></td>
+                        <td>
+                          <button onClick={() => setSelectedUserId((current) => (current === u.id ? null : u.id))}>More</button>
+                          <button
+                            style={{ marginLeft: 8 }}
+                            onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/inactive`)}`)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            style={{ marginLeft: 8, background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
+                            onClick={() => removeUser(u)}
+                            disabled={deletingId === u.id}
+                          >
+                            {deletingId === u.id ? "Deleting..." : "Delete"}
+                          </button>
+                          {role === "student" ? (
+                            <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
+                              Set Payment
+                            </button>
+                          ) : null}
+                          <button style={{ marginLeft: 8 }} onClick={() => downloadIdCard(u)} disabled={downloadingIdCardId === u.id}>
+                            {downloadingIdCardId === u.id ? "Preparing ID..." : "ID"}
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
+                      {selectedUserId === u.id && (
+                        <tr>
+                          <td colSpan="7" style={{ padding: "0 10px 12px", background: "#f8fafc" }}>
+                            <UserProfilePanel userId={selectedUserId} onClose={() => setSelectedUserId(null)} onChanged={load} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
 
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
-                    No users found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
+                      No users found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
         <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

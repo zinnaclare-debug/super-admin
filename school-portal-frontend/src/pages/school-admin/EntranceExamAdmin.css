@@ -270,11 +270,14 @@
 }
 
 .payx-table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .payx-table {
-  min-width: 720px;
+  min-width: 900px;
 }
 
 .payx-table select {
@@ -334,7 +337,7 @@
   }
 
   .payx-table {
-    min-width: 600px;
+    min-width: 900px;
   }
 }
 
