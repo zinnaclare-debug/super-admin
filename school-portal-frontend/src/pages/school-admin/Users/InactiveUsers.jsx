@@ -259,7 +259,7 @@ export default function InactiveUsers() {
   const searchStyle = { padding: 8, width: 320, minWidth: 220, flex: "2 1 260px", maxWidth: "100%", boxSizing: "border-box" };
 
   return (
-    <div>
+    <div style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h4 style={{ margin: 0 }}>Inactive {role === "staff" ? "Staff" : "Students"}</h4>
 
