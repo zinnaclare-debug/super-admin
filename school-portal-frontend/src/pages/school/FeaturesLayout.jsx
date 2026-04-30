@@ -24,8 +24,8 @@ function FeaturesLayout() {
   }, {});
 
   return (
-    <div style={{ display: "flex", gap: 24 }}>
-      <aside style={{ width: 260 }}>
+    <div style={{ display: "flex", gap: 24, flexWrap: "wrap", width: "100%", minWidth: 0 }}>
+      <aside style={{ width: 260, maxWidth: "100%", flex: "1 1 220px" }}>
         {Object.entries(grouped).map(([group, features]) => (
           <div key={group} style={{ marginBottom: 20 }}>
             <h4 style={{ textTransform: "capitalize" }}>{group}</h4>
@@ -50,7 +50,7 @@ function FeaturesLayout() {
         ))}
       </aside>
 
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: "999 1 420px", minWidth: 0, maxWidth: "100%" }}>
         <Outlet />
       </main>
     </div>

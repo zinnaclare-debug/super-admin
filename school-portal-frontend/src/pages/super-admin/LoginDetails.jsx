@@ -93,42 +93,43 @@ export default function SuperAdminLoginDetails() {
         {loading ? (
           <p>Loading login details...</p>
         ) : (
-          <table border="1" cellPadding="10" cellSpacing="0" width="100%">
-            <thead>
-              <tr>
-                <th>S/N</th>
-                <th>School</th>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Password</th>
-                <th>Last Password Set</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row, idx) => (
-                <tr key={row.user_id}>
-                  <td>{idx + 1}</td>
-                  <td>{row.school_name || "-"}</td>
-                  <td>{row.name || "-"}</td>
-                  <td>{row.username || "-"}</td>
-                  <td>{row.email || "-"}</td>
-                  <td>{row.password || "-"}</td>
-                  <td>{row.last_password_set_at || "-"}</td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
+          <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ minWidth: 900 }}>
+              <thead>
                 <tr>
-                  <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
-                    No login details found.
-                  </td>
+                  <th>S/N</th>
+                  <th>School</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Password</th>
+                  <th>Last Password Set</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((row, idx) => (
+                  <tr key={row.user_id}>
+                    <td>{idx + 1}</td>
+                    <td>{row.school_name || "-"}</td>
+                    <td>{row.name || "-"}</td>
+                    <td>{row.username || "-"}</td>
+                    <td>{row.email || "-"}</td>
+                    <td>{row.password || "-"}</td>
+                    <td>{row.last_password_set_at || "-"}</td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: "center", opacity: 0.7 }}>
+                      No login details found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
   );
 }
-

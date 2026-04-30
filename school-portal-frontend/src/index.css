@@ -79,6 +79,7 @@ button {
 table {
   width: 100%;
   border-collapse: collapse;
+  max-width: 100%;
 }
 
 button {
@@ -120,8 +121,9 @@ button:focus-visible {
 
   table {
     display: block;
-    width: fit-content;
+    width: 100%;
     max-width: 100%;
+    min-width: max-content;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;

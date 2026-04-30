@@ -22,29 +22,31 @@ function SchoolFeatures() {
     <div>
       <h2>General Features</h2>
 
-      <table border="1" cellPadding="10" width="100%">
-        <thead>
-          <tr>
-            <th>S/N</th>
-            <th>Feature</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {generalFeatures.map((f, i) => (
-            <tr key={f.key}>
-              <td>{i + 1}</td>
-              <td>{f.label}</td>
-              <td>
-                <strong>
-                  {isEnabled(f.key) ? "Enabled" : "Disabled"}
-                </strong>
-              </td>
+      <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table border="1" cellPadding="10" width="100%" style={{ minWidth: 520 }}>
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Feature</th>
+              <th>Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {generalFeatures.map((f, i) => (
+              <tr key={f.key}>
+                <td>{i + 1}</td>
+                <td>{f.label}</td>
+                <td>
+                  <strong>
+                    {isEnabled(f.key) ? "Enabled" : "Disabled"}
+                  </strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

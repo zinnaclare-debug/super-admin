@@ -826,7 +826,7 @@ function DashboardLayout() {
           maxWidth: "100%",
           boxSizing: "border-box",
           padding: isMobile ? "12px 10px" : isCompactSidebar ? "10px 8px 10px 10px" : 30,
-          overflowX: "auto",
+          overflowX: "hidden",
         }}
       >
         <Outlet />

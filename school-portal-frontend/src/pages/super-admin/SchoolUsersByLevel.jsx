@@ -81,29 +81,31 @@ function SchoolUsersByLevel() {
         {loading ? (
           <p>Loading students...</p>
         ) : (
-          <table border="1" cellPadding="10" width="100%">
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>S/N</th>
-                <th>Name</th>
-                <th>Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((st, idx) => (
-                <tr key={st.student_id}>
-                  <td>{idx + 1}</td>
-                  <td>{st.name}</td>
-                  <td>{st.level}</td>
-                </tr>
-              ))}
-              {students.length === 0 ? (
+          <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table border="1" cellPadding="10" width="100%" style={{ minWidth: 540 }}>
+              <thead>
                 <tr>
-                  <td colSpan="3">No students found for this selection.</td>
+                  <th style={{ width: 70 }}>S/N</th>
+                  <th>Name</th>
+                  <th>Level</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {students.map((st, idx) => (
+                  <tr key={st.student_id}>
+                    <td>{idx + 1}</td>
+                    <td>{st.name}</td>
+                    <td>{st.level}</td>
+                  </tr>
+                ))}
+                {students.length === 0 ? (
+                  <tr>
+                    <td colSpan="3">No students found for this selection.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

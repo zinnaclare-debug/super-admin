@@ -134,8 +134,8 @@ export default function StudentPaymentSetup() {
         </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <table border="1" cellPadding="8" cellSpacing="0" width="100%">
+      <div style={{ marginTop: 14, width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table border="1" cellPadding="8" cellSpacing="0" width="100%" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th style={{ width: 80 }}>No.</th>

@@ -47,41 +47,43 @@ export default function FeatureTable({
         </button>
       </div>
 
-      <table border="1" cellPadding="10" width="100%">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            {showDescription && <th>Description</th>}
-            {hasCategory && <th>Category</th>}
-            <th>Status</th>
-            {!readOnly ? <th>Action</th> : null}
-          </tr>
-        </thead>
-
-        <tbody>
-          {sorted.map((f) => (
-            <tr key={f.feature}>
-              <td>{labelMap[f.feature] || f.feature}</td>
-              {showDescription && <td>{f.description || ""}</td>}
-              {hasCategory && (
-                <td style={{ textTransform: "capitalize" }}>
-                  {f.category || ""}
-                </td>
-              )}
-              <td>
-                <strong>{f.enabled ? "Enabled" : "Disabled"}</strong>
-              </td>
-              {!readOnly ? (
-                <td>
-                  <button onClick={() => onToggle(f.feature, !f.enabled)}>
-                    {f.enabled ? "Disable" : "Enable"}
-                  </button>
-                </td>
-              ) : null}
+      <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table border="1" cellPadding="10" width="100%" style={{ minWidth: showDescription ? 760 : 560 }}>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              {showDescription && <th>Description</th>}
+              {hasCategory && <th>Category</th>}
+              <th>Status</th>
+              {!readOnly ? <th>Action</th> : null}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {sorted.map((f) => (
+              <tr key={f.feature}>
+                <td>{labelMap[f.feature] || f.feature}</td>
+                {showDescription && <td>{f.description || ""}</td>}
+                {hasCategory && (
+                  <td style={{ textTransform: "capitalize" }}>
+                    {f.category || ""}
+                  </td>
+                )}
+                <td>
+                  <strong>{f.enabled ? "Enabled" : "Disabled"}</strong>
+                </td>
+                {!readOnly ? (
+                  <td>
+                    <button onClick={() => onToggle(f.feature, !f.enabled)}>
+                      {f.enabled ? "Disable" : "Enable"}
+                    </button>
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
