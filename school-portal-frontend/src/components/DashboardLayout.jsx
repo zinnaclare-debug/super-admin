@@ -234,6 +234,8 @@ function DashboardLayout() {
     }
   }, [user]);
 
+  const sidebarRoleLabel = user?.role === "super_admin" ? "Lyte Bridge" : roleLabel;
+
   const compactSidebarWidth = isCompactSidebar ? 118 : 240;
 
   const linkStyle = ({ isActive }) => ({
@@ -307,7 +309,7 @@ function DashboardLayout() {
       {!isCompactSidebar || isMobile ? (
         <>
           <h3 style={{ margin: 0 }}>Welcome, {user?.name}</h3>
-          <p style={{ opacity: 0.8, marginTop: 6 }}>{roleLabel}</p>
+          <p style={{ opacity: 0.8, marginTop: 6 }}>{sidebarRoleLabel}</p>
         </>
       ) : (
         <h3 style={{ margin: 0, textAlign: "center" }}>SP</h3>
@@ -623,7 +625,7 @@ function DashboardLayout() {
         {!isCompactSidebar || isMobile ? (
           <>
             <h3 style={{ margin: 0 }}>Welcome, {user?.name}</h3>
-            <p style={{ opacity: 0.8, marginTop: 6 }}>{roleLabel}</p>
+            <p style={{ opacity: 0.8, marginTop: 6 }}>{sidebarRoleLabel}</p>
           </>
         ) : (
           <h3 style={{ margin: 0, textAlign: "center" }}>SP</h3>
