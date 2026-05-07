@@ -36,11 +36,12 @@ const readStoredFilters = (role, status) => {
   }
 };
 
-export default function ActiveUsers() {
+export default function ActiveUsers({ status = "active" }) {
   const { role } = useParams();
   const navigate = useNavigate();
-  const storageKey = filterStorageKey(role, "active");
-  const storedFilters = readStoredFilters(role, "active");
+  const isGraduated = status === "graduated";
+  const storageKey = filterStorageKey(role, status);
+  const storedFilters = readStoredFilters(role, status);
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState({
     levels: [],
@@ -65,7 +66,7 @@ export default function ActiveUsers() {
   const [downloadingIdCardId, setDownloadingIdCardId] = useState(null);
 
   useEffect(() => {
-    const nextFilters = readStoredFilters(role, "active");
+    const nextFilters = readStoredFilters(role, status);
     setQ(nextFilters.q);
     setLevelFilter(nextFilters.levelFilter);
     setClassFilter(nextFilters.classFilter);
@@ -73,7 +74,7 @@ export default function ActiveUsers() {
     setPage(nextFilters.page);
     setSelectedIds(new Set());
     setSelectedUserId(null);
-  }, [role]);
+  }, [role, status]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,7 +87,7 @@ export default function ActiveUsers() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { role, status: "active", page, per_page: PAGE_SIZE };
+      const params = { role, status, page, per_page: PAGE_SIZE };
       if (q) params.q = q;
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
@@ -116,7 +117,7 @@ export default function ActiveUsers() {
     } finally {
       setLoading(false);
     }
-  }, [classFilter, departmentFilter, levelFilter, page, q, role]);
+  }, [classFilter, departmentFilter, levelFilter, page, q, role, status]);
 
   useEffect(() => {
     load();
@@ -174,7 +175,7 @@ export default function ActiveUsers() {
   const downloadUsersPdf = async () => {
     setDownloadingPdf(true);
     try {
-      const params = { status: "active", role };
+      const params = { status, role };
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
       if (departmentFilter) params.department = departmentFilter;
@@ -189,7 +190,7 @@ export default function ActiveUsers() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = parseFileName(res.headers, `users_${role || "all"}_active.pdf`);
+      link.download = parseFileName(res.headers, `users_${role || "all"}_${status}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -261,7 +262,9 @@ export default function ActiveUsers() {
   return (
     <div style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h4 style={{ margin: 0 }}>Active {role === "staff" ? "Staff" : "Students"}</h4>
+        <h4 style={{ margin: 0 }}>
+          {isGraduated ? "Graduated Students" : `Active ${role === "staff" ? "Staff" : "Students"}`}
+        </h4>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 560px", width: "100%" }}>
           <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={filterControlStyle}>
@@ -341,12 +344,12 @@ export default function ActiveUsers() {
                         <td>{levels.length ? levels.join(", ") : "-"}</td>
                         <td>{classes.length ? classes.join(", ") : "-"}</td>
                         <td>{departments.length ? departments.join(", ") : "-"}</td>
-                        <td><strong>{u.status || "active"}</strong></td>
+                        <td><strong>{u.status || status}</strong></td>
                         <td>
                           <button onClick={() => setSelectedUserId((current) => (current === u.id ? null : u.id))}>More</button>
                           <button
                             style={{ marginLeft: 8 }}
-                            onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/active`)}`)}
+                            onClick={() => navigate(`/school/admin/register?editUserId=${u.id}&role=${u.role}&returnTo=${encodeURIComponent(`/school/admin/users/${role}/${status}`)}`)}
                           >
                             Edit
                           </button>
@@ -357,7 +360,7 @@ export default function ActiveUsers() {
                           >
                             {deletingId === u.id ? "Deleting..." : "Delete"}
                           </button>
-                          {role === "student" ? (
+                          {role === "student" && !isGraduated ? (
                             <button style={{ marginLeft: 8 }} onClick={() => navigate(`/school/admin/students/${u.id}/set-payment`)}>
                               Set Payment
                             </button>

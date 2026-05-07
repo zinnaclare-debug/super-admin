@@ -8,8 +8,10 @@ use App\Models\ClassDepartment;
 use App\Models\LevelDepartment;
 use App\Models\School;
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Term;
 use App\Models\TermSubject;
+use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use Illuminate\Http\Request;
@@ -103,6 +105,7 @@ class AcademicSessionController extends Controller
 
             $this->copyPreviousSessionTeacherAssignments($schoolId, (int) $session->id);
             $this->copyPreviousSessionSubjectMappings($schoolId, (int) $session->id);
+            $this->graduateStudentsWithoutNextClass($schoolId, (int) $session->id, $classTemplates);
 
             return response()->json(['data' => $session], 201);
         });
@@ -511,6 +514,198 @@ class AcademicSessionController extends Controller
                 TermSubject::updateOrCreate($where, $values);
             }
         }
+    }
+
+    private function graduateStudentsWithoutNextClass(int $schoolId, int $newSessionId, array $classTemplates): void
+    {
+        if (!Schema::hasColumn('students', 'status')) {
+            return;
+        }
+
+        $previousSession = $this->resolveSourceSessionForCarryOver($schoolId, $newSessionId);
+        if (!$previousSession) {
+            return;
+        }
+
+        $sourceClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $previousSession->id)
+            ->get(['id', 'level', 'name']);
+
+        $targetClasses = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $newSessionId)
+            ->get(['id', 'level', 'name']);
+
+        if ($sourceClasses->isEmpty() || $targetClasses->isEmpty()) {
+            return;
+        }
+
+        $graduatingClassIds = $sourceClasses
+            ->filter(fn (SchoolClass $class) => $this->resolveNextClassForGraduationCheck($schoolId, $class, $targetClasses, $classTemplates) === null)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($graduatingClassIds)) {
+            return;
+        }
+
+        $studentIds = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $previousSession->id)
+            ->whereIn('class_id', $graduatingClassIds)
+            ->pluck('student_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($studentIds)) {
+            return;
+        }
+
+        $userIds = Student::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('id', $studentIds)
+            ->where(function ($query) {
+                $query->whereNull('status')->orWhere('status', '!=', 'graduated');
+            })
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        Student::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('id', $studentIds)
+            ->update([
+                'status' => 'graduated',
+                'graduated_at' => now(),
+                'graduation_session_id' => (int) $previousSession->id,
+                'updated_at' => now(),
+            ]);
+
+        if (!empty($userIds)) {
+            User::query()
+                ->where('school_id', $schoolId)
+                ->whereIn('id', $userIds)
+                ->where('role', 'student')
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => now(),
+                ]);
+        }
+    }
+
+    private function resolveNextClassForGraduationCheck(int $schoolId, SchoolClass $sourceClass, $targetClasses, array $classTemplates): ?SchoolClass
+    {
+        $templateMapped = $this->resolveNextClassUsingTemplatesForGraduation($sourceClass, $targetClasses, $classTemplates);
+        if ($templateMapped) {
+            return $templateMapped;
+        }
+
+        $sourceRank = $this->classProgressionRank((string) $sourceClass->name, (string) $sourceClass->level);
+        $targetRank = $this->nextClassProgressionRank($sourceRank);
+        if ($targetRank === null) {
+            return null;
+        }
+
+        return $targetClasses->first(function (SchoolClass $class) use ($targetRank) {
+            return $this->classProgressionRank((string) $class->name, (string) $class->level) === $targetRank;
+        });
+    }
+
+    private function resolveNextClassUsingTemplatesForGraduation(SchoolClass $sourceClass, $targetClasses, array $classTemplates): ?SchoolClass
+    {
+        $sections = ClassTemplateSchema::activeSections($classTemplates);
+        $sequence = [];
+
+        foreach ($sections as $section) {
+            $level = strtolower(trim((string) ($section['key'] ?? '')));
+            if ($level === '') {
+                continue;
+            }
+
+            foreach (ClassTemplateSchema::activeClassNames($section) as $className) {
+                $sequence[] = [
+                    'level' => $level,
+                    'name' => strtolower(trim((string) $className)),
+                ];
+            }
+        }
+
+        if (count($sequence) < 2) {
+            return null;
+        }
+
+        $sourceLevel = strtolower(trim((string) $sourceClass->level));
+        $sourceName = strtolower(trim((string) $sourceClass->name));
+        $sourceIndex = collect($sequence)
+            ->search(fn ($item) => $item['level'] === $sourceLevel && $item['name'] === $sourceName);
+
+        if ($sourceIndex === false || !isset($sequence[(int) $sourceIndex + 1])) {
+            return null;
+        }
+
+        $nextSpec = $sequence[(int) $sourceIndex + 1];
+        $exact = $targetClasses->first(function (SchoolClass $class) use ($nextSpec) {
+            return strtolower(trim((string) $class->level)) === $nextSpec['level']
+                && strtolower(trim((string) $class->name)) === $nextSpec['name'];
+        });
+
+        if ($exact) {
+            return $exact;
+        }
+
+        return $targetClasses
+            ->filter(fn (SchoolClass $class) => strtolower(trim((string) $class->level)) === $nextSpec['level'])
+            ->sortBy('id')
+            ->first();
+    }
+
+    private function classProgressionRank(string $className, string $classLevel = ''): ?int
+    {
+        $name = strtolower(trim($className));
+        $level = strtolower(trim($classLevel));
+
+        if (preg_match('/(?:nursery|kg)\D*(\d+)/i', $name, $m)) {
+            return 10 + (int) $m[1];
+        }
+        if (preg_match('/(?:primary|pry|basic)\D*(\d+)/i', $name, $m)) {
+            return 20 + (int) $m[1];
+        }
+        if (preg_match('/(?:^|\b)(?:js|jss|junior\s*secondary)\D*(\d+)/i', $name, $m)) {
+            return 30 + (int) $m[1];
+        }
+        if (preg_match('/(?:^|\b)(?:ss|sss|senior\s*secondary)\D*(\d+)/i', $name, $m)) {
+            return 40 + (int) $m[1];
+        }
+        if (preg_match('/grade\D*(\d+)/i', $name, $m)) {
+            return 20 + (int) $m[1];
+        }
+
+        return null;
+    }
+
+    private function nextClassProgressionRank(?int $currentRank): ?int
+    {
+        if ($currentRank === null) {
+            return null;
+        }
+
+        return match (true) {
+            $currentRank >= 11 && $currentRank < 13 => $currentRank + 1,
+            $currentRank === 13 => 21,
+            $currentRank >= 21 && $currentRank < 26 => $currentRank + 1,
+            $currentRank === 26 => 31,
+            $currentRank >= 31 && $currentRank < 33 => $currentRank + 1,
+            $currentRank === 33 => 41,
+            $currentRank >= 41 && $currentRank < 43 => $currentRank + 1,
+            default => null,
+        };
     }
 }
 

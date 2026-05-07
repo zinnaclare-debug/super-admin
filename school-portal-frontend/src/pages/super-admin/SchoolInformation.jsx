@@ -130,6 +130,10 @@ export default function SchoolInformation() {
   const [savingExamRecord, setSavingExamRecord] = useState(false);
   const [savingGradingSchema, setSavingGradingSchema] = useState(false);
   const [savingClassTemplates, setSavingClassTemplates] = useState(false);
+  const [importingHistory, setImportingHistory] = useState(false);
+  const [historyFile, setHistoryFile] = useState(null);
+  const [makeLatestSessionCurrent, setMakeLatestSessionCurrent] = useState(false);
+  const [historyImportResult, setHistoryImportResult] = useState(null);
 
   const [school, setSchool] = useState(null);
   const [branding, setBranding] = useState({
@@ -156,6 +160,7 @@ export default function SchoolInformation() {
 
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
+  const historyInputRef = useRef(null);
 
   const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
   const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows([]));
@@ -602,6 +607,78 @@ export default function SchoolInformation() {
     }
   };
 
+  const downloadHistoryTemplate = async () => {
+    try {
+      const res = await api.get(`/api/super-admin/schools/${schoolId}/information/history-import/template`, {
+        responseType: "blob",
+      });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${school?.name || "school"}-history-import-template.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download history import template.");
+    }
+  };
+
+  const pickHistoryFile = (event) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+
+    if (!file) return;
+
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith(".csv") && !lowerName.endsWith(".txt")) {
+      alert("Upload a CSV file. You can save Excel broadsheets as CSV before importing.");
+      return;
+    }
+
+    setHistoryFile(file);
+    setHistoryImportResult(null);
+  };
+
+  const importSchoolHistory = async () => {
+    if (!historyFile) {
+      alert("Select the school history CSV file first.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Import this school history now? This will create/update sessions, classes, students, subjects, scores, and student graduation status."
+      )
+    ) {
+      return;
+    }
+
+    setImportingHistory(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", historyFile);
+      fd.append("make_latest_session_current", makeLatestSessionCurrent ? "1" : "0");
+
+      const res = await api.post(`/api/super-admin/schools/${schoolId}/information/history-import`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setHistoryImportResult(res.data?.data || null);
+      setHistoryFile(null);
+      alert(res.data?.message || "School history imported successfully.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to import school history.");
+    } finally {
+      setImportingHistory(false);
+    }
+  };
+
   if (loading) {
     return <p>Loading school information...</p>;
   }
@@ -935,6 +1012,82 @@ export default function SchoolInformation() {
             {savingClassTemplates ? "Saving..." : "Save Class Templates"}
           </button>
         </div>
+      </section>
+
+      <section className="sai-card sai-history-card">
+        <div className="sai-section-head">
+          <div>
+            <h3>Past Student History Import</h3>
+            <p className="sai-note">
+              Upload an Excel-compatible CSV broadsheet to migrate old sessions, classes, students, subjects,
+              results, and graduation status into this school.
+            </p>
+          </div>
+          <button type="button" onClick={downloadHistoryTemplate}>
+            Download CSV Template
+          </button>
+        </div>
+
+        <div className="sai-history-guide">
+          <span>Required: session, term, class, student_name.</span>
+          <span>Long format: add subject, ca, exam or score.</span>
+          <span>Wide format: put subject names as columns with numeric scores.</span>
+          <span>Status can be active, inactive, or graduated. Blank status is auto-detected.</span>
+        </div>
+
+        <div className="sai-upload sai-history-upload">
+          <input
+            ref={historyInputRef}
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            onChange={pickHistoryFile}
+            style={{ display: "none" }}
+          />
+          <div>
+            <strong>{historyFile ? historyFile.name : "No history CSV selected"}</strong>
+            <small className="sai-note">Save Excel/XLSX broadsheets as CSV before uploading.</small>
+          </div>
+          <button type="button" onClick={() => historyInputRef.current?.click()} disabled={importingHistory}>
+            Select CSV
+          </button>
+        </div>
+
+        <label className="sai-check sai-history-check">
+          <input
+            type="checkbox"
+            checked={makeLatestSessionCurrent}
+            onChange={(e) => setMakeLatestSessionCurrent(e.target.checked)}
+          />
+          <span>Make the latest imported session the current session</span>
+        </label>
+
+        <div className="sai-actions">
+          <button type="button" onClick={importSchoolHistory} disabled={importingHistory || !historyFile}>
+            {importingHistory ? "Importing..." : "Import School History"}
+          </button>
+        </div>
+
+        {historyImportResult?.summary ? (
+          <div className="sai-import-result">
+            <h4>Last Import Summary</h4>
+            <div className="sai-import-grid">
+              {Object.entries(historyImportResult.summary).map(([key, value]) => (
+                <span key={key}>
+                  <strong>{String(key).replaceAll("_", " ")}</strong>
+                  {value}
+                </span>
+              ))}
+            </div>
+            {Array.isArray(historyImportResult.warnings) && historyImportResult.warnings.length > 0 ? (
+              <div className="sai-import-warnings">
+                <strong>Warnings</strong>
+                {historyImportResult.warnings.map((warning, index) => (
+                  <p key={`${warning}-${index}`}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     </div>
   );

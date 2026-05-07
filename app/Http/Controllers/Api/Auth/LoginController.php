@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\School;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class LoginController extends Controller
 {
@@ -23,6 +25,19 @@ class LoginController extends Controller
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
+        }
+
+        if ($user->role === 'student' && Schema::hasColumn('students', 'status')) {
+            $studentStatus = Student::query()
+                ->where('user_id', (int) $user->id)
+                ->value('status');
+
+            if ($studentStatus === 'graduated') {
+                return response()->json([
+                    'code' => 'graduated',
+                    'message' => 'Congratulations, you have graduated.',
+                ], 403);
+            }
         }
 
         if (!$user->is_active) {

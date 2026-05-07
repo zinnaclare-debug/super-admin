@@ -20,6 +20,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\GradingSchema;
+use App\Support\SchoolHistoryImportService;
 use App\Support\SchoolSubscriptionBilling;
 use App\Support\UserCredentialStore;
 use Illuminate\Validation\ValidationException;
@@ -448,6 +449,40 @@ class SchoolController extends Controller
             'data' => $this->attachDepartmentTemplatesToClassTemplates($normalized, $departmentTemplateMapByClass),
             'department_templates_by_class' => $departmentTemplateMapByClass,
             'department_templates_by_level' => $departmentTemplateMapByLevel,
+        ]);
+    }
+
+    public function downloadHistoryImportTemplate(School $school)
+    {
+        $fileName = Str::slug($school->name ?: 'school') . '-history-import-template.csv';
+
+        return response(SchoolHistoryImportService::templateCsv(), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ]);
+    }
+
+    public function importHistory(Request $request, School $school, SchoolHistoryImportService $importer)
+    {
+        $payload = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+            'make_latest_session_current' => ['nullable', 'boolean'],
+        ]);
+
+        try {
+            $result = $importer->import(
+                $school,
+                $payload['file'],
+                (int) $request->user()->id,
+                (bool) ($payload['make_latest_session_current'] ?? false)
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'School history imported successfully.',
+            'data' => $result,
         ]);
     }
 

@@ -435,6 +435,7 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
             ->where('enrollments.class_id', (int) $class->id)
             ->where('enrollments.term_id', (int) $term->id)
             ->where('students.school_id', $schoolId)
+            ->where('users.is_active', true)
             ->select([
                 'students.id as student_id',
                 'users.name as student_name',
@@ -446,6 +447,13 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
 
         if (Schema::hasColumn('enrollments', 'school_id')) {
             $studentQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        if (Schema::hasColumn('students', 'status')) {
+            $studentQuery->where(function ($query) {
+                $query->whereNull('students.status')
+                    ->orWhere('students.status', '!=', 'graduated');
+            });
         }
 
         $students = $studentQuery->get();
@@ -506,6 +514,12 @@ public function unassignTeacherFromSubject(Request $request, SchoolClass $class,
         abort_unless((int) $subject->school_id === $schoolId, 403);
         abort_unless((int) $student->school_id === $schoolId, 403);
         abort_unless((int) $term->academic_session_id === (int) $class->academic_session_id, 400);
+
+        if (Schema::hasColumn('students', 'status') && $student->status === 'graduated') {
+            return response()->json([
+                'message' => 'Graduated students cannot be assigned to subjects.',
+            ], 422);
+        }
 
         if (!Schema::hasTable('student_subject_exclusions')) {
             return response()->json([

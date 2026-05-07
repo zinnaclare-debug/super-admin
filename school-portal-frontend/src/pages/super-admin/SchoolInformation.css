@@ -49,6 +49,24 @@
   margin: 0;
 }
 
+.sai-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sai-section-head button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: #fff;
+  background: linear-gradient(125deg, #0f172a 0%, #0f766e 100%);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .sai-grid {
   margin-top: 12px;
   display: grid;
@@ -85,6 +103,90 @@
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.sai-history-card {
+  border-color: #bfdbfe;
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.sai-history-guide {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.sai-history-guide span {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+  padding: 10px 12px;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sai-history-upload {
+  margin-top: 12px;
+}
+
+.sai-history-upload > div {
+  display: grid;
+  gap: 3px;
+}
+
+.sai-history-check {
+  margin-top: 12px;
+}
+
+.sai-import-result {
+  margin-top: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.sai-import-result h4 {
+  margin: 0 0 10px;
+}
+
+.sai-import-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.sai-import-grid span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 9px;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.sai-import-grid strong {
+  color: #475569;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.sai-import-warnings {
+  margin-top: 12px;
+  border-left: 4px solid #f59e0b;
+  padding: 8px 10px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.sai-import-warnings p {
+  margin: 6px 0 0;
+  font-size: 13px;
 }
 
 .sai-preview {

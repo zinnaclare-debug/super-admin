@@ -27,6 +27,11 @@ export default function UsersRoleHome() {
         <NavLink to="inactive" style={btnStyle}>
           Inactive
         </NavLink>
+        {role === "student" ? (
+          <NavLink to="graduated" style={btnStyle}>
+            Graduated
+          </NavLink>
+        ) : null}
       </div>
 
       <Outlet />

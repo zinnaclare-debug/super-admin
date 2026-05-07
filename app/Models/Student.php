@@ -15,6 +15,13 @@ class Student extends Model
         'dob',
         'address',
         'photo_path',
+        'status',
+        'graduated_at',
+        'graduation_session_id',
+    ];
+
+    protected $casts = [
+        'graduated_at' => 'datetime',
     ];
 
     public function user()

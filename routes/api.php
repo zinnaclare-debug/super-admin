@@ -115,6 +115,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
     Route::put('/super-admin/schools/{school}/information/grading-schema', [SchoolController::class, 'updateInformationGradingSchema']);
     Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
+    Route::get('/super-admin/schools/{school}/information/history-import/template', [SchoolController::class, 'downloadHistoryImportTemplate']);
+    Route::post('/super-admin/schools/{school}/information/history-import', [SchoolController::class, 'importHistory']);
     Route::get('/super-admin/schools/{school}/information/website', [SuperAdminSchoolWebsiteController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/website', [SuperAdminSchoolWebsiteController::class, 'upsert']);
     Route::get('/super-admin/schools/{school}/information/website/applications', [SuperAdminSchoolWebsiteController::class, 'applications']);

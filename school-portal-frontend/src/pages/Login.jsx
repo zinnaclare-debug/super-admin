@@ -17,6 +17,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [tenantSchool, setTenantSchool] = useState(null);
   const [logoLoadError, setLogoLoadError] = useState(false);
+  const [graduationMessage, setGraduationMessage] = useState("");
 
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
@@ -93,6 +94,7 @@ const loginThemeStyle = useMemo(
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setGraduationMessage("");
 
     try {
       // 1️⃣ LOGIN
@@ -123,7 +125,11 @@ const loginThemeStyle = useMemo(
       }
 
     } catch (err) {
-      alert(err.response?.data?.message || "Login failed");
+      if (err.response?.data?.code === "graduated") {
+        setGraduationMessage(err.response?.data?.message || "Congratulations, you have graduated.");
+      } else {
+        alert(err.response?.data?.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -243,6 +249,14 @@ const loginThemeStyle = useMemo(
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
+
+          {graduationMessage ? (
+            <div className="login-graduation-card" role="status">
+              <span className="login-graduation-burst">Congratulations</span>
+              <strong>{graduationMessage}</strong>
+              <p>Your student portal access has been closed because your academic level is complete. Please contact your school admin for transcript or printed result requests.</p>
+            </div>
+          ) : null}
 
           <div className="login-contact-block">
             <p className="login-contact-school-name">

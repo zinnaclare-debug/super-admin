@@ -163,6 +163,7 @@ function App() {
           <Route path=":role" element={<UsersRoleHome />}>
             <Route path="active" element={<ActiveUsers />} />
             <Route path="inactive" element={<InactiveUsers />} />
+            <Route path="graduated" element={<ActiveUsers status="graduated" />} />
           </Route>
         </Route>
         <Route path="admin/students/:userId/set-payment" element={<StudentPaymentSetup />} />

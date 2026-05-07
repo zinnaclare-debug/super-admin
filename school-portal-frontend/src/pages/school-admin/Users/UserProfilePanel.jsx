@@ -29,7 +29,7 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
       await loadProfile();
       onChanged?.();
     } catch (e) {
-      alert("Failed to update user status");
+      alert(e?.response?.data?.message || "Failed to update user status");
     }
   };
 
@@ -75,28 +75,38 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
 
       {loading ? (
         <p>Loading profile...</p>
-      ) : (
+      ) : (() => {
+        const isGraduated = user?.status === "graduated";
+
+        return (
         <>
           <p><strong>Name:</strong> {user?.name}</p>
           <p><strong>Email:</strong> {user?.email || "-"}</p>
           <p><strong>Role:</strong> {user?.role}</p>
           <p>
             <strong>Status:</strong>{" "}
-            {user?.is_active ? "Active" : "Inactive"}
+            {isGraduated ? "Graduated" : (user?.is_active ? "Active" : "Inactive")}
           </p>
 
-          <button onClick={toggleStatus}>
-            {user?.is_active ? "Disable User" : "Enable User"}
-          </button>
+          {isGraduated ? (
+            <p style={{ margin: "8px 0 0", color: "#92400e", fontWeight: 700 }}>
+              Graduated account is locked. Use transcripts or printed results for this student.
+            </p>
+          ) : (
+            <button onClick={toggleStatus}>
+              {user?.is_active ? "Disable User" : "Enable User"}
+            </button>
+          )}
           <button
             onClick={resetPassword}
-            style={{ marginLeft: 8 }}
+            style={{ marginLeft: isGraduated ? 0 : 8 }}
             disabled={resettingPassword}
           >
             {resettingPassword ? "Resetting..." : "Reset Password"}
           </button>
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }
