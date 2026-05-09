@@ -33,7 +33,7 @@ export default function SuspendedSchoolNotice({ message = "This school account i
           {message} Please contact Lyte Bridge support or the school administrator for reactivation.
         </p>
         <a
-          href="https://lyt.com.ng"
+          href="mailto:lytebridgeinfo@gmail.com"
           style={{
             display: "inline-flex",
             borderRadius: 999,
@@ -44,7 +44,7 @@ export default function SuspendedSchoolNotice({ message = "This school account i
             textDecoration: "none",
           }}
         >
-          Back to main site
+          lytebridgeinfo@gmail.com
         </a>
       </section>
     </main>

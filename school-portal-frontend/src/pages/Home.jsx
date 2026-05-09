@@ -36,7 +36,7 @@ const DEFAULT_PLATFORM_CONTENT = {
 const CONTACT_LINES = [
   { phone: "+2348027453306", dial: "+2348027453306", label: "Call us now" },
   { phone: "+2349136806652", dial: "+2349136806652", label: "WhatsApp and phone" },
-  { phone: "+2347066906190", dial: "+2347066906190", label: "Support line" },
+  { phone: "lytebridgeinfo@gmail.com", dial: "mailto:lytebridgeinfo@gmail.com", label: "Email support" },
 ];
 
 function Home() {
