@@ -44,6 +44,19 @@ class LoginController extends Controller
             return response()->json(['message' => 'Account disabled'], 403);
         }
 
+        if ($user->role !== 'super_admin' && !empty($user->school_id)) {
+            $userSchoolStatus = School::query()
+                ->where('id', (int) $user->school_id)
+                ->value('status');
+
+            if ($userSchoolStatus !== 'active') {
+                return response()->json([
+                    'code' => 'school_suspended',
+                    'message' => 'This school account is suspended.',
+                ], 403);
+            }
+        }
+
         $requestKey = (string) config('tenancy.request_key', 'tenant_school');
         $tenantSchool = $request->attributes->get($requestKey) ?? $this->resolveTenantSchool($request);
 

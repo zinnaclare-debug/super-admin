@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import SuspendedSchoolNotice from "../components/SuspendedSchoolNotice";
 import heroArt from "../assets/dashboard/hero.svg";
 import graduationArt from "../assets/login/Graduation-cuate.svg";
 import brandBanner from "../assets/home/lytebridge-brand.jpg";
@@ -18,6 +19,7 @@ function Login() {
   const [tenantSchool, setTenantSchool] = useState(null);
   const [logoLoadError, setLogoLoadError] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState("");
+  const [suspendedMessage, setSuspendedMessage] = useState("");
 
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
@@ -75,8 +77,11 @@ const loginThemeStyle = useMemo(
           setTenantSchool(res.data.school);
         }
       })
-      .catch(() => {
-        // Keep generic login page on errors / central domain.
+      .catch((err) => {
+        if (!active) return;
+        if (err?.response?.status === 403) {
+          setSuspendedMessage(err?.response?.data?.message || "This school account is suspended.");
+        }
       });
 
     return () => {
@@ -134,6 +139,10 @@ const loginThemeStyle = useMemo(
       setLoading(false);
     }
   };
+
+  if (suspendedMessage) {
+    return <SuspendedSchoolNotice message={suspendedMessage} />;
+  }
 
   return (
    <div

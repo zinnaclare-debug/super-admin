@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
+import SuspendedSchoolNotice from "../components/SuspendedSchoolNotice";
 import PublicSchoolPortal from "./public-school/PublicSchoolPortal";
 import brandArt from "../assets/home/lytebridge-brand.jpg";
 import coreFunctionsArt from "../assets/home/lytebridge-core-functions.jpeg";
@@ -42,6 +43,7 @@ function Home() {
   const [siteData, setSiteData] = useState(null);
   const [platformContent, setPlatformContent] = useState(DEFAULT_PLATFORM_CONTENT);
   const [loaded, setLoaded] = useState(false);
+  const [suspendedMessage, setSuspendedMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -56,6 +58,9 @@ function Home() {
         if (siteResult.status === "fulfilled") {
           setSiteData(siteResult.value.data || null);
         } else {
+          if (siteResult.reason?.response?.status === 403) {
+            setSuspendedMessage(siteResult.reason?.response?.data?.message || "This school account is suspended.");
+          }
           setSiteData(null);
         }
 
@@ -74,6 +79,10 @@ function Home() {
 
   if (!loaded) {
     return <div className="home-page"><p style={{ padding: 24 }}>Loading...</p></div>;
+  }
+
+  if (suspendedMessage) {
+    return <SuspendedSchoolNotice message={suspendedMessage} />;
   }
 
   if (siteData?.is_tenant && siteData?.school) {

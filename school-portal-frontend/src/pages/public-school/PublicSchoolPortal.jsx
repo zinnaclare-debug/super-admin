@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Navigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import SuspendedSchoolNotice from "../../components/SuspendedSchoolNotice";
 import { createCbtSecurityFramework } from "../../utils/cbtSecurityFramework";
 import "./PublicSchoolPortal.css";
 import "../shared/CbtShowcase.css";
@@ -504,6 +505,10 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
 
   if (loading) {
     return <div className="school-site-shell"><p>Loading school website...</p></div>;
+  }
+
+  if (error && !siteData?.is_tenant) {
+    return <SuspendedSchoolNotice message={error} />;
   }
 
   if (!siteData?.is_tenant || !school) {
