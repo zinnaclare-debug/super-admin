@@ -61,9 +61,15 @@ function SuperAdminSchools() {
     loadSchools();
   }, [navigate]);
 
-  const toggleSchool = async (id) => {
+  const toggleSchool = async (school) => {
+    const action = school.status === "active" ? "suspend" : "activate";
+    const deleteCode = requestSuperAdminDeleteCode(school.name || "this school", action);
+    if (!deleteCode) return;
+
     try {
-      await api.patch(`/api/super-admin/schools/${id}/toggle`);
+      await api.patch(`/api/super-admin/schools/${school.id}/toggle`, {
+        delete_code: deleteCode,
+      });
       loadSchools();
     } catch (err) {
       console.error("TOGGLE SCHOOL ERROR:", err.response?.data);
