@@ -208,6 +208,11 @@
   cursor: pointer;
 }
 
+.teach-staff-btn > span {
+  display: grid;
+  gap: 3px;
+}
+
 .teach-staff-btn--active {
   border-color: #0f766e;
   background: linear-gradient(130deg, #ecfdf5, #fefce8);
@@ -236,6 +241,77 @@
 
 .teach-category {
   margin-top: 14px;
+}
+
+.teach-collapse {
+  margin-top: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+  overflow: hidden;
+}
+
+.teach-collapse > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.teach-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+
+.teach-collapse > summary::before {
+  content: "+";
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: #0f766e;
+  font-weight: 900;
+}
+
+.teach-collapse[open] > summary::before {
+  content: "-";
+}
+
+.teach-collapse > summary strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 12px;
+}
+
+.teach-collapse > .teach-category,
+.teach-collapse > .teach-file-list,
+.teach-collapse--nested {
+  margin: 10px 12px 12px;
+}
+
+.teach-collapse--nested {
+  background: #fff;
+}
+
+.teach-collapse--nested > summary {
+  padding: 10px 11px;
+  font-size: 13px;
+}
+
+.teach-collapse--nested > summary::before {
+  width: 18px;
+  height: 18px;
+  background: #2563eb;
 }
 
 @media (max-width: 980px) {

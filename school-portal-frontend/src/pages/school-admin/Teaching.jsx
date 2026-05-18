@@ -5,7 +5,7 @@ import mobileArt from "../../assets/teaching/mobile-devices.svg";
 import readingArt from "../../assets/teaching/reading-book.svg";
 import "../shared/Teaching.css";
 
-const CATEGORY_ORDER = ["topic", "exam_question", "lesson_note"];
+const CATEGORY_ORDER = ["topic", "exam_question", "lesson_note", "lesson_plan"];
 
 function bytes(value) {
   const size = Number(value || 0);
@@ -25,6 +25,7 @@ export default function SchoolAdminTeaching() {
   const [context, setContext] = useState(null);
   const [staff, setStaff] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [staffSubjects, setStaffSubjects] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
@@ -36,12 +37,26 @@ export default function SchoolAdminTeaching() {
   const selectedSession = periods.find((period) => String(period.id) === String(selectedSessionId)) || null;
   const termOptions = Array.isArray(selectedSession?.terms) ? selectedSession.terms : [];
   const categories = context?.categories || {};
-  const grouped = useMemo(() => {
-    return CATEGORY_ORDER.reduce((acc, key) => {
-      acc[key] = materials.filter((item) => item.category === key);
-      return acc;
-    }, {});
-  }, [materials]);
+  const subjectGroups = useMemo(() => {
+    const groups = staffSubjects.map((subject) => ({
+      key: String(subject.term_subject_id),
+      label: subject.label || subject.subject_name || "Subject",
+      subject,
+      materials: materials.filter((item) => String(item.term_subject_id || "") === String(subject.term_subject_id)),
+    }));
+
+    const unassigned = materials.filter((item) => !item.term_subject_id);
+    if (unassigned.length) {
+      groups.push({
+        key: "unassigned",
+        label: "General / Unassigned",
+        subject: null,
+        materials: unassigned,
+      });
+    }
+
+    return groups;
+  }, [materials, staffSubjects]);
 
   const loadContext = async () => {
     const res = await api.get("/api/school-admin/teaching/context");
@@ -88,9 +103,11 @@ export default function SchoolAdminTeaching() {
         },
       });
       setMaterials(res.data?.data?.materials || []);
+      setStaffSubjects(res.data?.data?.subjects || []);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to load staff teaching files.");
       setMaterials([]);
+      setStaffSubjects([]);
     } finally {
       setLoadingMaterials(false);
     }
@@ -114,6 +131,7 @@ export default function SchoolAdminTeaching() {
     setSelectedSessionId(String(sessionId || ""));
     setSelectedTermId(currentTerm ? String(currentTerm.id) : "");
     setSelectedStaff(null);
+    setStaffSubjects([]);
     setMaterials([]);
   };
 
@@ -145,7 +163,7 @@ export default function SchoolAdminTeaching() {
           <span className="teach-pill">School Admin Teaching</span>
           <h2 className="teach-title">Review staff teaching files by session and term</h2>
           <p className="teach-subtitle">
-            Select an active staff member, inspect uploaded topics, exam questions, and lesson notes, then download what you need.
+            Select an active staff member, inspect uploaded topics, exam questions, lesson notes, and lesson plans by subject, then download what you need.
           </p>
           <div className="teach-meta">
             <span>{selectedSession?.label || context?.current_session?.session_name || "Session -"}</span>
@@ -195,6 +213,7 @@ export default function SchoolAdminTeaching() {
                     <span>
                       <strong>{item.name}</strong>
                       <span className="teach-small">{item.email || item.username || "-"}</span>
+                      <span className="teach-small">{item.subjects_count || 0} subject{Number(item.subjects_count || 0) === 1 ? "" : "s"}</span>
                     </span>
                     <strong>{item.materials_count}</strong>
                   </button>
@@ -208,28 +227,45 @@ export default function SchoolAdminTeaching() {
             <h3>{selectedStaff ? `${selectedStaff.name}'s Files` : "Select Staff"}</h3>
             {loadingMaterials ? <p className="teach-state">Loading files...</p> : null}
             {!loadingMaterials && selectedStaff ? (
-              CATEGORY_ORDER.map((key) => (
-                <div className="teach-category" key={key}>
-                  <h4>{categories[key] || key}</h4>
-                  <div className="teach-file-list">
-                    {(grouped[key] || []).map((item) => (
-                      <div className="teach-file-row" key={item.id}>
-                        <div className="teach-file-main">
-                          <p className="teach-file-name">{item.title || item.original_name}</p>
-                          <p className="teach-file-meta">
-                            {item.original_name} | {item.status} | {bytes(item.compressed_size || item.file_size)}
-                          </p>
-                          {item.processing_note ? <p className="teach-file-meta">{item.processing_note}</p> : null}
-                        </div>
-                        <button className="teach-btn" onClick={() => download(item)} disabled={downloadingId === item.id || item.status !== "ready"}>
-                          {downloadingId === item.id ? "Downloading..." : "Download"}
-                        </button>
-                      </div>
-                    ))}
-                    {(grouped[key] || []).length === 0 ? <p className="teach-small">No file uploaded.</p> : null}
-                  </div>
-                </div>
-              ))
+              <>
+                {subjectGroups.map((group, groupIndex) => (
+                  <details className="teach-collapse" key={group.key} open={groupIndex === 0}>
+                    <summary>
+                      <span>{group.label}</span>
+                      <strong>{group.materials.length} file{group.materials.length === 1 ? "" : "s"}</strong>
+                    </summary>
+                    {CATEGORY_ORDER.map((key, categoryIndex) => {
+                      const rows = group.materials.filter((item) => item.category === key);
+                      return (
+                        <details className="teach-collapse teach-collapse--nested" key={`${group.key}-${key}`} open={categoryIndex === 0}>
+                          <summary>
+                            <span>{categories[key] || key}</span>
+                            <strong>{rows.length}</strong>
+                          </summary>
+                          <div className="teach-file-list">
+                            {rows.map((item) => (
+                              <div className="teach-file-row" key={item.id}>
+                                <div className="teach-file-main">
+                                  <p className="teach-file-name">{item.title || item.original_name}</p>
+                                  <p className="teach-file-meta">
+                                    {item.original_name} | {item.status} | {bytes(item.compressed_size || item.file_size)}
+                                  </p>
+                                  {item.processing_note ? <p className="teach-file-meta">{item.processing_note}</p> : null}
+                                </div>
+                                <button className="teach-btn" onClick={() => download(item)} disabled={downloadingId === item.id || item.status !== "ready"}>
+                                  {downloadingId === item.id ? "Downloading..." : "Download"}
+                                </button>
+                              </div>
+                            ))}
+                            {rows.length === 0 ? <p className="teach-small">No file uploaded.</p> : null}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </details>
+                ))}
+                {subjectGroups.length === 0 ? <p className="teach-small">No subject or upload found for this staff member.</p> : null}
+              </>
             ) : null}
             {!selectedStaff ? <p className="teach-small">Choose a staff name from the vertical list to view teaching files.</p> : null}
           </article>

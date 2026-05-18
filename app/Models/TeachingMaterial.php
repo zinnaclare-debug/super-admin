@@ -10,6 +10,7 @@ class TeachingMaterial extends Model
     public const CATEGORY_TOPIC = 'topic';
     public const CATEGORY_EXAM_QUESTION = 'exam_question';
     public const CATEGORY_LESSON_NOTE = 'lesson_note';
+    public const CATEGORY_LESSON_PLAN = 'lesson_plan';
 
     public const STATUS_PROCESSING = 'processing';
     public const STATUS_READY = 'ready';
@@ -20,6 +21,8 @@ class TeachingMaterial extends Model
         'staff_user_id',
         'academic_session_id',
         'term_id',
+        'term_subject_id',
+        'subject_id',
         'category',
         'title',
         'original_name',
@@ -49,5 +52,15 @@ class TeachingMaterial extends Model
     public function term(): BelongsTo
     {
         return $this->belongsTo(Term::class);
+    }
+
+    public function termSubject(): BelongsTo
+    {
+        return $this->belongsTo(TermSubject::class);
+    }
+
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class);
     }
 }

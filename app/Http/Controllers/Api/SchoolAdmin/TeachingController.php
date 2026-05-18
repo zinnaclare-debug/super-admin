@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\TeachingMaterial;
 use App\Models\Term;
+use App\Models\TermSubject;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -52,6 +53,15 @@ class TeachingController extends Controller
                     ->where('academic_session_id', (int) $session->id)
                     ->where('term_id', (int) $term->id)
                     ->count();
+                $subjectCount = TermSubject::query()
+                    ->where('term_subjects.school_id', $schoolId)
+                    ->where('term_subjects.teacher_user_id', (int) $staffUser->id)
+                    ->where('term_subjects.term_id', (int) $term->id)
+                    ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+                    ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+                    ->where('terms.academic_session_id', (int) $session->id)
+                    ->where('classes.academic_session_id', (int) $session->id)
+                    ->count();
 
                 return [
                     'id' => (int) $staffUser->id,
@@ -59,6 +69,7 @@ class TeachingController extends Controller
                     'email' => $staffUser->email,
                     'username' => $staffUser->username,
                     'materials_count' => $count,
+                    'subjects_count' => $subjectCount,
                 ];
             })
             ->values();
@@ -94,15 +105,22 @@ class TeachingController extends Controller
         }
 
         $materials = TeachingMaterial::query()
-            ->where('school_id', $schoolId)
-            ->where('staff_user_id', (int) $staff->id)
-            ->where('academic_session_id', (int) $session->id)
-            ->where('term_id', (int) $term->id)
-            ->orderBy('category')
-            ->orderByDesc('id')
+            ->select('teaching_materials.*', 'subjects.name as subject_name', 'classes.name as class_name', 'classes.level as class_level')
+            ->leftJoin('term_subjects', 'term_subjects.id', '=', 'teaching_materials.term_subject_id')
+            ->leftJoin('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->leftJoin('classes', 'classes.id', '=', 'term_subjects.class_id')
+            ->where('teaching_materials.school_id', $schoolId)
+            ->where('teaching_materials.staff_user_id', (int) $staff->id)
+            ->where('teaching_materials.academic_session_id', (int) $session->id)
+            ->where('teaching_materials.term_id', (int) $term->id)
+            ->orderBy('subjects.name')
+            ->orderBy('classes.name')
+            ->orderBy('teaching_materials.category')
+            ->orderByDesc('teaching_materials.id')
             ->get()
             ->map(fn (TeachingMaterial $material) => $this->materialPayload($material))
             ->values();
+        $subjects = $this->assignedSubjects($schoolId, (int) $staff->id, (int) $session->id, (int) $term->id);
 
         return response()->json([
             'data' => [
@@ -114,6 +132,7 @@ class TeachingController extends Controller
                 ],
                 'selected_session' => $this->sessionPayload($session),
                 'selected_term' => $this->termPayload($term),
+                'subjects' => $subjects,
                 'materials' => $materials,
                 'categories' => $this->categories(),
             ],
@@ -224,6 +243,12 @@ class TeachingController extends Controller
     {
         return [
             'id' => (int) $material->id,
+            'term_subject_id' => $material->term_subject_id ? (int) $material->term_subject_id : null,
+            'subject_id' => $material->subject_id ? (int) $material->subject_id : null,
+            'subject_name' => $material->getAttribute('subject_name') ?: null,
+            'class_name' => $material->getAttribute('class_name') ?: null,
+            'class_level' => $material->getAttribute('class_level') ?: null,
+            'subject_label' => $this->subjectLabel($material),
             'category' => (string) $material->category,
             'category_label' => $this->categories()[$material->category] ?? $material->category,
             'title' => $material->title,
@@ -245,7 +270,54 @@ class TeachingController extends Controller
             TeachingMaterial::CATEGORY_TOPIC => 'Topics for the Term',
             TeachingMaterial::CATEGORY_EXAM_QUESTION => 'Exam Questions',
             TeachingMaterial::CATEGORY_LESSON_NOTE => 'Lesson Notes',
+            TeachingMaterial::CATEGORY_LESSON_PLAN => 'Lesson Plans',
         ];
+    }
+
+    private function assignedSubjects(int $schoolId, int $staffUserId, int $sessionId, int $termId): array
+    {
+        return TermSubject::query()
+            ->where('term_subjects.school_id', $schoolId)
+            ->where('term_subjects.teacher_user_id', $staffUserId)
+            ->where('term_subjects.term_id', $termId)
+            ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+            ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+            ->where('terms.academic_session_id', $sessionId)
+            ->where('classes.academic_session_id', $sessionId)
+            ->orderBy('subjects.name')
+            ->orderBy('classes.name')
+            ->get([
+                'term_subjects.id as term_subject_id',
+                'term_subjects.subject_id as subject_id',
+                'subjects.name as subject_name',
+                'classes.name as class_name',
+                'classes.level as class_level',
+            ])
+            ->map(fn ($row) => [
+                'term_subject_id' => (int) $row->term_subject_id,
+                'subject_id' => (int) $row->subject_id,
+                'subject_name' => (string) $row->subject_name,
+                'class_name' => (string) $row->class_name,
+                'class_level' => (string) $row->class_level,
+                'label' => trim((string) $row->subject_name . ' - ' . (string) $row->class_name),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function subjectLabel(TeachingMaterial $material): string
+    {
+        $subject = trim((string) ($material->getAttribute('subject_name') ?: ''));
+        $class = trim((string) ($material->getAttribute('class_name') ?: ''));
+        if ($subject !== '' && $class !== '') {
+            return "{$subject} - {$class}";
+        }
+        if ($subject !== '') {
+            return $subject;
+        }
+
+        return 'General / Unassigned';
     }
 
     private function sessionPayload(AcademicSession $session): array
