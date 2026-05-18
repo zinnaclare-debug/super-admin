@@ -93,9 +93,6 @@ export default function AcademicSessionDetails() {
         <p style={{ marginTop: 0, opacity: 0.85 }}>
           Current Term: <strong>{currentTerm?.name || "Not set"}</strong>
         </p>
-        <p style={{ marginTop: 0, opacity: 0.8 }}>
-          Setting a new current session or term will unpublish results and refresh billing for the new cycle.
-        </p>
       </div>
 
       {loading && <p>Loading session details...</p>}
