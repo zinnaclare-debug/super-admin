@@ -309,11 +309,25 @@ class SchoolHistoryImportService
     {
         $level = strtolower(trim($level));
         if ($level !== '') {
+            $level = str_replace(['-', ' '], '_', $level);
+            $level = preg_replace('/[^a-z0-9_]+/', '', $level) ?? '';
+            $level = preg_replace('/_+/', '_', $level) ?? '';
+            $level = trim($level, '_');
+
+            if (str_starts_with($level, 'creche')) {
+                return 'creche';
+            }
+            if (str_starts_with($level, 'pre_nursery') || str_starts_with($level, 'prenursery')) {
+                return 'pre_nursery';
+            }
+
             return $level;
         }
 
         $class = strtolower($className);
         return match (true) {
+            str_contains($class, 'creche') => 'creche',
+            str_contains($class, 'pre nursery'), str_contains($class, 'pre-nursery'), str_contains($class, 'prenursery') => 'pre_nursery',
             str_contains($class, 'nursery'), str_contains($class, 'kg') => 'nursery',
             str_contains($class, 'primary'), str_contains($class, 'pry'), str_contains($class, 'basic') => 'primary',
             default => 'secondary',
@@ -729,6 +743,10 @@ class SchoolHistoryImportService
         }
 
         return match (true) {
+            $rank >= 1 && $rank < 3 => true,
+            $rank === 3 => true,
+            $rank >= 6 && $rank < 8 => true,
+            $rank === 8 => true,
             $rank >= 11 && $rank < 13 => true,
             $rank === 13 => true,
             $rank >= 21 && $rank < 26 => true,
@@ -782,6 +800,12 @@ class SchoolHistoryImportService
         $name = strtolower(trim($className));
         $level = strtolower(trim($level));
 
+        if (preg_match('/(?:creche)\D*(\d+)/i', $name, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/(?:pre\s*[-_]?\s*nursery|prenursery)\D*(\d+)/i', $name, $m)) {
+            return 5 + (int) $m[1];
+        }
         if (preg_match('/(?:nursery|kg)\D*(\d+)/i', $name, $m)) {
             return 10 + (int) $m[1];
         }

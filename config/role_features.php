@@ -14,6 +14,7 @@ return [
         'question bank',
         'behaviour rating',
         'announcements',
+        'teaching',
     ],
 
     'student' => [

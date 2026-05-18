@@ -5,6 +5,7 @@ namespace App\Support;
 class ClassTemplateSchema
 {
     private const SECTION_SIZES = [
+        'creche' => 3,
         'pre_nursery' => 3,
         'nursery' => 3,
         'primary' => 6,
@@ -12,6 +13,7 @@ class ClassTemplateSchema
     ];
 
     private const SECTION_LABELS = [
+        'creche' => 'Creche',
         'pre_nursery' => 'Pre Nursery',
         'nursery' => 'Nursery',
         'primary' => 'Primary',
@@ -26,7 +28,7 @@ class ClassTemplateSchema
             $sections[] = [
                 'key' => $key,
                 'label' => $label,
-                'enabled' => $key !== 'pre_nursery',
+                'enabled' => !in_array($key, ['creche', 'pre_nursery'], true),
                 'classes' => self::defaultClassRows($label, $count),
             ];
         }
@@ -63,7 +65,7 @@ class ClassTemplateSchema
 
             $enabled = array_key_exists('enabled', $item)
                 ? (bool) $item['enabled']
-                : ($key !== 'pre_nursery');
+                : (!in_array($key, ['creche', 'pre_nursery'], true));
 
             $classes = [];
             if (isset($item['classes']) && is_array($item['classes'])) {

@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\SchoolAdmin\PromotionController;
 use App\Http\Controllers\Api\SchoolAdmin\ReportsController;
 use App\Http\Controllers\Api\SchoolAdmin\TranscriptController;
 use App\Http\Controllers\Api\SchoolAdmin\AnnouncementController as SchoolAdminAnnouncementController;
+use App\Http\Controllers\Api\SchoolAdmin\TeachingController as SchoolAdminTeachingController;
 
 use App\Http\Controllers\Api\Staff\TeacherResultsController;
 use App\Http\Controllers\Api\Staff\StaffProfileController;
@@ -43,6 +44,7 @@ use App\Http\Controllers\Api\Staff\StaffProfileController;
 use App\Http\Controllers\Api\Staff\TeacherTopicsController;
 use App\Http\Controllers\Api\Staff\ELibraryController as StaffELibraryController;
 use App\Http\Controllers\Api\Staff\AnnouncementController as StaffAnnouncementController;
+use App\Http\Controllers\Api\Staff\TeachingController as StaffTeachingController;
 use App\Http\Controllers\Api\Student\ELibraryController as StudentELibraryController;
 use App\Http\Controllers\Api\Staff\VirtualClassesController as StaffVirtualClassesController;
 use App\Http\Controllers\Api\Staff\QuestionBankController as StaffQuestionBankController;
@@ -216,6 +218,15 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:announcements');
     Route::delete('/school-admin/announcements/{announcement}', [SchoolAdminAnnouncementController::class, 'destroy'])
         ->middleware('feature:announcements');
+
+    Route::get('/school-admin/teaching/context', [SchoolAdminTeachingController::class, 'context'])
+        ->middleware('feature:teaching');
+    Route::get('/school-admin/teaching/staff', [SchoolAdminTeachingController::class, 'staff'])
+        ->middleware('feature:teaching');
+    Route::get('/school-admin/teaching/materials', [SchoolAdminTeachingController::class, 'materials'])
+        ->middleware('feature:teaching');
+    Route::get('/school-admin/teaching/materials/{material}/download', [SchoolAdminTeachingController::class, 'download'])
+        ->middleware('feature:teaching');
 
     // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
@@ -446,6 +457,14 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', fn () => response()->json(['message' => 'Staff Dashboard']));
     Route::get('/staff/announcements', [StaffAnnouncementController::class, 'index'])
         ->middleware('feature:announcements');
+    Route::get('/staff/teaching', [StaffTeachingController::class, 'index'])
+        ->middleware('feature:teaching');
+    Route::post('/staff/teaching', [StaffTeachingController::class, 'store'])
+        ->middleware('feature:teaching');
+    Route::delete('/staff/teaching/materials/{material}', [StaffTeachingController::class, 'destroy'])
+        ->middleware('feature:teaching');
+    Route::get('/staff/teaching/materials/{material}/download', [StaffTeachingController::class, 'download'])
+        ->middleware('feature:teaching');
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);

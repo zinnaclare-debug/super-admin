@@ -262,6 +262,7 @@ function DashboardLayout() {
       "virtual class": "virtual-class",
       "question bank": "question-bank",
       "school fees": "school-fees",
+      teaching: "teaching",
       announcements: "announcements",
       subjects: "subjects",
       cbt: "cbt",
@@ -288,6 +289,7 @@ function DashboardLayout() {
       "announcement desk": "announcements",
       website: "website",
       entrance_exam: "entrance-exam",
+      teaching: "teaching",
     };
     return `/school/admin/${map[normalized] || encodeURIComponent(normalized)}`;
   };

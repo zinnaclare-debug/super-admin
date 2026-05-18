@@ -34,6 +34,7 @@ class FixSchoolFeaturesSeeder extends Seeder
             'transcript',
             'teacher_report',
             'student_report',
+            'teaching',
         ];
 
         $schools = School::all();

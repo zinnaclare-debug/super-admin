@@ -395,7 +395,7 @@ class SchoolController extends Controller
     public function updateInformationClassTemplates(Request $request, School $school)
     {
         $payload = $request->validate([
-            'class_templates' => 'required|array|size:4',
+            'class_templates' => 'required|array|size:5',
             'class_templates.*.key' => 'required|string|max:50',
             'class_templates.*.label' => 'required|string|max:80',
             'class_templates.*.enabled' => 'required|boolean',

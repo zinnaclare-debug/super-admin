@@ -261,6 +261,54 @@
   padding: 8px 10px;
 }
 
+.payx-period-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.payx-period-list h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.payx-period-card {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  color: #0f172a;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.payx-period-card--selected {
+  border-color: #0f766e;
+  background: linear-gradient(130deg, #ecfdf5, #fefce8);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.payx-period-card:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.payx-period-card span {
+  display: grid;
+  gap: 3px;
+}
+
+.payx-period-card small {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .payx-table-wrap {
   margin-top: 12px;
   overflow-x: auto;
@@ -300,6 +348,14 @@
   background: #f8fafc;
 }
 
+.payx-table tfoot td {
+  padding: 11px 10px;
+  border-top: 2px solid #0f766e;
+  color: #0f172a;
+  background: #ecfdf5;
+  font-size: 13px;
+}
+
 .payx-small {
   display: block;
   margin-top: 8px;
@@ -337,6 +393,11 @@
   .payx-select,
   .payx-btn {
     width: 100%;
+  }
+
+  .payx-period-card {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .payx-hero-art {

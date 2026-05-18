@@ -77,6 +77,22 @@
             text-transform: uppercase;
             font-size: 10px;
         }
+        .badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 2px 7px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-current {
+            color: #065f46;
+            background: #d1fae5;
+        }
+        .badge-arrears {
+            color: #9a3412;
+            background: #ffedd5;
+        }
         .money { text-align: right; }
         .summary-signature-layout {
             width: 100%;
@@ -209,7 +225,7 @@
             </div>
         </td>
         <td>
-            <div class="label">Session / Term</div>
+            <div class="label">Current Session / Term</div>
             <div class="value">
                 {{ $session?->session_name ?: ($session?->academic_year ?: '-') }} /
                 {{ $term?->name ?: '-' }}
@@ -227,22 +243,37 @@
     <thead>
         <tr>
             <th style="width:8%;">No.</th>
-            <th>Fee Description</th>
-            <th style="width:24%;">Amount (NGN)</th>
+            <th>Session / Term</th>
+            <th style="width:16%;">Type</th>
+            <th style="width:18%;">Fee (NGN)</th>
+            <th style="width:18%;">Paid (NGN)</th>
+            <th style="width:18%;">Outstanding (NGN)</th>
         </tr>
     </thead>
     <tbody>
-        @forelse(($lineItems ?? []) as $index => $row)
+        @forelse(($feePeriods ?? []) as $index => $row)
             <tr>
                 <td>{{ $index + 1 }}</td>
-                <td>{{ $row['description'] ?? '-' }}</td>
-                <td class="money">{{ number_format((float) ($row['amount'] ?? 0), 2) }}</td>
+                <td>{{ $row['period_label'] ?? '-' }}</td>
+                <td>
+                    @if(($row['type'] ?? '') === 'arrears')
+                        <span class="badge badge-arrears">Arrears</span>
+                    @else
+                        <span class="badge badge-current">Current Fee</span>
+                    @endif
+                </td>
+                <td class="money">{{ number_format((float) ($row['amount_due'] ?? 0), 2) }}</td>
+                <td class="money">{{ number_format((float) ($row['total_paid'] ?? 0), 2) }}</td>
+                <td class="money">{{ number_format((float) ($row['outstanding'] ?? 0), 2) }}</td>
             </tr>
         @empty
             <tr>
                 <td>1</td>
-                <td>School Fees</td>
+                <td>{{ $session?->session_name ?: ($session?->academic_year ?: '-') }} / {{ $term?->name ?: '-' }}</td>
+                <td><span class="badge badge-current">Current Fee</span></td>
                 <td class="money">{{ number_format((float) ($amountDue ?? 0), 2) }}</td>
+                <td class="money">{{ number_format((float) ($totalPaid ?? 0), 2) }}</td>
+                <td class="money">{{ number_format((float) ($outstanding ?? 0), 2) }}</td>
             </tr>
         @endforelse
     </tbody>
@@ -264,16 +295,16 @@
         <td>
             <table class="summary-table">
                 <tr>
-                    <td>Total Invoice</td>
-                    <td class="money">{{ number_format((float) ($amountDue ?? 0), 2) }}</td>
+                    <td>Total Fees</td>
+                    <td class="money">{{ number_format((float) ($totalInvoice ?? $amountDue ?? 0), 2) }}</td>
                 </tr>
                 <tr>
                     <td>Total Paid So Far</td>
-                    <td class="money">{{ number_format((float) ($totalPaid ?? 0), 2) }}</td>
+                    <td class="money">{{ number_format((float) ($totalPaidAllPeriods ?? $totalPaid ?? 0), 2) }}</td>
                 </tr>
                 <tr class="total-row">
-                    <td>Outstanding Balance</td>
-                    <td class="money">{{ number_format((float) ($outstanding ?? 0), 2) }}</td>
+                    <td>Total Outstanding</td>
+                    <td class="money">{{ number_format((float) ($totalOutstanding ?? $outstanding ?? 0), 2) }}</td>
                 </tr>
             </table>
         </td>
@@ -281,7 +312,7 @@
 </table>
 
 <div class="footnote">
-    This is a system-generated invoice based on the current school fee configuration for this term.
+    This is a system-generated invoice. Arrears remain tied to their original session and term until paid.
 </div>
 </body>
 </html>

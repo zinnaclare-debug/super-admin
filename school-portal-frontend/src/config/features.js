@@ -23,6 +23,7 @@ export const FEATURE_DEFINITIONS = [
   { key: "announcements", label: "Announcement Desk", category: "admin" },
   { key: "website", label: "Website", category: "admin" },
   { key: "entrance_exam", label: "Entrance Exam", category: "admin" },
+  { key: "teaching", label: "Teaching", category: "admin" },
 
   { key: "users", label: "Users", category: "admin" },
   { key: "academics", label: "Academics", category: "admin" },

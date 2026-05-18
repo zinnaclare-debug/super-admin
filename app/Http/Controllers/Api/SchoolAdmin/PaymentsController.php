@@ -64,6 +64,7 @@ class PaymentsController extends Controller
                 'fees_by_level' => $feesByLevel,
                 'legacy_amount_due' => $legacySetting ? (float) $legacySetting->amount_due : null,
                 'paystack_subaccount_code' => $school?->paystack_subaccount_code,
+                'payment_periods' => $this->paymentPeriods($schoolId),
             ],
         ]);
     }
@@ -179,7 +180,8 @@ class PaymentsController extends Controller
     public function index(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
-        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        [$currentSession, $currentTerm] = $this->resolveCurrentSessionAndTerm($schoolId);
+        [$session, $term] = $this->resolveRequestedSessionAndTerm($schoolId, $request, $currentSession, $currentTerm);
         if (!$session || !$term) {
             return response()->json([
                 'message' => 'No current academic session/term configured.',
@@ -226,16 +228,26 @@ class PaymentsController extends Controller
                 'view' => $view,
                 'status' => $status,
                 'current_session' => [
+                    'id' => $currentSession->id,
+                    'session_name' => $currentSession->session_name,
+                    'academic_year' => $currentSession->academic_year,
+                ],
+                'current_term' => [
+                    'id' => $currentTerm->id,
+                    'name' => $currentTerm->name,
+                ],
+                'active_levels' => $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []),
+                'filter_options' => $filterOptions,
+                'payment_periods' => $this->paymentPeriods($schoolId),
+                'selected_session' => [
                     'id' => $session->id,
                     'session_name' => $session->session_name,
                     'academic_year' => $session->academic_year,
                 ],
-                'current_term' => [
+                'selected_term' => [
                     'id' => $term->id,
                     'name' => $term->name,
                 ],
-                'active_levels' => $this->extractSessionLevels($schoolId, $session->id, $session->levels ?? []),
-                'filter_options' => $filterOptions,
                 'totals' => [
                     'paid' => $totalPaid,
                     'outstanding' => $totalOutstanding,
@@ -247,7 +259,8 @@ class PaymentsController extends Controller
     public function downloadPdf(Request $request)
     {
         $schoolId = (int) $request->user()->school_id;
-        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        [$currentSession, $currentTerm] = $this->resolveCurrentSessionAndTerm($schoolId);
+        [$session, $term] = $this->resolveRequestedSessionAndTerm($schoolId, $request, $currentSession, $currentTerm);
         if (!$session || !$term) {
             return response()->json([
                 'message' => 'No current academic session/term configured.',
@@ -261,6 +274,8 @@ class PaymentsController extends Controller
             'class' => 'nullable|string|max:120',
             'department' => 'nullable|string|max:120',
             'search' => 'nullable|string|max:120',
+            'academic_session_id' => 'nullable|integer',
+            'term_id' => 'nullable|integer',
         ]);
 
         $view = strtolower(trim((string) ($payload['view'] ?? 'payments')));
@@ -631,34 +646,72 @@ class PaymentsController extends Controller
         }
 
         $placements = $this->resolvePlacementMap($schoolId, $sessionId, $termId, $studentIds);
+        $feeTerms = Term::query()
+            ->join('academic_sessions', 'academic_sessions.id', '=', 'terms.academic_session_id')
+            ->where('terms.school_id', $schoolId)
+            ->where('academic_sessions.school_id', $schoolId)
+            ->where(function ($query) use ($sessionId, $termId) {
+                $query->where('terms.academic_session_id', '<', $sessionId)
+                    ->orWhere(function ($sub) use ($sessionId, $termId) {
+                        $sub->where('terms.academic_session_id', $sessionId)
+                            ->where('terms.id', '<=', $termId);
+                    });
+            })
+            ->orderBy('terms.academic_session_id')
+            ->orderBy('terms.id')
+            ->get([
+                'terms.id',
+                'terms.name',
+                'terms.academic_session_id',
+                'academic_sessions.session_name',
+                'academic_sessions.academic_year',
+            ]);
 
         $paidTotals = SchoolFeePayment::query()
             ->where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->where('term_id', $termId)
             ->where('status', 'success')
             ->whereIn('student_id', $studentIds)
-            ->groupBy('student_id')
-            ->selectRaw('student_id, SUM(amount_paid) as total_paid')
-            ->pluck('total_paid', 'student_id');
+            ->where(function ($query) use ($sessionId, $termId) {
+                $query->where('academic_session_id', '<', $sessionId)
+                    ->orWhere(function ($sub) use ($sessionId, $termId) {
+                        $sub->where('academic_session_id', $sessionId)
+                            ->where('term_id', '<=', $termId);
+                    });
+            })
+            ->groupBy('student_id', 'academic_session_id', 'term_id')
+            ->selectRaw('student_id, academic_session_id, term_id, SUM(amount_paid) as total_paid')
+            ->get()
+            ->keyBy(fn ($row) => (int) $row->student_id . ':' . (int) $row->academic_session_id . ':' . (int) $row->term_id);
 
         $plans = StudentFeePlan::query()
             ->where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->where('term_id', $termId)
             ->whereIn('student_id', $studentIds)
-            ->get(['student_id', 'amount_due'])
-            ->keyBy('student_id');
+            ->where(function ($query) use ($sessionId, $termId) {
+                $query->where('academic_session_id', '<', $sessionId)
+                    ->orWhere(function ($sub) use ($sessionId, $termId) {
+                        $sub->where('academic_session_id', $sessionId)
+                            ->where('term_id', '<=', $termId);
+                    });
+            })
+            ->get(['student_id', 'academic_session_id', 'term_id', 'amount_due'])
+            ->keyBy(fn ($row) => (int) $row->student_id . ':' . (int) $row->academic_session_id . ':' . (int) $row->term_id);
 
         $settings = SchoolFeeSetting::query()
             ->where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->where('term_id', $termId)
+            ->where(function ($query) use ($sessionId, $termId) {
+                $query->where('academic_session_id', '<', $sessionId)
+                    ->orWhere(function ($sub) use ($sessionId, $termId) {
+                        $sub->where('academic_session_id', $sessionId)
+                            ->where('term_id', '<=', $termId);
+                    });
+            })
             ->get();
         $settingsByLevel = $settings
             ->filter(fn ($row) => !empty($row->level))
-            ->keyBy(fn ($row) => strtolower(trim((string) $row->level)));
-        $legacy = $settings->first(fn ($row) => empty($row->level));
+            ->keyBy(fn ($row) => (int) $row->academic_session_id . ':' . (int) $row->term_id . ':' . strtolower(trim((string) $row->level)));
+        $legacySettings = $settings
+            ->filter(fn ($row) => empty($row->level))
+            ->keyBy(fn ($row) => (int) $row->academic_session_id . ':' . (int) $row->term_id);
 
         $rows = [];
         foreach ($students as $student) {
@@ -670,17 +723,51 @@ class PaymentsController extends Controller
             ];
 
             $level = $placement['level'] ?: strtolower(trim((string) ($student->student_level ?? '')));
-            $customPlan = $plans->get($studentId);
-            if ($customPlan) {
-                $amountDue = (float) $customPlan->amount_due;
-            } else {
-                $amountDue = isset($settingsByLevel[$level])
-                    ? (float) $settingsByLevel[$level]->amount_due
-                    : (float) ($legacy?->amount_due ?? 0);
+            $amountPaid = 0;
+            $amountOutstanding = 0;
+            $arrearsBreakdown = [];
+
+            foreach ($feeTerms as $feeTerm) {
+                $periodSessionId = (int) $feeTerm->academic_session_id;
+                $periodTermId = (int) $feeTerm->id;
+                $periodKey = $periodSessionId . ':' . $periodTermId;
+                $studentPeriodKey = $studentId . ':' . $periodKey;
+                $customPlan = $plans->get($studentPeriodKey);
+                if ($customPlan) {
+                    $amountDue = (float) $customPlan->amount_due;
+                } else {
+                    $amountDue = $settingsByLevel->has($periodKey . ':' . $level)
+                        ? (float) $settingsByLevel->get($periodKey . ':' . $level)->amount_due
+                        : (float) ($legacySettings->get($periodKey)?->amount_due ?? 0);
+                }
+
+                if ($amountDue <= 0.00001) {
+                    continue;
+                }
+
+                $paid = (float) ($paidTotals->get($studentPeriodKey)?->total_paid ?? 0);
+                $outstanding = max($amountDue - $paid, 0);
+                if ($outstanding <= 0.00001) {
+                    continue;
+                }
+
+                $amountPaid += $paid;
+                $amountOutstanding += $outstanding;
+                $sessionLabel = (string) ($feeTerm->session_name ?: $feeTerm->academic_year ?: 'Session ' . $periodSessionId);
+                $termLabel = (string) ($feeTerm->name ?: 'Term ' . $periodTermId);
+                $arrearsBreakdown[] = [
+                    'academic_session_id' => $periodSessionId,
+                    'term_id' => $periodTermId,
+                    'session_label' => $sessionLabel,
+                    'term_label' => $termLabel,
+                    'period_label' => $sessionLabel . ' / ' . $termLabel,
+                    'amount_due' => $amountDue,
+                    'amount_paid' => $paid,
+                    'amount_outstanding' => $outstanding,
+                    'type' => $periodSessionId === $sessionId && $periodTermId === $termId ? 'current' : 'arrears',
+                ];
             }
 
-            $amountPaid = (float) ($paidTotals[$studentId] ?? 0);
-            $amountOutstanding = max($amountDue - $amountPaid, 0);
             if ($amountOutstanding <= 0.00001) {
                 continue;
             }
@@ -697,6 +784,7 @@ class PaymentsController extends Controller
                 'department_name' => $placement['department_name'] ?: '-',
                 'amount_paid' => $amountPaid,
                 'amount_outstanding' => $amountOutstanding,
+                'arrears_breakdown' => $arrearsBreakdown,
             ];
         }
 
@@ -868,6 +956,67 @@ class PaymentsController extends Controller
         }
 
         return [$session, $term];
+    }
+
+    private function resolveRequestedSessionAndTerm(
+        int $schoolId,
+        Request $request,
+        ?AcademicSession $currentSession,
+        ?Term $currentTerm
+    ): array {
+        if (!$currentSession || !$currentTerm) {
+            return [null, null];
+        }
+
+        $sessionId = (int) $request->query('academic_session_id', $currentSession->id);
+        $termId = (int) $request->query('term_id', $currentTerm->id);
+
+        $session = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $sessionId)
+            ->first();
+        if (!$session) {
+            return [$currentSession, $currentTerm];
+        }
+
+        $term = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->where('id', $termId)
+            ->first();
+        if (!$term) {
+            $term = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $session->id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return [$session, $term];
+    }
+
+    private function paymentPeriods(int $schoolId): array
+    {
+        $sessions = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->with(['terms' => fn ($query) => $query->orderBy('id')])
+            ->orderBy('id')
+            ->get();
+
+        return $sessions->map(function ($session) {
+            return [
+                'id' => (int) $session->id,
+                'session_name' => $session->session_name,
+                'academic_year' => $session->academic_year,
+                'label' => (string) ($session->session_name ?: $session->academic_year ?: ('Session ' . $session->id)),
+                'is_current' => (string) $session->status === 'current',
+                'terms' => $session->terms->map(fn ($term) => [
+                    'id' => (int) $term->id,
+                    'name' => $term->name,
+                    'is_current' => (bool) $term->is_current,
+                ])->values()->all(),
+            ];
+        })->values()->all();
     }
 
     private function extractSessionLevels(int $schoolId, int $sessionId, mixed $rawLevels): array

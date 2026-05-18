@@ -57,6 +57,7 @@ import AnnouncementDesk from "./pages/school-admin/AnnouncementDesk";
 import WebsiteAdmin from "./pages/school-admin/WebsiteAdmin";
 import EntranceExamAdmin from "./pages/school-admin/EntranceExamAdmin";
 import EntranceExamClassQuestions from "./pages/school-admin/EntranceExamClassQuestions";
+import SchoolAdminTeaching from "./pages/school-admin/Teaching";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
 
 
@@ -86,6 +87,7 @@ import CBTHome from "./pages/staff/cbt/CBTHome";
 import StaffCbtExamQuestions from "./pages/staff/cbt/ExamQuestions";
 import StaffCbtExamResults from "./pages/staff/cbt/ExamResults";
 import StaffAnnouncementsHome from "./pages/staff/announcements/AnnouncementsHome";
+import StaffTeachingHome from "./pages/staff/teaching/TeachingHome";
 import StudentELibrary from "./pages/student/e-library/StudentELibrary";
 import StudentResultsHome from "./pages/student/results/ResultsHome";
 import StudentProfile from "./pages/student/Profile";
@@ -217,6 +219,7 @@ function App() {
         <Route path="admin/student_report" element={<StudentReport />} />
         <Route path="admin/student_result" element={<StudentResult />} />
         <Route path="admin/announcements" element={<AnnouncementDesk />} />
+        <Route path="admin/teaching" element={<RequireFeature feature="teaching"><SchoolAdminTeaching /></RequireFeature>} />
         <Route path="admin/website" element={<RequireFeature feature="website"><WebsiteAdmin /></RequireFeature>} />
         <Route path="admin/entrance-exam" element={<RequireFeature feature="entrance_exam"><EntranceExamAdmin /></RequireFeature>} />
         <Route path="admin/entrance-exam/classes/:className/questions" element={<RequireFeature feature="entrance_exam"><EntranceExamClassQuestions /></RequireFeature>} />
@@ -236,6 +239,7 @@ function App() {
         <Route path="dashboard" element={<StaffDashboard />} />
        <Route path="profile" element={<StaffProfile />} />
         <Route path="announcements" element={<StaffAnnouncementsHome />} />
+        <Route path="teaching" element={<StaffTeachingHome />} />
         <Route path="results" element={<ResultsHome />} />
         <Route path="results/:termSubjectId" element={<SubjectScores />} />
         <Route path=":featureKey" element={<FeaturePage />} />

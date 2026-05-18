@@ -9,7 +9,7 @@ use App\Models\SchoolClass;
 
 class DepartmentTemplateSync
 {
-    private const ALLOWED_LEVELS = ['pre_nursery', 'nursery', 'primary', 'secondary'];
+    private const ALLOWED_LEVELS = ['creche', 'pre_nursery', 'nursery', 'primary', 'secondary'];
 
     public static function normalizeLevels(mixed $rawLevels): array
     {

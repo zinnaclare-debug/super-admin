@@ -686,6 +686,9 @@ class LoginDetailsController extends Controller
             return '';
         }
 
+        if (str_starts_with($normalized, 'creche')) {
+            return 'creche';
+        }
         if (str_starts_with($normalized, 'pre_nursery') || str_starts_with($normalized, 'prenursery')) {
             return 'pre_nursery';
         }

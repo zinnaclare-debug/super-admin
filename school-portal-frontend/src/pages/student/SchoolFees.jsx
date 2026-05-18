@@ -23,6 +23,10 @@ function stateClass(status) {
   return "payx-state payx-state--loading";
 }
 
+function periodKey(period) {
+  return `${period?.academic_session_id || ""}:${period?.term_id || ""}`;
+}
+
 export default function StudentSchoolFees() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -33,14 +37,20 @@ export default function StudentSchoolFees() {
   const [error, setError] = useState("");
   const [summary, setSummary] = useState(null);
   const [amount, setAmount] = useState("");
+  const [selectedPeriodKey, setSelectedPeriodKey] = useState("");
 
   const fee = summary?.fee || {};
   const outstanding = Number(fee?.outstanding || 0);
   const amountDue = Number(fee?.amount_due || 0);
   const totalPaid = Number(fee?.total_paid || 0);
+  const arrearsOutstanding = Number(fee?.arrears_outstanding || 0);
+  const totalPayable = Number(fee?.total_payable || outstanding);
+  const feePeriods = Array.isArray(fee?.fee_periods) ? fee.fee_periods : [];
+  const selectedPeriod = feePeriods.find((period) => periodKey(period) === selectedPeriodKey) || null;
+  const selectedOutstanding = Number(selectedPeriod?.outstanding || 0);
   const hasInvoice = !!fee?.has_invoice;
   const isFullyPaid = !!fee?.is_fully_paid;
-  const canPay = !!fee?.can_pay;
+  const canPay = !!fee?.can_pay && feePeriods.some((period) => Number(period?.outstanding || 0) > 0);
   const paymentStatus = fee?.payment_status || "awaiting_invoice";
   const paymentStatusLabel = fee?.payment_status_label || "Awaiting Invoice";
   const statusMessage =
@@ -79,12 +89,20 @@ export default function StudentSchoolFees() {
 
   useEffect(() => {
     if (!summary) return;
-    if (canPay && outstanding > 0) {
-      setAmount(String(outstanding));
+    const firstPayable = feePeriods.find((period) => Number(period?.outstanding || 0) > 0);
+    if (firstPayable) {
+      setSelectedPeriodKey(periodKey(firstPayable));
+      setAmount(String(Number(firstPayable.outstanding || 0)));
     } else {
+      setSelectedPeriodKey("");
       setAmount("");
     }
-  }, [summary, outstanding, canPay]);
+  }, [summary]);
+
+  const selectPeriod = (period) => {
+    setSelectedPeriodKey(periodKey(period));
+    setAmount(String(Number(period?.outstanding || 0)));
+  };
 
   const verifyPayment = async (reference) => {
     if (!reference) return;
@@ -112,16 +130,24 @@ export default function StudentSchoolFees() {
     if (!canPay) {
       return alert("School fees online payment is not available until your invoice is ready.");
     }
+    if (!selectedPeriod) {
+      return alert("Select the term/session balance you want to pay.");
+    }
 
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       return alert("Enter a valid amount.");
+    }
+    if (value > selectedOutstanding) {
+      return alert("Amount cannot exceed the selected outstanding balance.");
     }
 
     setPaying(true);
     try {
       const res = await api.post("/api/student/school-fees/initialize", {
         amount: value,
+        academic_session_id: selectedPeriod.academic_session_id,
+        term_id: selectedPeriod.term_id,
       });
       const url = res.data?.data?.authorization_url;
       if (!url) throw new Error("No authorization URL returned");
@@ -233,13 +259,23 @@ export default function StudentSchoolFees() {
                     </span>
                   </div>
                   <div className="payx-row">
+                    <span className="payx-label">Old Debt / Arrears</span>
+                    <span className="payx-value">NGN {formatMoney(arrearsOutstanding)}</span>
+                  </div>
+                  <div className="payx-row">
                     <span className="payx-label">Total Paid</span>
                     <span className="payx-value">NGN {formatMoney(totalPaid)}</span>
                   </div>
                   <div className="payx-row">
-                    <span className="payx-label">Outstanding</span>
+                    <span className="payx-label">Current Term Outstanding</span>
                     <span className="payx-value">
                       {hasInvoice ? `NGN ${formatMoney(outstanding)}` : "Awaiting invoice"}
+                    </span>
+                  </div>
+                  <div className="payx-row">
+                    <span className="payx-label">Total Payable</span>
+                    <span className="payx-value">
+                      {hasInvoice ? `NGN ${formatMoney(totalPayable)}` : "Awaiting invoice"}
                     </span>
                   </div>
                   <div className="payx-row">
@@ -266,15 +302,70 @@ export default function StudentSchoolFees() {
 
                     <div className="payx-kv" style={{ marginTop: 12 }}>
                       <div className="payx-row">
-                        <span className="payx-label">Total Invoice</span>
+                        <span className="payx-label">Current Fee</span>
                         <span className="payx-value">NGN {formatMoney(amountDue)}</span>
                       </div>
                       <div className="payx-row">
-                        <span className="payx-label">Payment Made</span>
+                        <span className="payx-label">Current Payment Made</span>
                         <span className="payx-value">NGN {formatMoney(totalPaid)}</span>
                       </div>
                       <div className="payx-row">
-                        <span className="payx-label">Outstanding Balance</span>
+                        <span className="payx-label">All Outstanding Balances</span>
+                        <span className="payx-value">NGN {formatMoney(totalPayable)}</span>
+                      </div>
+                    </div>
+
+                    <div className="payx-period-list">
+                      <h4>Choose What You Want To Pay</h4>
+                      {feePeriods.map((period) => {
+                        const periodOutstanding = Number(period?.outstanding || 0);
+                        const selected = periodKey(period) === selectedPeriodKey;
+
+                        return (
+                          <button
+                            type="button"
+                            className={`payx-period-card${selected ? " payx-period-card--selected" : ""}`}
+                            key={periodKey(period)}
+                            onClick={() => selectPeriod(period)}
+                            disabled={periodOutstanding <= 0 || paying || verifying}
+                          >
+                            <span>
+                              <strong>{period.period_label}</strong>
+                              <small>{period.type === "arrears" ? "Outstanding debt / arrears" : "Current term fee"}</small>
+                            </span>
+                            <span>
+                              <small>Fee: NGN {formatMoney(period.amount_due)}</small>
+                              <small>Paid: NGN {formatMoney(period.total_paid)}</small>
+                              <strong>Balance: NGN {formatMoney(periodOutstanding)}</strong>
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {feePeriods.length === 0 ? (
+                        <p className="payx-small">No payable fee period is available yet.</p>
+                      ) : null}
+                    </div>
+
+                    {selectedPeriod ? (
+                      <div className="payx-kv" style={{ marginTop: 12 }}>
+                        <div className="payx-row">
+                          <span className="payx-label">Selected Balance</span>
+                          <span className="payx-value">
+                            {selectedPeriod.period_label} - NGN {formatMoney(selectedOutstanding)}
+                          </span>
+                        </div>
+                        <div className="payx-row">
+                          <span className="payx-label">Selected Type</span>
+                          <span className="payx-value">
+                            {selectedPeriod.type === "arrears" ? "Old Debt / Arrears" : "Current Term Fee"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="payx-kv" style={{ marginTop: 12 }}>
+                      <div className="payx-row">
+                        <span className="payx-label">Current Outstanding</span>
                         <span className="payx-value">NGN {formatMoney(outstanding)}</span>
                       </div>
                     </div>
@@ -309,7 +400,7 @@ export default function StudentSchoolFees() {
                           {verifying ? <span className="payx-label">Verifying payment...</span> : null}
                         </div>
                         <small className="payx-small">
-                          You can pay partially. Remaining balance will continue to show until the invoice is fully settled.
+                          You can pay one selected term/session at a time. Old debts will continue to show separately until each one is fully settled.
                         </small>
                       </>
                     ) : null}
@@ -331,6 +422,7 @@ export default function StudentSchoolFees() {
                       <th>S/N</th>
                       <th>Reference</th>
                       <th>Amount</th>
+                      <th>Session / Term</th>
                       <th>Status</th>
                       <th>Reason</th>
                       <th>Date</th>
@@ -345,6 +437,7 @@ export default function StudentSchoolFees() {
                         <td>
                           {p.currency} {formatMoney(p.amount_paid)}
                         </td>
+                        <td>{p.session_label || "-"} / {p.term_label || "-"}</td>
                         <td>{p.status}</td>
                         <td>{p.failure_reason || "-"}</td>
                         <td>{p.paid_at || p.created_at || "-"}</td>
@@ -361,7 +454,7 @@ export default function StudentSchoolFees() {
                     ))}
                     {(summary?.payments || []).length === 0 ? (
                       <tr>
-                        <td colSpan="7">No payments yet.</td>
+                        <td colSpan="8">No payments yet.</td>
                       </tr>
                     ) : null}
                   </tbody>

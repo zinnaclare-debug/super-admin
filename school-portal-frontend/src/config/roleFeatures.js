@@ -12,6 +12,7 @@ export const ROLE_FEATURES = {
     "question bank",
     "behaviour rating",
     "school fees",
+    "teaching",
   ],
   student: [
     "attendance",

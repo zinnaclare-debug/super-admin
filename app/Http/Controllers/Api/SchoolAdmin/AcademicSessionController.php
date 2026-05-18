@@ -671,6 +671,12 @@ class AcademicSessionController extends Controller
         $name = strtolower(trim($className));
         $level = strtolower(trim($classLevel));
 
+        if (preg_match('/(?:creche)\D*(\d+)/i', $name, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/(?:pre\s*[-_]?\s*nursery|prenursery)\D*(\d+)/i', $name, $m)) {
+            return 5 + (int) $m[1];
+        }
         if (preg_match('/(?:nursery|kg)\D*(\d+)/i', $name, $m)) {
             return 10 + (int) $m[1];
         }
@@ -697,6 +703,10 @@ class AcademicSessionController extends Controller
         }
 
         return match (true) {
+            $currentRank >= 1 && $currentRank < 3 => $currentRank + 1,
+            $currentRank === 3 => 6,
+            $currentRank >= 6 && $currentRank < 8 => $currentRank + 1,
+            $currentRank === 8 => 11,
             $currentRank >= 11 && $currentRank < 13 => $currentRank + 1,
             $currentRank === 13 => 21,
             $currentRank >= 21 && $currentRank < 26 => $currentRank + 1,

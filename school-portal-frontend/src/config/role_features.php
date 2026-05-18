@@ -13,6 +13,7 @@ return [
         'question bank',
         'behaviour rating',
         'school fees',
+        'teaching',
     ],
 
     'student' => [

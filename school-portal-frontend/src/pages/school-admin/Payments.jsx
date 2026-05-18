@@ -52,11 +52,16 @@ export default function SchoolAdminPayments() {
   const [levelFilter, setLevelFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [selectedTermId, setSelectedTermId] = useState("");
 
   const filterOptions = context?.filter_options || {};
   const levelOptions = Array.isArray(filterOptions.levels) ? filterOptions.levels : [];
   const classOptions = Array.isArray(filterOptions.classes) ? filterOptions.classes : [];
   const departmentOptions = Array.isArray(filterOptions.departments) ? filterOptions.departments : [];
+  const paymentPeriods = Array.isArray(context?.payment_periods) ? context.payment_periods : [];
+  const selectedSession = paymentPeriods.find((period) => String(period.id) === String(selectedSessionId)) || null;
+  const selectedTermOptions = Array.isArray(selectedSession?.terms) ? selectedSession.terms : [];
 
   const totals = context?.totals || { paid: 0, outstanding: 0 };
 
@@ -71,6 +76,8 @@ export default function SchoolAdminPayments() {
       setActiveLevels(levels);
       setLevelFees(buildInitialLevelFees(levels, data?.fees_by_level || {}));
       setPaystackSubaccountCode(String(data?.paystack_subaccount_code ?? ""));
+      setSelectedSessionId(String(data?.current_session?.id || ""));
+      setSelectedTermId(String(data?.current_term?.id || ""));
     } catch (e) {
       const message = e?.response?.data?.message || "Failed to load payment config.";
       setSessionConfigError(message);
@@ -100,6 +107,8 @@ export default function SchoolAdminPayments() {
         view: viewMode,
         status: statusFilter,
       };
+      if (selectedSessionId) params.academic_session_id = selectedSessionId;
+      if (selectedTermId) params.term_id = selectedTermId;
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
       if (departmentFilter) params.department = departmentFilter;
@@ -135,6 +144,8 @@ export default function SchoolAdminPayments() {
     levelFilter,
     classFilter,
     departmentFilter,
+    selectedSessionId,
+    selectedTermId,
   ]);
 
   const saveConfig = async () => {
@@ -179,6 +190,8 @@ export default function SchoolAdminPayments() {
         status: statusFilter,
         search,
       };
+      if (selectedSessionId) params.academic_session_id = selectedSessionId;
+      if (selectedTermId) params.term_id = selectedTermId;
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
       if (departmentFilter) params.department = departmentFilter;
@@ -229,6 +242,14 @@ export default function SchoolAdminPayments() {
     return "Payment Records";
   }, [viewMode]);
 
+  const handleSessionFilterChange = (sessionId) => {
+    const nextSession = paymentPeriods.find((period) => String(period.id) === String(sessionId));
+    const firstTerm = Array.isArray(nextSession?.terms) ? nextSession.terms[0] : null;
+    setSelectedSessionId(String(sessionId || ""));
+    setSelectedTermId(firstTerm ? String(firstTerm.id) : "");
+    setPage(1);
+  };
+
   return (
     <div className="payx-page payx-page--admin">
       <section className="payx-hero">
@@ -239,8 +260,8 @@ export default function SchoolAdminPayments() {
             Filter by payment status, level, class, department, and view outstanding students with downloadable summary.
           </p>
           <div className="payx-meta">
-            <span>{context?.current_session?.session_name || context?.current_session?.academic_year || "Session -"}</span>
-            <span>{context?.current_term?.name || "Term -"}</span>
+            <span>{context?.selected_session?.session_name || context?.selected_session?.academic_year || context?.current_session?.session_name || context?.current_session?.academic_year || "Session -"}</span>
+            <span>{context?.selected_term?.name || context?.current_term?.name || "Term -"}</span>
             <span>{activeLevels.length} active level{activeLevels.length === 1 ? "" : "s"}</span>
           </div>
         </div>
@@ -364,6 +385,38 @@ export default function SchoolAdminPayments() {
               <option value="unsuccessful">Unsuccessful Payments</option>
             </select>
 
+            <select
+              className="payx-input"
+              value={selectedSessionId}
+              onChange={(e) => handleSessionFilterChange(e.target.value)}
+              style={{ width: 190 }}
+            >
+              <option value="">Select Session</option>
+              {paymentPeriods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.label || period.session_name || period.academic_year || `Session ${period.id}`}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="payx-input"
+              value={selectedTermId}
+              onChange={(e) => {
+                setSelectedTermId(e.target.value);
+                setPage(1);
+              }}
+              style={{ width: 170 }}
+              disabled={!selectedSessionId}
+            >
+              <option value="">Select Term</option>
+              {selectedTermOptions.map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.name}
+                </option>
+              ))}
+            </select>
+
             <select className="payx-input" value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} style={{ width: 170 }}>
               <option value="">All Levels</option>
               {levelOptions.map((v) => <option key={v} value={v}>{prettyLevel(v)}</option>)}
@@ -396,6 +449,8 @@ export default function SchoolAdminPayments() {
               setClassFilter("");
               setDepartmentFilter("");
               setSearch("");
+              setSelectedSessionId(String(context?.current_session?.id || ""));
+              setSelectedTermId(String(context?.current_term?.id || ""));
               setPage(1);
             }}>
               Clear Filters
@@ -453,6 +508,13 @@ export default function SchoolAdminPayments() {
                         </tr>
                       ) : null}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="5"><strong>Total For Selected Filter</strong></td>
+                        <td><strong>NGN {Number(totals.paid || 0).toFixed(2)}</strong></td>
+                        <td><strong>NGN {Number(totals.outstanding || 0).toFixed(2)}</strong></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 ) : (
                   <table className="payx-table">
@@ -491,6 +553,13 @@ export default function SchoolAdminPayments() {
                         </tr>
                       ) : null}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="5"><strong>Total Successful Payments For Selected Filter</strong></td>
+                        <td><strong>NGN {Number(totals.paid || 0).toFixed(2)}</strong></td>
+                        <td colSpan="4"></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 )}
               </div>
@@ -515,4 +584,3 @@ export default function SchoolAdminPayments() {
     </div>
   );
 }
-

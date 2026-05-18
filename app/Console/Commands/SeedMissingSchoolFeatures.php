@@ -26,6 +26,7 @@ class SeedMissingSchoolFeatures extends Command
             ['key' => 'school fees', 'description' => 'Fees & payments'],
             ['key' => 'attendance', 'description' => 'Student attendance tracking'],
             ['key' => 'class progress', 'description' => 'Class teacher progress overview'],
+            ['key' => 'teaching', 'description' => 'Staff teaching uploads and school admin downloads'],
         ];
 
         $schools = School::all();

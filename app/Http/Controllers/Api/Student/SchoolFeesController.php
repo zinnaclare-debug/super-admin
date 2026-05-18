@@ -40,35 +40,40 @@ class SchoolFeesController extends Controller
             ], 422);
         }
 
-        $studentLevel = $this->resolveStudentLevel(
+        $feePeriods = $this->buildFeePeriods(
             $schoolId,
             (int) $student->id,
             (int) $session->id,
             (int) $term->id
         );
-        $feeSource = $this->resolveStudentFeeSource(
+        $currentPeriod = collect($feePeriods)->first(fn ($row) => (bool) ($row['is_current'] ?? false));
+        $amountDue = (float) ($currentPeriod['amount_due'] ?? 0);
+        $totalPaid = (float) ($currentPeriod['total_paid'] ?? 0);
+        $outstanding = (float) ($currentPeriod['outstanding'] ?? 0);
+        $studentLevel = $currentPeriod['student_level'] ?? $this->resolveStudentLevel(
             $schoolId,
             (int) $student->id,
             (int) $session->id,
-            (int) $term->id,
-            $studentLevel
+            (int) $term->id
         );
-        $amountDue = (float) $feeSource['amount_due'];
-        $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
-            ->where('student_id', $student->id)
-            ->where('academic_session_id', $session->id)
-            ->where('term_id', $term->id)
-            ->where('status', 'success')
-            ->sum('amount_paid');
-        $outstanding = max($amountDue - $totalPaid, 0);
+        $feeSource = [
+            'configured_level' => $currentPeriod['configured_level'] ?? null,
+            'source' => $currentPeriod['source'] ?? null,
+            'line_items' => $currentPeriod['line_items'] ?? [],
+        ];
+        $arrearsOutstanding = (float) collect($feePeriods)
+            ->where('type', 'arrears')
+            ->sum('outstanding');
+        $totalPayable = (float) collect($feePeriods)->sum('outstanding');
 
         $payments = SchoolFeePayment::where('school_id', $schoolId)
             ->where('student_id', $student->id)
-            ->where('academic_session_id', $session->id)
-            ->where('term_id', $term->id)
             ->orderByDesc('id')
             ->get()
             ->map(function ($p) {
+                $session = AcademicSession::query()->find((int) $p->academic_session_id);
+                $term = Term::query()->find((int) $p->term_id);
+
                 return [
                     'id' => $p->id,
                     'reference' => $p->reference,
@@ -80,6 +85,8 @@ class SchoolFeesController extends Controller
                     'failure_reason' => $p->status === 'success'
                         ? null
                         : ($p->paystack_gateway_response ?: $p->paystack_status ?: 'Payment unsuccessful'),
+                    'session_label' => $this->sessionLabel($session),
+                    'term_label' => $term?->name ?: '-',
                     'receipt_download_url' => '/api/student/school-fees/payments/' . $p->id . '/receipt',
                 ];
             })
@@ -104,8 +111,11 @@ class SchoolFeesController extends Controller
                     'outstanding' => $outstanding,
                     'source' => $feeSource['source'],
                     'line_items' => $feeSource['line_items'],
+                    'arrears_outstanding' => $arrearsOutstanding,
+                    'total_payable' => $totalPayable,
+                    'fee_periods' => $feePeriods,
                     'invoice_download_url' => '/api/student/school-fees/invoice',
-                ], $this->buildFeeStatusPayload($amountDue, $totalPaid, $outstanding)),
+                ], $this->buildFeeStatusPayload($amountDue + $arrearsOutstanding, $totalPaid, $totalPayable)),
                 'student' => [
                     'id' => $student->id,
                     'name' => $user->name,
@@ -133,45 +143,58 @@ class SchoolFeesController extends Controller
             ], 422);
         }
 
-        $studentLevel = $this->resolveStudentLevel(
-            $schoolId,
-            (int) $student->id,
-            (int) $session->id,
-            (int) $term->id
-        );
-        $feeSource = $this->resolveStudentFeeSource(
-            $schoolId,
-            (int) $student->id,
-            (int) $session->id,
-            (int) $term->id,
-            $studentLevel
-        );
-        $amountDue = (float) $feeSource['amount_due'];
-        if ($amountDue <= 0) {
+        $payload = $request->validate([
+            'amount' => 'required|numeric|min:100',
+            'academic_session_id' => 'nullable|integer',
+            'term_id' => 'nullable|integer',
+        ]);
+
+        $targetSessionId = (int) ($payload['academic_session_id'] ?? $session->id);
+        $targetTermId = (int) ($payload['term_id'] ?? $term->id);
+        $feePeriods = $this->buildFeePeriods($schoolId, (int) $student->id, (int) $session->id, (int) $term->id);
+        $targetPeriod = collect($feePeriods)->first(function ($row) use ($targetSessionId, $targetTermId) {
+            return (int) ($row['academic_session_id'] ?? 0) === $targetSessionId
+                && (int) ($row['term_id'] ?? 0) === $targetTermId;
+        });
+
+        if (!$targetPeriod) {
             return response()->json([
-                'message' => 'School fees online payment has not been inputed for this term. Please contact your school admin.',
+                'message' => 'Selected fee period is not available for payment.',
             ], 422);
         }
 
-        $totalPaid = (float) SchoolFeePayment::where('school_id', $schoolId)
-            ->where('student_id', $student->id)
-            ->where('academic_session_id', $session->id)
-            ->where('term_id', $term->id)
-            ->where('status', 'success')
-            ->sum('amount_paid');
-        $outstanding = max($amountDue - $totalPaid, 0);
-        if ($outstanding <= 0.00001) {
-            return response()->json(['message' => 'School fees already fully paid.'], 422);
+        $targetSession = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->find($targetSessionId);
+        $targetTerm = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $targetSessionId)
+            ->find($targetTermId);
+        if (!$targetSession || !$targetTerm) {
+            return response()->json(['message' => 'Selected fee period was not found.'], 404);
         }
 
-        $payload = $request->validate([
-            'amount' => 'required|numeric|min:100',
-        ]);
+        $studentLevel = $targetPeriod['student_level'] ?? null;
+        $feeSource = [
+            'source' => $targetPeriod['source'] ?? null,
+            'line_items' => $targetPeriod['line_items'] ?? [],
+        ];
+        $amountDue = (float) ($targetPeriod['amount_due'] ?? 0);
+        if ($amountDue <= 0) {
+            return response()->json([
+                'message' => 'School fees online payment has not been inputed for the selected term. Please contact your school admin.',
+            ], 422);
+        }
+
+        $outstanding = (float) ($targetPeriod['outstanding'] ?? 0);
+        if ($outstanding <= 0.00001) {
+            return response()->json(['message' => 'Selected school fee period is already fully paid.'], 422);
+        }
 
         $requestedAmount = round((float) $payload['amount'], 2);
         if ($requestedAmount > $outstanding) {
             return response()->json([
-                'message' => 'Amount cannot exceed outstanding balance.',
+                'message' => 'Amount cannot exceed outstanding balance for the selected term.',
                 'outstanding' => $outstanding,
             ], 422);
         }
@@ -199,8 +222,10 @@ class SchoolFeesController extends Controller
                 'student_id' => $student->id,
                 'student_user_id' => $user->id,
                 'student_username' => $user->username,
-                'academic_session_id' => $session->id,
-                'term_id' => $term->id,
+                'academic_session_id' => $targetSession->id,
+                'term_id' => $targetTerm->id,
+                'payment_period_type' => $targetPeriod['type'] ?? 'current',
+                'payment_period_label' => $targetPeriod['period_label'] ?? null,
             ],
         ];
         if (!empty($school?->paystack_subaccount_code)) {
@@ -228,8 +253,8 @@ class SchoolFeesController extends Controller
             'school_id' => $schoolId,
             'student_id' => $student->id,
             'student_user_id' => $user->id,
-            'academic_session_id' => $session->id,
-            'term_id' => $term->id,
+            'academic_session_id' => $targetSession->id,
+            'term_id' => $targetTerm->id,
             'amount_due_snapshot' => $amountDue,
             'amount_paid' => $requestedAmount,
             'currency' => 'NGN',
@@ -243,6 +268,8 @@ class SchoolFeesController extends Controller
                 'student_username' => $user->username,
                 'fee_source' => $feeSource['source'],
                 'fee_line_items' => $feeSource['line_items'],
+                'payment_period_type' => $targetPeriod['type'] ?? 'current',
+                'payment_period_label' => $targetPeriod['period_label'] ?? null,
             ],
         ]);
 
@@ -380,27 +407,33 @@ class SchoolFeesController extends Controller
             return response()->json(['message' => 'School not found.'], 404);
         }
 
-        $studentLevel = $this->resolveStudentLevel(
+        $feePeriods = $this->buildFeePeriods(
             $schoolId,
             (int) $student->id,
             (int) $session->id,
             (int) $term->id
         );
-        $feeSource = $this->resolveStudentFeeSource(
+        $currentPeriod = collect($feePeriods)->first(fn ($row) => (bool) ($row['is_current'] ?? false));
+        $studentLevel = $currentPeriod['student_level'] ?? $this->resolveStudentLevel(
             $schoolId,
             (int) $student->id,
             (int) $session->id,
-            (int) $term->id,
-            $studentLevel
+            (int) $term->id
         );
-        $amountDue = (float) $feeSource['amount_due'];
-        if ($amountDue <= 0) {
+        $amountDue = (float) ($currentPeriod['amount_due'] ?? 0);
+        $totalPaid = (float) ($currentPeriod['total_paid'] ?? 0);
+        $outstanding = (float) ($currentPeriod['outstanding'] ?? 0);
+        $totalInvoice = (float) collect($feePeriods)->sum('amount_due');
+        $totalPaidAllPeriods = (float) collect($feePeriods)->sum('total_paid');
+        $totalOutstanding = (float) collect($feePeriods)->sum('outstanding');
+
+        if ($totalInvoice <= 0) {
             return response()->json([
-                'message' => 'School fees online payment has not been inputed for this term. Please contact your school admin.',
+                'message' => 'School fees online payment has not been inputed for any payable term. Please contact your school admin.',
             ], 422);
         }
 
-        $lineItems = $feeSource['line_items'];
+        $lineItems = $currentPeriod['line_items'] ?? [];
         if (empty($lineItems)) {
             $lineItems = [[
                 'description' => 'School Fees',
@@ -408,20 +441,12 @@ class SchoolFeesController extends Controller
             ]];
         }
 
-        $totalPaid = (float) SchoolFeePayment::query()
-            ->where('school_id', $schoolId)
-            ->where('student_id', (int) $student->id)
-            ->where('academic_session_id', (int) $session->id)
-            ->where('term_id', (int) $term->id)
-            ->where('status', 'success')
-            ->sum('amount_paid');
-        $outstanding = max($amountDue - $totalPaid, 0);
-        $status = $this->buildFeeStatusPayload($amountDue, $totalPaid, $outstanding);
+        $status = $this->buildFeeStatusPayload($totalInvoice, $totalPaidAllPeriods, $totalOutstanding);
 
         $placement = $this->resolveStudentPlacement((int) $student->id, (int) $term->id);
         $logoDataUri = $this->logoDataUri($school->logo_path);
         $headSignatureDataUri = $this->imageDataUri($school->head_signature_path);
-        $invoiceNumber = 'INV-' . $schoolId . '-' . $student->id . '-' . $session->id . '-' . $term->id;
+        $invoiceNumber = 'INV-' . $schoolId . '-' . $student->id . '-' . $session->id . '-' . $term->id . '-ALL';
 
         try {
             @set_time_limit(120);
@@ -439,9 +464,13 @@ class SchoolFeesController extends Controller
                 'session' => $session,
                 'term' => $term,
                 'lineItems' => $lineItems,
+                'feePeriods' => $feePeriods,
                 'amountDue' => $amountDue,
                 'totalPaid' => $totalPaid,
                 'outstanding' => $outstanding,
+                'totalInvoice' => $totalInvoice,
+                'totalPaidAllPeriods' => $totalPaidAllPeriods,
+                'totalOutstanding' => $totalOutstanding,
                 'statusLabel' => $status['payment_status_label'],
                 'statusMessage' => $status['status_message'],
                 'invoiceNumber' => $invoiceNumber,
@@ -650,6 +679,109 @@ class SchoolFeesController extends Controller
             'payment_status_label' => 'Payment Pending',
             'status_message' => 'Invoice is available for this term. No payment has been made yet.',
         ];
+    }
+
+    private function buildFeePeriods(int $schoolId, int $studentId, int $currentSessionId, int $currentTermId): array
+    {
+        $student = Student::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $studentId)
+            ->first();
+        $studentLevelFallback = strtolower(trim((string) ($student?->education_level ?? '')));
+
+        $terms = Term::query()
+            ->join('academic_sessions', 'academic_sessions.id', '=', 'terms.academic_session_id')
+            ->where('terms.school_id', $schoolId)
+            ->where('academic_sessions.school_id', $schoolId)
+            ->where(function ($query) use ($currentSessionId, $currentTermId) {
+                $query->where('terms.academic_session_id', '<', $currentSessionId)
+                    ->orWhere(function ($sub) use ($currentSessionId, $currentTermId) {
+                        $sub->where('terms.academic_session_id', $currentSessionId)
+                            ->where('terms.id', '<=', $currentTermId);
+                    });
+            })
+            ->orderBy('terms.academic_session_id')
+            ->orderBy('terms.id')
+            ->get([
+                'terms.id',
+                'terms.name',
+                'terms.academic_session_id',
+                'academic_sessions.session_name',
+                'academic_sessions.academic_year',
+            ]);
+
+        $rows = [];
+        foreach ($terms as $periodTerm) {
+            $sessionId = (int) $periodTerm->academic_session_id;
+            $termId = (int) $periodTerm->id;
+            $isCurrent = $sessionId === $currentSessionId && $termId === $currentTermId;
+            $studentLevel = $this->resolveStudentLevel($schoolId, $studentId, $sessionId, $termId)
+                ?: ($studentLevelFallback ?: null);
+            $feeSource = $this->resolveStudentFeeSource($schoolId, $studentId, $sessionId, $termId, $studentLevel);
+            $amountDue = (float) $feeSource['amount_due'];
+            $totalPaid = (float) SchoolFeePayment::query()
+                ->where('school_id', $schoolId)
+                ->where('student_id', $studentId)
+                ->where('academic_session_id', $sessionId)
+                ->where('term_id', $termId)
+                ->where('status', 'success')
+                ->sum('amount_paid');
+            $outstanding = max($amountDue - $totalPaid, 0);
+
+            if ($amountDue <= 0.00001 && $totalPaid <= 0.00001) {
+                continue;
+            }
+
+            // Old settled terms stay in history, not in the carried-forward payable list.
+            if (!$isCurrent && $outstanding <= 0.00001) {
+                continue;
+            }
+
+            $sessionLabel = trim((string) ($periodTerm->session_name ?: $periodTerm->academic_year ?: 'Session ' . $sessionId));
+            $termLabel = trim((string) ($periodTerm->name ?: 'Term ' . $termId));
+            $lineItems = $feeSource['line_items'];
+            if (empty($lineItems) && $amountDue > 0) {
+                $lineItems = [[
+                    'description' => 'School Fees',
+                    'amount' => $amountDue,
+                ]];
+            }
+
+            $rows[] = [
+                'academic_session_id' => $sessionId,
+                'term_id' => $termId,
+                'session_label' => $sessionLabel,
+                'term_label' => $termLabel,
+                'period_label' => $sessionLabel . ' / ' . $termLabel,
+                'type' => $isCurrent ? 'current' : 'arrears',
+                'is_current' => $isCurrent,
+                'student_level' => $studentLevel,
+                'configured_level' => $feeSource['configured_level'],
+                'source' => $feeSource['source'],
+                'line_items' => $lineItems,
+                'amount_due' => $amountDue,
+                'total_paid' => $totalPaid,
+                'outstanding' => $outstanding,
+                'can_pay' => $outstanding > 0.00001,
+            ];
+        }
+
+        return collect($rows)
+            ->sortBy([
+                ['academic_session_id', 'asc'],
+                ['term_id', 'asc'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function sessionLabel(?AcademicSession $session): string
+    {
+        if (!$session) {
+            return '-';
+        }
+
+        return (string) ($session->session_name ?: $session->academic_year ?: ('Session ' . $session->id));
     }
 
     private function resolveCurrentSessionAndTerm(int $schoolId): array
