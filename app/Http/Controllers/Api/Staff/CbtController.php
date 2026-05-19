@@ -324,6 +324,84 @@ class CbtController extends Controller
   }
 
   // GET /api/staff/cbt/exams/{exam}/questions
+  public function resetExam(Request $request, CbtExam $exam)
+  {
+    $user = $request->user();
+    abort_unless($user->role === 'staff', 403);
+    $schoolId = $user->school_id;
+
+    abort_unless((int) $exam->school_id === (int) $schoolId, 403);
+    abort_unless((int) $exam->teacher_user_id === (int) $user->id, 403);
+
+    if (!$this->hasCbtTimingColumns()) {
+      return response()->json([
+        'message' => 'CBT timing schema is missing (starts_at/ends_at/duration). Run migrations and try again.'
+      ], 500);
+    }
+
+    $data = $request->validate([
+      'starts_at' => 'required|date',
+      'ends_at' => 'required|date|after:starts_at',
+      'duration_minutes' => 'required|integer|min:1|max:300',
+    ]);
+
+    $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
+    if (!$session) return response()->json(['message' => 'No current session'], 422);
+
+    $currentTerm = Term::where('school_id', $schoolId)
+      ->where('academic_session_id', $session->id)
+      ->where('is_current', true)
+      ->first();
+    if (!$currentTerm) return response()->json(['message' => 'No current term'], 422);
+
+    $termSubject = TermSubject::where('id', $exam->term_subject_id)
+      ->where('school_id', $schoolId)
+      ->where('teacher_user_id', $user->id)
+      ->first();
+    if (!$termSubject) return response()->json(['message' => 'You are not assigned to this exam subject'], 403);
+
+    $term = Term::where('id', $termSubject->term_id)->where('school_id', $schoolId)->first();
+    if (
+      !$term ||
+      (int) $term->academic_session_id !== (int) $session->id ||
+      (int) $term->id !== (int) $currentTerm->id
+    ) {
+      return response()->json(['message' => 'CBT can only be reset for current session and current term'], 403);
+    }
+
+    $startsAt = Carbon::parse($data['starts_at'])->format('Y-m-d H:i:s');
+    $endsAt = Carbon::parse($data['ends_at'])->format('Y-m-d H:i:s');
+    $durationMinutes = (int) $data['duration_minutes'];
+
+    DB::transaction(function () use ($exam, $schoolId, $startsAt, $endsAt, $durationMinutes) {
+      $payload = [];
+      if ($this->cbtHasColumn('starts_at')) {
+        $payload['starts_at'] = $startsAt;
+      }
+      if ($this->cbtHasColumn('ends_at')) {
+        $payload['ends_at'] = $endsAt;
+      }
+      if ($this->cbtHasColumn('duration_minutes')) {
+        $payload['duration_minutes'] = $durationMinutes;
+      }
+      if ($this->cbtHasColumn('duration')) {
+        $payload['duration'] = $durationMinutes;
+      }
+
+      $exam->forceFill($payload)->save();
+
+      CbtExamAttempt::where('school_id', $schoolId)
+        ->where('cbt_exam_id', $exam->id)
+        ->delete();
+    });
+
+    return response()->json([
+      'message' => 'CBT exam reset successfully. Previous attempts and results were cleared.',
+      'data' => $exam->fresh(),
+    ]);
+  }
+
+  // GET /api/staff/cbt/exams/{exam}/questions
   public function examQuestions(Request $request, CbtExam $exam)
   {
     $user = $request->user();
