@@ -284,9 +284,11 @@ export default function StudentCBTHome() {
     if (!selectedExam) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.classList.add("cbt-exam-active");
+    window.dispatchEvent(new Event("cbt-exam-lockdown-change"));
     document.body.style.overflow = "hidden";
     return () => {
       document.body.classList.remove("cbt-exam-active");
+      window.dispatchEvent(new Event("cbt-exam-lockdown-change"));
       document.body.style.overflow = previousOverflow;
     };
   }, [selectedExam]);

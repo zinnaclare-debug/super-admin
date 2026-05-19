@@ -23,6 +23,9 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     faceDetector: null,
     faceDetectionRunning: false,
     faceDetectionFailures: 0,
+    darkFrameSeconds: 0,
+    lastFaceResultAt: 0,
+    videoEl: null,
   };
 
   const onWarning = callbacks.onWarning || (() => {});
@@ -125,6 +128,30 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     }
   };
 
+  const isVideoFrameDark = (video) => {
+    if (!video?.videoWidth || !video?.videoHeight) return false;
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 24;
+      canvas.height = 16;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return false;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let totalBrightness = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        totalBrightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      }
+
+      const averageBrightness = totalBrightness / (pixels.length / 4);
+      return averageBrightness < 8;
+    } catch {
+      return false;
+    }
+  };
+
   const detectionCenter = (detection, video) => {
     const box = detection?.boundingBox || detection?.locationData?.relativeBoundingBox || detection;
     if (!box) return null;
@@ -209,6 +236,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     });
 
     detector.onResults((results) => {
+      state.lastFaceResultAt = Date.now();
       handleFaceDetections(results?.detections || [], video);
       state.faceDetectionRunning = false;
     });
@@ -226,9 +254,24 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
         return;
       }
 
+      if (isVideoFrameDark(video)) {
+        state.darkFrameSeconds += 1;
+        onStatus({ type: "camera", message: "Camera is returning a blank video frame." });
+        if (state.darkFrameSeconds >= noFaceTimeout) {
+          handleCameraClosed("camera_blank_frame");
+        }
+        return;
+      }
+      state.darkFrameSeconds = 0;
+
       state.faceDetectionRunning = true;
       try {
-        await detector.send({ image: video });
+        await Promise.race([
+          detector.send({ image: video }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("face_detection_timeout")), 2500);
+          }),
+        ]);
         state.faceDetectionFailures = 0;
       } catch {
         state.faceDetectionRunning = false;
@@ -241,6 +284,15 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     }, 1000);
 
     state.timers.push(timer);
+
+    const watchdogTimer = setInterval(() => {
+      if (!state.running) return;
+      const now = Date.now();
+      if (state.lastFaceResultAt && now - state.lastFaceResultAt > 5000) {
+        handleCameraClosed("face_detection_stalled");
+      }
+    }, 1000);
+    state.timers.push(watchdogTimer);
   }
 
   async function enableWebcamChecks() {
@@ -258,6 +310,11 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
       const video = document.createElement("video");
       video.srcObject = state.videoStream;
       video.muted = true;
+      video.playsInline = true;
+      video.setAttribute("playsinline", "true");
+      video.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+      document.body.appendChild(video);
+      state.videoEl = video;
       await video.play();
 
       const cameraLiveTimer = setInterval(() => {
@@ -393,9 +450,15 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     state.lastFaceCenter = null;
     state.lastHeadMovementAt = 0;
     state.soundSeconds = 0;
+    state.darkFrameSeconds = 0;
+    state.lastFaceResultAt = 0;
     if (state.videoStream) {
       state.videoStream.getTracks().forEach((t) => t.stop());
       state.videoStream = null;
+    }
+    if (state.videoEl) {
+      state.videoEl.remove();
+      state.videoEl = null;
     }
     if (state.audioStream) {
       state.audioStream.getTracks().forEach((t) => t.stop());

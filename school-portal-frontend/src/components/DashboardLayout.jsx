@@ -36,6 +36,22 @@ function DashboardLayout() {
     return window.innerWidth <= 768;
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCbtExamActive, setIsCbtExamActive] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return document.body.classList.contains("cbt-exam-active");
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return undefined;
+
+    const syncCbtExamState = () => {
+      setIsCbtExamActive(document.body.classList.contains("cbt-exam-active"));
+    };
+
+    window.addEventListener("cbt-exam-lockdown-change", syncCbtExamState);
+    syncCbtExamState();
+    return () => window.removeEventListener("cbt-exam-lockdown-change", syncCbtExamState);
+  }, []);
 
   useEffect(() => {
     const onResize = () => {
@@ -514,7 +530,7 @@ function DashboardLayout() {
         overflowX: "hidden",
       }}
     >
-      {isMobile ? (
+      {isMobile && !isCbtExamActive ? (
         <>
           <div
             style={{
@@ -616,7 +632,7 @@ function DashboardLayout() {
         </>
       ) : null}
 
-      {!isMobile ? (
+      {!isMobile && !isCbtExamActive ? (
       <aside
         style={{
           width: compactSidebarWidth,
@@ -837,11 +853,11 @@ function DashboardLayout() {
       <main
         style={{
           flex: 1,
-          width: isMobile ? "100%" : isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",
+          width: isCbtExamActive || isMobile ? "100%" : isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",
           minWidth: 0,
           maxWidth: "100%",
           boxSizing: "border-box",
-          padding: isMobile ? "12px 10px" : isCompactSidebar ? "10px 8px 10px 10px" : 30,
+          padding: isCbtExamActive ? 0 : isMobile ? "12px 10px" : isCompactSidebar ? "10px 8px 10px 10px" : 30,
           overflowX: "hidden",
         }}
       >
