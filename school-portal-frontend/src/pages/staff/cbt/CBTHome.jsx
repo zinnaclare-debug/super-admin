@@ -12,10 +12,15 @@ const defaultSecurityPolicy = {
   block_copy_paste: true,
   block_tab_switch: true,
   no_face_timeout_seconds: 30,
-  max_warnings: 3,
+  max_warnings: 2,
   auto_submit_on_violation: true,
   logout_on_violation: true,
   ai_proctoring_enabled: true,
+  auto_submit_on_camera_blocked: true,
+  auto_submit_on_sound_detected: true,
+  sound_detection_enabled: true,
+  sound_threshold: 0.12,
+  sound_duration_seconds: 2,
 };
 
 function createDefaultForm() {
@@ -311,6 +316,7 @@ export default function CBTHome() {
                   ["auto_submit_on_violation", "Auto-submit on violation"],
                   ["logout_on_violation", "Logout on major violation"],
                   ["ai_proctoring_enabled", "Enable AI proctoring hooks"],
+                  ["sound_detection_enabled", "Detect sound/noise"],
                 ].map(([k, label]) => (
                   <label key={k} className="cbx-check">
                     <input
@@ -349,12 +355,12 @@ export default function CBTHome() {
                   className="cbx-field"
                   type="number"
                   min="1"
-                  max="20"
+                  max="2"
                   value={form.security_policy.max_warnings}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      security_policy: { ...form.security_policy, max_warnings: Number(e.target.value) },
+                      security_policy: { ...form.security_policy, max_warnings: Math.min(2, Math.max(1, Number(e.target.value))) },
                     })
                   }
                   placeholder="Max warnings"

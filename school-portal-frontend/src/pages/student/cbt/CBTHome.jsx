@@ -23,11 +23,16 @@ export default function StudentCBTHome() {
     auto_submit_on_violation: true,
     auto_submit_on_fullscreen_exit: true,
     auto_submit_on_multiple_faces: true,
+    auto_submit_on_camera_blocked: true,
+    auto_submit_on_sound_detected: true,
     ai_proctoring_enabled: true,
-    max_warnings: 3,
+    sound_detection_enabled: true,
+    max_warnings: 2,
     no_face_timeout_seconds: 30,
     max_head_movement_warnings: 2,
     head_movement_threshold_px: 60,
+    sound_threshold: 0.12,
+    sound_duration_seconds: 2,
   };
 
   const [exams, setExams] = useState([]);
@@ -50,6 +55,7 @@ export default function StudentCBTHome() {
 
   const securityRef = useRef(null);
   const submittingRef = useRef(false);
+  const selectedExamRef = useRef(null);
 
   const stopSecurityRuntime = () => {
     if (securityRef.current) {
@@ -86,6 +92,7 @@ export default function StudentCBTHome() {
     stopSecurityRuntime();
     await exitFullscreenSafely();
     setSelectedExam(null);
+    selectedExamRef.current = null;
     setQuestions([]);
     setAnswers({});
     setActiveQuestionIndex(0);
@@ -116,12 +123,13 @@ export default function StudentCBTHome() {
   };
 
   const submitExam = async (submitMode = "manual", violationReason = null) => {
-    if (!selectedExam || submittingRef.current) return false;
+    const examForSubmit = selectedExamRef.current || selectedExam;
+    if (!examForSubmit || submittingRef.current) return false;
 
     setSubmitting(true);
     submittingRef.current = true;
     try {
-      const res = await api.post(`/api/student/cbt/exams/${selectedExam.id}/submit`, {
+      const res = await api.post(`/api/student/cbt/exams/${examForSubmit.id}/submit`, {
         answers,
         submit_mode: submitMode,
         violation_reason: violationReason || undefined,
@@ -182,6 +190,7 @@ export default function StudentCBTHome() {
     }
 
     setSelectedExam(exam);
+    selectedExamRef.current = exam;
     setLoadingQuestions(true);
     try {
       await requestFullscreenForExam(exam);

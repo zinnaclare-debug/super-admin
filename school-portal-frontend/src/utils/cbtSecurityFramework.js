@@ -11,9 +11,12 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     headMovementWarnings: 0,
     running: false,
     timers: [],
-    stream: null,
+    videoStream: null,
+    audioStream: null,
+    audioContext: null,
     lastFaceCenter: null,
     lastHeadMovementAt: 0,
+    soundSeconds: 0,
   };
 
   const onWarning = callbacks.onWarning || (() => {});
@@ -21,10 +24,12 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   const onStatus = callbacks.onStatus || (() => {});
   const onHeadMovement = callbacks.onHeadMovement || (() => {});
 
-  const maxWarnings = policy?.max_warnings ?? 3;
+  const maxWarnings = Math.min(Number(policy?.max_warnings ?? 2), 2);
   const noFaceTimeout = policy?.no_face_timeout_seconds ?? 30;
   const maxHeadMovements = policy?.max_head_movement_warnings ?? 2;
   const headMovementThresholdPx = policy?.head_movement_threshold_px ?? 60;
+  const soundThreshold = Number(policy?.sound_threshold ?? 0.12);
+  const soundDuration = Number(policy?.sound_duration_seconds ?? 2);
 
   const warn = (reason) => {
     state.warnings += 1;
@@ -100,9 +105,9 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     if (!navigator.mediaDevices?.getUserMedia) return;
 
     try {
-      state.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      state.videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       const video = document.createElement("video");
-      video.srcObject = state.stream;
+      video.srcObject = state.videoStream;
       video.muted = true;
       await video.play();
 
@@ -172,7 +177,58 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
 
       state.timers.push(timer);
     } catch {
-      warn("webcam_access_denied");
+      if (policy?.auto_submit_on_violation || policy?.auto_submit_on_camera_blocked) {
+        onMajorViolation({ reason: "webcam_access_denied", warnings: state.warnings });
+      } else {
+        warn("webcam_access_denied");
+      }
+    }
+  }
+
+  async function enableSoundChecks() {
+    if (!policy?.sound_detection_enabled) return;
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    if (!window.AudioContext && !window.webkitAudioContext) return;
+
+    try {
+      state.audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      state.audioContext = new AudioCtx();
+      const source = state.audioContext.createMediaStreamSource(state.audioStream);
+      const analyser = state.audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+
+      const data = new Uint8Array(analyser.fftSize);
+      const timer = setInterval(() => {
+        if (!state.running) return;
+        analyser.getByteTimeDomainData(data);
+
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) {
+          const normalized = (data[i] - 128) / 128;
+          sum += normalized * normalized;
+        }
+        const rms = Math.sqrt(sum / data.length);
+
+        if (rms >= soundThreshold) {
+          state.soundSeconds += 1;
+          onStatus({ type: "sound", message: "Sound detected during CBT." });
+          if (state.soundSeconds >= soundDuration) {
+            warn("sound_detected");
+            state.soundSeconds = 0;
+            if (policy?.auto_submit_on_violation || policy?.auto_submit_on_sound_detected) {
+              onMajorViolation({ reason: "sound_detected", warnings: state.warnings });
+            }
+          }
+        } else {
+          state.soundSeconds = 0;
+        }
+      }, 1000);
+
+      state.timers.push(timer);
+    } catch {
+      onStatus({ type: "sound", message: "Microphone check could not start; sound detection disabled." });
     }
   }
 
@@ -198,6 +254,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     document.addEventListener("click", linkClickHandler, true);
     await enterFullscreen();
     await enableWebcamChecks();
+    await enableSoundChecks();
     onStatus({ type: "security", message: "CBT security started." });
   }
 
@@ -217,9 +274,18 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     state.timers = [];
     state.lastFaceCenter = null;
     state.lastHeadMovementAt = 0;
-    if (state.stream) {
-      state.stream.getTracks().forEach((t) => t.stop());
-      state.stream = null;
+    state.soundSeconds = 0;
+    if (state.videoStream) {
+      state.videoStream.getTracks().forEach((t) => t.stop());
+      state.videoStream = null;
+    }
+    if (state.audioStream) {
+      state.audioStream.getTracks().forEach((t) => t.stop());
+      state.audioStream = null;
+    }
+    if (state.audioContext) {
+      state.audioContext.close?.();
+      state.audioContext = null;
     }
   }
 
