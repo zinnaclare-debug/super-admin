@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import api from "../../../services/api";
 import cbtMainArt from "../../../assets/cbt-dashboard/online-meetings.svg";
 import cbtResumeArt from "../../../assets/cbt-dashboard/online-resume.svg";
@@ -29,7 +30,7 @@ export default function StudentCBTHome() {
     ai_proctoring_enabled: true,
     sound_detection_enabled: true,
     max_warnings: 2,
-    no_face_timeout_seconds: 30,
+    no_face_timeout_seconds: 3,
     max_head_movement_warnings: 2,
     head_movement_threshold_px: 60,
     sound_threshold: 0.12,
@@ -78,6 +79,15 @@ export default function StudentCBTHome() {
   const examSecurityPolicy = (exam) => ({
     ...strictSecurityDefaults,
     ...(exam?.security_policy || {}),
+    ai_proctoring_enabled: true,
+    sound_detection_enabled: true,
+    auto_submit_on_violation: true,
+    auto_submit_on_camera_blocked: true,
+    auto_submit_on_no_face: true,
+    auto_submit_on_multiple_faces: true,
+    auto_submit_on_sound_detected: true,
+    max_warnings: 2,
+    no_face_timeout_seconds: Math.min(Number(exam?.security_policy?.no_face_timeout_seconds ?? 3), 3),
   });
 
   const requestFullscreenForExam = async (exam) => {
@@ -273,8 +283,10 @@ export default function StudentCBTHome() {
   useEffect(() => {
     if (!selectedExam) return undefined;
     const previousOverflow = document.body.style.overflow;
+    document.body.classList.add("cbt-exam-active");
     document.body.style.overflow = "hidden";
     return () => {
+      document.body.classList.remove("cbt-exam-active");
       document.body.style.overflow = previousOverflow;
     };
   }, [selectedExam]);
@@ -296,6 +308,98 @@ export default function StudentCBTHome() {
     if (!selectedExam) return;
     await submitExam("exit");
   };
+
+  const examPanel = selectedExam ? (
+    <div className="cbx-page cbx-page--student cbx-exam-lockdown">
+      <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
+        <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
+        <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", fontWeight: 700, color: "#0f172a" }}>
+          <span>Answered {attemptedCount} / {totalCount}</span>
+          <span>Time Left: {formatCountdown(timeLeftSeconds)}</span>
+          <span>Warnings: {securityWarnings}</span>
+          <span>Head Movement: {headMovementWarnings}</span>
+        </div>
+        {securityStatus ? (
+          <p className="cbx-state cbx-state--warn">{securityStatus}</p>
+        ) : null}
+
+        {loadingQuestions ? (
+          <p className="cbx-state cbx-state--loading">Loading questions...</p>
+        ) : currentQuestion ? (
+          <>
+            <div className="cbx-table-wrap">
+              <table className="cbx-table">
+                <tbody>
+                  <tr>
+                    <th style={{ width: 130 }}>Question</th>
+                    <td>{activeQuestionIndex + 1} of {totalCount}: {currentQuestion.question_text}</td>
+                  </tr>
+                  {[
+                    ["A", currentQuestion.option_a],
+                    ["B", currentQuestion.option_b],
+                    ["C", currentQuestion.option_c],
+                    ["D", currentQuestion.option_d],
+                  ].map(([key, text]) => (
+                    <tr key={key}>
+                      <th>Option {key}</th>
+                      <td>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                          <input
+                            type="radio"
+                            name={`question-${currentQuestion.id}`}
+                            value={key}
+                            checked={answers[currentQuestion.id] === key}
+                            onChange={(e) =>
+                              setAnswers((prev) => ({ ...prev, [currentQuestion.id]: e.target.value }))
+                            }
+                          />
+                          <span>{text || "-"}</span>
+                        </label>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="cbx-btn cbx-btn--soft"
+                onClick={() => setActiveQuestionIndex((x) => Math.max(0, x - 1))}
+                disabled={activeQuestionIndex <= 0}
+              >
+                Previous
+              </button>
+              <button
+                className="cbx-btn cbx-btn--soft"
+                onClick={() => setActiveQuestionIndex((x) => Math.min(questions.length - 1, x + 1))}
+                disabled={activeQuestionIndex >= questions.length - 1}
+              >
+                Next
+              </button>
+              <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
+                {submitting ? "Ending..." : "Exit"}
+              </button>
+              <button
+                className="cbx-btn"
+                style={{ marginLeft: "auto" }}
+                onClick={() => submitExam("manual")}
+                disabled={submitting || !questions.length}
+              >
+                {submitting ? "Submitting..." : "Submit"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
+        )}
+      </section>
+    </div>
+  ) : null;
+
+  if (selectedExam && typeof document !== "undefined") {
+    return createPortal(examPanel, document.body);
+  }
 
   return (
     <div className={`cbx-page cbx-page--student ${selectedExam ? "cbx-exam-lockdown" : ""}`}>
@@ -373,90 +477,6 @@ export default function StudentCBTHome() {
             ) : null}
           </section>
         </>
-      ) : selectedExam ? (
-        <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
-          <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
-          <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", fontWeight: 700, color: "#0f172a" }}>
-            <span>Answered {attemptedCount} / {totalCount}</span>
-            <span>Time Left: {formatCountdown(timeLeftSeconds)}</span>
-            <span>Warnings: {securityWarnings}</span>
-            <span>Head Movement: {headMovementWarnings}</span>
-          </div>
-          {securityStatus ? (
-            <p className="cbx-state cbx-state--warn">{securityStatus}</p>
-          ) : null}
-
-          {loadingQuestions ? (
-            <p className="cbx-state cbx-state--loading">Loading questions...</p>
-          ) : currentQuestion ? (
-            <>
-              <div className="cbx-table-wrap">
-                <table className="cbx-table">
-                  <tbody>
-                    <tr>
-                      <th style={{ width: 130 }}>Question</th>
-                      <td>{activeQuestionIndex + 1} of {totalCount}: {currentQuestion.question_text}</td>
-                    </tr>
-                    {[
-                      ["A", currentQuestion.option_a],
-                      ["B", currentQuestion.option_b],
-                      ["C", currentQuestion.option_c],
-                      ["D", currentQuestion.option_d],
-                    ].map(([key, text]) => (
-                      <tr key={key}>
-                        <th>Option {key}</th>
-                        <td>
-                          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                            <input
-                              type="radio"
-                              name={`question-${currentQuestion.id}`}
-                              value={key}
-                              checked={answers[currentQuestion.id] === key}
-                              onChange={(e) =>
-                                setAnswers((prev) => ({ ...prev, [currentQuestion.id]: e.target.value }))
-                              }
-                            />
-                            <span>{text || "-"}</span>
-                          </label>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  className="cbx-btn cbx-btn--soft"
-                  onClick={() => setActiveQuestionIndex((x) => Math.max(0, x - 1))}
-                  disabled={activeQuestionIndex <= 0}
-                >
-                  Previous
-                </button>
-                <button
-                  className="cbx-btn cbx-btn--soft"
-                  onClick={() => setActiveQuestionIndex((x) => Math.min(questions.length - 1, x + 1))}
-                  disabled={activeQuestionIndex >= questions.length - 1}
-                >
-                  Next
-                </button>
-                <button className="cbx-btn cbx-btn--danger" onClick={handleExitExam} disabled={submitting}>
-                  {submitting ? "Ending..." : "Exit"}
-                </button>
-                <button
-                  className="cbx-btn"
-                  style={{ marginLeft: "auto" }}
-                  onClick={() => submitExam("manual")}
-                  disabled={submitting || !questions.length}
-                >
-                  {submitting ? "Submitting..." : "Submit"}
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="cbx-state cbx-state--empty">No questions in this exam yet.</p>
-          )}
-        </section>
       ) : (
         <section className="cbx-panel" style={{ maxWidth: 980, margin: "0 auto" }}>
           <h3 style={{ marginTop: 0 }}>{reviewExam?.title || "Exam Review"}</h3>

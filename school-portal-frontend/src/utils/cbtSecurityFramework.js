@@ -22,6 +22,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     majorViolationSent: false,
     faceDetector: null,
     faceDetectionRunning: false,
+    faceDetectionFailures: 0,
   };
 
   const onWarning = callbacks.onWarning || (() => {});
@@ -30,7 +31,11 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   const onHeadMovement = callbacks.onHeadMovement || (() => {});
 
   const maxWarnings = Math.min(Number(policy?.max_warnings ?? 2), 2);
-  const noFaceTimeout = policy?.no_face_timeout_seconds ?? 30;
+  const configuredNoFaceTimeout = Number(policy?.no_face_timeout_seconds ?? 3);
+  const noFaceTimeout =
+    policy?.auto_submit_on_violation || policy?.auto_submit_on_no_face
+      ? Math.min(Math.max(configuredNoFaceTimeout, 1), 3)
+      : Math.max(configuredNoFaceTimeout, 1);
   const maxHeadMovements = policy?.max_head_movement_warnings ?? 2;
   const headMovementThresholdPx = policy?.head_movement_threshold_px ?? 60;
   const soundThreshold = Number(policy?.sound_threshold ?? 0.12);
@@ -213,12 +218,25 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
 
     const timer = setInterval(async () => {
       if (!state.running || state.faceDetectionRunning) return;
+
+      const tracks = state.videoStream?.getVideoTracks?.() || [];
+      const hasLiveTrack = tracks.some((track) => track.readyState === "live" && track.enabled && !track.muted);
+      if (!hasLiveTrack || video.paused || video.ended || video.readyState < 2) {
+        handleCameraClosed("camera_not_live");
+        return;
+      }
+
       state.faceDetectionRunning = true;
       try {
         await detector.send({ image: video });
+        state.faceDetectionFailures = 0;
       } catch {
         state.faceDetectionRunning = false;
+        state.faceDetectionFailures += 1;
         onStatus({ type: "proctoring", message: "MediaPipe face check failed on this frame." });
+        if (state.faceDetectionFailures >= 3) {
+          handleCameraClosed("face_detection_failed");
+        }
       }
     }, 1000);
 

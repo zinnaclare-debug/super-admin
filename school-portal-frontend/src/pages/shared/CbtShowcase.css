@@ -26,10 +26,27 @@
 .cbx-exam-lockdown {
   position: fixed;
   inset: 0;
-  z-index: 99999;
+  z-index: 2147483647;
   overflow-y: auto;
   border-radius: 0;
   padding: 20px;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(125, 211, 252, 0.28), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(34, 197, 94, 0.2), transparent 50%),
+    linear-gradient(135deg, #164e63, #0e7490 52%, #0f172a);
+}
+
+body.cbt-exam-active {
+  overflow: hidden !important;
+}
+
+body.cbt-exam-active #root {
+  visibility: hidden;
+}
+
+body.cbt-exam-active .cbx-exam-lockdown {
+  visibility: visible;
 }
 
 .cbx-hero {
