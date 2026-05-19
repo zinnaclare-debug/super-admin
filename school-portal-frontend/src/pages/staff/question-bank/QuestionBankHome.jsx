@@ -420,11 +420,6 @@ export default function QuestionBankHome() {
                 {aiGenerating ? "Generating..." : "Generate by AI"}
               </button>
             </div>
-            {aiGenerating ? (
-              <small className="qbx-state qbx-state--loading">
-                AI question generation is running in the queue. You can stay on this page while it completes.
-              </small>
-            ) : null}
           </div>
         </section>
 

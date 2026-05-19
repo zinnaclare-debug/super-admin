@@ -144,12 +144,165 @@ class QuestionBankController extends Controller
     ];
   }
 
+  private function buildBiologyFallbackQuestions(string $topic, int $count): array
+  {
+    $topicKey = strtolower($topic);
+    $templates = [];
+
+    if (str_contains($topicKey, 'brain')) {
+      $templates = [
+        [
+          'Which part of the brain controls balance and coordination of voluntary movement?',
+          'Cerebellum',
+          ['Cerebrum', 'Medulla oblongata', 'Hypothalamus'],
+          'The cerebellum coordinates balance, posture, and smooth movement.',
+        ],
+        [
+          'Which part of the brain is mainly responsible for thinking, memory, learning, and voluntary actions?',
+          'Cerebrum',
+          ['Cerebellum', 'Spinal cord', 'Medulla oblongata'],
+          'The cerebrum handles higher mental activities and voluntary actions.',
+        ],
+        [
+          'The medulla oblongata controls which of the following activities?',
+          'Breathing and heartbeat',
+          ['Bone growth', 'Food digestion in the stomach', 'Blood filtration'],
+          'The medulla controls involuntary activities such as breathing and heartbeat.',
+        ],
+        [
+          'What protects the brain from physical injury?',
+          'The skull',
+          ['The rib cage', 'The backbone only', 'The diaphragm'],
+          'The skull is the hard bony structure that protects the brain.',
+        ],
+        [
+          'Which cells carry messages in the nervous system?',
+          'Neurons',
+          ['Red blood cells', 'Platelets', 'Muscle fibres'],
+          'Neurons are nerve cells that transmit impulses around the body.',
+        ],
+        [
+          'Which structure connects the brain to the spinal cord?',
+          'Brain stem',
+          ['Cerebral cortex', 'Rib cage', 'Pelvis'],
+          'The brain stem links the brain with the spinal cord.',
+        ],
+        [
+          'Which part of the brain helps regulate body temperature and hunger?',
+          'Hypothalamus',
+          ['Cerebellum', 'Skull', 'Optic nerve'],
+          'The hypothalamus helps maintain body temperature, hunger, and thirst.',
+        ],
+        [
+          'A quick withdrawal of the hand from a hot object is called a',
+          'Reflex action',
+          ['Voluntary action', 'Digestive action', 'Respiratory action'],
+          'Reflex actions are fast automatic responses to harmful stimuli.',
+        ],
+        [
+          'Which organ receives information from sense organs and interprets it?',
+          'Brain',
+          ['Heart', 'Liver', 'Kidney'],
+          'The brain receives and interprets information from the sense organs.',
+        ],
+        [
+          'Damage to the cerebellum is most likely to affect',
+          'Balance and coordinated movement',
+          ['Urine formation', 'Blood clotting', 'Food absorption'],
+          'The cerebellum controls coordination and balance.',
+        ],
+      ];
+    } elseif (str_contains($topicKey, 'human body') || str_contains($topicKey, 'body')) {
+      $templates = [
+        [
+          'Which system transports oxygen and nutrients around the human body?',
+          'Circulatory system',
+          ['Digestive system', 'Skeletal system', 'Excretory system'],
+          'The circulatory system moves blood, oxygen, and nutrients around the body.',
+        ],
+        [
+          'Which organ pumps blood to all parts of the body?',
+          'Heart',
+          ['Lungs', 'Stomach', 'Kidney'],
+          'The heart pumps blood through blood vessels to the body.',
+        ],
+        [
+          'Which body system is responsible for breaking down food into simpler substances?',
+          'Digestive system',
+          ['Respiratory system', 'Nervous system', 'Muscular system'],
+          'The digestive system breaks food down so nutrients can be absorbed.',
+        ],
+        [
+          'The lungs are the main organs of which body system?',
+          'Respiratory system',
+          ['Circulatory system', 'Skeletal system', 'Reproductive system'],
+          'The lungs are used for breathing and gaseous exchange.',
+        ],
+        [
+          'Which body system gives shape, support, and protection to the body?',
+          'Skeletal system',
+          ['Digestive system', 'Nervous system', 'Endocrine system'],
+          'The skeleton supports the body and protects delicate organs.',
+        ],
+        [
+          'Which organs remove excess water, salts, and urea from the blood?',
+          'Kidneys',
+          ['Lungs', 'Small intestine', 'Pancreas'],
+          'The kidneys filter blood and produce urine.',
+        ],
+        [
+          'Which system controls and coordinates body activities using nerve impulses?',
+          'Nervous system',
+          ['Digestive system', 'Circulatory system', 'Skeletal system'],
+          'The nervous system controls body responses through nerve impulses.',
+        ],
+        [
+          'What is the basic structural and functional unit of the human body?',
+          'Cell',
+          ['Tissue', 'Organ', 'System'],
+          'The cell is the smallest living unit of the body.',
+        ],
+        [
+          'A group of similar cells performing the same function is called a',
+          'Tissue',
+          ['System', 'Skeleton', 'Joint'],
+          'A tissue is made up of similar cells working together.',
+        ],
+        [
+          'Which body system enables movement by working with bones?',
+          'Muscular system',
+          ['Respiratory system', 'Excretory system', 'Digestive system'],
+          'Muscles contract and relax to move bones at joints.',
+        ],
+      ];
+    }
+
+    if (empty($templates)) {
+      return [];
+    }
+
+    $rows = [];
+    foreach (array_slice($templates, 0, $count) as $index => [$question, $correct, $wrong, $explanation]) {
+      $rows[] = $this->buildFallbackMcq($question, $correct, $wrong, $explanation, $index);
+    }
+
+    return $this->uniqueQuestions($rows);
+  }
+
   private function buildFallbackQuestions(string $subjectName, string $prompt, int $count): array
   {
     $cleanPrompt = trim((string)(preg_replace('/\s+/', ' ', $prompt) ?? ''));
     $subjectLabel = trim($subjectName) !== '' ? $subjectName : 'the subject';
     $topic = $this->extractPromptTopic($cleanPrompt, $subjectLabel);
     $topicTitle = ucfirst($topic);
+    $subjectKey = strtolower($subjectLabel);
+
+    if (str_contains($subjectKey, 'biology') || str_contains($subjectKey, 'basic science')) {
+      $biologyRows = $this->buildBiologyFallbackQuestions($topic, $count);
+      if (count($biologyRows) >= $count) {
+        return array_slice($biologyRows, 0, $count);
+      }
+    }
 
     preg_match_all('/[A-Za-z][A-Za-z0-9\-]{2,}/', strtolower($cleanPrompt), $matches);
     $keywords = array_values(array_unique(array_slice($matches[0] ?? [], 0, 10)));
