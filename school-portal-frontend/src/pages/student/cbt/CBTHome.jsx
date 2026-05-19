@@ -24,6 +24,7 @@ export default function StudentCBTHome() {
     auto_submit_on_fullscreen_exit: true,
     auto_submit_on_multiple_faces: true,
     auto_submit_on_camera_blocked: true,
+    auto_submit_on_no_face: true,
     auto_submit_on_sound_detected: true,
     ai_proctoring_enabled: true,
     sound_detection_enabled: true,
@@ -269,6 +270,15 @@ export default function StudentCBTHome() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedExam) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedExam]);
+
   const currentQuestion = questions[activeQuestionIndex] || null;
   const attemptedCount = Object.values(answers).filter((v) => ["A", "B", "C", "D"].includes(String(v))).length;
   const totalCount = questions.length;
@@ -288,7 +298,7 @@ export default function StudentCBTHome() {
   };
 
   return (
-    <div className="cbx-page cbx-page--student">
+    <div className={`cbx-page cbx-page--student ${selectedExam ? "cbx-exam-lockdown" : ""}`}>
       {!selectedExam && !reviewExam ? (
         <>
           <section className="cbx-hero">

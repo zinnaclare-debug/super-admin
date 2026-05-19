@@ -4,6 +4,8 @@
   This is a best-effort browser layer, not a full secure browser.
 */
 
+import { FaceDetection } from "@mediapipe/face_detection";
+
 export function createCbtSecurityFramework(policy, callbacks = {}) {
   const state = {
     warnings: 0,
@@ -17,6 +19,9 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     lastFaceCenter: null,
     lastHeadMovementAt: 0,
     soundSeconds: 0,
+    majorViolationSent: false,
+    faceDetector: null,
+    faceDetectionRunning: false,
   };
 
   const onWarning = callbacks.onWarning || (() => {});
@@ -31,11 +36,17 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   const soundThreshold = Number(policy?.sound_threshold ?? 0.12);
   const soundDuration = Number(policy?.sound_duration_seconds ?? 2);
 
+  const majorViolation = (reason, extra = {}) => {
+    if (state.majorViolationSent) return;
+    state.majorViolationSent = true;
+    onMajorViolation({ reason, warnings: state.warnings, ...extra });
+  };
+
   const warn = (reason) => {
     state.warnings += 1;
     onWarning({ reason, warnings: state.warnings });
     if (state.warnings >= maxWarnings) {
-      onMajorViolation({ reason, warnings: state.warnings });
+      majorViolation(reason);
     }
   };
 
@@ -93,12 +104,126 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   const fullscreenHandler = () => {
     if (policy?.fullscreen_required && !document.fullscreenElement) {
       if (policy?.auto_submit_on_violation || policy?.auto_submit_on_fullscreen_exit) {
-        onMajorViolation({ reason: "fullscreen_exit", warnings: state.warnings });
+        majorViolation("fullscreen_exit");
       } else {
         warn("fullscreen_exit");
       }
     }
   };
+
+  const handleCameraClosed = (reason) => {
+    onStatus({ type: "camera", message: "Camera is not active during CBT." });
+    if (policy?.auto_submit_on_violation || policy?.auto_submit_on_camera_blocked) {
+      majorViolation(reason);
+    } else {
+      warn(reason);
+    }
+  };
+
+  const detectionCenter = (detection, video) => {
+    const box = detection?.boundingBox || detection?.locationData?.relativeBoundingBox || detection;
+    if (!box) return null;
+
+    if (box.xCenter != null && box.yCenter != null) {
+      const x = Number(box.xCenter);
+      const y = Number(box.yCenter);
+      return {
+        x: x <= 1 ? x * (video?.videoWidth || 1) : x,
+        y: y <= 1 ? y * (video?.videoHeight || 1) : y,
+      };
+    }
+
+    const x = Number(box.x ?? box.left ?? 0);
+    const y = Number(box.y ?? box.top ?? 0);
+    const width = Number(box.width ?? 0);
+    const height = Number(box.height ?? 0);
+    return {
+      x: x + width / 2,
+      y: y + height / 2,
+    };
+  };
+
+  const handleFaceDetections = (detections, video) => {
+    const faces = Array.isArray(detections) ? detections : [];
+    if (!faces.length) {
+      state.noFaceSeconds += 1;
+      state.lastFaceCenter = null;
+      if (state.noFaceSeconds >= noFaceTimeout) {
+        if (policy?.auto_submit_on_violation || policy?.auto_submit_on_no_face) {
+          majorViolation("no_face_detected");
+        } else {
+          warn("no_face_detected");
+        }
+        state.noFaceSeconds = 0;
+      }
+      return;
+    }
+
+    state.noFaceSeconds = 0;
+    if (faces.length > 1) {
+      warn("multiple_faces_detected");
+      if (policy?.auto_submit_on_violation || policy?.auto_submit_on_multiple_faces) {
+        majorViolation("multiple_faces_detected");
+      }
+    }
+
+    const center = detectionCenter(faces[0], video);
+    if (!center) return;
+
+    if (state.lastFaceCenter) {
+      const dx = center.x - state.lastFaceCenter.x;
+      const dy = center.y - state.lastFaceCenter.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const now = Date.now();
+
+      if (distance >= headMovementThresholdPx && now - state.lastHeadMovementAt >= 1500) {
+        state.headMovementWarnings += 1;
+        state.lastHeadMovementAt = now;
+        onHeadMovement({ count: state.headMovementWarnings, distance });
+        warn("head_movement_detected");
+
+        if (state.headMovementWarnings >= maxHeadMovements) {
+          majorViolation("head_movement_limit_exceeded", {
+            head_movements: state.headMovementWarnings,
+          });
+        }
+      }
+    }
+
+    state.lastFaceCenter = center;
+  };
+
+  async function enableMediaPipeFaceChecks(video) {
+    const detector = new FaceDetection({
+      locateFile: (file) => `/mediapipe/face_detection/${file}`,
+    });
+
+    detector.setOptions({
+      model: "short",
+      minDetectionConfidence: Number(policy?.min_face_detection_confidence ?? 0.6),
+    });
+
+    detector.onResults((results) => {
+      handleFaceDetections(results?.detections || [], video);
+      state.faceDetectionRunning = false;
+    });
+
+    state.faceDetector = detector;
+    onStatus({ type: "proctoring", message: "MediaPipe AI face detection started." });
+
+    const timer = setInterval(async () => {
+      if (!state.running || state.faceDetectionRunning) return;
+      state.faceDetectionRunning = true;
+      try {
+        await detector.send({ image: video });
+      } catch {
+        state.faceDetectionRunning = false;
+        onStatus({ type: "proctoring", message: "MediaPipe face check failed on this frame." });
+      }
+    }, 1000);
+
+    state.timers.push(timer);
+  }
 
   async function enableWebcamChecks() {
     if (!policy?.ai_proctoring_enabled) return;
@@ -106,14 +231,37 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
 
     try {
       state.videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const videoTracks = state.videoStream.getVideoTracks();
+      videoTracks.forEach((track) => {
+        track.onended = () => handleCameraClosed("camera_ended");
+        track.onmute = () => handleCameraClosed("camera_muted");
+      });
+
       const video = document.createElement("video");
       video.srcObject = state.videoStream;
       video.muted = true;
       await video.play();
 
+      const cameraLiveTimer = setInterval(() => {
+        if (!state.running) return;
+        const tracks = state.videoStream?.getVideoTracks?.() || [];
+        const hasLiveTrack = tracks.some((track) => track.readyState === "live" && track.enabled && !track.muted);
+        if (!hasLiveTrack) {
+          handleCameraClosed("camera_not_live");
+        }
+      }, 1000);
+      state.timers.push(cameraLiveTimer);
+
+      try {
+        await enableMediaPipeFaceChecks(video);
+        return;
+      } catch {
+        onStatus({ type: "proctoring", message: "MediaPipe AI face detector failed; using browser fallback." });
+      }
+
       const faceDetector = "FaceDetector" in window ? new window.FaceDetector({ maxDetectedFaces: 2 }) : null;
       if (!faceDetector) {
-        onStatus({ type: "proctoring", message: "FaceDetector API not available; AI checks disabled." });
+        onStatus({ type: "proctoring", message: "AI face detector is not available in this browser; camera-live checks remain active." });
         return;
       }
 
@@ -121,55 +269,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
         if (!state.running) return;
         try {
           const faces = await faceDetector.detect(video);
-          if (!faces.length) {
-            state.noFaceSeconds += 2;
-            state.lastFaceCenter = null;
-            if (state.noFaceSeconds >= noFaceTimeout) {
-              warn("no_face_detected");
-              state.noFaceSeconds = 0;
-            }
-          } else {
-            state.noFaceSeconds = 0;
-            if (faces.length > 1) {
-              warn("multiple_faces_detected");
-              if (policy?.auto_submit_on_violation || policy?.auto_submit_on_multiple_faces) {
-                onMajorViolation({ reason: "multiple_faces_detected", warnings: state.warnings });
-              }
-            }
-
-            // Head movement guard (best effort): if face center jumps repeatedly, treat as violation.
-            const box = faces[0]?.boundingBox;
-            if (box) {
-              const center = {
-                x: box.x + box.width / 2,
-                y: box.y + box.height / 2,
-              };
-
-              if (state.lastFaceCenter) {
-                const dx = center.x - state.lastFaceCenter.x;
-                const dy = center.y - state.lastFaceCenter.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const now = Date.now();
-
-                if (distance >= headMovementThresholdPx && now - state.lastHeadMovementAt >= 1500) {
-                  state.headMovementWarnings += 1;
-                  state.lastHeadMovementAt = now;
-                  onHeadMovement({ count: state.headMovementWarnings, distance });
-                  warn("head_movement_detected");
-
-                  if (state.headMovementWarnings >= maxHeadMovements) {
-                    onMajorViolation({
-                      reason: "head_movement_limit_exceeded",
-                      warnings: state.warnings,
-                      head_movements: state.headMovementWarnings,
-                    });
-                  }
-                }
-              }
-
-              state.lastFaceCenter = center;
-            }
-          }
+          handleFaceDetections(faces, video);
         } catch {
           // ignore detector frame errors
         }
@@ -178,7 +278,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
       state.timers.push(timer);
     } catch {
       if (policy?.auto_submit_on_violation || policy?.auto_submit_on_camera_blocked) {
-        onMajorViolation({ reason: "webcam_access_denied", warnings: state.warnings });
+        majorViolation("webcam_access_denied");
       } else {
         warn("webcam_access_denied");
       }
@@ -218,7 +318,7 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
             warn("sound_detected");
             state.soundSeconds = 0;
             if (policy?.auto_submit_on_violation || policy?.auto_submit_on_sound_detected) {
-              onMajorViolation({ reason: "sound_detected", warnings: state.warnings });
+              majorViolation("sound_detected");
             }
           }
         } else {
@@ -287,6 +387,11 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
       state.audioContext.close?.();
       state.audioContext = null;
     }
+    if (state.faceDetector) {
+      state.faceDetector.close?.();
+      state.faceDetector = null;
+    }
+    state.faceDetectionRunning = false;
   }
 
   return {
