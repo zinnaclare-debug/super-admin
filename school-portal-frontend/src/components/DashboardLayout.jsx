@@ -37,20 +37,39 @@ function DashboardLayout() {
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCbtExamActive, setIsCbtExamActive] = useState(() => {
-    if (typeof document === "undefined") return false;
-    return document.body.classList.contains("cbt-exam-active");
+    if (typeof window === "undefined" || typeof document === "undefined") return false;
+    return Boolean(window.__CBT_EXAM_LOCKDOWN__) || document.body.dataset.cbtLockdown === "true" || document.body.classList.contains("cbt-exam-active");
   });
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return undefined;
 
-    const syncCbtExamState = () => {
-      setIsCbtExamActive(document.body.classList.contains("cbt-exam-active"));
+    const syncCbtExamState = (event) => {
+      const eventState = event?.detail?.active;
+      const active =
+        typeof eventState === "boolean"
+          ? eventState
+          : Boolean(window.__CBT_EXAM_LOCKDOWN__) ||
+            document.body.dataset.cbtLockdown === "true" ||
+            document.body.classList.contains("cbt-exam-active");
+      setIsCbtExamActive(active);
+      if (active) {
+        setIsMobileMenuOpen(false);
+      }
     };
+
+    const observer = new MutationObserver(syncCbtExamState);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["class", "data-cbt-lockdown"],
+    });
 
     window.addEventListener("cbt-exam-lockdown-change", syncCbtExamState);
     syncCbtExamState();
-    return () => window.removeEventListener("cbt-exam-lockdown-change", syncCbtExamState);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("cbt-exam-lockdown-change", syncCbtExamState);
+    };
   }, []);
 
   useEffect(() => {

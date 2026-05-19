@@ -297,7 +297,10 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
 
   async function enableWebcamChecks() {
     if (!policy?.ai_proctoring_enabled) return;
-    if (!navigator.mediaDevices?.getUserMedia) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      handleCameraClosed("webcam_api_unavailable");
+      return;
+    }
 
     try {
       state.videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });

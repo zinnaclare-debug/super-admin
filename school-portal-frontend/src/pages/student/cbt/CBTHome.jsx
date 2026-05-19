@@ -16,6 +16,29 @@ function formatDate(value) {
   }
 }
 
+function setCbtExamLockdown(active) {
+  if (typeof window !== "undefined") {
+    window.__CBT_EXAM_LOCKDOWN__ = Boolean(active);
+  }
+
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("cbt-exam-active", Boolean(active));
+    if (active) {
+      document.body.dataset.cbtLockdown = "true";
+    } else {
+      delete document.body.dataset.cbtLockdown;
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("cbt-exam-lockdown-change", {
+        detail: { active: Boolean(active) },
+      })
+    );
+  }
+}
+
 export default function StudentCBTHome() {
   const strictSecurityDefaults = {
     fullscreen_required: true,
@@ -102,6 +125,7 @@ export default function StudentCBTHome() {
   const closeExam = async () => {
     stopSecurityRuntime();
     await exitFullscreenSafely();
+    setCbtExamLockdown(false);
     setSelectedExam(null);
     selectedExamRef.current = null;
     setQuestions([]);
@@ -200,6 +224,7 @@ export default function StudentCBTHome() {
       return;
     }
 
+    setCbtExamLockdown(true);
     setSelectedExam(exam);
     selectedExamRef.current = exam;
     setLoadingQuestions(true);
@@ -236,6 +261,9 @@ export default function StudentCBTHome() {
       }
     } catch (err) {
       setQuestions([]);
+      setCbtExamLockdown(false);
+      setSelectedExam(null);
+      selectedExamRef.current = null;
       alert(err?.response?.data?.message || "Failed to load exam questions");
     } finally {
       setLoadingQuestions(false);
@@ -283,12 +311,10 @@ export default function StudentCBTHome() {
   useEffect(() => {
     if (!selectedExam) return undefined;
     const previousOverflow = document.body.style.overflow;
-    document.body.classList.add("cbt-exam-active");
-    window.dispatchEvent(new Event("cbt-exam-lockdown-change"));
+    setCbtExamLockdown(true);
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.classList.remove("cbt-exam-active");
-      window.dispatchEvent(new Event("cbt-exam-lockdown-change"));
+      setCbtExamLockdown(false);
       document.body.style.overflow = previousOverflow;
     };
   }, [selectedExam]);

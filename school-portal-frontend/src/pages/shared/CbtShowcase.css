@@ -49,6 +49,15 @@ body.cbt-exam-active .cbx-exam-lockdown {
   visibility: visible;
 }
 
+body[data-cbt-lockdown="true"] .feature-shell,
+body[data-cbt-lockdown="true"] aside,
+body[data-cbt-lockdown="true"] header,
+body.cbt-exam-active .feature-shell,
+body.cbt-exam-active aside,
+body.cbt-exam-active header {
+  display: none !important;
+}
+
 .cbx-hero {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

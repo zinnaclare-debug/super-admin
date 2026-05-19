@@ -275,6 +275,7 @@ function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="cbt" element={<StudentCBTHome />} />
         <Route element={<StudentFeatureLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<StudentDashboard />} />
@@ -294,7 +295,6 @@ function App() {
               </Suspense>
             }
           />
-          <Route path="cbt" element={<StudentCBTHome />} />
           <Route path="school-fees" element={<StudentSchoolFees />} />
           <Route path=":featureKey" element={<FeaturePage />} />
         </Route>
