@@ -68,6 +68,20 @@ export default function StudentCBTHome() {
     }
   };
 
+  const examSecurityPolicy = (exam) => ({
+    ...strictSecurityDefaults,
+    ...(exam?.security_policy || {}),
+  });
+
+  const requestFullscreenForExam = async (exam) => {
+    const policy = examSecurityPolicy(exam);
+    if (!policy.fullscreen_required || document.fullscreenElement || !document.documentElement.requestFullscreen) {
+      return;
+    }
+
+    await document.documentElement.requestFullscreen();
+  };
+
   const closeExam = async () => {
     stopSecurityRuntime();
     await exitFullscreenSafely();
@@ -137,7 +151,7 @@ export default function StudentCBTHome() {
   const startSecurityRuntime = async (exam) => {
     stopSecurityRuntime();
 
-    const policy = { ...(exam?.security_policy || {}), ...strictSecurityDefaults };
+    const policy = examSecurityPolicy(exam);
     const runtime = createCbtSecurityFramework(policy, {
       onStatus: ({ message }) => setSecurityStatus(message || ""),
       onWarning: ({ reason, warnings }) => {
@@ -169,6 +183,11 @@ export default function StudentCBTHome() {
 
     setSelectedExam(exam);
     setLoadingQuestions(true);
+    try {
+      await requestFullscreenForExam(exam);
+    } catch {
+      setSecurityStatus("Fullscreen could not start. If required, leaving fullscreen may end the exam.");
+    }
     try {
       const res = await api.get(`/api/student/cbt/exams/${exam.id}/questions`);
       const list = res.data?.data || [];
@@ -338,9 +357,15 @@ export default function StudentCBTHome() {
       ) : selectedExam ? (
         <section className="cbx-panel" style={{ maxWidth: 900, margin: "0 auto" }}>
           <h3 style={{ marginTop: 0 }}>{selectedExam.title}</h3>
-          <div style={{ marginBottom: 12, fontWeight: 700, color: "#0f172a" }}>
-            Answered {attemptedCount} / {totalCount}
+          <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", fontWeight: 700, color: "#0f172a" }}>
+            <span>Answered {attemptedCount} / {totalCount}</span>
+            <span>Time Left: {formatCountdown(timeLeftSeconds)}</span>
+            <span>Warnings: {securityWarnings}</span>
+            <span>Head Movement: {headMovementWarnings}</span>
           </div>
+          {securityStatus ? (
+            <p className="cbx-state cbx-state--warn">{securityStatus}</p>
+          ) : null}
 
           {loadingQuestions ? (
             <p className="cbx-state cbx-state--loading">Loading questions...</p>

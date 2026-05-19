@@ -40,6 +40,12 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
     return false;
   };
 
+  const copyPasteHandler = (e) => {
+    if (!policy?.block_copy_paste) return true;
+    warn("blocked_copy_paste_action");
+    return blockEvent(e);
+  };
+
   const keydownHandler = (e) => {
     const k = (e.key || "").toLowerCase();
     const isCopy = (e.ctrlKey || e.metaKey) && ["c", "x", "v", "a", "p", "s"].includes(k);
@@ -181,10 +187,10 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   async function start() {
     state.running = true;
     window.addEventListener("keydown", keydownHandler, true);
-    document.addEventListener("copy", blockEvent, true);
-    document.addEventListener("cut", blockEvent, true);
-    document.addEventListener("paste", blockEvent, true);
-    document.addEventListener("contextmenu", blockEvent, true);
+    document.addEventListener("copy", copyPasteHandler, true);
+    document.addEventListener("cut", copyPasteHandler, true);
+    document.addEventListener("paste", copyPasteHandler, true);
+    document.addEventListener("contextmenu", copyPasteHandler, true);
     document.addEventListener("visibilitychange", visibilityHandler, true);
     document.addEventListener("fullscreenchange", fullscreenHandler, true);
     window.addEventListener("beforeunload", beforeUnloadHandler, true);
@@ -198,10 +204,10 @@ export function createCbtSecurityFramework(policy, callbacks = {}) {
   function stop() {
     state.running = false;
     window.removeEventListener("keydown", keydownHandler, true);
-    document.removeEventListener("copy", blockEvent, true);
-    document.removeEventListener("cut", blockEvent, true);
-    document.removeEventListener("paste", blockEvent, true);
-    document.removeEventListener("contextmenu", blockEvent, true);
+    document.removeEventListener("copy", copyPasteHandler, true);
+    document.removeEventListener("cut", copyPasteHandler, true);
+    document.removeEventListener("paste", copyPasteHandler, true);
+    document.removeEventListener("contextmenu", copyPasteHandler, true);
     document.removeEventListener("visibilitychange", visibilityHandler, true);
     document.removeEventListener("fullscreenchange", fullscreenHandler, true);
     window.removeEventListener("beforeunload", beforeUnloadHandler, true);
