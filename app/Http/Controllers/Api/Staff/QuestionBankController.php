@@ -19,18 +19,7 @@ class QuestionBankController extends Controller
 {
   private function questionKey(array $q): string
   {
-    $parts = [
-      strtolower(trim((string)($q['question_text'] ?? ''))),
-      strtolower(trim((string)($q['option_a'] ?? ''))),
-      strtolower(trim((string)($q['option_b'] ?? ''))),
-      strtolower(trim((string)($q['option_c'] ?? ''))),
-      strtolower(trim((string)($q['option_d'] ?? ''))),
-    ];
-
-    $normalized = implode('|', array_map(
-      fn($v) => preg_replace('/\s+/', ' ', (string)$v) ?? '',
-      $parts
-    ));
+    $normalized = preg_replace('/\s+/', ' ', strtolower(trim((string)($q['question_text'] ?? '')))) ?? '';
 
     return trim((string)$normalized);
   }
@@ -262,7 +251,14 @@ class QuestionBankController extends Controller
 
   private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): void
   {
+    $seen = $this->existingQuestionKeys($schoolId, $teacherUserId, $subjectId);
+
     foreach ($generated as $q) {
+      $key = $this->questionKey((array) $q);
+      if ($key === '' || isset($seen[$key])) {
+        continue;
+      }
+
       QuestionBankQuestion::create([
         'school_id' => $schoolId,
         'teacher_user_id' => $teacherUserId,
@@ -271,7 +267,28 @@ class QuestionBankController extends Controller
         'media_path' => null,
         'media_type' => null,
       ]);
+
+      $seen[$key] = true;
     }
+  }
+
+  private function existingQuestionKeys(int $schoolId, int $teacherUserId, int $subjectId): array
+  {
+    $keys = [];
+
+    QuestionBankQuestion::query()
+      ->where('school_id', $schoolId)
+      ->where('teacher_user_id', $teacherUserId)
+      ->where('subject_id', $subjectId)
+      ->pluck('question_text')
+      ->each(function ($text) use (&$keys) {
+        $key = $this->questionKey(['question_text' => $text]);
+        if ($key !== '') {
+          $keys[$key] = true;
+        }
+      });
+
+    return $keys;
   }
 
   private function aiErrorMeta($response): array
@@ -423,6 +440,8 @@ class QuestionBankController extends Controller
     $data = $request->validate([
       'subject_id' => 'nullable|integer',
       'term_subject_id' => 'nullable|integer',
+      'page' => 'nullable|integer|min:1',
+      'per_page' => 'nullable|integer|min:1|max:100',
     ]);
 
     $query = QuestionBankQuestion::query()
@@ -444,18 +463,33 @@ class QuestionBankController extends Controller
       }
     }
 
-    $items = $query
+    $perPage = (int) ($data['per_page'] ?? 30);
+    $page = (int) ($data['page'] ?? 1);
+
+    $paginator = $query
       ->orderByDesc('question_bank_questions.id')
-      ->get([
+      ->paginate($perPage, [
         'question_bank_questions.*',
         'subjects.name as subject_name',
-      ])
+      ], 'page', $page);
+
+    $items = $paginator->getCollection()
       ->map(function ($q) {
         $q->media_url = $q->media_path ? Storage::disk('public')->url($q->media_path) : null;
         return $q;
       });
 
-    return response()->json(['data' => $items]);
+    return response()->json([
+      'data' => $items->values(),
+      'meta' => [
+        'current_page' => $paginator->currentPage(),
+        'per_page' => $paginator->perPage(),
+        'total' => $paginator->total(),
+        'last_page' => $paginator->lastPage(),
+        'from' => $paginator->firstItem(),
+        'to' => $paginator->lastItem(),
+      ],
+    ]);
   }
 
   // POST /api/staff/question-bank
@@ -861,5 +895,35 @@ Rules:
     $question->delete();
 
     return response()->json(['message' => 'Deleted']);
+  }
+
+  public function bulkDestroy(Request $request)
+  {
+    $user = $request->user();
+    abort_unless($user->role === 'staff', 403);
+    $schoolId = $user->school_id;
+
+    $data = $request->validate([
+      'question_ids' => 'required|array|min:1|max:200',
+      'question_ids.*' => 'required|integer',
+    ]);
+
+    $questions = QuestionBankQuestion::query()
+      ->where('school_id', $schoolId)
+      ->where('teacher_user_id', $user->id)
+      ->whereIn('id', array_values(array_unique($data['question_ids'])))
+      ->get();
+
+    foreach ($questions as $question) {
+      if ($question->media_path && Storage::disk('public')->exists($question->media_path)) {
+        Storage::disk('public')->delete($question->media_path);
+      }
+      $question->delete();
+    }
+
+    return response()->json([
+      'message' => 'Selected questions deleted.',
+      'deleted_count' => $questions->count(),
+    ]);
   }
 }

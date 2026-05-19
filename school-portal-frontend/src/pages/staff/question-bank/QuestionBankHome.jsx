@@ -18,6 +18,7 @@ const defaultQuestion = {
   media: null,
   media_type: "image",
 };
+const PAGE_SIZE = 30;
 
 export default function QuestionBankHome() {
   const [subjectsRaw, setSubjectsRaw] = useState([]);
@@ -26,6 +27,8 @@ export default function QuestionBankHome() {
   const [loading, setLoading] = useState(true);
   const [termId, setTermId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [termSubjectId, setTermSubjectId] = useState("");
+  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
   const [exportExamId, setExportExamId] = useState("");
   const [draft, setDraft] = useState(defaultQuestion);
@@ -37,15 +40,17 @@ export default function QuestionBankHome() {
   const manualCreateRef = useRef(null);
   const questionTextRef = useRef(null);
 
-  const loadQuestions = async (sid = "") => {
+  const loadQuestions = async (sid = "", tsid = "", page = 1) => {
     if (!sid) {
       setQuestions([]);
+      setPagination({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
       return;
     }
     const res = await api.get("/api/staff/question-bank", {
-      params: { subject_id: sid },
+      params: { subject_id: sid, term_subject_id: tsid || undefined, page, per_page: PAGE_SIZE },
     });
     setQuestions(res.data?.data || []);
+    setPagination(res.data?.meta || { current_page: page, last_page: 1, total: 0, from: 0, to: 0 });
   };
 
   const loadAll = async () => {
@@ -83,12 +88,12 @@ export default function QuestionBankHome() {
 
   const subjects = useMemo(() => {
     const filtered = termId ? subjectsRaw.filter((s) => String(s.term_id) === String(termId)) : subjectsRaw;
-    return Array.from(new Map(filtered.map((s) => [s.subject_id, s])).values());
+    return filtered;
   }, [subjectsRaw, termId]);
 
   const selectedSubject = useMemo(
-    () => subjects.find((s) => String(s.subject_id) === String(subjectId)) || null,
-    [subjects, subjectId]
+    () => subjects.find((s) => String(s.term_subject_id) === String(termSubjectId)) || subjects.find((s) => String(s.subject_id) === String(subjectId)) || null,
+    [subjects, subjectId, termSubjectId]
   );
 
   useEffect(() => {
@@ -98,25 +103,30 @@ export default function QuestionBankHome() {
       return;
     }
 
-    const exists = subjects.some((s) => String(s.subject_id) === String(subjectId));
-    const nextId = exists ? String(subjectId) : String(subjects[0].subject_id);
+    const exists = subjects.some((s) => String(s.term_subject_id) === String(termSubjectId));
+    const nextSubject = exists ? selectedSubject : subjects[0];
+    const nextId = String(nextSubject?.subject_id || "");
+    const nextTermSubjectId = String(nextSubject?.term_subject_id || "");
 
-    if (nextId !== String(subjectId)) {
+    if (nextId !== String(subjectId) || nextTermSubjectId !== String(termSubjectId)) {
       setSubjectId(nextId);
+      setTermSubjectId(nextTermSubjectId);
       return;
     }
 
-    loadQuestions(nextId).catch((err) => {
+    loadQuestions(nextId, nextTermSubjectId, 1).catch((err) => {
       setQuestions([]);
       console.warn("Question bank questions failed:", err?.response?.data || err?.message);
     });
-  }, [subjects]);
+  }, [subjects, subjectId, termSubjectId, selectedSubject]);
 
-  const handleSubjectSelect = async (nextSubjectId) => {
-    const sid = String(nextSubjectId || "");
+  const handleSubjectSelect = async (subject) => {
+    const sid = String(subject?.subject_id || "");
+    const tsid = String(subject?.term_subject_id || "");
     setSubjectId(sid);
+    setTermSubjectId(tsid);
     setSelectedQuestionIds([]);
-    await loadQuestions(sid);
+    await loadQuestions(sid, tsid, 1);
   };
 
   const createQuestion = async (e) => {
@@ -142,7 +152,7 @@ export default function QuestionBankHome() {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setDraft(defaultQuestion);
-      await loadQuestions(subjectId);
+      await loadQuestions(subjectId, termSubjectId, pagination.current_page || 1);
       alert("Question saved");
     } catch (err) {
       alert(err?.response?.data?.message || "Save failed");
@@ -160,7 +170,7 @@ export default function QuestionBankHome() {
         count: Number(aiCount),
         import_to_bank: aiImport,
       });
-      if (aiImport) await loadQuestions(subjectId);
+      if (aiImport) await loadQuestions(subjectId, termSubjectId, 1);
       alert(`Generated ${res.data?.data?.length || 0} questions for ${selectedSubject?.subject_name || "selected subject"}`);
     } catch (err) {
       const code = err?.response?.data?.code || err?.response?.data?.details?.error?.code;
@@ -184,7 +194,7 @@ export default function QuestionBankHome() {
     if (!window.confirm("Delete this question?")) return;
     try {
       await api.delete(`/api/staff/question-bank/${id}`);
-      await loadQuestions(subjectId);
+      await loadQuestions(subjectId, termSubjectId, pagination.current_page || 1);
       setSelectedQuestionIds((prev) => prev.filter((x) => x !== id));
     } catch (err) {
       alert(err?.response?.data?.message || "Delete failed");
@@ -204,8 +214,35 @@ export default function QuestionBankHome() {
     }
   };
 
+  const bulkDelete = async () => {
+    if (!selectedQuestionIds.length) return alert("Select at least one question to delete.");
+    if (!window.confirm(`Delete ${selectedQuestionIds.length} selected question(s)?`)) return;
+    try {
+      await api.delete("/api/staff/question-bank/bulk-delete", {
+        data: { question_ids: selectedQuestionIds },
+      });
+      setSelectedQuestionIds([]);
+      await loadQuestions(subjectId, termSubjectId, pagination.current_page || 1);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Bulk delete failed");
+    }
+  };
+
   const toggleSelect = (id, checked) => {
     setSelectedQuestionIds((prev) => (checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
+  };
+
+  const toggleSelectPage = (checked) => {
+    const pageIds = questions.map((q) => q.id);
+    setSelectedQuestionIds((prev) => {
+      if (checked) return [...new Set([...prev, ...pageIds])];
+      return prev.filter((id) => !pageIds.includes(id));
+    });
+  };
+
+  const goToPage = async (page) => {
+    const nextPage = Math.max(1, Math.min(Number(page || 1), Number(pagination.last_page || 1)));
+    await loadQuestions(subjectId, termSubjectId, nextPage);
   };
 
   const cleanQuestionText = (text) =>
@@ -254,7 +291,7 @@ export default function QuestionBankHome() {
             </p>
             <div className="qbx-metrics">
               <span>{loading ? "Loading..." : `${subjects.length} subject${subjects.length === 1 ? "" : "s"} available`}</span>
-              <span>{loading ? "Syncing..." : `${questions.length} question${questions.length === 1 ? "" : "s"} in selected subject`}</span>
+              <span>{loading ? "Syncing..." : `${pagination.total || 0} question${Number(pagination.total || 0) === 1 ? "" : "s"} in selected subject`}</span>
             </div>
           </div>
 
@@ -282,6 +319,7 @@ export default function QuestionBankHome() {
                 onChange={(e) => {
                   setTermId(e.target.value);
                   setSelectedQuestionIds([]);
+                  setTermSubjectId("");
                 }}
                 disabled={loading}
               >
@@ -295,7 +333,7 @@ export default function QuestionBankHome() {
             </div>
             <div className="qbx-selected">
               <span>Selected Subject</span>
-              <strong>{selectedSubject?.subject_name || "None selected"}</strong>
+              <strong>{selectedSubject ? `${selectedSubject.subject_name} - ${selectedSubject.class_name}` : "None selected"}</strong>
             </div>
           </div>
 
@@ -305,13 +343,13 @@ export default function QuestionBankHome() {
             ) : (
               subjects.map((s) => (
                 <button
-                  key={s.subject_id}
+                  key={s.term_subject_id}
                   type="button"
-                  className={`qbx-subject-btn ${String(subjectId) === String(s.subject_id) ? "is-active" : ""}`}
-                  onClick={() => handleSubjectSelect(s.subject_id)}
+                  className={`qbx-subject-btn ${String(termSubjectId) === String(s.term_subject_id) ? "is-active" : ""}`}
+                  onClick={() => handleSubjectSelect(s)}
                 >
                   <span>{s.subject_name}</span>
-                  <small>{s.subject_code || s.class_name || "Subject"}</small>
+                  <small>{[s.subject_code, s.class_name].filter(Boolean).join(" | ") || "Subject"}</small>
                 </button>
               ))
             )}
@@ -427,6 +465,9 @@ export default function QuestionBankHome() {
             <button className="qbx-btn" onClick={exportToCBT}>
               Export Selected Questions
             </button>
+            <button className="qbx-btn qbx-btn--danger" onClick={bulkDelete} disabled={!selectedQuestionIds.length}>
+              Delete Selected ({selectedQuestionIds.length})
+            </button>
           </div>
         </section>
 
@@ -457,7 +498,7 @@ export default function QuestionBankHome() {
                           onChange={(e) => toggleSelect(q.id, e.target.checked)}
                         />
                       </td>
-                      <td>{idx + 1}</td>
+                      <td>{(pagination.from || 1) + idx}</td>
                       <td>{cleanQuestionText(q.question_text)}</td>
                       <td>
                         A. {q.option_a}
@@ -491,6 +532,30 @@ export default function QuestionBankHome() {
                   )}
                 </tbody>
               </table>
+              {questions.length ? (
+                <div className="qbx-pagination">
+                  <label className="qbx-check">
+                    <input
+                      type="checkbox"
+                      checked={questions.length > 0 && questions.every((q) => selectedQuestionIds.includes(q.id))}
+                      onChange={(e) => toggleSelectPage(e.target.checked)}
+                    />
+                    Select all on this page
+                  </label>
+                  <span>
+                    Showing {pagination.from || 0}-{pagination.to || 0} of {pagination.total || 0}
+                  </span>
+                  <div className="qbx-inline">
+                    <button className="qbx-btn qbx-btn--soft" onClick={() => goToPage((pagination.current_page || 1) - 1)} disabled={(pagination.current_page || 1) <= 1}>
+                      Previous
+                    </button>
+                    <strong>Page {pagination.current_page || 1} of {pagination.last_page || 1}</strong>
+                    <button className="qbx-btn qbx-btn--soft" onClick={() => goToPage((pagination.current_page || 1) + 1)} disabled={(pagination.current_page || 1) >= (pagination.last_page || 1)}>
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </section>
