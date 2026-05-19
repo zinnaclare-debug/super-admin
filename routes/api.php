@@ -501,6 +501,7 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/question-bank', [StaffQuestionBankController::class, 'index']);
     Route::post('/staff/question-bank', [StaffQuestionBankController::class, 'store']);
     Route::post('/staff/question-bank/ai-generate', [StaffQuestionBankController::class, 'aiGenerate']);
+    Route::get('/staff/question-bank/ai-generate/{generationJob}', [StaffQuestionBankController::class, 'generationStatus']);
     Route::post('/staff/question-bank/bulk-delete', [StaffQuestionBankController::class, 'bulkDestroy']);
     Route::delete('/staff/question-bank/bulk-delete', [StaffQuestionBankController::class, 'bulkDestroy']);
     Route::delete('/staff/question-bank/{question}', [StaffQuestionBankController::class, 'destroy']);

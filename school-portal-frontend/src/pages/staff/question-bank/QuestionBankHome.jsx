@@ -35,10 +35,13 @@ export default function QuestionBankHome() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiCount, setAiCount] = useState(3);
   const [aiImport, setAiImport] = useState(true);
+  const [aiGenerationJob, setAiGenerationJob] = useState(null);
   const [aiFallbackMessage, setAiFallbackMessage] = useState("");
   const [processingMedia, setProcessingMedia] = useState(false);
   const manualCreateRef = useRef(null);
   const questionTextRef = useRef(null);
+  const completedGenerationAlerts = useRef(new Set());
+  const aiGenerating = ["queued", "processing"].includes(aiGenerationJob?.status);
 
   const loadQuestions = async (sid = "", tsid = "", page = 1) => {
     if (!sid) {
@@ -80,6 +83,39 @@ export default function QuestionBankHome() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (!aiGenerationJob?.id || !aiGenerating) return undefined;
+
+    const pollGeneration = async () => {
+      try {
+        const res = await api.get(`/api/staff/question-bank/ai-generate/${aiGenerationJob.id}`);
+        const nextJob = res.data?.data || null;
+        if (!nextJob) return;
+
+        setAiGenerationJob(nextJob);
+
+        if (nextJob.status === "completed" && !completedGenerationAlerts.current.has(nextJob.id)) {
+          completedGenerationAlerts.current.add(nextJob.id);
+          if (Number(nextJob.imported_count || 0) > 0) {
+            await loadQuestions(subjectId, termSubjectId, 1);
+          }
+          alert(`AI generation completed. ${nextJob.imported_count || nextJob.generated_count || 0} question(s) added.`);
+        }
+
+        if (nextJob.status === "failed" && !completedGenerationAlerts.current.has(nextJob.id)) {
+          completedGenerationAlerts.current.add(nextJob.id);
+          alert(nextJob.error_message || "AI generation failed.");
+        }
+      } catch (err) {
+        console.warn("AI generation status failed:", err?.response?.data || err?.message);
+      }
+    };
+
+    pollGeneration();
+    const timer = window.setInterval(pollGeneration, 2500);
+    return () => window.clearInterval(timer);
+  }, [aiGenerationJob?.id, aiGenerating, subjectId, termSubjectId]);
 
   const terms = useMemo(
     () => Array.from(new Map(subjectsRaw.map((s) => [s.term_id, s])).values()),
@@ -170,8 +206,7 @@ export default function QuestionBankHome() {
         count: Number(aiCount),
         import_to_bank: aiImport,
       });
-      if (aiImport) await loadQuestions(subjectId, termSubjectId, 1);
-      alert(`Generated ${res.data?.data?.length || 0} questions for ${selectedSubject?.subject_name || "selected subject"}`);
+      setAiGenerationJob(res.data?.job || null);
     } catch (err) {
       const code = err?.response?.data?.code || err?.response?.data?.details?.error?.code;
       const msg = err?.response?.data?.message || "AI generate failed";
@@ -379,12 +414,17 @@ export default function QuestionBankHome() {
                 <option value={10}>10 questions</option>
               </select>
               <label className="qbx-check">
-                <input type="checkbox" checked={aiImport} onChange={(e) => setAiImport(e.target.checked)} /> Import to question bank
+                <input type="checkbox" checked={aiImport} onChange={(e) => setAiImport(e.target.checked)} disabled={aiGenerating} /> Import to question bank
               </label>
-              <button className="qbx-btn" onClick={generateByAI}>
-                Generate by AI
+              <button className="qbx-btn" onClick={generateByAI} disabled={aiGenerating}>
+                {aiGenerating ? "Generating..." : "Generate by AI"}
               </button>
             </div>
+            {aiGenerating ? (
+              <small className="qbx-state qbx-state--loading">
+                AI question generation is running in the queue. You can stay on this page while it completes.
+              </small>
+            ) : null}
           </div>
         </section>
 

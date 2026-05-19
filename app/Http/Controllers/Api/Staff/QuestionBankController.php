@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateQuestionBankQuestionsJob;
 use App\Models\AcademicSession;
+use App\Models\QuestionBankGenerationJob;
 use App\Models\QuestionBankQuestion;
 use App\Models\Subject;
 use App\Models\TermSubject;
@@ -19,7 +21,10 @@ class QuestionBankController extends Controller
 {
   private function questionKey(array $q): string
   {
-    $normalized = preg_replace('/\s+/', ' ', strtolower(trim((string)($q['question_text'] ?? '')))) ?? '';
+    $text = strtolower(trim((string)($q['question_text'] ?? '')));
+    $text = preg_replace('/\(\s*#?\d+\s*\)\s*$/', '', $text) ?? $text;
+    $text = preg_replace('/#\d+\s*$/', '', $text) ?? $text;
+    $normalized = preg_replace('/\s+/', ' ', $text) ?? '';
 
     return trim((string)$normalized);
   }
@@ -230,28 +235,105 @@ class QuestionBankController extends Controller
       5
     );
 
-    $rows = $this->uniqueQuestions($rows);
-    for ($i = count($rows); $i < $count; $i++) {
-      $rows[] = $this->buildFallbackMcq(
-        "Which action best strengthens {$topicTitle} skills in {$subjectLabel}? (#" . ($i + 1) . ")",
-        "Practice on mixed questions and review each explanation carefully.",
+    $extraTemplates = [
+      [
+        "What shows that a learner understands {$topicTitle} in {$subjectLabel}?",
+        "The learner can explain the idea and use it correctly in a new example.",
         [
-          "Read only the topic title and skip the lesson details.",
-          "Use one method for every question without checking fit.",
-          "Ignore errors because final answers matter more than process.",
+          "The learner only repeats definitions without examples.",
+          "The learner avoids all practical questions on the topic.",
+          "The learner guesses answers without checking the reason.",
         ],
-        "Skill growth requires practice, reflection, and correction.",
-        $i
-      );
+        "True understanding is shown through explanation and correct application.",
+      ],
+      [
+        "Why is feedback useful when studying {$topicTitle}?",
+        "It helps the learner identify mistakes and improve future answers.",
+        [
+          "It replaces the need to practise any question.",
+          "It makes wrong answers automatically correct.",
+          "It removes the need to understand the lesson.",
+        ],
+        "Feedback is valuable because it guides correction and improvement.",
+      ],
+      [
+        "Which question should a student ask after solving a {$topicTitle} problem?",
+        "Can I explain why my answer is correct?",
+        [
+          "Can I avoid checking the answer?",
+          "Can I copy the same answer everywhere?",
+          "Can I skip the next example completely?",
+        ],
+        "Explaining the reason behind an answer strengthens learning.",
+      ],
+      [
+        "Which method best supports long-term memory of {$topicTitle}?",
+        "Reviewing the concept regularly and applying it in different examples.",
+        [
+          "Reading the topic once and never revising it.",
+          "Memorizing only one answer from the lesson.",
+          "Ignoring examples because they take time.",
+        ],
+        "Regular review and varied practice support long-term memory.",
+      ],
+      [
+        "What is the best way to correct a mistake in {$topicTitle}?",
+        "Compare the wrong answer with the explanation and practise a similar question.",
+        [
+          "Erase the answer without checking why it was wrong.",
+          "Repeat the same mistake until it looks familiar.",
+          "Stop studying the topic completely.",
+        ],
+        "Correction works best when the learner understands the cause of the mistake.",
+      ],
+      [
+        "Which learning behaviour should be avoided in {$subjectLabel}?",
+        "Depending on guessing instead of understanding the lesson.",
+        [
+          "Practising with examples after learning the concept.",
+          "Asking for clarification when confused.",
+          "Reviewing mistakes after each exercise.",
+        ],
+        "Guessing weakens learning because it ignores the reason behind answers.",
+      ],
+      [
+        "How can a teacher check understanding of {$topicTitle}?",
+        "Ask learners to solve a new problem and explain their reasoning.",
+        [
+          "Ask learners only to copy notes silently.",
+          "Avoid questions that require explanation.",
+          "Use unrelated examples from another topic only.",
+        ],
+        "New examples and explanations reveal whether learners understand the topic.",
+      ],
+      [
+        "What makes an answer strong in {$topicTitle}?",
+        "It is correct and supported by a clear reason.",
+        [
+          "It is long even when it does not answer the question.",
+          "It is copied without understanding.",
+          "It ignores the instruction in the question.",
+        ],
+        "A strong answer combines correctness with clear reasoning.",
+      ],
+    ];
+
+    foreach ($extraTemplates as $i => [$question, $correct, $wrong, $explanation]) {
+      if (count($rows) >= $count) {
+        break;
+      }
+
+      $rows[] = $this->buildFallbackMcq($question, $correct, $wrong, $explanation, count($rows) + $i);
       $rows = $this->uniqueQuestions($rows);
     }
 
     return array_slice($rows, 0, $count);
   }
 
-  private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): void
+  private function maybeImportToBank(array $generated, int $schoolId, int $teacherUserId, int $subjectId): int
   {
     $seen = $this->existingQuestionKeys($schoolId, $teacherUserId, $subjectId);
+    $imported = 0;
 
     foreach ($generated as $q) {
       $key = $this->questionKey((array) $q);
@@ -269,7 +351,10 @@ class QuestionBankController extends Controller
       ]);
 
       $seen[$key] = true;
+      $imported++;
     }
+
+    return $imported;
   }
 
   private function existingQuestionKeys(int $schoolId, int $teacherUserId, int $subjectId): array
@@ -543,6 +628,180 @@ class QuestionBankController extends Controller
     return response()->json(['message' => 'Saved', 'data' => $row], 201);
   }
 
+  public function generateQuestionsForQueue(
+    int $schoolId,
+    int $teacherUserId,
+    int $subjectId,
+    string $prompt,
+    int $count,
+    bool $importToBank
+  ): array {
+    $subject = Subject::where('id', $subjectId)
+      ->where('school_id', $schoolId)
+      ->first();
+
+    if (!$subject) {
+      throw new \RuntimeException('Invalid subject');
+    }
+
+    $aiBaseUrl = trim((string) config('services.ai.base_url', 'https://api.openai.com/v1'));
+    $aiModel = trim((string) config('services.ai.model', 'gpt-4.1-mini'));
+    $aiApiKey = trim((string) config('services.ai.api_key', ''));
+    $aiCaBundle = trim((string) config('services.ai.ca_bundle', ''));
+    $chatCompletionsUrl = rtrim($aiBaseUrl, '/') . '/chat/completions';
+    $isLocalAiEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $aiBaseUrl);
+
+    $fallbackResult = function (string $message) use ($subject, $prompt, $count, $schoolId, $teacherUserId, $subjectId, $importToBank) {
+      $fallback = $this->withUniqueFallbackFill([], $subject->name, $prompt, $count);
+      $imported = $importToBank ? $this->maybeImportToBank($fallback, $schoolId, $teacherUserId, $subjectId) : 0;
+
+      return [
+        'message' => $message,
+        'fallback' => true,
+        'data' => $fallback,
+        'imported_count' => $imported,
+      ];
+    };
+
+    if ($aiApiKey === '' && !$isLocalAiEndpoint) {
+      return $fallbackResult('AI API key missing on server. Generated fallback questions.');
+    }
+
+    $systemPrompt = "You generate multiple-choice questions from the user's statement.
+Return STRICT JSON only:
+{
+  \"questions\": [
+    {
+      \"question_text\": \"...\",
+      \"option_a\": \"...\",
+      \"option_b\": \"...\",
+      \"option_c\": \"...\",
+      \"option_d\": \"...\",
+      \"correct_option\": \"A|B|C|D\",
+      \"explanation\": \"...\"
+    }
+  ]
+}
+Rules:
+- Generate exactly the requested count.
+- Every question must be unique. Do not repeat or rephrase the same stem.
+- Questions must be based on the statement and subject.
+- question_text must NOT include numbering/prefixes.
+- Keep options concise and plausible.
+- correct_option must be one of A,B,C,D.
+- Keep explanation to one short sentence.";
+
+    $userPrompt = "Subject: {$subject->name}\nCount: {$count}\nStatement:\n{$prompt}";
+
+    $configuredTimeout = (int) config('services.ai.timeout', 45);
+    $configuredConnectTimeout = (int) config('services.ai.connect_timeout', 10);
+    $http = Http::timeout(max(5, min($configuredTimeout, 25)))
+      ->connectTimeout(max(3, min($configuredConnectTimeout, 8)))
+      ->acceptJson();
+
+    if ($aiApiKey !== '') {
+      $http = $http->withToken($aiApiKey);
+    }
+
+    $verifyPath = null;
+    if (str_starts_with(strtolower($chatCompletionsUrl), 'https://')) {
+      $verifyCandidates = array_values(array_filter([
+        $aiCaBundle,
+        ini_get('curl.cainfo'),
+        ini_get('openssl.cafile'),
+        base_path('cacert.pem'),
+        'C:\\Users\\EMMY\\AppData\\Local\\Programs\\PHP\\current\\extras\\ssl\\cacert.pem',
+      ], fn($v) => is_string($v) && trim($v) !== ''));
+
+      foreach ($verifyCandidates as $cand) {
+        if (file_exists($cand)) {
+          $verifyPath = $cand;
+          break;
+        }
+      }
+
+      if ($verifyPath) {
+        $http = $http->withOptions([
+          'verify' => $verifyPath,
+          'curl' => [
+            CURLOPT_CAINFO => $verifyPath,
+          ],
+        ]);
+      }
+    }
+
+    try {
+      $response = $http->retry(1, 500)->post($chatCompletionsUrl, [
+        'model' => $aiModel,
+        'temperature' => 0.3,
+        'max_tokens' => max(250, min(1200, $count * 120)),
+        'stream' => false,
+        'messages' => [
+          ['role' => 'system', 'content' => $systemPrompt],
+          ['role' => 'user', 'content' => $userPrompt],
+        ],
+      ]);
+    } catch (Throwable $e) {
+      Log::error('Queued AI question generation failed', [
+        'base_url' => $aiBaseUrl,
+        'subject_id' => $subjectId,
+        'teacher_user_id' => $teacherUserId,
+        'message' => $e->getMessage(),
+      ]);
+
+      return $fallbackResult('AI provider unavailable. Generated fallback questions.');
+    }
+
+    if ($response->failed()) {
+      [$providerStatus, , $providerMessage] = $this->aiErrorMeta($response);
+      $message = $providerMessage !== ''
+        ? "AI provider failed ({$providerMessage}). Generated fallback questions."
+        : "AI provider failed with status {$providerStatus}. Generated fallback questions.";
+
+      return $fallbackResult($message);
+    }
+
+    $content = (string) data_get($response->json(), 'choices.0.message.content', '');
+    $payload = $this->extractJsonObject($content);
+
+    if (!$payload || !is_array($payload['questions'] ?? null)) {
+      return $fallbackResult('AI returned invalid format. Generated fallback questions.');
+    }
+
+    $generated = collect($payload['questions'])
+      ->take($count)
+      ->map(function ($q) {
+        $correct = strtoupper(trim((string)($q['correct_option'] ?? 'A')));
+        if (!in_array($correct, ['A', 'B', 'C', 'D'], true)) {
+          $correct = 'A';
+        }
+
+        return [
+          'question_text' => $this->stripQuestionPrefix((string)($q['question_text'] ?? '')),
+          'option_a' => trim((string)($q['option_a'] ?? '')),
+          'option_b' => trim((string)($q['option_b'] ?? '')),
+          'option_c' => trim((string)($q['option_c'] ?? '')),
+          'option_d' => trim((string)($q['option_d'] ?? '')),
+          'correct_option' => $correct,
+          'explanation' => trim((string)($q['explanation'] ?? '')),
+          'source_type' => 'ai',
+        ];
+      })
+      ->filter(fn($q) => $q['question_text'] !== '' && $q['option_a'] !== '' && $q['option_b'] !== '')
+      ->values()
+      ->all();
+
+    $generated = $this->withUniqueFallbackFill($generated, $subject->name, $prompt, $count);
+    $imported = $importToBank ? $this->maybeImportToBank($generated, $schoolId, $teacherUserId, $subjectId) : 0;
+
+    return [
+      'message' => 'Generated',
+      'fallback' => false,
+      'data' => $generated,
+      'imported_count' => $imported,
+    ];
+  }
+
   // POST /api/staff/question-bank/ai-generate
   // Generate objective questions from a statement using an OpenAI-compatible API.
   public function aiGenerate(Request $request)
@@ -562,6 +821,26 @@ class QuestionBankController extends Controller
       ->where('school_id', $schoolId)
       ->first();
     if (!$subject) return response()->json(['message' => 'Invalid subject'], 422);
+
+    $generationJob = QuestionBankGenerationJob::create([
+      'school_id' => $schoolId,
+      'teacher_user_id' => $user->id,
+      'subject_id' => $subject->id,
+      'status' => QuestionBankGenerationJob::STATUS_QUEUED,
+      'prompt' => $data['prompt'],
+      'question_count' => (int) $data['count'],
+      'import_to_bank' => (bool) ($data['import_to_bank'] ?? true),
+    ]);
+
+    GenerateQuestionBankQuestionsJob::dispatch($generationJob->id);
+
+    return response()->json([
+      'message' => 'AI question generation queued.',
+      'job' => [
+        'id' => $generationJob->id,
+        'status' => $generationJob->status,
+      ],
+    ], 202);
 
     $aiBaseUrl = trim((string) config('services.ai.base_url', 'https://api.openai.com/v1'));
     $aiModel = trim((string) config('services.ai.model', 'gpt-4.1-mini'));
@@ -876,6 +1155,27 @@ Rules:
     return response()->json([
       'message' => 'Generated',
       'data' => $generated,
+    ]);
+  }
+
+  public function generationStatus(Request $request, QuestionBankGenerationJob $generationJob)
+  {
+    $user = $request->user();
+    abort_unless($user->role === 'staff', 403);
+    abort_unless((int) $generationJob->school_id === (int) $user->school_id, 403);
+    abort_unless((int) $generationJob->teacher_user_id === (int) $user->id, 403);
+
+    return response()->json([
+      'data' => [
+        'id' => $generationJob->id,
+        'status' => $generationJob->status,
+        'generated_count' => $generationJob->generated_count,
+        'imported_count' => $generationJob->imported_count,
+        'message' => data_get($generationJob->result_json, 'message'),
+        'fallback' => (bool) data_get($generationJob->result_json, 'fallback', false),
+        'error_message' => $generationJob->error_message,
+        'completed_at' => optional($generationJob->completed_at)->toISOString(),
+      ],
     ]);
   }
 
