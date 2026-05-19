@@ -218,8 +218,8 @@ export default function QuestionBankHome() {
     if (!selectedQuestionIds.length) return alert("Select at least one question to delete.");
     if (!window.confirm(`Delete ${selectedQuestionIds.length} selected question(s)?`)) return;
     try {
-      await api.delete("/api/staff/question-bank/bulk-delete", {
-        data: { question_ids: selectedQuestionIds },
+      await api.post("/api/staff/question-bank/bulk-delete", {
+        question_ids: selectedQuestionIds,
       });
       setSelectedQuestionIds([]);
       await loadQuestions(subjectId, termSubjectId, pagination.current_page || 1);
@@ -349,7 +349,10 @@ export default function QuestionBankHome() {
                   onClick={() => handleSubjectSelect(s)}
                 >
                   <span>{s.subject_name}</span>
-                  <small>{[s.subject_code, s.class_name].filter(Boolean).join(" | ") || "Subject"}</small>
+                  <small className="qbx-subject-meta">
+                    {s.subject_code ? <b>{s.subject_code}</b> : null}
+                    <em>{s.class_name || "Class not set"}</em>
+                  </small>
                 </button>
               ))
             )}
@@ -465,13 +468,19 @@ export default function QuestionBankHome() {
             <button className="qbx-btn" onClick={exportToCBT}>
               Export Selected Questions
             </button>
-            <button className="qbx-btn qbx-btn--danger" onClick={bulkDelete} disabled={!selectedQuestionIds.length}>
-              Delete Selected ({selectedQuestionIds.length})
-            </button>
           </div>
         </section>
 
         <section className="qbx-panel">
+          <div className="qbx-question-actions">
+            <div>
+              <h3>Questions</h3>
+              <p>{selectedQuestionIds.length} selected from this question bank.</p>
+            </div>
+            <button type="button" className="qbx-btn qbx-btn--danger" onClick={bulkDelete} disabled={!selectedQuestionIds.length}>
+              Delete Selected Questions ({selectedQuestionIds.length})
+            </button>
+          </div>
           {loading ? (
             <p className="qbx-state qbx-state--loading">Loading question bank...</p>
           ) : (
