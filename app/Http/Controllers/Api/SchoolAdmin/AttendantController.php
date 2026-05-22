@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
 use App\Models\SchoolAttendantSetting;
 use App\Models\SchoolPublicHoliday;
 use App\Models\StaffAttendantRecord;
+use App\Models\Term;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -29,6 +31,34 @@ class AttendantController extends Controller
         );
     }
 
+    private function resolveCurrentSessionAndTerm(int $schoolId): array
+    {
+        $session = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('status', 'current')
+            ->first();
+
+        if (!$session) {
+            return [null, null];
+        }
+
+        $term = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('is_current', true)
+            ->first();
+
+        if (!$term) {
+            $term = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return [$session, $term];
+    }
+
     public function context(Request $request)
     {
         $user = $request->user();
@@ -36,10 +66,19 @@ class AttendantController extends Controller
 
         $schoolId = (int) $user->school_id;
         $setting = $this->setting($schoolId);
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
 
         return response()->json([
             'data' => [
                 'setting' => $setting,
+                'current_session' => $session ? [
+                    'id' => $session->id,
+                    'label' => $session->session_name ?: $session->academic_year,
+                ] : null,
+                'current_term' => $term ? [
+                    'id' => $term->id,
+                    'name' => $term->name,
+                ] : null,
                 'staff' => User::query()
                     ->where('school_id', $schoolId)
                     ->where('role', 'staff')
@@ -146,11 +185,20 @@ class AttendantController extends Controller
             'date_to' => 'nullable|date',
             'staff_user_id' => 'nullable|integer',
             'status' => 'nullable|string|max:60',
+            'academic_session_id' => 'nullable|integer',
+            'term_id' => 'nullable|integer',
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'page' => 'nullable|integer|min:1',
         ]);
+        [$session, $term] = $this->resolveCurrentSessionAndTerm((int) $user->school_id);
+        $sessionId = (int) ($data['academic_session_id'] ?? ($session?->id ?? 0));
+        $termId = (int) ($data['term_id'] ?? ($term?->id ?? 0));
 
         $query = StaffAttendantRecord::query()
-            ->with(['staffUser:id,name,email,username'])
+            ->with(['staffUser:id,name,email,username', 'academicSession:id,session_name,academic_year', 'term:id,name'])
             ->where('school_id', $user->school_id)
+            ->when($sessionId > 0, fn ($q) => $q->where('academic_session_id', $sessionId))
+            ->when($termId > 0, fn ($q) => $q->where('term_id', $termId))
             ->when(!empty($data['date_from']), fn ($q) => $q->whereDate('attendance_date', '>=', $data['date_from']))
             ->when(!empty($data['date_to']), fn ($q) => $q->whereDate('attendance_date', '<=', $data['date_to']))
             ->when(!empty($data['staff_user_id']), fn ($q) => $q->where('staff_user_id', $data['staff_user_id']))
@@ -158,7 +206,7 @@ class AttendantController extends Controller
             ->orderByDesc('attendance_date')
             ->orderByDesc('signed_in_at');
 
-        $records = $query->paginate(50);
+        $records = $query->paginate((int) ($data['per_page'] ?? 100));
 
         return response()->json([
             'data' => [
@@ -171,5 +219,110 @@ class AttendantController extends Controller
                 ],
             ],
         ]);
+    }
+
+    public function history(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'school_admin', 403);
+
+        $schoolId = (int) $user->school_id;
+        $staff = User::query()
+            ->where('school_id', $schoolId)
+            ->where('role', 'staff')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'username', 'is_active', 'created_at']);
+
+        $records = StaffAttendantRecord::query()
+            ->with(['staffUser:id,name,email,username,is_active', 'academicSession:id,session_name,academic_year,status', 'term:id,name,academic_session_id'])
+            ->where('school_id', $schoolId)
+            ->whereNotNull('academic_session_id')
+            ->whereNotNull('term_id')
+            ->orderBy('attendance_date')
+            ->get();
+
+        $recordStaff = $records
+            ->pluck('staffUser')
+            ->filter()
+            ->unique('id')
+            ->values();
+        $staffRows = $staff->merge($recordStaff)
+            ->unique('id')
+            ->sortBy(fn ($item) => strtolower((string) $item->name))
+            ->values();
+
+        $sessions = AcademicSession::query()
+            ->with(['terms' => fn ($query) => $query->orderBy('id')])
+            ->where('school_id', $schoolId)
+            ->orderByDesc('id')
+            ->get();
+        $recordsByTerm = $records->groupBy(fn ($record) => (int) $record->term_id);
+
+        $history = $sessions->map(function (AcademicSession $session) use ($recordsByTerm, $staffRows) {
+            $terms = $session->terms->map(function (Term $term) use ($recordsByTerm, $staffRows) {
+                $termRecords = $recordsByTerm->get((int) $term->id, collect());
+                $expectedDates = $termRecords
+                    ->pluck('attendance_date')
+                    ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $expectedDays = $expectedDates->count();
+                $recordsByStaff = $termRecords->groupBy(fn ($record) => (int) $record->staff_user_id);
+
+                $summary = $staffRows->map(function (User $staff, int $index) use ($recordsByStaff, $expectedDays) {
+                    $rows = $recordsByStaff->get((int) $staff->id, collect());
+                    $present = $rows
+                        ->pluck('attendance_date')
+                        ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                        ->filter()
+                        ->unique()
+                        ->count();
+                    $late = $rows
+                        ->filter(fn ($row) => $row->status === 'late')
+                        ->pluck('attendance_date')
+                        ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                        ->unique()
+                        ->count();
+                    $farFromSchool = $rows
+                        ->filter(fn ($row) => $row->status === 'out_of_range' || $row->location_status === 'outside_school')
+                        ->pluck('attendance_date')
+                        ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                        ->unique()
+                        ->count();
+                    $absent = max(0, $expectedDays - $present);
+
+                    return [
+                        'sn' => $index + 1,
+                        'staff_user_id' => $staff->id,
+                        'staff_name' => $staff->name,
+                        'present' => $present,
+                        'late' => $late,
+                        'far_from_school_present' => $farFromSchool,
+                        'absent' => $absent,
+                        'expected_days' => $expectedDays,
+                        'attendance_percent' => $expectedDays > 0 ? round(($present / $expectedDays) * 100, 1) : null,
+                        'last_sign_in' => optional($rows->sortByDesc('signed_in_at')->first())->signed_in_at,
+                    ];
+                })->values();
+
+                return [
+                    'id' => $term->id,
+                    'name' => $term->name,
+                    'expected_days' => $expectedDays,
+                    'recorded_dates' => $expectedDates,
+                    'summary' => $summary,
+                ];
+            })->values();
+
+            return [
+                'id' => $session->id,
+                'label' => $session->session_name ?: $session->academic_year ?: ('Session ' . $session->id),
+                'status' => $session->status,
+                'terms' => $terms,
+            ];
+        })->values();
+
+        return response()->json(['data' => ['sessions' => $history]]);
     }
 }

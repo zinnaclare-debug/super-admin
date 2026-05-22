@@ -60,19 +60,25 @@ function emptySetting() {
 export default function SchoolAdminAttendant() {
   const [setting, setSetting] = useState(emptySetting());
   const [staff, setStaff] = useState([]);
+  const [currentSession, setCurrentSession] = useState(null);
+  const [currentTerm, setCurrentTerm] = useState(null);
   const [records, setRecords] = useState([]);
   const [pagination, setPagination] = useState(null);
+  const [history, setHistory] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [filters, setFilters] = useState({
     date_from: today,
     date_to: today,
     staff_user_id: "",
     status: "",
+    page: 1,
+    per_page: 100,
   });
   const [holidayForm, setHolidayForm] = useState({ holiday_date: today, title: "", description: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [recordsLoading, setRecordsLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [holidaySaving, setHolidaySaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -101,6 +107,8 @@ export default function SchoolAdminAttendant() {
       const data = res.data?.data || {};
       setSetting(normalizeSetting(data.setting));
       setStaff(data.staff || []);
+      setCurrentSession(data.current_session || null);
+      setCurrentTerm(data.current_term || null);
     } catch (e) {
       setMessage(e?.response?.data?.message || "Failed to load attendant settings.");
     } finally {
@@ -121,6 +129,18 @@ export default function SchoolAdminAttendant() {
     }
   };
 
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await api.get("/api/school-admin/attendant/history");
+      setHistory(res.data?.data?.sessions || []);
+    } catch (e) {
+      setMessage(e?.response?.data?.message || "Failed to load attendance history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const loadHolidays = async () => {
     try {
       const res = await api.get("/api/school-admin/attendant/holidays");
@@ -133,11 +153,20 @@ export default function SchoolAdminAttendant() {
   useEffect(() => {
     loadContext();
     loadHolidays();
+    loadHistory();
   }, []);
 
   useEffect(() => {
     loadRecords();
-  }, [filters.date_from, filters.date_to, filters.staff_user_id, filters.status]);
+  }, [filters.date_from, filters.date_to, filters.staff_user_id, filters.status, filters.page]);
+
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value, page: 1 }));
+  };
+
+  const changePage = (nextPage) => {
+    setFilters((current) => ({ ...current, page: nextPage }));
+  };
 
   const updateSetting = (key, value) => {
     setSetting((current) => ({ ...current, [key]: value }));
@@ -211,6 +240,7 @@ export default function SchoolAdminAttendant() {
       await api.post("/api/school-admin/attendant/holidays", holidayForm);
       setHolidayForm({ holiday_date: today, title: "", description: "" });
       await loadHolidays();
+      await loadHistory();
       setMessage("Public holiday saved.");
     } catch (e) {
       setMessage(e?.response?.data?.message || "Failed to save public holiday.");
@@ -224,6 +254,7 @@ export default function SchoolAdminAttendant() {
     try {
       await api.delete(`/api/school-admin/attendant/holidays/${holiday.id}`);
       await loadHolidays();
+      await loadHistory();
       setMessage("Public holiday deleted.");
     } catch (e) {
       setMessage(e?.response?.data?.message || "Failed to delete public holiday.");
@@ -241,6 +272,7 @@ export default function SchoolAdminAttendant() {
           </p>
           <div className="att-meta">
             <span>{staff.length} active staff</span>
+            <span>{[currentSession?.label, currentTerm?.name].filter(Boolean).join(" | ") || "No current term"}</span>
             <span>{locationConfigured ? "Location configured" : "Location not configured"}</span>
             <span>{signedCount} record{signedCount === 1 ? "" : "s"} in view</span>
           </div>
@@ -350,13 +382,13 @@ export default function SchoolAdminAttendant() {
       <section className="att-panel">
         <h3>Staff Attendance Records</h3>
         <div className="att-filter-row">
-          <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_from} onChange={(e) => setFilters((current) => ({ ...current, date_from: e.target.value }))} />
-          <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_to} onChange={(e) => setFilters((current) => ({ ...current, date_to: e.target.value }))} />
-          <select className="att-select" style={{ maxWidth: 240 }} value={filters.staff_user_id} onChange={(e) => setFilters((current) => ({ ...current, staff_user_id: e.target.value }))}>
+          <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_from} onChange={(e) => updateFilter("date_from", e.target.value)} />
+          <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_to} onChange={(e) => updateFilter("date_to", e.target.value)} />
+          <select className="att-select" style={{ maxWidth: 240 }} value={filters.staff_user_id} onChange={(e) => updateFilter("staff_user_id", e.target.value)}>
             <option value="">All Staff</option>
             {staff.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          <select className="att-select" style={{ maxWidth: 190 }} value={filters.status} onChange={(e) => setFilters((current) => ({ ...current, status: e.target.value }))}>
+          <select className="att-select" style={{ maxWidth: 190 }} value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
             <option value="">All Status</option>
             <option value="present">Present</option>
             <option value="late">Late</option>
@@ -418,9 +450,88 @@ export default function SchoolAdminAttendant() {
           </table>
         </div>
         {pagination ? (
-          <p className="att-small" style={{ marginTop: 10 }}>
-            Showing {records.length} of {pagination.total} record{Number(pagination.total) === 1 ? "" : "s"}.
-          </p>
+          <div className="att-filter-row" style={{ marginTop: 10 }}>
+            <p className="att-small" style={{ margin: 0 }}>
+              Showing {records.length} of {pagination.total} record{Number(pagination.total) === 1 ? "" : "s"} | Page {pagination.current_page} of {pagination.last_page}
+            </p>
+            <button className="att-btn att-btn--soft att-btn--tiny" type="button" disabled={pagination.current_page <= 1 || recordsLoading} onClick={() => changePage(pagination.current_page - 1)}>
+              Previous
+            </button>
+            <button className="att-btn att-btn--soft att-btn--tiny" type="button" disabled={pagination.current_page >= pagination.last_page || recordsLoading} onClick={() => changePage(pagination.current_page + 1)}>
+              Next
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="att-panel">
+        <div className="att-filter-row" style={{ justifyContent: "space-between" }}>
+          <h3 style={{ margin: 0 }}>Attendance History</h3>
+          <button className="att-btn att-btn--soft att-btn--tiny" type="button" onClick={loadHistory} disabled={historyLoading}>
+            {historyLoading ? "Refreshing..." : "Refresh History"}
+          </button>
+        </div>
+        <p className="att-small">
+          Open a session, then open First Term, Second Term, or Third Term to see staff attendance metrics.
+        </p>
+        {historyLoading ? <p className="att-state att-state--warn">Loading attendance history...</p> : null}
+        {!historyLoading && history.length === 0 ? <p className="att-small">No attendance history found yet.</p> : null}
+        {!historyLoading ? (
+          <div className="att-history-list">
+            {history.map((session, sessionIndex) => (
+              <details className="att-collapse" key={session.id} open={sessionIndex === 0}>
+                <summary>
+                  <span>{session.label}</span>
+                  <strong>{session.terms?.length || 0} term{Number(session.terms?.length || 0) === 1 ? "" : "s"}</strong>
+                </summary>
+                {(session.terms || []).map((term, termIndex) => (
+                  <details className="att-collapse att-collapse--nested" key={term.id} open={sessionIndex === 0 && termIndex === 0}>
+                    <summary>
+                      <span>{term.name}</span>
+                      <strong>{term.expected_days} expected day{Number(term.expected_days) === 1 ? "" : "s"}</strong>
+                    </summary>
+                    <div className="att-table-wrap">
+                      <table className="att-table">
+                        <thead>
+                          <tr>
+                            <th>S/N</th>
+                            <th>Staff Name</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th>Late</th>
+                            <th>Far From School Present</th>
+                            <th>Expected Days</th>
+                            <th>Attendance %</th>
+                            <th>Last Sign-in</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(term.summary || []).map((row) => (
+                            <tr key={`${term.id}-${row.staff_user_id}`}>
+                              <td>{row.sn}</td>
+                              <td><strong>{row.staff_name}</strong></td>
+                              <td>{row.present}</td>
+                              <td>{row.absent}</td>
+                              <td>{row.late}</td>
+                              <td>{row.far_from_school_present}</td>
+                              <td>{row.expected_days}</td>
+                              <td>{row.attendance_percent == null ? "-" : `${row.attendance_percent}%`}</td>
+                              <td>{compactDateTime(row.last_sign_in)}</td>
+                            </tr>
+                          ))}
+                          {(term.summary || []).length === 0 ? (
+                            <tr>
+                              <td colSpan="9">No staff found for this term.</td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ))}
+              </details>
+            ))}
+          </div>
         ) : null}
       </section>
     </div>

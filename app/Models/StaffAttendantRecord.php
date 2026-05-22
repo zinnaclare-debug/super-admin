@@ -9,6 +9,8 @@ class StaffAttendantRecord extends Model
 {
     protected $fillable = [
         'school_id',
+        'academic_session_id',
+        'term_id',
         'staff_user_id',
         'attendance_date',
         'signed_in_at',
@@ -42,5 +44,15 @@ class StaffAttendantRecord extends Model
     public function staffUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_user_id');
+    }
+
+    public function academicSession(): BelongsTo
+    {
+        return $this->belongsTo(AcademicSession::class);
+    }
+
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(Term::class);
     }
 }

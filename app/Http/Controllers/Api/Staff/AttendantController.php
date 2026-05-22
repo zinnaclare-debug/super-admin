@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
 use App\Models\SchoolAttendantSetting;
 use App\Models\SchoolPublicHoliday;
 use App\Models\StaffAttendantRecord;
+use App\Models\Term;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +44,34 @@ class AttendantController extends Controller
         return (int) round($earthRadius * $c);
     }
 
+    private function resolveCurrentSessionAndTerm(int $schoolId): array
+    {
+        $session = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('status', 'current')
+            ->first();
+
+        if (!$session) {
+            return [null, null];
+        }
+
+        $term = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('is_current', true)
+            ->first();
+
+        if (!$term) {
+            $term = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return [$session, $term];
+    }
+
     private function dayContext(int $schoolId, SchoolAttendantSetting $setting): array
     {
         $timezone = $setting->timezone ?: 'Africa/Lagos';
@@ -71,9 +101,12 @@ class AttendantController extends Controller
 
         $schoolId = (int) $user->school_id;
         $setting = $this->setting($schoolId);
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
         $ctx = $this->dayContext($schoolId, $setting);
         $record = StaffAttendantRecord::query()
             ->where('school_id', $schoolId)
+            ->when($session, fn ($q) => $q->where('academic_session_id', $session->id))
+            ->when($term, fn ($q) => $q->where('term_id', $term->id))
             ->where('staff_user_id', $user->id)
             ->whereDate('attendance_date', $ctx['date'])
             ->first();
@@ -82,6 +115,14 @@ class AttendantController extends Controller
             'data' => [
                 'today' => $ctx['date'],
                 'server_time' => $ctx['now']->toIso8601String(),
+                'current_session' => $session ? [
+                    'id' => $session->id,
+                    'label' => $session->session_name ?: $session->academic_year,
+                ] : null,
+                'current_term' => $term ? [
+                    'id' => $term->id,
+                    'name' => $term->name,
+                ] : null,
                 'is_working_day' => $ctx['is_working_day'],
                 'is_blocked' => $ctx['is_blocked'],
                 'blocked_reason' => $ctx['blocked_reason'],
@@ -118,6 +159,11 @@ class AttendantController extends Controller
 
         $schoolId = (int) $user->school_id;
         $setting = $this->setting($schoolId);
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$term) {
+            return response()->json(['message' => 'No current academic session/term configured for your school.'], 422);
+        }
+
         $ctx = $this->dayContext($schoolId, $setting);
 
         if ($ctx['is_blocked']) {
@@ -154,10 +200,12 @@ class AttendantController extends Controller
             $status = 'late';
         }
 
-        $record = DB::transaction(function () use ($schoolId, $user, $ctx, $now, $data, $distance, $inside, $status, $request) {
+        $record = DB::transaction(function () use ($schoolId, $session, $term, $user, $ctx, $now, $data, $distance, $inside, $status, $request) {
             return StaffAttendantRecord::firstOrCreate(
                 [
                     'school_id' => $schoolId,
+                    'academic_session_id' => $session->id,
+                    'term_id' => $term->id,
                     'staff_user_id' => $user->id,
                     'attendance_date' => $ctx['date'],
                 ],

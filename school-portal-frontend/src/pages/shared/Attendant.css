@@ -279,6 +279,68 @@
   text-transform: uppercase;
 }
 
+.att-history-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.att-collapse {
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.att-collapse > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #0f172a;
+  font-weight: 900;
+  list-style: none;
+}
+
+.att-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+
+.att-collapse > summary::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: #064e3b;
+  background: #bbf7d0;
+  flex: 0 0 auto;
+}
+
+.att-collapse[open] > summary::before {
+  content: "-";
+}
+
+.att-collapse > summary span {
+  flex: 1;
+}
+
+.att-collapse > summary strong {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 12px;
+}
+
+.att-collapse--nested {
+  margin: 10px;
+  background: #fff;
+}
+
 @media (max-width: 900px) {
   .att-hero,
   .att-grid,

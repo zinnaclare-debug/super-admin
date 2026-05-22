@@ -28,6 +28,7 @@ export default function StaffAttendantHome() {
 
   const record = data?.record || null;
   const setting = data?.setting || {};
+  const currentPeriod = [data?.current_session?.label, data?.current_term?.name].filter(Boolean).join(" | ");
   const stateClass = record ? "att-state--good" : data?.is_blocked ? "att-state--warn" : "att-state--good";
   const canSign = useMemo(() => {
     return !loading && !data?.is_blocked && setting.location_configured && !record;
@@ -99,6 +100,7 @@ export default function StaffAttendantHome() {
             </p>
             <div className="att-meta">
               <span>{loading ? "Loading..." : data?.today || "Today"}</span>
+              {currentPeriod ? <span>{currentPeriod}</span> : null}
               <span>{record ? "Signed" : "Not signed"}</span>
               <span>{setting.location_configured ? `${setting.radius_meters}m allowed radius` : "Location not configured"}</span>
             </div>

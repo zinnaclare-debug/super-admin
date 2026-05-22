@@ -242,6 +242,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:attendant');
     Route::get('/school-admin/attendant/records', [SchoolAdminAttendantController::class, 'records'])
         ->middleware('feature:attendant');
+    Route::get('/school-admin/attendant/history', [SchoolAdminAttendantController::class, 'history'])
+        ->middleware('feature:attendant');
 
     // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
