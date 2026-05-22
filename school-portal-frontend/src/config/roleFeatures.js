@@ -1,6 +1,7 @@
 export const ROLE_FEATURES = {
   staff: [
     "attendance",
+    "attendant",
     "class progress",
     "results",
     "profile",

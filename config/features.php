@@ -32,6 +32,7 @@ return [
         [ 'key' => 'website', 'label' => 'Website', 'category' => 'admin' ],
         [ 'key' => 'entrance_exam', 'label' => 'Entrance Exam', 'category' => 'admin' ],
         [ 'key' => 'teaching', 'label' => 'Teaching', 'category' => 'admin' ],
+        [ 'key' => 'attendant', 'label' => 'Staff Attendant', 'category' => 'admin' ],
     ],
 
     // Legacy synonyms (map legacy key => canonical key)
@@ -44,6 +45,8 @@ return [
         'exam' => 'results',
         'exams' => 'results',
         'teaching desk' => 'teaching',
+        'staff attendance' => 'attendant',
+        'staff attendant' => 'attendant',
     ],
 ];
 

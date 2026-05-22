@@ -13,6 +13,7 @@ class FixSchoolFeaturesSeeder extends Seeder
         $features = [
             // GENERAL
             'attendance',
+            'attendant',
             'results',
             'profile',
             'topics',
@@ -35,6 +36,9 @@ class FixSchoolFeaturesSeeder extends Seeder
             'teacher_report',
             'student_report',
             'teaching',
+            'announcements',
+            'website',
+            'entrance_exam',
         ];
 
         $schools = School::all();

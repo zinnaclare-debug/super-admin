@@ -24,6 +24,7 @@ export const FEATURE_DEFINITIONS = [
   { key: "website", label: "Website", category: "admin" },
   { key: "entrance_exam", label: "Entrance Exam", category: "admin" },
   { key: "teaching", label: "Teaching", category: "admin" },
+  { key: "attendant", label: "Staff Attendant", category: "admin" },
 
   { key: "users", label: "Users", category: "admin" },
   { key: "academics", label: "Academics", category: "admin" },

@@ -8,6 +8,7 @@ enum SchoolFeatureEnum: string
     case E_LEARNING = 'e_learning';
     case ANNOUNCEMENT = 'announcement';
     case ATTENDANCE = 'attendance';
+    case ATTENDANT = 'attendant';
     case QUESTION_BANK = 'question_bank';
     case RESULT_SHEET = 'result_sheet';
     

@@ -298,6 +298,7 @@ function DashboardLayout() {
       "question bank": "question-bank",
       "school fees": "school-fees",
       teaching: "teaching",
+      attendant: "attendant",
       announcements: "announcements",
       subjects: "subjects",
       cbt: "cbt",
@@ -325,6 +326,7 @@ function DashboardLayout() {
       website: "website",
       entrance_exam: "entrance-exam",
       teaching: "teaching",
+      attendant: "attendant",
     };
     return `/school/admin/${map[normalized] || encodeURIComponent(normalized)}`;
   };

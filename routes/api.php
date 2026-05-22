@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\SchoolAdmin\ReportsController;
 use App\Http\Controllers\Api\SchoolAdmin\TranscriptController;
 use App\Http\Controllers\Api\SchoolAdmin\AnnouncementController as SchoolAdminAnnouncementController;
 use App\Http\Controllers\Api\SchoolAdmin\TeachingController as SchoolAdminTeachingController;
+use App\Http\Controllers\Api\SchoolAdmin\AttendantController as SchoolAdminAttendantController;
 
 use App\Http\Controllers\Api\Staff\TeacherResultsController;
 use App\Http\Controllers\Api\Staff\StaffProfileController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Api\Staff\TeacherTopicsController;
 use App\Http\Controllers\Api\Staff\ELibraryController as StaffELibraryController;
 use App\Http\Controllers\Api\Staff\AnnouncementController as StaffAnnouncementController;
 use App\Http\Controllers\Api\Staff\TeachingController as StaffTeachingController;
+use App\Http\Controllers\Api\Staff\AttendantController as StaffAttendantController;
 use App\Http\Controllers\Api\Student\ELibraryController as StudentELibraryController;
 use App\Http\Controllers\Api\Staff\VirtualClassesController as StaffVirtualClassesController;
 use App\Http\Controllers\Api\Staff\QuestionBankController as StaffQuestionBankController;
@@ -227,6 +229,19 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:teaching');
     Route::get('/school-admin/teaching/materials/{material}/download', [SchoolAdminTeachingController::class, 'download'])
         ->middleware('feature:teaching');
+
+    Route::get('/school-admin/attendant/context', [SchoolAdminAttendantController::class, 'context'])
+        ->middleware('feature:attendant');
+    Route::put('/school-admin/attendant/settings', [SchoolAdminAttendantController::class, 'updateSettings'])
+        ->middleware('feature:attendant');
+    Route::get('/school-admin/attendant/holidays', [SchoolAdminAttendantController::class, 'holidays'])
+        ->middleware('feature:attendant');
+    Route::post('/school-admin/attendant/holidays', [SchoolAdminAttendantController::class, 'storeHoliday'])
+        ->middleware('feature:attendant');
+    Route::delete('/school-admin/attendant/holidays/{holiday}', [SchoolAdminAttendantController::class, 'destroyHoliday'])
+        ->middleware('feature:attendant');
+    Route::get('/school-admin/attendant/records', [SchoolAdminAttendantController::class, 'records'])
+        ->middleware('feature:attendant');
 
     // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
@@ -465,6 +480,10 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
         ->middleware('feature:teaching');
     Route::get('/staff/teaching/materials/{material}/download', [StaffTeachingController::class, 'download'])
         ->middleware('feature:teaching');
+    Route::get('/staff/attendant/today', [StaffAttendantController::class, 'today'])
+        ->middleware('feature:attendant');
+    Route::post('/staff/attendant/sign-in', [StaffAttendantController::class, 'signIn'])
+        ->middleware('feature:attendant');
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);

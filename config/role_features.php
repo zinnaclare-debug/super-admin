@@ -3,6 +3,7 @@
 return [
     'staff' => [
         'attendance',
+        'attendant',
         'class progress',
         'results',
         'profile',

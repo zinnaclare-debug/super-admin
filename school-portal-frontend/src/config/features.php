@@ -28,11 +28,14 @@ return [
         ['key' => 'teacher_report',    'label' => 'Teacher Report',    'category' => 'admin'],
         ['key' => 'student_report',    'label' => 'Student Report',    'category' => 'admin'],
         ['key' => 'teaching',          'label' => 'Teaching',          'category' => 'admin'],
+        ['key' => 'attendant',         'label' => 'Staff Attendant',   'category' => 'admin'],
     ],
 
     // optional: map old keys → new keys (only if you have old records with different naming)
     'legacy_map' => [
         'result' => 'results',
         'teaching desk' => 'teaching',
+        'staff attendance' => 'attendant',
+        'staff attendant' => 'attendant',
     ],
 ];

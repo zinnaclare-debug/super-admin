@@ -25,6 +25,7 @@ class SeedMissingSchoolFeatures extends Command
             ['key' => 'behaviour rating', 'description' => 'Student behaviour tracking'],
             ['key' => 'school fees', 'description' => 'Fees & payments'],
             ['key' => 'attendance', 'description' => 'Student attendance tracking'],
+            ['key' => 'attendant', 'description' => 'Daily staff attendant sign-in with location'],
             ['key' => 'class progress', 'description' => 'Class teacher progress overview'],
             ['key' => 'teaching', 'description' => 'Staff teaching uploads and school admin downloads'],
         ];

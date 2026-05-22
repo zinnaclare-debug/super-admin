@@ -14,6 +14,7 @@ return [
         'behaviour rating',
         'school fees',
         'teaching',
+        'attendant',
     ],
 
     'student' => [
