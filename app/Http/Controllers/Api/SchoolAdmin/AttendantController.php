@@ -24,6 +24,7 @@ class AttendantController extends Controller
                 'timezone' => 'Africa/Lagos',
                 'working_days' => $this->defaultWorkingDays(),
                 'radius_meters' => 150,
+                'allow_outside_location' => true,
             ]
         );
     }

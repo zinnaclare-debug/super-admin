@@ -25,6 +25,7 @@ class AttendantController extends Controller
                 'timezone' => 'Africa/Lagos',
                 'working_days' => $this->defaultWorkingDays(),
                 'radius_meters' => 150,
+                'allow_outside_location' => true,
             ]
         );
     }
@@ -111,7 +112,7 @@ class AttendantController extends Controller
         $data = $request->validate([
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'accuracy_meters' => 'nullable|integer|min:0|max:10000',
+            'accuracy_meters' => 'nullable|integer|min:0|max:1000000',
             'device_info' => 'nullable|array',
         ]);
 
@@ -145,12 +146,6 @@ class AttendantController extends Controller
         );
 
         $inside = $distance <= (int) $setting->radius_meters;
-        if (!$inside && !$setting->allow_outside_location) {
-            return response()->json([
-                'message' => "You are outside the school sign-in area ({$distance}m away).",
-                'data' => ['distance_from_school_meters' => $distance],
-            ], 422);
-        }
 
         $status = 'present';
         if (!$inside) {
