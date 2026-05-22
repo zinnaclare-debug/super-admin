@@ -177,7 +177,7 @@ class AttendantController extends Controller
         });
 
         return response()->json([
-            'message' => $record->wasRecentlyCreated ? 'Attendant signed successfully.' : 'You have already signed attendant today.',
+            'message' => $record->wasRecentlyCreated ? 'Staff attendance signed successfully.' : 'You have already signed staff attendance today.',
             'data' => ['record' => $record],
         ]);
     }

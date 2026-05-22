@@ -86,7 +86,7 @@ class AttendantController extends Controller
         }
         $setting->save();
 
-        return response()->json(['message' => 'Attendant settings saved.', 'data' => ['setting' => $setting]]);
+        return response()->json(['message' => 'Staff attendance settings saved.', 'data' => ['setting' => $setting]]);
     }
 
     public function holidays(Request $request)

@@ -14,6 +14,20 @@ import {
   unreadAnnouncementCount,
 } from "../utils/announcementNotifier";
 
+const FEATURE_LABEL_OVERRIDES = {
+  attendance: "Student Attendance",
+  attendant: "Staff Attendance",
+};
+
+function featureLabel(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return (FEATURE_LABEL_OVERRIDES[key] || String(value || "").replaceAll("_", " ")).toUpperCase();
+}
+
+function featureSortLabel(value) {
+  return featureLabel(value).toLowerCase();
+}
+
 function DashboardLayout() {
   const navigate = useNavigate();
 
@@ -210,17 +224,22 @@ function DashboardLayout() {
   };
 
   const generalFeatures = useMemo(
-    () => features.filter((f) => f.enabled && f.category === "general"),
+    () =>
+      features
+        .filter((f) => f.enabled && f.category === "general")
+        .sort((a, b) => featureSortLabel(a.feature).localeCompare(featureSortLabel(b.feature))),
     [features]
   );
 
   const adminFeatures = useMemo(
     () =>
-      features.filter((f) => {
-        if (!f.enabled || f.category !== "admin") return false;
-        if (String(f.feature || "").toLowerCase() === "student_result" && !resultsPublished) return false;
-        return true;
-      }),
+      features
+        .filter((f) => {
+          if (!f.enabled || f.category !== "admin") return false;
+          if (String(f.feature || "").toLowerCase() === "student_result" && !resultsPublished) return false;
+          return true;
+        })
+        .sort((a, b) => featureSortLabel(a.feature).localeCompare(featureSortLabel(b.feature))),
     [features, resultsPublished]
   );
   const schoolAdminPaymentsEnabled = useMemo(
@@ -331,9 +350,18 @@ function DashboardLayout() {
     return `/school/admin/${map[normalized] || encodeURIComponent(normalized)}`;
   };
 
-  const featureLabel = (value) => String(value || "").replaceAll("_", " ").toUpperCase();
-  const sidebarFeatures =
-    user?.role === "student" ? features.filter((f) => f !== "subjects") : user?.role === "staff" ? features.filter((f) => String((f?.feature ?? f) || "").toLowerCase() !== "class progress") : features;
+  const sidebarFeatures = useMemo(() => {
+    const list =
+      user?.role === "student"
+        ? features.filter((f) => f !== "subjects")
+        : user?.role === "staff"
+          ? features.filter((f) => String((f?.feature ?? f) || "").toLowerCase() !== "class progress")
+          : features;
+
+    return [...list].sort((a, b) =>
+      featureSortLabel(a?.feature ?? a).localeCompare(featureSortLabel(b?.feature ?? b))
+    );
+  }, [features, user?.role]);
   const isAnnouncementFeature = (value) => String(value || "").toLowerCase() === "announcements";
 
   const handleOpenAnnouncements = () => {

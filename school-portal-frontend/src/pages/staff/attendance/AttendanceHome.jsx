@@ -87,11 +87,11 @@ export default function AttendanceHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Attendance (Class Teacher)" showHeader={false}>
+    <StaffFeatureLayout title="Student Attendance (Class Teacher)" showHeader={false}>
       <div className="sat-page">
         <section className="sat-hero">
           <div>
-            <span className="sat-pill">Staff Attendance</span>
+            <span className="sat-pill">Student Attendance</span>
             <h2>Track attendance clearly and save class records fast</h2>
             <p className="sat-subtitle">
               Select class and term, update each student&apos;s attendance days, and keep term summary details in one organized page.

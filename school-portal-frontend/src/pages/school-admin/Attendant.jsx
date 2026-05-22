@@ -30,6 +30,19 @@ function statusLabel(value) {
   return String(value || "present").replaceAll("_", " ");
 }
 
+function formatHolidayDate(value) {
+  if (!value) return "-";
+  const raw = String(value);
+  const datePart = raw.includes("T") ? raw.split("T")[0] : raw;
+  const [year, month, day] = datePart.split("-");
+  if (!year || !month || !day) return raw;
+  return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function emptySetting() {
   return {
     latitude: "",
@@ -182,7 +195,7 @@ export default function SchoolAdminAttendant() {
       };
       const res = await api.put("/api/school-admin/attendant/settings", payload);
       setSetting(normalizeSetting(res.data?.data?.setting));
-      setMessage(res.data?.message || "Attendant settings saved.");
+      setMessage(res.data?.message || "Staff attendance settings saved.");
     } catch (e) {
       setMessage(e?.response?.data?.message || "Failed to save attendant settings.");
     } finally {
@@ -221,8 +234,8 @@ export default function SchoolAdminAttendant() {
     <div className="att-page">
       <section className="att-hero">
         <div>
-          <span className="att-pill">School Admin Attendant</span>
-          <h2 className="att-title">Track staff sign-in with location proof</h2>
+          <span className="att-pill">School Admin Staff Attendance</span>
+          <h2 className="att-title">Track staff attendance with location proof</h2>
           <p className="att-subtitle">
             Configure the school location, choose working days, add public holidays, and review where each staff member signed in from.
           </p>
@@ -296,7 +309,7 @@ export default function SchoolAdminAttendant() {
           </label>
           <div className="att-filter-row" style={{ marginTop: 14 }}>
             <button className="att-btn att-btn--soft" type="button" onClick={useCurrentLocation}>Use This Device Location</button>
-            <button className="att-btn" type="submit" disabled={saving}>{saving ? "Saving..." : "Save Attendant Settings"}</button>
+            <button className="att-btn" type="submit" disabled={saving}>{saving ? "Saving..." : "Save Staff Attendance Settings"}</button>
           </div>
         </form>
 
@@ -322,9 +335,11 @@ export default function SchoolAdminAttendant() {
           <div style={{ marginTop: 12 }}>
             {holidays.map((holiday) => (
               <div className="att-card" key={holiday.id} style={{ marginBottom: 8 }}>
-                <p className="att-small"><strong>{holiday.holiday_date}</strong> - {holiday.title}</p>
-                {holiday.description ? <p className="att-small">{holiday.description}</p> : null}
-                <button className="att-btn att-btn--danger" type="button" onClick={() => deleteHoliday(holiday)}>Delete</button>
+                <p className="att-small" style={{ marginBottom: 2 }}>
+                  <strong>{formatHolidayDate(holiday.holiday_date)}</strong> - {holiday.title}
+                </p>
+                {holiday.description ? <p className="att-small" style={{ marginTop: 0 }}>{holiday.description}</p> : null}
+                <button className="att-btn att-btn--danger att-btn--tiny" type="button" onClick={() => deleteHoliday(holiday)}>Delete</button>
               </div>
             ))}
             {holidays.length === 0 ? <p className="att-small">No public holiday added yet.</p> : null}
@@ -333,7 +348,7 @@ export default function SchoolAdminAttendant() {
       </section>
 
       <section className="att-panel">
-        <h3>Staff Attendant Records</h3>
+        <h3>Staff Attendance Records</h3>
         <div className="att-filter-row">
           <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_from} onChange={(e) => setFilters((current) => ({ ...current, date_from: e.target.value }))} />
           <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_to} onChange={(e) => setFilters((current) => ({ ...current, date_to: e.target.value }))} />

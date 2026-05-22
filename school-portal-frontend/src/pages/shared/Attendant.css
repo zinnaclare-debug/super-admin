@@ -201,6 +201,12 @@
   background: linear-gradient(135deg, #fee2e2, #fecaca);
 }
 
+.att-btn--tiny {
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
 .att-state {
   margin: 0;
   border-radius: 14px;

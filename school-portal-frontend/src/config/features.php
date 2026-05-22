@@ -4,7 +4,7 @@ return [
     // canonical feature list (single source of truth for backend)
     'definitions' => [
         // GENERAL
-        ['key' => 'attendance',        'label' => 'Attendance',        'category' => 'general'],
+        ['key' => 'attendance',        'label' => 'Student Attendance', 'category' => 'general'],
         ['key' => 'results',           'label' => 'Results',           'category' => 'general'],
         ['key' => 'profile',           'label' => 'Profile',           'category' => 'general'],
         ['key' => 'topics',            'label' => 'Topics',            'category' => 'general'],
@@ -28,7 +28,7 @@ return [
         ['key' => 'teacher_report',    'label' => 'Teacher Report',    'category' => 'admin'],
         ['key' => 'student_report',    'label' => 'Student Report',    'category' => 'admin'],
         ['key' => 'teaching',          'label' => 'Teaching',          'category' => 'admin'],
-        ['key' => 'attendant',         'label' => 'Staff Attendant',   'category' => 'admin'],
+        ['key' => 'attendant',         'label' => 'Staff Attendance',  'category' => 'admin'],
     ],
 
     // optional: map old keys → new keys (only if you have old records with different naming)

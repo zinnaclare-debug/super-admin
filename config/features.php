@@ -3,7 +3,7 @@
 return [
     'definitions' => [
         // GENERAL
-        [ 'key' => 'attendance', 'label' => 'Attendance', 'category' => 'general' ],
+        [ 'key' => 'attendance', 'label' => 'Student Attendance', 'category' => 'general' ],
         [ 'key' => 'class progress', 'label' => 'Class Progress', 'category' => 'general' ],
         [ 'key' => 'results', 'label' => 'Results', 'category' => 'general' ],
         [ 'key' => 'profile', 'label' => 'Student Profiles', 'category' => 'general' ],
@@ -32,7 +32,7 @@ return [
         [ 'key' => 'website', 'label' => 'Website', 'category' => 'admin' ],
         [ 'key' => 'entrance_exam', 'label' => 'Entrance Exam', 'category' => 'admin' ],
         [ 'key' => 'teaching', 'label' => 'Teaching', 'category' => 'admin' ],
-        [ 'key' => 'attendant', 'label' => 'Staff Attendant', 'category' => 'admin' ],
+        [ 'key' => 'attendant', 'label' => 'Staff Attendance', 'category' => 'admin' ],
     ],
 
     // Legacy synonyms (map legacy key => canonical key)

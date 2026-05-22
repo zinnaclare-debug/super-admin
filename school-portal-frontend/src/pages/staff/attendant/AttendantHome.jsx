@@ -71,7 +71,7 @@ export default function StaffAttendantHome() {
               screen: `${window.screen?.width || 0}x${window.screen?.height || 0}`,
             },
           });
-          setMessage(res.data?.message || "Attendant signed successfully.");
+          setMessage(res.data?.message || "Staff attendance signed successfully.");
           await load();
         } catch (e) {
           setMessage(e?.response?.data?.message || "Sign-in failed.");
@@ -88,14 +88,14 @@ export default function StaffAttendantHome() {
   };
 
   return (
-    <StaffFeatureLayout title="Attendant" showHeader={false}>
+    <StaffFeatureLayout title="Staff Attendance" showHeader={false}>
       <div className="att-page">
         <section className="att-hero">
           <div>
-            <span className="att-pill">Daily Staff Attendant</span>
-            <h2 className="att-title">Sign online attendant with verified location</h2>
+            <span className="att-pill">Daily Staff Attendance</span>
+            <h2 className="att-title">Sign staff attendance with verified location</h2>
             <p className="att-subtitle">
-              Sign in once per working day. Your school can verify the time, device, and distance from the school location.
+              Sign in once per working day. Your school can verify your attendance time and location from the admin dashboard.
             </p>
             <div className="att-meta">
               <span>{loading ? "Loading..." : data?.today || "Today"}</span>
@@ -117,7 +117,7 @@ export default function StaffAttendantHome() {
             {!loading ? (
               <>
                 <p className={`att-state ${stateClass}`}>
-                  {record ? `Signed: ${statusText(record)}` : data?.is_blocked ? data?.blocked_reason : "Ready to sign attendant"}
+                  {record ? `Signed: ${statusText(record)}` : data?.is_blocked ? data?.blocked_reason : "Ready to sign attendance"}
                 </p>
                 {message ? <p className="att-small">{message}</p> : null}
                 {!setting.location_configured ? (
@@ -127,7 +127,7 @@ export default function StaffAttendantHome() {
                 ) : null}
                 <div style={{ marginTop: 14 }}>
                   <button className="att-btn" onClick={signIn} disabled={!canSign || signing}>
-                    {signing ? "Signing..." : record ? "Already Signed Today" : "Sign Online Attendant"}
+                    {signing ? "Signing..." : record ? "Already Signed Today" : "Sign Staff Attendance"}
                   </button>
                 </div>
               </>
@@ -139,9 +139,6 @@ export default function StaffAttendantHome() {
             <div className="att-card">
               <p className="att-small"><strong>Time:</strong> {formatDateTime(record?.signed_in_at)}</p>
               <p className="att-small"><strong>Status:</strong> {statusText(record)}</p>
-              <p className="att-small"><strong>Location:</strong> {record?.location_status?.replaceAll("_", " ") || "-"}</p>
-              <p className="att-small"><strong>Distance:</strong> {record?.distance_from_school_meters != null ? `${record.distance_from_school_meters}m from school` : "-"}</p>
-              <p className="att-small"><strong>Accuracy:</strong> {record?.accuracy_meters != null ? `${record.accuracy_meters}m` : "-"}</p>
             </div>
           </article>
         </section>
