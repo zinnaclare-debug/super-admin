@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import peopleArt from "../../../assets/users/people.svg";
+import usersPerMinuteArt from "../../../assets/users/users-per-minute.svg";
+import profileCardArt from "../../../assets/profile/profile-card.svg";
+import "../../shared/PaymentsShowcase.css";
+import "./StudentPaymentSetup.css";
 
 const EMPTY_ROWS = Array.from({ length: 10 }, () => ({ enabled: false, description: "", amount: "" }));
 
@@ -99,102 +104,152 @@ export default function StudentPaymentSetup() {
     }
   };
 
-  if (loading) return <p>Loading student payment setup...</p>;
+  if (loading) return <p className="payx-state payx-state--loading">Loading student payment setup...</p>;
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h3 style={{ margin: 0 }}>Set Student Payment</h3>
-      </div>
-
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 10,
-          padding: 14,
-          marginTop: 12,
-          background: "#f8fafc",
-          display: "grid",
-          gap: 8,
-        }}
-      >
-        <div><strong>Name:</strong> {details?.student?.name || "-"}</div>
-        <div><strong>Email:</strong> {details?.student?.email || "-"}</div>
-        <div><strong>Username:</strong> {details?.student?.username || "-"}</div>
+    <div className="payx-page payx-page--admin student-payment-setup">
+      <section className="payx-hero student-payment-setup__hero">
         <div>
-          <strong>Level/Class/Department:</strong>{" "}
-          {details?.student?.education_level || "-"} / {details?.student?.class_name || "-"} / {details?.student?.department_name || "-"}
+          <span className="payx-pill">Student Fee Setup</span>
+          <h2 className="payx-title">Set a custom payment plan for this student.</h2>
+          <p className="payx-subtitle">
+            Use the centralized school fee as the fallback, or define student-specific fee items for the current session and term.
+          </p>
+          <div className="payx-meta">
+            <span>{details?.student?.name || "Student"}</span>
+            <span>{details?.current_session?.session_name || details?.current_session?.academic_year || "Session -"}</span>
+            <span>{details?.current_term?.name || "Term -"}</span>
+          </div>
         </div>
-        <div>
-          <strong>Current Session/Term:</strong>{" "}
-          {details?.current_session?.session_name || details?.current_session?.academic_year || "-"} / {details?.current_term?.name || "-"}
-        </div>
-        <div>
-          <strong>Centralized Fee (fallback):</strong> NGN {Number(details?.fallback?.amount_due || 0).toFixed(2)}
-        </div>
-      </div>
 
-      <div style={{ marginTop: 14, width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-        <table border="1" cellPadding="8" cellSpacing="0" width="100%" style={{ minWidth: 720 }}>
-          <thead>
-            <tr>
-              <th style={{ width: 80 }}>No.</th>
-              <th style={{ width: 90 }}>Use</th>
-              <th>Fee Description</th>
-              <th style={{ width: 220 }}>Amount (NGN)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <tr key={idx}>
-                <td>{idx + 1}</td>
-                <td style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={!!row.enabled}
-                    onChange={(e) => updateRow(idx, "enabled", e.target.checked)}
-                  />
-                </td>
-                <td>
-                  <input
-                    value={row.description}
-                    onChange={(e) => updateRow(idx, "description", e.target.value)}
-                    placeholder={`Fee item ${idx + 1}`}
-                    style={{ width: "100%", padding: 8 }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={row.amount}
-                    onChange={(e) => updateRow(idx, "amount", e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: "100%", padding: 8 }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-        <div><strong>Custom Total:</strong> NGN {totalAmount.toFixed(2)}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={clearCustomPlan}
-            disabled={saving}
-            style={{ background: "#f59e0b", border: "1px solid #d97706", color: "#fff" }}
-          >
-            {saving ? "Please wait..." : "Use Centralized Fee"}
-          </button>
-          <button onClick={save} disabled={saving}>
-            {saving ? "Saving..." : "Save Payment Plan"}
-          </button>
+        <div className="payx-hero-art" aria-hidden="true">
+          <div className="payx-art payx-art--main student-payment-setup__art-main">
+            <img src={peopleArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--card student-payment-setup__art-card">
+            <img src={usersPerMinuteArt} alt="" />
+          </div>
+          <div className="payx-art payx-art--online student-payment-setup__art-online">
+            <img src={profileCardArt} alt="" />
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="payx-panel student-payment-setup__panel">
+        <div className="payx-card student-payment-setup__card">
+          <div className="student-payment-setup__toolbar">
+            <div>
+              <h3>Student Details</h3>
+              <p>Review the student and current billing context before saving a custom plan.</p>
+            </div>
+            <button className="payx-btn payx-btn--soft" type="button" onClick={() => navigate(-1)}>
+              Back
+            </button>
+          </div>
+
+          <div className="payx-kv student-payment-setup__kv">
+            <div className="payx-row">
+              <span className="payx-label">Name</span>
+              <span className="payx-value">{details?.student?.name || "-"}</span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Email</span>
+              <span className="payx-value">{details?.student?.email || "-"}</span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Username</span>
+              <span className="payx-value">{details?.student?.username || "-"}</span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Level / Class / Department</span>
+              <span className="payx-value">
+                {details?.student?.education_level || "-"} / {details?.student?.class_name || "-"} / {details?.student?.department_name || "-"}
+              </span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Session / Term</span>
+              <span className="payx-value">
+                {details?.current_session?.session_name || details?.current_session?.academic_year || "-"} / {details?.current_term?.name || "-"}
+              </span>
+            </div>
+            <div className="payx-row">
+              <span className="payx-label">Centralized Fee</span>
+              <span className="payx-value">NGN {Number(details?.fallback?.amount_due || 0).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="payx-card student-payment-setup__card">
+          <div className="student-payment-setup__toolbar">
+            <div>
+              <h3>Custom Fee Items</h3>
+              <p>Enable only the rows you want included in this student payment plan.</p>
+            </div>
+            <strong className="student-payment-setup__total">NGN {totalAmount.toFixed(2)}</strong>
+          </div>
+
+          <div className="payx-table-wrap student-payment-setup__table-wrap">
+            <table className="payx-table student-payment-setup__table">
+              <thead>
+                <tr>
+                  <th style={{ width: 80 }}>No.</th>
+                  <th style={{ width: 90 }}>Use</th>
+                  <th>Fee Description</th>
+                  <th style={{ width: 220 }}>Amount (NGN)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, idx) => (
+                  <tr key={idx}>
+                    <td>{idx + 1}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!row.enabled}
+                        onChange={(e) => updateRow(idx, "enabled", e.target.checked)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="payx-input student-payment-setup__table-input"
+                        value={row.description}
+                        onChange={(e) => updateRow(idx, "description", e.target.value)}
+                        placeholder={`Fee item ${idx + 1}`}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="payx-input student-payment-setup__table-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.amount}
+                        onChange={(e) => updateRow(idx, "amount", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="student-payment-setup__footer">
+            <div>
+              <span className="payx-label">Custom Total</span>
+              <strong className="payx-value">NGN {totalAmount.toFixed(2)}</strong>
+            </div>
+            <div className="payx-actions">
+              <button className="payx-btn payx-btn--soft student-payment-setup__warning-btn" onClick={clearCustomPlan} disabled={saving}>
+                {saving ? "Please wait..." : "Use Centralized Fee"}
+              </button>
+              <button className="payx-btn" onClick={save} disabled={saving}>
+                {saving ? "Saving..." : "Save Payment Plan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

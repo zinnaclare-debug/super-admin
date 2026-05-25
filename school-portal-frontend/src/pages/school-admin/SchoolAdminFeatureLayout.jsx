@@ -64,7 +64,9 @@ function titleFromPath(pathname) {
 export default function SchoolAdminFeatureLayout() {
   const { pathname } = useLocation();
   const showBack = !NO_BACK_EXACT_PATHS.has(pathname);
-  const backOnly = pathname.startsWith("/school/admin/classes");
+  const backOnly =
+    pathname.startsWith("/school/admin/classes") ||
+    (pathname.startsWith("/school/admin/students/") && pathname.endsWith("/set-payment"));
   const showHeader = backOnly || !HEADERLESS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   return (

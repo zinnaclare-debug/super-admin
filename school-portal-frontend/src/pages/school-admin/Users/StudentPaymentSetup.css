@@ -1,0 +1,102 @@
+.student-payment-setup,
+.student-payment-setup__panel,
+.student-payment-setup__panel > * {
+  min-width: 0;
+}
+
+.student-payment-setup__panel {
+  display: grid;
+  gap: 16px;
+}
+
+.student-payment-setup__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.student-payment-setup__toolbar h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.student-payment-setup__toolbar p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.student-payment-setup__card {
+  min-width: 0;
+}
+
+.student-payment-setup__kv {
+  margin-top: 14px;
+}
+
+.student-payment-setup__table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.student-payment-setup__table {
+  min-width: 720px;
+}
+
+.student-payment-setup__table-input {
+  width: 100%;
+}
+
+.student-payment-setup__total {
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+}
+
+.student-payment-setup__footer {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.student-payment-setup__warning-btn {
+  color: #78350f;
+  background: linear-gradient(130deg, #fef3c7, #fed7aa);
+}
+
+.student-payment-setup__art-main {
+  background: linear-gradient(160deg, #ffffff, #ecfeff);
+}
+
+.student-payment-setup__art-card {
+  background: linear-gradient(160deg, #fef3c7, #e0f2fe);
+}
+
+.student-payment-setup__art-online {
+  background: linear-gradient(160deg, #f0fdf4, #fefce8);
+}
+
+@media (max-width: 640px) {
+  .student-payment-setup__toolbar,
+  .student-payment-setup__footer,
+  .student-payment-setup__footer .payx-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .student-payment-setup__toolbar .payx-btn,
+  .student-payment-setup__footer .payx-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .student-payment-setup__table {
+    min-width: 620px;
+  }
+}
