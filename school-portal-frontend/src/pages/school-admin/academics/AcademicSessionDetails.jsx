@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 import { getStoredUser } from "../../../utils/authStorage";
+import AcademicPageShell from "./AcademicPageShell";
 
 const prettyLevel = (value) =>
   String(value || "")
@@ -67,56 +68,44 @@ export default function AcademicSessionDetails() {
     }
   };
 
+  const sessionLabel = session?.session_name || session?.academic_year || "Academic Session";
+
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "10px 12px",
-          border: "1px solid #ddd",
-          borderRadius: 10,
-          background: "#fff",
-        }}
-      >
-        <strong>{schoolName}</strong>
+    <AcademicPageShell
+      pill="Academic Session Details"
+      title={`Manage ${sessionLabel}`}
+      subtitle="Set the current term, review levels, and open each class setup from one polished session workspace."
+      meta={[
+        schoolName,
+        `Status: ${session?.status || "N/A"}`,
+        `Current Term: ${currentTerm?.name || "Not set"}`,
+      ]}
+    >
+      <div className="academic-inner__toolbar">
+        <div>
+          <h3>{sessionLabel}</h3>
+          <p>Session structure and term controls for this academic year.</p>
+        </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <p style={{ margin: "8px 0", fontWeight: 700 }}>
-          {session?.session_name || session?.academic_year || "Academic Session"}
-        </p>
-        <p style={{ marginTop: 0, opacity: 0.75 }}>
-          Status: <strong>{session?.status || "N/A"}</strong>
-        </p>
-        <p style={{ marginTop: 0, opacity: 0.85 }}>
-          Current Term: <strong>{currentTerm?.name || "Not set"}</strong>
-        </p>
-      </div>
-
-      {loading && <p>Loading session details...</p>}
+      {loading && <p className="payx-state payx-state--loading">Loading session details...</p>}
 
       {!loading && !session && (
-        <p style={{ marginTop: 16, color: "red" }}>Session not found or no access.</p>
+        <p className="payx-state payx-state--error">Session not found or no access.</p>
       )}
 
       {!loading && session && (
         <>
-          <div style={{ marginTop: 10, border: "1px solid #ddd", borderRadius: 8, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Terms</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="payx-card academic-inner__card">
+            <h3 className="academic-inner__card-title">Terms</h3>
+            <p className="academic-inner__muted">Choose the active term for this session.</p>
+            <div className="academic-inner__chip-row" style={{ marginTop: 12 }}>
               {terms.map((term) => (
                 <button
                   key={term.id}
                   onClick={() => setCurrent(term.id)}
                   disabled={processing}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: 6,
-                    border: term.is_current ? "1px solid #2563eb" : "1px solid #ccc",
-                    background: term.is_current ? "#eff6ff" : "#fff",
-                  }}
+                  className={`academic-inner__chip${term.is_current ? " academic-inner__chip--active" : ""}`}
                 >
                   {term.name} {term.is_current ? "(Current)" : ""}
                 </button>
@@ -125,49 +114,27 @@ export default function AcademicSessionDetails() {
           </div>
 
           {!currentTerm ? (
-            <div
-              style={{
-                marginTop: 14,
-                padding: 12,
-                border: "1px solid #f59e0b",
-                borderRadius: 8,
-                background: "#fffbeb",
-              }}
-            >
+            <div className="academic-inner__notice">
               Set a current term first before managing levels and classes for this session.
             </div>
           ) : null}
 
-          <div style={{ marginTop: 16, display: currentTerm ? "grid" : "none", gap: 12 }}>
+          <div className="academic-inner__grid" style={{ display: currentTerm ? "grid" : "none" }}>
             {levels.map((level) => (
-              <div
-                key={level.level}
-                style={{
-                  border: "1px solid #ddd",
-                  padding: 14,
-                  borderRadius: 8,
-                  background: "#fff",
-                }}
-              >
+              <div key={level.level} className="payx-card academic-inner__card">
                 <div>
-                  <strong style={{ fontSize: 16 }}>{prettyLevel(level.level)}</strong>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  <h3 className="academic-inner__card-title">{prettyLevel(level.level)}</h3>
+                  <p className="academic-inner__muted">
                     Classes: {level.classes?.length || 0} | Departments: {level.departments?.length || 0}
-                  </div>
+                  </p>
                 </div>
 
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div className="academic-inner__chip-row" style={{ marginTop: 12 }}>
                   {(level.classes || []).map((cls) => (
                     <button
                       key={cls.id}
                       onClick={() => navigate(`/school/admin/classes/${cls.id}`)}
-                      style={{
-                        padding: "8px 10px",
-                        border: "1px solid #ccc",
-                        borderRadius: 6,
-                        background: "#fff",
-                        cursor: "pointer",
-                      }}
+                      className="academic-inner__chip"
                     >
                       {cls.name}
                     </button>
@@ -179,21 +146,12 @@ export default function AcademicSessionDetails() {
                 </div>
 
                 <div style={{ marginTop: 12 }}>
-                  <strong style={{ fontSize: 14 }}>Departments</strong>
-                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <strong>Departments</strong>
+                  <div className="academic-inner__chip-row" style={{ marginTop: 8 }}>
                     {(level.departments || []).map((department) => (
                       <span
                         key={department.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          border: "1px solid #cbd5e1",
-                          borderRadius: 999,
-                          padding: "4px 10px",
-                          background: "#f8fafc",
-                          fontSize: 12,
-                        }}
+                        className="academic-inner__chip"
                       >
                         <span>{department.name}</span>
                       </span>
@@ -207,12 +165,12 @@ export default function AcademicSessionDetails() {
             ))}
           </div>
 
-          <div style={{ marginTop: 12, fontSize: 13, opacity: 0.85 }}>
+          <div className="payx-state payx-state--warn">
             Department creation and updates are managed from <strong>Super Admin - School Information</strong>.
           </div>
         </>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }
 

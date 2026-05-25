@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function EnrollStudents() {
   const { classId } = useParams();
@@ -47,21 +48,29 @@ export default function EnrollStudents() {
   };
 
   return (
-    <div>
-      <div style={{ marginTop: 12 }}>
+    <AcademicPageShell
+      pill="Enroll Students"
+      title="Bulk enroll students"
+      subtitle="Search available students, select the right records, and enroll them into the class in a mobile-friendly table."
+      meta={[`${students.length} students`, `${Object.values(selected).filter(Boolean).length} selected`]}
+    >
+      <div className="payx-card academic-inner__card">
+      <div className="academic-inner__actions">
         <input
+          className="academic-inner__input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email..."
-          style={{ width: 320, padding: 10 }}
         />
+      </div>
       </div>
 
       {loading ? (
-        <p>Loading students...</p>
+        <p className="payx-state payx-state--loading">Loading students...</p>
       ) : (
-        <>
-          <table border="1" cellPadding="10" width="100%" style={{ marginTop: 12 }}>
+        <div className="payx-card academic-inner__card">
+          <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
             <thead>
               <tr>
                 <th>Select</th>
@@ -92,12 +101,13 @@ export default function EnrollStudents() {
               )}
             </tbody>
           </table>
-
-          <div style={{ marginTop: 12 }}>
-            <button onClick={enroll}>Enroll Selected Students</button>
           </div>
-        </>
+
+          <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+            <button className="payx-btn" onClick={enroll}>Enroll Selected Students</button>
+          </div>
+        </div>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }

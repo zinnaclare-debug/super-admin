@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function ClassPage() {
   const { classId } = useParams();
@@ -132,29 +133,33 @@ export default function ClassPage() {
   if (loading) return <p>Loading...</p>;
 
   return (
-    <div>
-      {/* Navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <AcademicPageShell
+      pill="Class Setup"
+      title={`Set up ${cls?.name || "Class"}`}
+      subtitle="Manage class teachers, departments, term enrollment, and subject entry points from one clean class workspace."
+      meta={[
+        `${terms.length} terms`,
+        departments.length > 0 ? `${departments.length} departments` : "No departments",
+        currentTeacher ? "Teacher assigned" : "Teacher not assigned",
+      ]}
+    >
+      <div className="academic-inner__toolbar">
+        <div>
+          <h3>{cls?.name || "Class Setup"}</h3>
+          <p>Choose a department when needed, then manage class teachers and term enrollment.</p>
+        </div>
       </div>
 
-      {/* Actions */}
       {departments.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <strong>Departments (Sub Class)</strong>
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        <div className="payx-card academic-inner__card">
+          <h3 className="academic-inner__card-title">Departments</h3>
+          <p className="academic-inner__muted">Select the department/sub-class you want to manage.</p>
+          <div className="academic-inner__chip-row" style={{ marginTop: 12 }}>
             {departments.map((department) => (
               <button
                 key={department.id}
                 onClick={() => setSelectedDepartmentId(String(department.id))}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  background:
-                    String(selectedDepartmentId) === String(department.id) ? "#2563eb" : "#fff",
-                  color:
-                    String(selectedDepartmentId) === String(department.id) ? "#fff" : "#111",
-                }}
+                className={`academic-inner__chip${String(selectedDepartmentId) === String(department.id) ? " academic-inner__chip--active" : ""}`}
               >
                 {department.name} ({cls?.name || "Class"})
               </button>
@@ -163,21 +168,24 @@ export default function ClassPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
-        <p style={{ margin: "0 0 10px" }}>
+      <div className="payx-card academic-inner__card">
+        <h3 className="academic-inner__card-title">Class Teacher</h3>
+        <p className="academic-inner__muted">
+          {departments.length > 0
+            ? `Department: ${selectedDepartment?.name || "Department"}`
+            : "Whole class teacher assignment"}
+        </p>
+        <p>
+          Current Teacher:{" "}
           <strong>
-            {departments.length > 0
-              ? `Class Teacher (${selectedDepartment?.name || "Department"})`
-              : "Class Teacher"}
+            {currentTeacher
+              ? `${currentTeacher.name}${currentTeacher.email ? ` (${currentTeacher.email})` : ""}`
+              : "Not assigned"}
           </strong>
-          :{" "}
-          {currentTeacher
-            ? `${currentTeacher.name}${currentTeacher.email ? ` (${currentTeacher.email})` : ""}`
-            : "Not assigned"}
         </p>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+        <div className="academic-inner__actions">
+          <select className="academic-inner__select" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
             <option value="">Select Teacher</option>
             {teachers.map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
@@ -186,79 +194,68 @@ export default function ClassPage() {
             ))}
           </select>
 
-          <button onClick={assign} disabled={savingTeacher || !teacherId}>
+          <button className="payx-btn" onClick={assign} disabled={savingTeacher || !teacherId}>
             {savingTeacher ? "Saving..." : "Assign Class Teacher"}
           </button>
-          <button onClick={unassign} disabled={savingTeacher || !currentTeacher}>
+          <button className="payx-btn payx-btn--soft" onClick={unassign} disabled={savingTeacher || !currentTeacher}>
             {savingTeacher ? "Saving..." : "Unassign Class Teacher"}
           </button>
         </div>
       </div>
 
-      {/* Terms table */}
-      <table border="1" cellPadding="10" width="100%" style={{ marginTop: 16 }}>
-        <thead>
-          <tr>
-            <th>S/N</th>
-            <th>Term</th>
-            <th style={{ width: 220 }}>Enrolled Students</th>
-            <th>Enrollment</th>
-          </tr>
-        </thead>
+      <div className="payx-card academic-inner__card">
+        <h3 className="academic-inner__card-title">Terms</h3>
+        <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
+            <thead>
+              <tr>
+                <th>S/N</th>
+                <th>Term</th>
+                <th style={{ width: 220 }}>Enrolled Students</th>
+                <th>Enrollment</th>
+              </tr>
+            </thead>
 
-        <tbody>
-          {terms.map((t, idx) => (
-            <tr key={t.id}>
-              <td>{idx + 1}</td>
+            <tbody>
+              {terms.map((t, idx) => (
+                <tr key={t.id}>
+                  <td>{idx + 1}</td>
+                  <td>
+                    <button
+                      onClick={() => navigate(`/school/admin/classes/${classId}/terms/${t.id}`)}
+                      className="academic-inner__link-btn"
+                    >
+                      {t.name}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="payx-btn payx-btn--soft"
+                      onClick={() => navigate(`/school/admin/classes/${classId}/terms/${t.id}/students${departmentQuery}`)}
+                    >
+                      View Enrolled
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="payx-btn"
+                      onClick={() => navigate(`/school/admin/classes/${classId}/terms/${t.id}/enroll${departmentQuery}`)}
+                    >
+                      Enroll Students
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
-              {/* ✅ KEEP TERM AS LINK */}
-              <td>
-                <button
-                  onClick={() => navigate(`/school/admin/classes/${classId}/terms/${t.id}`)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#2563eb",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
-                >
-                  {t.name}
-                </button>
-              </td>
-
-              {/* ✅ VIEW ENROLLED STUDENTS */}
-              <td>
-                <button
-                  onClick={() =>
-                    navigate(`/school/admin/classes/${classId}/terms/${t.id}/students${departmentQuery}`)
-                  }
-                  style={{ padding: "6px 10px", cursor: "pointer" }}
-                >
-                  View Enrolled
-                </button>
-              </td>
-
-              {/* ✅ BULK ENROLL BUTTON (PER TERM) */}
-              <td>
-                <button
-                  onClick={() =>
-                    navigate(`/school/admin/classes/${classId}/terms/${t.id}/enroll${departmentQuery}`)
-                  }
-                >
-                  Enroll (Bulk / One-by-One)
-                </button>
-              </td>
-            </tr>
-          ))}
-
-          {terms.length === 0 && (
-            <tr>
-              <td colSpan="4">No terms found.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+              {terms.length === 0 && (
+                <tr>
+                  <td colSpan="4">No terms found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AcademicPageShell>
   );
 }

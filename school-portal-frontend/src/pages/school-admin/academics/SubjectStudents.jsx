@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function SubjectStudents() {
   const { classId, termId, subjectId } = useParams();
@@ -72,38 +73,48 @@ export default function SubjectStudents() {
   }, [students, q]);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <AcademicPageShell
+      pill="Subject Students"
+      title={`${meta?.subject_name || "Subject"} students`}
+      subtitle="Control which enrolled students offer this subject for the selected class and term."
+      meta={[
+        meta?.class_name || "Class",
+        meta?.term_name || "Term",
+        `${filteredStudents.length} visible students`,
+      ]}
+    >
+      <div className="academic-inner__toolbar">
         <div>
-          <h3 style={{ margin: 0 }}>
+          <h3>
             {meta?.subject_name || "Subject"} Students
           </h3>
-          <p style={{ margin: "6px 0 0", opacity: 0.75 }}>
+          <p>
             {meta?.class_name || "Class"} | {meta?.term_name || "Term"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => navigate(-1)}>Back</button>
-          <button onClick={load} disabled={loading}>
+        <div className="academic-inner__actions">
+          <button className="payx-btn payx-btn--soft" onClick={() => navigate(-1)}>Back</button>
+          <button className="payx-btn" onClick={load} disabled={loading}>
             {loading ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
+      <div className="payx-card academic-inner__card">
         <input
+          className="academic-inner__input"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search student name, username, department..."
-          style={{ padding: 8, width: "min(420px, 100%)" }}
         />
       </div>
 
-      <div style={{ marginTop: 14, overflowX: "auto" }}>
+      <div className="payx-card academic-inner__card">
         {loading ? (
-          <p>Loading students...</p>
+          <p className="payx-state payx-state--loading">Loading students...</p>
         ) : (
-          <table border="1" cellPadding="8" width="100%">
+          <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
             <thead>
               <tr>
                 <th style={{ width: 70 }}>S/N</th>
@@ -124,13 +135,9 @@ export default function SubjectStudents() {
                   <td>{student.offering ? "Offering" : "Removed"}</td>
                   <td>
                     <button
+                      className={`payx-btn${student.offering ? " academic-inner__danger" : ""}`}
                       onClick={() => setStudentOffering(student, !student.offering)}
                       disabled={savingSubjectStudentId === Number(student.student_id)}
-                      style={
-                        student.offering
-                          ? { background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }
-                          : undefined
-                      }
                     >
                       {savingSubjectStudentId === Number(student.student_id)
                         ? "Saving..."
@@ -148,8 +155,9 @@ export default function SubjectStudents() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
-    </div>
+    </AcademicPageShell>
   );
 }

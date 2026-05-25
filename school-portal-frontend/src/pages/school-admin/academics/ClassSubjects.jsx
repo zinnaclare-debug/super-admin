@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 const BULK_SUBJECT_ROWS = 20;
 const createEmptyBulkRows = () =>
@@ -153,116 +154,123 @@ export default function ClassSubjects() {
   if (loading) return <p>Loading...</p>;
 
   return (
-    <div>
-      {/* navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <AcademicPageShell
+      pill="Class Subjects"
+      title={`${cls?.name || "Class"} subjects`}
+      subtitle="Create subjects once for the session, then manage students, CBT publishing, and term subject records from this page."
+      meta={[termName, `${subjects.length} subjects`, `${terms.length} terms`]}
+    >
+      <div className="academic-inner__toolbar">
+        <div>
+          <h3>{termName} Courses</h3>
+          <p>Select a term to view and manage the subjects available in that term.</p>
+        </div>
       </div>
 
-      {/* term selector */}
-      <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+      <div className="academic-inner__chip-row">
         {terms.map((t) => (
           <button
             key={t.id}
             onClick={() => setSelectedTermId(t.id)}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              background: selectedTermId === t.id ? "#2563eb" : "#fff",
-              color: selectedTermId === t.id ? "#fff" : "#111",
-            }}
+            className={`academic-inner__chip${selectedTermId === t.id ? " academic-inner__chip--active" : ""}`}
           >
             {t.name}
           </button>
         ))}
       </div>
 
-      {/* subjects table */}
-      <h3 style={{ marginTop: 16 }}>{termName} Courses</h3>
-      <table border="1" cellPadding="10" width="100%">
-        <thead>
-          <tr>
-            <th style={{ width: 70 }}>S/N</th>
-            <th>Course</th>
-            <th style={{ width: 160 }}>Code</th>
-            <th style={{ width: 220 }}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {subjects.map((s, idx) => (
-            <tr key={s.id}>
-              <td>{idx + 1}</td>
-              <td>{s.name}</td>
-              <td>{s.code || "-"}</td>
-              <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  onClick={() =>
-                    navigate(`/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/cbt`)
-                  }
-                  disabled={!selectedTermId}
-                >
-                  CBT
-                </button>
-                <button onClick={() => startEditSubject(s)}>Edit</button>
-                <button
-                  onClick={() =>
-                    navigate(
-                      `/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/students`
-                    )
-                  }
-                  disabled={!selectedTermId}
-                >
-                  Students
-                </button>
-                <button
-                  onClick={() => deleteSubject(s)}
-                  disabled={deletingSubjectId === s.id}
-                  style={{ background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}
-                >
-                  {deletingSubjectId === s.id ? "Deleting..." : "Delete"}
-                </button>
-              </td>
-            </tr>
-          ))}
-          {subjects.length === 0 && (
-            <tr>
-              <td colSpan="4">No courses yet for this term.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <div className="payx-card academic-inner__card">
+        <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>S/N</th>
+                <th>Course</th>
+                <th style={{ width: 160 }}>Code</th>
+                <th style={{ width: 280 }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subjects.map((s, idx) => (
+                <tr key={s.id}>
+                  <td>{idx + 1}</td>
+                  <td>{s.name}</td>
+                  <td>{s.code || "-"}</td>
+                  <td>
+                    <div className="academic-inner__action-cell">
+                      <button
+                        className="payx-btn payx-btn--soft"
+                        onClick={() =>
+                          navigate(`/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/cbt`)
+                        }
+                        disabled={!selectedTermId}
+                      >
+                        CBT
+                      </button>
+                      <button className="payx-btn payx-btn--soft" onClick={() => startEditSubject(s)}>Edit</button>
+                      <button
+                        className="payx-btn"
+                        onClick={() =>
+                          navigate(
+                            `/school/admin/academics/classes/${classId}/terms/${selectedTermId}/subjects/${s.id}/students`
+                          )
+                        }
+                        disabled={!selectedTermId}
+                      >
+                        Students
+                      </button>
+                      <button
+                        className="payx-btn academic-inner__danger"
+                        onClick={() => deleteSubject(s)}
+                        disabled={deletingSubjectId === s.id}
+                      >
+                        {deletingSubjectId === s.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {subjects.length === 0 && (
+                <tr>
+                  <td colSpan="4">No courses yet for this term.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* create subject */}
-      <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 14, borderRadius: 10 }}>
-        <h4 style={{ marginTop: 0 }}>Create Subject (Applies to whole session)</h4>
-        <p style={{ marginTop: 0, opacity: 0.75, fontSize: 13 }}>
+      <div className="payx-card academic-inner__card">
+        <h3 className="academic-inner__card-title">Create Subject (Applies to whole session)</h3>
+        <p className="academic-inner__muted">
           Fill up to 20 subjects at once. Leave unused rows blank.
         </p>
 
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="academic-inner__form-grid" style={{ marginTop: 12 }}>
           {bulkSubjects.map((row, idx) => (
-            <div key={`bulk-subject-row-${idx}`} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div key={`bulk-subject-row-${idx}`} className="academic-inner__bulk-row">
               <input
+                className="academic-inner__field"
                 value={row.name}
                 onChange={(e) => updateBulkSubject(idx, "name", e.target.value)}
                 placeholder={`Subject ${idx + 1} name`}
-                style={{ padding: 10, width: 320 }}
               />
               <input
+                className="academic-inner__field"
                 value={row.code}
                 onChange={(e) => updateBulkSubject(idx, "code", e.target.value)}
                 placeholder="Short code (optional)"
-                style={{ padding: 10, width: 180 }}
               />
             </div>
           ))}
         </div>
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-          <button onClick={createSubject} disabled={creating}>
+        <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+          <button className="payx-btn" onClick={createSubject} disabled={creating}>
             {creating ? "Saving..." : "Save Subjects"}
           </button>
-          <button type="button" onClick={() => setBulkSubjects(createEmptyBulkRows())} disabled={creating}>
+          <button className="payx-btn payx-btn--soft" type="button" onClick={() => setBulkSubjects(createEmptyBulkRows())} disabled={creating}>
             Clear All
           </button>
         </div>
@@ -272,45 +280,36 @@ export default function ClassSubjects() {
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1100,
-            padding: 12,
-          }}
+          className="academic-inner__modal"
         >
-          <div style={{ width: "min(560px, 100%)", background: "#fff", borderRadius: 10, padding: 16 }}>
-            <h4 style={{ marginTop: 0 }}>Edit Subject</h4>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="academic-inner__modal-card">
+            <h3 className="academic-inner__card-title">Edit Subject</h3>
+            <div className="academic-inner__actions" style={{ marginTop: 12 }}>
               <input
+                className="academic-inner__field"
                 value={editSubjectName}
                 onChange={(e) => setEditSubjectName(e.target.value)}
                 placeholder="Subject name"
-                style={{ padding: 10, width: 280 }}
               />
               <input
+                className="academic-inner__field"
                 value={editSubjectCode}
                 onChange={(e) => setEditSubjectCode(e.target.value)}
                 placeholder="Code (optional)"
-                style={{ padding: 10, width: 180 }}
               />
             </div>
 
-            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-              <button onClick={saveEditedSubject} disabled={savingEdit}>
+            <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+              <button className="payx-btn" onClick={saveEditedSubject} disabled={savingEdit}>
                 {savingEdit ? "Saving..." : "Save Changes"}
               </button>
-              <button onClick={cancelEditSubject} disabled={savingEdit}>
+              <button className="payx-btn payx-btn--soft" onClick={cancelEditSubject} disabled={savingEdit}>
                 Cancel
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }

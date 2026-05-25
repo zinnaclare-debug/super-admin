@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function TermCourses() {
   const { classId, termId } = useParams();
@@ -66,12 +67,18 @@ export default function TermCourses() {
   };
 
   return (
-    <div>
+    <AcademicPageShell
+      pill="Term Courses"
+      title="Assign teachers to term courses"
+      subtitle="Review every course in this term, attach the right teacher, and open enrolled students without leaving the academic setup flow."
+      meta={[`${courses.length} courses`, assigningSubjectId ? "Assigning teacher" : "Ready"]}
+    >
       {loading ? (
-        <p>Loading courses...</p>
+        <p className="payx-state payx-state--loading">Loading courses...</p>
       ) : (
-        <>
-          <table border="1" cellPadding="10" width="100%" style={{ marginTop: 12 }}>
+        <div className="payx-card academic-inner__card">
+          <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
             <thead>
               <tr>
                 <th style={{ width: 70 }}>S/N</th>
@@ -90,12 +97,14 @@ export default function TermCourses() {
                       {c.teacher_name ? (
                         <strong>{c.teacher_name}</strong>
                       ) : (
-                        <span style={{ opacity: 0.7 }}>Not assigned</span>
+                        <span className="academic-inner__muted">Not assigned</span>
                       )}
                     </td>
-                    <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button onClick={() => openAssignRow(c)}>Assign</button>
+                    <td>
+                      <div className="academic-inner__action-cell">
+                      <button className="payx-btn payx-btn--soft" onClick={() => openAssignRow(c)}>Assign</button>
                       <button
+                        className="payx-btn"
                         onClick={() =>
                           navigate(`/school/admin/classes/${classId}/terms/${termId}/subjects/${c.subject_id}/students`)
                         }
@@ -104,7 +113,7 @@ export default function TermCourses() {
                       </button>
                       {c.teacher_user_id && (
                         <button
-                          style={{ color: "red" }}
+                          className="payx-btn academic-inner__danger"
                           onClick={async () => {
                             if (!confirm("Unassign teacher from this course?")) return;
                             await api.patch(
@@ -116,20 +125,21 @@ export default function TermCourses() {
                           Unassign
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
 
                   {assigningSubjectId === c.subject_id && (
                     <tr>
-                      <td colSpan="4" style={{ background: "#fbfcff", padding: 0 }}>
-                        <div style={{ padding: 14, borderTop: "1px solid #e5e7eb" }}>
-                          <h3 style={{ margin: 0 }}>Assign Teacher to Course</h3>
-                          <p style={{ opacity: 0.75, margin: "6px 0 0" }}>
+                      <td colSpan="4">
+                        <div className="payx-card">
+                          <h3 className="academic-inner__card-title">Assign Teacher to Course</h3>
+                          <p className="academic-inner__muted">
                             Only teachers with matching education level will appear.
                           </p>
 
                           <div style={{ marginTop: 12 }}>
-                            <select value={selectedTeacherId} onChange={(e) => setSelectedTeacherId(e.target.value)}>
+                            <select className="academic-inner__select" value={selectedTeacherId} onChange={(e) => setSelectedTeacherId(e.target.value)}>
                               <option value="">Select Teacher</option>
                               {teachers.map((t) => (
                                 <option key={t.id} value={t.id}>
@@ -139,15 +149,15 @@ export default function TermCourses() {
                             </select>
                           </div>
 
-                          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                            <button onClick={() => assignTeacher(assigningSubjectId)} disabled={!selectedTeacherId || assigning}>
+                          <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+                            <button className="payx-btn" onClick={() => assignTeacher(assigningSubjectId)} disabled={!selectedTeacherId || assigning}>
                               {assigning ? "Assigning..." : "Assign"}
                             </button>
-                            <button onClick={closeAssignRow}>Cancel</button>
+                            <button className="payx-btn payx-btn--soft" onClick={closeAssignRow}>Cancel</button>
                           </div>
 
                           {teachers.length === 0 && (
-                            <p style={{ color: "red", marginTop: 8 }}>No eligible teachers found for this level.</p>
+                            <p className="payx-state payx-state--error" style={{ marginTop: 8 }}>No eligible teachers found for this level.</p>
                           )}
                         </div>
                       </td>
@@ -163,8 +173,9 @@ export default function TermCourses() {
               )}
             </tbody>
           </table>
-        </>
+          </div>
+        </div>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }

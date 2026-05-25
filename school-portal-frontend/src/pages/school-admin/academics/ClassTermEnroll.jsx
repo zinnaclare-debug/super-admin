@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function ClassTermEnroll() {
   const { classId, termId } = useParams();
@@ -154,17 +155,32 @@ export default function ClassTermEnroll() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <AcademicPageShell
+      pill="Student Enrollment"
+      title="Enroll students into this term"
+      subtitle="Search, select, assign departments where required, and enroll students in a responsive table that works on small screens."
+      meta={[
+        `${available.length} visible students`,
+        `${selected.size} selected`,
+        isDepartmentContext ? departmentName || "Selected department" : "All departments",
+      ]}
+    >
+      <div className="academic-inner__toolbar">
+        <div>
+          <h3>Available Students</h3>
+          <p>Select one or many students to enroll into this class term.</p>
+        </div>
         {isDepartmentContext ? (
-          <p style={{ margin: 0, opacity: 0.75 }}>
+          <p className="payx-state payx-state--ok">
             Enrolling into department: <strong>{departmentName || "Selected Department"}</strong>
           </p>
         ) : null}
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="payx-card academic-inner__card">
+      <div className="academic-inner__actions">
         <input
+          className="academic-inner__input"
           placeholder="Search students"
           value={search}
           onChange={(e) => {
@@ -173,6 +189,7 @@ export default function ClassTermEnroll() {
           }}
         />
         <button
+          className="payx-btn payx-btn--soft"
           onClick={() => {
             setSearch("");
             setPage(1);
@@ -181,12 +198,14 @@ export default function ClassTermEnroll() {
           Clear
         </button>
       </div>
+      </div>
 
       {loading ? (
-        <p>Loading students...</p>
+        <p className="payx-state payx-state--loading">Loading students...</p>
       ) : (
-        <div style={{ marginTop: 12 }}>
-          <table border="1" cellPadding="8" width="100%">
+        <div className="payx-card academic-inner__card">
+          <div className="academic-inner__table-wrap">
+          <table className="payx-table academic-inner__table">
             <thead>
               <tr>
                 <th style={{ width: 44 }}>
@@ -225,6 +244,7 @@ export default function ClassTermEnroll() {
                   {!isDepartmentContext && (
                     <td>
                       <select
+                        className="academic-inner__select"
                         value={rowDepartment[u.id] || ""}
                         onChange={(e) => setDepartment(u.id, e.target.value)}
                         style={{ width: "100%" }}
@@ -242,7 +262,7 @@ export default function ClassTermEnroll() {
                     </td>
                   )}
                   <td>
-                    <button onClick={() => enrollOne(u)}>Enroll One</button>
+                    <button className="payx-btn payx-btn--soft" onClick={() => enrollOne(u)}>Enroll One</button>
                   </td>
                 </tr>
               ))}
@@ -253,28 +273,29 @@ export default function ClassTermEnroll() {
               )}
             </tbody>
           </table>
+          </div>
 
           {meta && (
-            <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-              <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+              <button className="payx-btn payx-btn--soft" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Prev
               </button>
               <div>
                 Page {meta.current_page} / {meta.last_page}
               </div>
-              <button disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>
+              <button className="payx-btn payx-btn--soft" disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>
                 Next
               </button>
             </div>
           )}
 
-          <div style={{ marginTop: 12 }}>
-            <button onClick={submitBulk} disabled={submitting || selected.size === 0}>
+          <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+            <button className="payx-btn" onClick={submitBulk} disabled={submitting || selected.size === 0}>
               {submitting ? "Enrolling..." : `Enroll Selected (${selected.size})`}
             </button>
           </div>
         </div>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function AssignTeacher() {
   const { classId } = useParams();
@@ -94,19 +95,25 @@ export default function AssignTeacher() {
   };
 
   return (
-    <div>
-      {/* Navbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      </div>
-
+    <AcademicPageShell
+      pill="Assign Class Teacher"
+      title="Assign the right teacher"
+      subtitle="Choose the department where needed and attach one eligible teacher to the class setup."
+      meta={[
+        `${teachers.length} eligible teachers`,
+        departments.length > 0 ? `${departments.length} departments` : "Whole class",
+        currentTeacher ? "Teacher assigned" : "No teacher assigned",
+      ]}
+    >
       {loading ? (
-        <p>Loading teachers...</p>
+        <p className="payx-state payx-state--loading">Loading teachers...</p>
       ) : (
         <>
           {departments.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", marginBottom: 6 }}>Department</label>
+            <div className="payx-card academic-inner__card">
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 800 }}>Department</label>
               <select
+                className="academic-inner__select"
                 value={selectedDepartmentId}
                 onChange={(e) => setSelectedDepartmentId(e.target.value)}
               >
@@ -119,7 +126,8 @@ export default function AssignTeacher() {
             </div>
           )}
 
-          <p style={{ opacity: 0.75 }}>
+          <div className="payx-card academic-inner__card">
+          <p className="academic-inner__muted">
             Only teachers registered for this class level will show here.
           </p>
 
@@ -133,7 +141,7 @@ export default function AssignTeacher() {
             {currentTeacher ? `${currentTeacher.name}${currentTeacher.email ? ` (${currentTeacher.email})` : ""}` : "Not assigned"}
           </div>
 
-          <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+          <select className="academic-inner__select" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
             <option value="">Select Teacher</option>
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
@@ -142,21 +150,22 @@ export default function AssignTeacher() {
             ))}
           </select>
 
-          <div style={{ marginTop: 12 }}>
+          <div className="academic-inner__actions" style={{ marginTop: 12 }}>
             {!currentTeacher ? (
-              <button onClick={assign} disabled={saving}>
+              <button className="payx-btn" onClick={assign} disabled={saving}>
                 {saving ? "Saving..." : "Assign"}
               </button>
             ) : (
-              <button onClick={unassign} disabled={saving}>
+              <button className="payx-btn academic-inner__danger" onClick={unassign} disabled={saving}>
                 {saving ? "Saving..." : "Unassign"}
               </button>
             )}
           </div>
 
-          {teachers.length === 0 && <p style={{ color: "red" }}>No eligible teachers found for this level.</p>}
+          {teachers.length === 0 && <p className="payx-state payx-state--error" style={{ marginTop: 12 }}>No eligible teachers found for this level.</p>}
+          </div>
         </>
       )}
-    </div>
+    </AcademicPageShell>
   );
 }

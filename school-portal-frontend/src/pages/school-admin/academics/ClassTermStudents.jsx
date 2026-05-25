@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function ClassTermStudents() {
   const { classId, termId } = useParams();
@@ -63,39 +64,50 @@ export default function ClassTermStudents() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <AcademicPageShell
+      pill="Enrolled Students"
+      title="Students enrolled in this term"
+      subtitle="Review enrolled students, search records, and remove selected students when enrollment needs to be corrected."
+      meta={[
+        `${students.length} visible students`,
+        `${selected.size} selected`,
+        departmentName || "All departments",
+      ]}
+    >
+      <div className="academic-inner__toolbar">
         <div>
           {departmentName ? (
-            <p style={{ margin: "0 0 8px", opacity: 0.75 }}>
+            <p className="academic-inner__muted">
               Showing enrolled students for department: <strong>{departmentName}</strong>
             </p>
           ) : null}
           <button
+            className="payx-btn"
             onClick={() =>
               navigate(
                 `/school/admin/classes/${classId}/terms/${termId}/enroll` +
                   (departmentId ? `?department_id=${encodeURIComponent(departmentId)}&department_name=${encodeURIComponent(departmentName)}` : "")
               )
             }
-            style={{ marginLeft: 8 }}
           >
             Open Enroll Table
           </button>
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input placeholder="Search students" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-          <button onClick={() => { setSearch(''); setPage(1); }}>Clear</button>
+      <div className="payx-card academic-inner__card">
+        <div className="academic-inner__actions">
+          <input className="academic-inner__input" placeholder="Search students" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          <button className="payx-btn payx-btn--soft" onClick={() => { setSearch(''); setPage(1); }}>Clear</button>
         </div>
+      </div>
 
         {loading ? (
-          <p>Loading...</p>
+          <p className="payx-state payx-state--loading">Loading...</p>
         ) : (
-          <>
-            <table border="1" cellPadding="8" width="100%" style={{ marginTop: 12 }}>
+          <div className="payx-card academic-inner__card">
+            <div className="academic-inner__table-wrap">
+            <table className="payx-table academic-inner__table">
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>
@@ -141,28 +153,28 @@ export default function ClassTermStudents() {
                 )}
               </tbody>
             </table>
+            </div>
             
             {students.length > 0 && (
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <div className="academic-inner__actions" style={{ marginTop: 12 }}>
                 <button 
+                  className="payx-btn academic-inner__danger"
                   onClick={unenroll} 
                   disabled={selected.size === 0 || unrolling}
-                  style={{ color: 'red' }}
                 >
                   {unrolling ? 'Unenrolling...' : `Unenroll Selected (${selected.size})`}
                 </button>
               </div>
             )}
             {meta && (
-              <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
+              <div className="academic-inner__actions" style={{ marginTop: 12 }}>
+                <button className="payx-btn payx-btn--soft" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
                 <div>Page {meta.current_page} / {meta.last_page}</div>
-                <button disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>Next</button>
+                <button className="payx-btn payx-btn--soft" disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>Next</button>
               </div>
             )}
-          </>
+          </div>
         )}
-      </div>
-    </div>
+    </AcademicPageShell>
   );
 }

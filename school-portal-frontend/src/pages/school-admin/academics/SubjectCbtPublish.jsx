@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../../services/api";
+import AcademicPageShell from "./AcademicPageShell";
 
 export default function SubjectCbtPublish() {
   const { classId, termId, subjectId } = useParams();
@@ -46,67 +47,82 @@ export default function SubjectCbtPublish() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <AcademicPageShell
+      pill="CBT Publishing"
+      title="Publish CBT exams"
+      subtitle="Review prepared CBT exams for this subject and publish only the exams students should see."
+      meta={[
+        meta?.subject_name || "Subject",
+        meta?.class_name || "Class",
+        `${exams.length} exams`,
+      ]}
+    >
+      <div className="academic-inner__toolbar">
         <div>
-          <p style={{ marginTop: 6, opacity: 0.75 }}>
+          <h3>Prepared CBT Exams</h3>
+          <p>
             {meta
-              ? `${meta.subject_name} • ${meta.class_name} (${String(meta.class_level || "").toUpperCase()}) • ${meta.term_name}`
+              ? `${meta.subject_name} - ${meta.class_name} (${String(meta.class_level || "").toUpperCase()}) - ${meta.term_name}`
               : "Loading subject info..."}
           </p>
         </div>
       </div>
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="payx-state payx-state--loading">Loading...</p>
       ) : exams.length === 0 ? (
-        <p>No CBT exam has been prepared by staff for this subject yet.</p>
+        <p className="payx-state payx-state--warn">No CBT exam has been prepared by staff for this subject yet.</p>
       ) : (
-        <table border="1" cellPadding="10" width="100%" style={{ marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th style={{ width: 70 }}>S/N</th>
-              <th>Title</th>
-              <th>Teacher</th>
-              <th>Exam Window</th>
-              <th style={{ width: 120 }}>Questions</th>
-              <th style={{ width: 130 }}>Status</th>
-              <th style={{ width: 150 }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exams.map((exam, idx) => (
-              <tr key={exam.id}>
-                <td>{idx + 1}</td>
-                <td>{exam.title}</td>
-                <td>{exam.teacher_name || "-"}</td>
-                <td>
-                  {exam.starts_at ? new Date(exam.starts_at).toLocaleString() : "-"} -{" "}
-                  {exam.ends_at ? new Date(exam.ends_at).toLocaleString() : "-"}
-                </td>
-                <td>{exam.questions_count ?? 0}</td>
-                <td>{String(exam.status || "").toUpperCase()}</td>
-                <td>
-                  {exam.status === "published" ? (
-                    <span style={{ color: "#15803d", fontWeight: 600 }}>Published</span>
-                  ) : (
-                    <button
-                      onClick={() => publishExam(exam.id)}
-                      disabled={publishingId === exam.id}
-                    >
-                      {publishingId === exam.id ? "Publishing..." : "Publish"}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="payx-card academic-inner__card">
+          <div className="academic-inner__table-wrap">
+            <table className="payx-table academic-inner__table">
+              <thead>
+                <tr>
+                  <th style={{ width: 70 }}>S/N</th>
+                  <th>Title</th>
+                  <th>Teacher</th>
+                  <th>Exam Window</th>
+                  <th style={{ width: 120 }}>Questions</th>
+                  <th style={{ width: 130 }}>Status</th>
+                  <th style={{ width: 150 }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exams.map((exam, idx) => (
+                  <tr key={exam.id}>
+                    <td>{idx + 1}</td>
+                    <td>{exam.title}</td>
+                    <td>{exam.teacher_name || "-"}</td>
+                    <td>
+                      {exam.starts_at ? new Date(exam.starts_at).toLocaleString() : "-"} -{" "}
+                      {exam.ends_at ? new Date(exam.ends_at).toLocaleString() : "-"}
+                    </td>
+                    <td>{exam.questions_count ?? 0}</td>
+                    <td>{String(exam.status || "").toUpperCase()}</td>
+                    <td>
+                      {exam.status === "published" ? (
+                        <span style={{ color: "#15803d", fontWeight: 700 }}>Published</span>
+                      ) : (
+                        <button
+                          className="payx-btn"
+                          onClick={() => publishExam(exam.id)}
+                          disabled={publishingId === exam.id}
+                        >
+                          {publishingId === exam.id ? "Publishing..." : "Publish"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
-      <p style={{ marginTop: 12, opacity: 0.7 }}>
+      <p className="payx-state payx-state--ok">
         Students can see exam details only after publish. CBT questions are accessible only during the exam time window.
       </p>
-    </div>
+    </AcademicPageShell>
   );
 }
