@@ -380,7 +380,10 @@ export default function SchoolAdminAttendant() {
       </section>
 
       <section className="att-panel">
-        <h3>Staff Attendance Records</h3>
+        <h3>Current Term Attendance Register</h3>
+        <p className="att-small">
+          This table shows only the current term register: {[currentSession?.label, currentTerm?.name].filter(Boolean).join(" | ") || "No current term selected"}.
+        </p>
         <div className="att-filter-row">
           <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_from} onChange={(e) => updateFilter("date_from", e.target.value)} />
           <input className="att-field" style={{ maxWidth: 170 }} type="date" value={filters.date_to} onChange={(e) => updateFilter("date_to", e.target.value)} />
@@ -472,7 +475,7 @@ export default function SchoolAdminAttendant() {
           </button>
         </div>
         <p className="att-small">
-          Open a session, then open First Term, Second Term, or Third Term to see staff attendance metrics.
+          This section excludes the current term. When school admin makes another term current, the previous term will appear here automatically.
         </p>
         {historyLoading ? <p className="att-state att-state--warn">Loading attendance history...</p> : null}
         {!historyLoading && history.length === 0 ? <p className="att-small">No attendance history found yet.</p> : null}

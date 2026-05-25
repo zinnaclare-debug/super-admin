@@ -227,6 +227,7 @@ class AttendantController extends Controller
         abort_unless($user->role === 'school_admin', 403);
 
         $schoolId = (int) $user->school_id;
+        [$currentSession, $currentTerm] = $this->resolveCurrentSessionAndTerm($schoolId);
         $staff = User::query()
             ->where('school_id', $schoolId)
             ->where('role', 'staff')
@@ -252,7 +253,14 @@ class AttendantController extends Controller
             ->values();
 
         $sessions = AcademicSession::query()
-            ->with(['terms' => fn ($query) => $query->orderBy('id')])
+            ->with(['terms' => function ($query) use ($currentSession, $currentTerm) {
+                $query->when($currentSession && $currentTerm, function ($termQuery) use ($currentSession, $currentTerm) {
+                    $termQuery->where(function ($sub) use ($currentSession, $currentTerm) {
+                        $sub->where('academic_session_id', '!=', $currentSession->id)
+                            ->orWhere('id', '!=', $currentTerm->id);
+                    });
+                })->orderBy('id');
+            }])
             ->where('school_id', $schoolId)
             ->orderByDesc('id')
             ->get();
@@ -321,8 +329,20 @@ class AttendantController extends Controller
                 'status' => $session->status,
                 'terms' => $terms,
             ];
-        })->values();
+        })->filter(fn ($session) => count($session['terms'] ?? []) > 0)->values();
 
-        return response()->json(['data' => ['sessions' => $history]]);
+        return response()->json([
+            'data' => [
+                'current_session' => $currentSession ? [
+                    'id' => $currentSession->id,
+                    'label' => $currentSession->session_name ?: $currentSession->academic_year,
+                ] : null,
+                'current_term' => $currentTerm ? [
+                    'id' => $currentTerm->id,
+                    'name' => $currentTerm->name,
+                ] : null,
+                'sessions' => $history,
+            ],
+        ]);
     }
 }
