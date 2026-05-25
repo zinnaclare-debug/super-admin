@@ -852,33 +852,35 @@ export default function Register() {
           </p>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end", marginTop: 10 }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span>Bulk Upload Type</span>
-              <select value={bulkImportType} onChange={(e) => setBulkImportType(e.target.value)} style={{ minWidth: 180 }}>
-                <option value="student">Student CSV</option>
-                <option value="staff">Staff CSV</option>
-              </select>
-            </label>
-
-            {educationLevels.length > 0 && (
+            <div style={{ display: "grid", gap: 10, minWidth: 240 }}>
               <label style={{ display: "grid", gap: 6 }}>
-                <span>Template Education Level</span>
-                <select
-                  value={bulkTemplateLevel}
-                  onChange={(e) => setBulkTemplateLevel(e.target.value)}
-                  style={{ minWidth: 220 }}
-                >
-                  {educationLevels.map((level) => (
-                    <option key={level} value={level}>
-                      {prettyLevel(level)} ({level})
-                    </option>
-                  ))}
+                <span>Bulk Upload Type</span>
+                <select value={bulkImportType} onChange={(e) => setBulkImportType(e.target.value)} style={{ width: "100%" }}>
+                  <option value="student">Student CSV</option>
+                  <option value="staff">Staff CSV</option>
                 </select>
-                <small style={{ opacity: 0.75 }}>
-                  The CSV will use this exact education_level value.
-                </small>
               </label>
-            )}
+
+              {educationLevels.length > 0 && (
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span>Template Education Level</span>
+                  <select
+                    value={bulkTemplateLevel}
+                    onChange={(e) => setBulkTemplateLevel(e.target.value)}
+                    style={{ width: "100%" }}
+                  >
+                    {educationLevels.map((level) => (
+                      <option key={level} value={level}>
+                        {prettyLevel(level)} ({level})
+                      </option>
+                    ))}
+                  </select>
+                  <small style={{ opacity: 0.75 }}>
+                    The CSV will use this exact education_level value.
+                  </small>
+                </label>
+              )}
+            </div>
 
             <button type="button" onClick={downloadBulkTemplate}>
               Download {bulkTypeLabel} CSV Template
