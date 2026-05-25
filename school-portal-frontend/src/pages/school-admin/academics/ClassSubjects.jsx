@@ -165,6 +165,9 @@ export default function ClassSubjects() {
           <h3>{termName} Courses</h3>
           <p>Select a term to view and manage the subjects available in that term.</p>
         </div>
+        <button className="academic-inner__back-btn" type="button" onClick={() => navigate(-1)}>
+          Back
+        </button>
       </div>
 
       <div className="academic-inner__chip-row">
