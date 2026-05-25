@@ -430,6 +430,14 @@ export default function SchoolAdminAttendant() {
             <option value="out_of_range">Out of Range</option>
           </select>
           <button className="att-btn att-btn--soft" type="button" onClick={loadRecords}>Refresh</button>
+          <button
+            className="att-btn"
+            type="button"
+            onClick={() => downloadTermPdf(currentTerm)}
+            disabled={!currentTerm?.id || downloadingTermId === currentTerm?.id}
+          >
+            {downloadingTermId === currentTerm?.id ? "Downloading..." : "Download PDF"}
+          </button>
         </div>
 
         <div className="att-table-wrap" style={{ marginTop: 14 }}>
