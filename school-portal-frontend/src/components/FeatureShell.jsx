@@ -6,6 +6,7 @@ export default function FeatureShell({
   subtitle = "",
   showBack = false,
   showHeader = true,
+  backOnly = false,
   children,
 }) {
   const navigate = useNavigate();
@@ -13,11 +14,13 @@ export default function FeatureShell({
   return (
     <div className="feature-shell">
       {showHeader ? (
-        <div className="feature-shell__header">
-          <div>
-            <h2 className="feature-shell__title">{title}</h2>
-            {subtitle ? <div className="feature-shell__subtitle">{subtitle}</div> : null}
-          </div>
+        <div className={`feature-shell__header${backOnly ? " feature-shell__header--back-only" : ""}`}>
+          {!backOnly ? (
+            <div>
+              <h2 className="feature-shell__title">{title}</h2>
+              {subtitle ? <div className="feature-shell__subtitle">{subtitle}</div> : null}
+            </div>
+          ) : null}
           {showBack ? (
             <button className="feature-shell__back" onClick={() => navigate(-1)}>
               Back

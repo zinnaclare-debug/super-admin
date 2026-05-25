@@ -245,6 +245,23 @@
   padding: 0;
 }
 
+.academic-inner__back-btn {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: #082f49;
+  background: linear-gradient(130deg, #22d3ee, #fcd34d 95%);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.14);
+  cursor: pointer;
+  font-weight: 800;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.academic-inner__back-btn:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+}
+
 .academic-inner__modal {
   position: fixed;
   inset: 0;

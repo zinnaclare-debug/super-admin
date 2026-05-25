@@ -86,6 +86,9 @@ export default function AcademicSessionDetails() {
           <h3>{sessionLabel}</h3>
           <p>Session structure and term controls for this academic year.</p>
         </div>
+        <button className="academic-inner__back-btn" type="button" onClick={() => navigate(-1)}>
+          Back
+        </button>
       </div>
 
       {loading && <p className="payx-state payx-state--loading">Loading session details...</p>}
