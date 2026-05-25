@@ -227,10 +227,32 @@ class RegistrationController extends Controller
     {
         $payload = $request->validate([
             'import_type' => 'nullable|in:student,staff',
+            'education_level' => 'nullable|string|max:60',
         ]);
 
         $importType = $payload['import_type'] ?? 'student';
-        ['headers' => $headers, 'example' => $example, 'filename' => $filename] = $this->bulkTemplateDefinition($importType);
+        $school = $request->user()->school;
+        $activeLevels = $this->activeEducationLevelKeys($school);
+        $templateLevel = $this->normalizeEducationLevel($payload['education_level'] ?? null);
+
+        if ($templateLevel !== null && !in_array($templateLevel, $activeLevels, true)) {
+            throw ValidationException::withMessages([
+                'education_level' => [
+                    'Education level is not enabled for this school. Use one of: '
+                    . implode(', ', $activeLevels),
+                ],
+            ]);
+        }
+
+        $templateLevel = $templateLevel ?: ($activeLevels[0] ?? 'primary');
+        $exampleClassName = $this->exampleClassNameForLevel($school, $templateLevel);
+
+        ['headers' => $headers, 'example' => $example, 'filename' => $filename] = $this->bulkTemplateDefinition(
+            $importType,
+            $templateLevel,
+            $activeLevels,
+            $exampleClassName
+        );
 
         $encode = fn (array $row) => implode(',', array_map(function ($value) {
             $text = (string) $value;
@@ -599,8 +621,16 @@ class RegistrationController extends Controller
         ];
     }
 
-    private function bulkTemplateDefinition(string $importType): array
+    private function bulkTemplateDefinition(
+        string $importType,
+        string $templateLevel,
+        array $activeLevels,
+        string $exampleClassName
+    ): array
     {
+        $acceptedLevels = implode(' | ', $activeLevels ?: [$templateLevel]);
+        $templateLevelForFile = preg_replace('/[^a-z0-9_]+/i', '_', $templateLevel) ?: 'level';
+
         if ($importType === 'staff') {
             return [
                 'headers' => [
@@ -613,19 +643,23 @@ class RegistrationController extends Controller
                     'sex',
                     'dob',
                     'address',
+                    'accepted_education_levels',
+                    'template_note',
                 ],
                 'example' => [
                     'Samuel Adeyemi',
                     'samuel.ade@example.com',
                     'Pass1234',
                     '',
-                    'secondary',
+                    $templateLevel,
                     'Mathematics Teacher',
                     'M',
                     '1990-08-12',
                     '12 School Road',
+                    $acceptedLevels,
+                    'Use the exact education_level value shown in this template.',
                 ],
-                'filename' => 'staff_bulk_template.csv',
+                'filename' => "staff_bulk_template_{$templateLevelForFile}.csv",
             ];
         }
 
@@ -649,15 +683,17 @@ class RegistrationController extends Controller
                 'guardian_state_of_origin',
                 'guardian_occupation',
                 'guardian_relationship',
+                'accepted_education_levels',
+                'template_note',
             ],
             'example' => [
                 'Amina Yusuf',
                 'amina@example.com',
                 'Pass1234',
                 '',
-                'secondary',
-                'SS 1',
-                'Science',
+                $templateLevel,
+                $exampleClassName,
+                $templateLevel === 'secondary' ? 'Science' : '',
                 'F',
                 'Islam',
                 '2012-01-15',
@@ -669,8 +705,10 @@ class RegistrationController extends Controller
                 'Kano',
                 'Trader',
                 'mother',
+                $acceptedLevels,
+                'Use the exact education_level value shown in this template.',
             ],
-            'filename' => 'student_bulk_template.csv',
+            'filename' => "student_bulk_template_{$templateLevelForFile}.csv",
         ];
     }
 
@@ -871,7 +909,7 @@ class RegistrationController extends Controller
         $sessionTermIds = [];
 
         if ($class) {
-            $classLevel = strtolower(trim((string) $class->level));
+            $classLevel = $this->normalizeEducationLevel((string) $class->level);
             if ($educationLevel !== null && $educationLevel !== $classLevel) {
                 $errors[] = 'Education level does not match selected class level.';
             }
@@ -1607,13 +1645,71 @@ class RegistrationController extends Controller
     private function normalizeEducationLevel(?string $value): ?string
     {
         $normalized = strtolower(trim((string) $value));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?: '';
+        $normalized = trim($normalized, '_');
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function activeEducationLevelKeys(?School $school): array
+    {
+        if (!$school) {
+            return [];
+        }
+
+        return ClassTemplateSchema::activeLevelKeys(
+            ClassTemplateSchema::normalize($school->class_templates)
+        );
+    }
+
+    private function exampleClassNameForLevel(?School $school, string $level): string
+    {
+        $level = $this->normalizeEducationLevel($level) ?: 'primary';
+
+        if ($school) {
+            $currentSessionId = AcademicSession::query()
+                ->where('school_id', (int) $school->id)
+                ->where('status', 'current')
+                ->value('id');
+
+            if ($currentSessionId) {
+                $currentClassName = SchoolClass::query()
+                    ->where('school_id', (int) $school->id)
+                    ->where('academic_session_id', (int) $currentSessionId)
+                    ->whereRaw('LOWER(level) = ?', [$level])
+                    ->orderBy('id')
+                    ->value('name');
+
+                if ($currentClassName) {
+                    return (string) $currentClassName;
+                }
+            }
+
+            $templates = ClassTemplateSchema::normalize($school->class_templates);
+            foreach ($templates as $section) {
+                if (($section['key'] ?? null) !== $level) {
+                    continue;
+                }
+
+                $classNames = ClassTemplateSchema::activeClassNames($section);
+                if (!empty($classNames)) {
+                    return (string) $classNames[0];
+                }
+            }
+        }
+
+        return match ($level) {
+            'creche' => 'Creche 1',
+            'pre_nursery' => 'Pre Nursery 1',
+            'nursery' => 'Nursery 1',
+            'secondary' => 'SS 1',
+            default => 'Primary 1',
+        };
     }
 
     private function isValidEducationLevel(int $schoolId, string $level): bool
     {
-        $normalizedLevel = strtolower(trim($level));
-        if ($normalizedLevel === '') {
+        $normalizedLevel = $this->normalizeEducationLevel($level);
+        if (!$normalizedLevel) {
             return false;
         }
 
@@ -1650,8 +1746,5 @@ class RegistrationController extends Controller
             : url($relativeOrAbsolute);
     }
 }
-
-
-
 
 

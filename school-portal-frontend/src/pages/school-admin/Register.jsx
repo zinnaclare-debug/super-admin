@@ -66,6 +66,7 @@ export default function Register() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkImportType, setBulkImportType] = useState("student");
+  const [bulkTemplateLevel, setBulkTemplateLevel] = useState("");
 
   const [form, setForm] = useState({
     role: "",
@@ -110,6 +111,17 @@ export default function Register() {
     setBulkPreviewPageLoading(false);
     setBulkResult(null);
   }, [bulkImportType]);
+
+  useEffect(() => {
+    if (!educationLevels.length) {
+      setBulkTemplateLevel("");
+      return;
+    }
+
+    setBulkTemplateLevel((current) =>
+      current && educationLevels.includes(current) ? current : educationLevels[0]
+    );
+  }, [educationLevels]);
 
   useEffect(() => {
     let mounted = true;
@@ -434,7 +446,10 @@ export default function Register() {
   const downloadBulkTemplate = async () => {
     try {
       const res = await api.get("/api/school-admin/register/bulk/template", {
-        params: { import_type: bulkImportType },
+        params: {
+          import_type: bulkImportType,
+          education_level: bulkTemplateLevel || undefined,
+        },
         responseType: "blob",
       });
       const fileName = parseFileName(res.headers, bulkTemplateFallback);
@@ -844,6 +859,26 @@ export default function Register() {
                 <option value="staff">Staff CSV</option>
               </select>
             </label>
+
+            {educationLevels.length > 0 && (
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Template Education Level</span>
+                <select
+                  value={bulkTemplateLevel}
+                  onChange={(e) => setBulkTemplateLevel(e.target.value)}
+                  style={{ minWidth: 220 }}
+                >
+                  {educationLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {prettyLevel(level)} ({level})
+                    </option>
+                  ))}
+                </select>
+                <small style={{ opacity: 0.75 }}>
+                  The CSV will use this exact education_level value.
+                </small>
+              </label>
+            )}
 
             <button type="button" onClick={downloadBulkTemplate}>
               Download {bulkTypeLabel} CSV Template
