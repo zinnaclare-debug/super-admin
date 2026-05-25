@@ -24,6 +24,7 @@ export default function StaffAttendantHome() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState("");
 
   const record = data?.record || null;
@@ -32,6 +33,9 @@ export default function StaffAttendantHome() {
   const stateClass = record ? "att-state--good" : data?.is_blocked ? "att-state--warn" : "att-state--good";
   const canSign = useMemo(() => {
     return !loading && !data?.is_blocked && setting.location_configured && !record;
+  }, [data?.is_blocked, loading, record, setting.location_configured]);
+  const canSignOut = useMemo(() => {
+    return !loading && !data?.is_blocked && setting.location_configured && record && !record.signed_out_at;
   }, [data?.is_blocked, loading, record, setting.location_configured]);
 
   const load = async () => {
@@ -51,18 +55,18 @@ export default function StaffAttendantHome() {
     load();
   }, []);
 
-  const signIn = async () => {
+  const submitWithLocation = async ({ endpoint, actionLabel, onBusy, fallbackMessage }) => {
     if (!navigator.geolocation) {
       alert("Location is not supported on this device/browser.");
       return;
     }
 
-    setSigning(true);
+    onBusy(true);
     setMessage("Requesting location permission...");
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const res = await api.post("/api/staff/attendant/sign-in", {
+          const res = await api.post(endpoint, {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy_meters: Math.round(position.coords.accuracy || 0),
@@ -72,21 +76,35 @@ export default function StaffAttendantHome() {
               screen: `${window.screen?.width || 0}x${window.screen?.height || 0}`,
             },
           });
-          setMessage(res.data?.message || "Staff attendance signed successfully.");
+          setMessage(res.data?.message || fallbackMessage);
           await load();
         } catch (e) {
-          setMessage(e?.response?.data?.message || "Sign-in failed.");
+          setMessage(e?.response?.data?.message || `${actionLabel} failed.`);
         } finally {
-          setSigning(false);
+          onBusy(false);
         }
       },
       (error) => {
-        setSigning(false);
+        onBusy(false);
         setMessage(error?.message || "Location permission was denied.");
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
+
+  const signIn = async () => submitWithLocation({
+    endpoint: "/api/staff/attendant/sign-in",
+    actionLabel: "Sign-in",
+    onBusy: setSigning,
+    fallbackMessage: "Staff attendance signed successfully.",
+  });
+
+  const signOut = async () => submitWithLocation({
+    endpoint: "/api/staff/attendant/sign-out",
+    actionLabel: "Sign-out",
+    onBusy: setSigningOut,
+    fallbackMessage: "Staff attendance signed out successfully.",
+  });
 
   return (
     <StaffFeatureLayout title="Staff Attendance" showHeader={false}>
@@ -101,7 +119,7 @@ export default function StaffAttendantHome() {
             <div className="att-meta">
               <span>{loading ? "Loading..." : data?.today || "Today"}</span>
               {currentPeriod ? <span>{currentPeriod}</span> : null}
-              <span>{record ? "Signed" : "Not signed"}</span>
+              <span>{record?.signed_out_at ? "Signed out" : record ? "Signed in" : "Not signed"}</span>
               <span>{setting.location_configured ? `${setting.radius_meters}m allowed radius` : "Location not configured"}</span>
             </div>
           </div>
@@ -119,7 +137,11 @@ export default function StaffAttendantHome() {
             {!loading ? (
               <>
                 <p className={`att-state ${stateClass}`}>
-                  {record ? `Signed: ${statusText(record)}` : data?.is_blocked ? data?.blocked_reason : "Ready to sign attendance"}
+                  {record?.signed_out_at
+                    ? `Signed out: ${statusText(record)}`
+                    : record
+                      ? `Signed in: ${statusText(record)}`
+                      : data?.is_blocked ? data?.blocked_reason : "Ready to sign attendance"}
                 </p>
                 {message ? <p className="att-small">{message}</p> : null}
                 {!setting.location_configured ? (
@@ -128,9 +150,15 @@ export default function StaffAttendantHome() {
                   </p>
                 ) : null}
                 <div style={{ marginTop: 14 }}>
-                  <button className="att-btn" onClick={signIn} disabled={!canSign || signing}>
-                    {signing ? "Signing..." : record ? "Already Signed Today" : "Sign Staff Attendance"}
-                  </button>
+                  {!record ? (
+                    <button className="att-btn" onClick={signIn} disabled={!canSign || signing}>
+                      {signing ? "Signing..." : "Sign Staff Attendance"}
+                    </button>
+                  ) : (
+                    <button className="att-btn" onClick={signOut} disabled={!canSignOut || signingOut}>
+                      {signingOut ? "Signing Out..." : record.signed_out_at ? "Already Signed Out" : "Sign Out"}
+                    </button>
+                  )}
                 </div>
               </>
             ) : null}
@@ -140,6 +168,7 @@ export default function StaffAttendantHome() {
             <h3>Sign-in Details</h3>
             <div className="att-card">
               <p className="att-small"><strong>Time:</strong> {formatDateTime(record?.signed_in_at)}</p>
+              <p className="att-small"><strong>Sign Out:</strong> {formatDateTime(record?.signed_out_at)}</p>
               <p className="att-small"><strong>Status:</strong> {statusText(record)}</p>
             </div>
           </article>

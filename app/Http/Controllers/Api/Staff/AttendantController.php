@@ -94,6 +94,29 @@ class AttendantController extends Controller
         ];
     }
 
+    private function locationProof(SchoolAttendantSetting $setting, array $data): array
+    {
+        $distance = $this->distanceMeters(
+            (float) $setting->latitude,
+            (float) $setting->longitude,
+            (float) $data['latitude'],
+            (float) $data['longitude']
+        );
+        $inside = $distance <= (int) $setting->radius_meters;
+
+        return [$distance, $inside];
+    }
+
+    private function validateLocationPayload(Request $request): array
+    {
+        return $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'accuracy_meters' => 'nullable|integer|min:0|max:1000000',
+            'device_info' => 'nullable|array',
+        ]);
+    }
+
     public function today(Request $request)
     {
         $user = $request->user();
@@ -150,12 +173,7 @@ class AttendantController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'staff', 403);
 
-        $data = $request->validate([
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'accuracy_meters' => 'nullable|integer|min:0|max:1000000',
-            'device_info' => 'nullable|array',
-        ]);
+        $data = $this->validateLocationPayload($request);
 
         $schoolId = (int) $user->school_id;
         $setting = $this->setting($schoolId);
@@ -184,14 +202,7 @@ class AttendantController extends Controller
             return response()->json(['message' => 'Sign-in has closed for today.'], 422);
         }
 
-        $distance = $this->distanceMeters(
-            (float) $setting->latitude,
-            (float) $setting->longitude,
-            (float) $data['latitude'],
-            (float) $data['longitude']
-        );
-
-        $inside = $distance <= (int) $setting->radius_meters;
+        [$distance, $inside] = $this->locationProof($setting, $data);
 
         $status = 'present';
         if (!$inside) {
@@ -227,6 +238,70 @@ class AttendantController extends Controller
         return response()->json([
             'message' => $record->wasRecentlyCreated ? 'Staff attendance signed successfully.' : 'You have already signed staff attendance today.',
             'data' => ['record' => $record],
+        ]);
+    }
+
+    public function signOut(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'staff', 403);
+
+        $data = $this->validateLocationPayload($request);
+
+        $schoolId = (int) $user->school_id;
+        $setting = $this->setting($schoolId);
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$term) {
+            return response()->json(['message' => 'No current academic session/term configured for your school.'], 422);
+        }
+
+        $ctx = $this->dayContext($schoolId, $setting);
+        if ($ctx['is_blocked']) {
+            return response()->json([
+                'message' => $ctx['blocked_reason'] ?: 'Attendant sign-out is not available today.',
+            ], 422);
+        }
+
+        if ($setting->latitude === null || $setting->longitude === null) {
+            return response()->json(['message' => 'School location has not been configured by school admin.'], 422);
+        }
+
+        $record = StaffAttendantRecord::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('term_id', $term->id)
+            ->where('staff_user_id', $user->id)
+            ->whereDate('attendance_date', $ctx['date'])
+            ->first();
+
+        if (!$record) {
+            return response()->json(['message' => 'You need to sign in before signing out.'], 422);
+        }
+
+        if ($record->signed_out_at) {
+            return response()->json([
+                'message' => 'You have already signed out today.',
+                'data' => ['record' => $record],
+            ]);
+        }
+
+        [$distance, $inside] = $this->locationProof($setting, $data);
+        $record->fill([
+            'signed_out_at' => $ctx['now']->copy()->timezone('UTC'),
+            'sign_out_latitude' => $data['latitude'],
+            'sign_out_longitude' => $data['longitude'],
+            'sign_out_accuracy_meters' => $data['accuracy_meters'] ?? null,
+            'sign_out_distance_from_school_meters' => $distance,
+            'sign_out_location_status' => $inside ? 'inside_school' : 'outside_school',
+            'sign_out_ip_address' => $request->ip(),
+            'sign_out_user_agent' => substr((string) $request->userAgent(), 0, 1000),
+            'sign_out_device_info' => $data['device_info'] ?? null,
+        ]);
+        $record->save();
+
+        return response()->json([
+            'message' => 'Staff attendance signed out successfully.',
+            'data' => ['record' => $record->fresh()],
         ]);
     }
 }

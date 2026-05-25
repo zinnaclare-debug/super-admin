@@ -244,6 +244,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:attendant');
     Route::get('/school-admin/attendant/history', [SchoolAdminAttendantController::class, 'history'])
         ->middleware('feature:attendant');
+    Route::get('/school-admin/attendant/history/{term}/download/pdf', [SchoolAdminAttendantController::class, 'downloadTermPdf'])
+        ->middleware('feature:attendant');
 
     // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
@@ -485,6 +487,8 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::get('/staff/attendant/today', [StaffAttendantController::class, 'today'])
         ->middleware('feature:attendant');
     Route::post('/staff/attendant/sign-in', [StaffAttendantController::class, 'signIn'])
+        ->middleware('feature:attendant');
+    Route::post('/staff/attendant/sign-out', [StaffAttendantController::class, 'signOut'])
         ->middleware('feature:attendant');
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);

@@ -9,7 +9,10 @@ use App\Models\SchoolPublicHoliday;
 use App\Models\StaffAttendantRecord;
 use App\Models\Term;
 use App\Models\User;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class AttendantController extends Controller
 {
@@ -311,6 +314,7 @@ class AttendantController extends Controller
                         'expected_days' => $expectedDays,
                         'attendance_percent' => $expectedDays > 0 ? round(($present / $expectedDays) * 100, 1) : null,
                         'last_sign_in' => optional($rows->sortByDesc('signed_in_at')->first())->signed_in_at,
+                        'last_sign_out' => optional($rows->sortByDesc('signed_out_at')->first())->signed_out_at,
                     ];
                 })->values();
 
@@ -343,6 +347,108 @@ class AttendantController extends Controller
                 ] : null,
                 'sessions' => $history,
             ],
+        ]);
+    }
+
+    public function downloadTermPdf(Request $request, Term $term)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'school_admin' && (int) $term->school_id === (int) $user->school_id, 403);
+
+        $schoolId = (int) $user->school_id;
+        $session = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('id', $term->academic_session_id)
+            ->first();
+
+        $records = StaffAttendantRecord::query()
+            ->with(['staffUser:id,name,email,username'])
+            ->where('school_id', $schoolId)
+            ->where('term_id', $term->id)
+            ->orderBy('attendance_date')
+            ->orderBy('signed_in_at')
+            ->get();
+
+        $staff = User::query()
+            ->where('school_id', $schoolId)
+            ->where('role', 'staff')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'username']);
+
+        $expectedDates = $records
+            ->pluck('attendance_date')
+            ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+            ->filter()
+            ->unique()
+            ->values();
+        $expectedDays = $expectedDates->count();
+        $recordsByStaff = $records->groupBy(fn ($record) => (int) $record->staff_user_id);
+
+        $summary = $staff->map(function (User $staffUser, int $index) use ($recordsByStaff, $expectedDays) {
+            $rows = $recordsByStaff->get((int) $staffUser->id, collect());
+            $present = $rows
+                ->pluck('attendance_date')
+                ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                ->filter()
+                ->unique()
+                ->count();
+            $late = $rows
+                ->filter(fn ($row) => $row->status === 'late')
+                ->pluck('attendance_date')
+                ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                ->unique()
+                ->count();
+            $farFromSchool = $rows
+                ->filter(fn ($row) => $row->status === 'out_of_range' || $row->location_status === 'outside_school')
+                ->pluck('attendance_date')
+                ->map(fn ($date) => optional($date)->toDateString() ?: (string) $date)
+                ->unique()
+                ->count();
+
+            return [
+                'sn' => $index + 1,
+                'staff_name' => $staffUser->name,
+                'present' => $present,
+                'absent' => max(0, $expectedDays - $present),
+                'late' => $late,
+                'far_from_school_present' => $farFromSchool,
+                'expected_days' => $expectedDays,
+                'attendance_percent' => $expectedDays > 0 ? round(($present / $expectedDays) * 100, 1) : null,
+                'last_sign_in' => optional($rows->sortByDesc('signed_in_at')->first())->signed_in_at,
+                'last_sign_out' => optional($rows->sortByDesc('signed_out_at')->first())->signed_out_at,
+            ];
+        })->values();
+
+        $html = view('pdf.staff_attendance_report', [
+            'schoolName' => $user->school?->name ?: 'School',
+            'sessionLabel' => $session?->session_name ?: $session?->academic_year ?: 'Academic Session',
+            'termName' => $term->name,
+            'expectedDays' => $expectedDays,
+            'summary' => $summary,
+            'records' => $records,
+            'generatedAt' => now(),
+        ])->render();
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $dompdfTempDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dompdf';
+        if (!is_dir($dompdfTempDir)) {
+            @mkdir($dompdfTempDir, 0775, true);
+        }
+        $options->set('tempDir', $dompdfTempDir);
+        $options->set('fontDir', $dompdfTempDir);
+        $options->set('fontCache', $dompdfTempDir);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $fileName = Str::slug(($session?->session_name ?: $session?->academic_year ?: 'session') . '-' . $term->name . '-staff-attendance') . '.pdf';
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
     }
 }

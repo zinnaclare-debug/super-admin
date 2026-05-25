@@ -17,6 +17,13 @@ const DAYS = [
 
 const today = new Date().toISOString().slice(0, 10);
 
+const parseFileName = (headers, fallback = "staff_attendance.pdf") => {
+  const contentDisposition = headers?.["content-disposition"] || "";
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!match?.[1]) return fallback;
+  return decodeURIComponent(match[1].replace(/"/g, "").trim());
+};
+
 function compactDateTime(value) {
   if (!value) return "-";
   try {
@@ -80,6 +87,7 @@ export default function SchoolAdminAttendant() {
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [holidaySaving, setHolidaySaving] = useState(false);
+  const [downloadingTermId, setDownloadingTermId] = useState(null);
   const [message, setMessage] = useState("");
 
   const locationConfigured = setting.latitude !== "" && setting.latitude !== null && setting.longitude !== "" && setting.longitude !== null;
@@ -261,6 +269,30 @@ export default function SchoolAdminAttendant() {
     }
   };
 
+  const downloadTermPdf = async (term) => {
+    if (!term?.id) return;
+    setDownloadingTermId(term.id);
+    setMessage("");
+    try {
+      const res = await api.get(`/api/school-admin/attendant/history/${term.id}/download/pdf`, {
+        responseType: "blob",
+      });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = parseFileName(res.headers, `${term.name || "term"}_staff_attendance.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setMessage(e?.response?.data?.message || "Failed to download attendance PDF.");
+    } finally {
+      setDownloadingTermId(null);
+    }
+  };
+
   return (
     <div className="att-page">
       <section className="att-hero">
@@ -407,6 +439,7 @@ export default function SchoolAdminAttendant() {
                 <th>Staff</th>
                 <th>Date</th>
                 <th>Signed In</th>
+                <th>Signed Out</th>
                 <th>Status</th>
                 <th>Location</th>
                 <th>Device</th>
@@ -422,31 +455,37 @@ export default function SchoolAdminAttendant() {
                   </td>
                   <td>{record.attendance_date}</td>
                   <td>{compactDateTime(record.signed_in_at)}</td>
+                  <td>{compactDateTime(record.signed_out_at)}</td>
                   <td><span className="att-badge">{statusLabel(record.status)}</span></td>
                   <td>
-                    <p className="att-small">{statusLabel(record.location_status)}</p>
-                    <p className="att-small">{record.distance_from_school_meters ?? "-"}m from school</p>
-                    <p className="att-small">Accuracy: {record.accuracy_meters ?? "-"}m</p>
+                    <p className="att-small"><strong>In:</strong> {statusLabel(record.location_status)} | {record.distance_from_school_meters ?? "-"}m</p>
+                    <p className="att-small"><strong>Out:</strong> {record.sign_out_location_status ? statusLabel(record.sign_out_location_status) : "not signed out"} | {record.sign_out_distance_from_school_meters ?? "-"}m</p>
                   </td>
                   <td>
                     <p className="att-small">{record.ip_address || "-"}</p>
                     <p className="att-small">{record.device_info?.platform || "-"}</p>
                   </td>
                   <td>
-                    {record.latitude && record.longitude ? (
-                      <a className="att-btn att-btn--soft" href={`https://www.google.com/maps?q=${record.latitude},${record.longitude}`} target="_blank" rel="noreferrer">Open Map</a>
-                    ) : "-"}
+                    <div className="att-filter-row">
+                      {record.latitude && record.longitude ? (
+                        <a className="att-btn att-btn--soft att-btn--tiny" href={`https://www.google.com/maps?q=${record.latitude},${record.longitude}`} target="_blank" rel="noreferrer">Sign In</a>
+                      ) : null}
+                      {record.sign_out_latitude && record.sign_out_longitude ? (
+                        <a className="att-btn att-btn--soft att-btn--tiny" href={`https://www.google.com/maps?q=${record.sign_out_latitude},${record.sign_out_longitude}`} target="_blank" rel="noreferrer">Sign Out</a>
+                      ) : null}
+                      {!record.latitude && !record.sign_out_latitude ? "-" : null}
+                    </div>
                   </td>
                 </tr>
               ))}
               {!recordsLoading && records.length === 0 ? (
                 <tr>
-                  <td colSpan="7">No attendant record found for this filter.</td>
+                  <td colSpan="8">No attendant record found for this filter.</td>
                 </tr>
               ) : null}
               {recordsLoading ? (
                 <tr>
-                  <td colSpan="7">Loading attendant records...</td>
+                  <td colSpan="8">Loading attendant records...</td>
                 </tr>
               ) : null}
             </tbody>
@@ -491,7 +530,18 @@ export default function SchoolAdminAttendant() {
                   <details className="att-collapse att-collapse--nested" key={term.id} open={sessionIndex === 0 && termIndex === 0}>
                     <summary>
                       <span>{term.name}</span>
-                      <strong>{term.expected_days} expected day{Number(term.expected_days) === 1 ? "" : "s"}</strong>
+                      <button
+                        className="att-btn att-btn--soft att-btn--tiny"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          downloadTermPdf(term);
+                        }}
+                        disabled={downloadingTermId === term.id}
+                      >
+                        {downloadingTermId === term.id ? "Downloading..." : "Download PDF"}
+                      </button>
                     </summary>
                     <div className="att-table-wrap">
                       <table className="att-table">
@@ -506,6 +556,7 @@ export default function SchoolAdminAttendant() {
                             <th>Expected Days</th>
                             <th>Attendance %</th>
                             <th>Last Sign-in</th>
+                            <th>Last Sign-out</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -520,11 +571,12 @@ export default function SchoolAdminAttendant() {
                               <td>{row.expected_days}</td>
                               <td>{row.attendance_percent == null ? "-" : `${row.attendance_percent}%`}</td>
                               <td>{compactDateTime(row.last_sign_in)}</td>
+                              <td>{compactDateTime(row.last_sign_out)}</td>
                             </tr>
                           ))}
                           {(term.summary || []).length === 0 ? (
                             <tr>
-                              <td colSpan="9">No staff found for this term.</td>
+                              <td colSpan="10">No staff found for this term.</td>
                             </tr>
                           ) : null}
                         </tbody>
