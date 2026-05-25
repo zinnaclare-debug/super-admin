@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../services/api";
 import AcademicPageShell from "./AcademicPageShell";
 
 export default function SubjectCbtPublish() {
   const { classId, termId, subjectId } = useParams();
+  const navigate = useNavigate();
 
   const [meta, setMeta] = useState(null);
   const [exams, setExams] = useState([]);
@@ -63,9 +64,12 @@ export default function SubjectCbtPublish() {
           <p>
             {meta
               ? `${meta.subject_name} - ${meta.class_name} (${String(meta.class_level || "").toUpperCase()}) - ${meta.term_name}`
-              : "Loading subject info..."}
+            : "Loading subject info..."}
           </p>
         </div>
+        <button className="academic-inner__back-btn" type="button" onClick={() => navigate(-1)}>
+          Back
+        </button>
       </div>
 
       {loading ? (
