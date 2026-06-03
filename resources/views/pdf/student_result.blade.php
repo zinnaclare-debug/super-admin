@@ -199,14 +199,17 @@
     $timesPresent = (int) ($attendance?->days_present ?? 0);
     $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
     $totalObtainable = max(1, count($rows)) * 100;
+    $isCumulative = (bool) ($isCumulativeResult ?? (($resultType ?? 'term') === 'cumulative'));
     $assessmentSchema = \App\Support\AssessmentSchema::normalizeSchema($assessmentSchema ?? []);
     $activeCaIndices = \App\Support\AssessmentSchema::activeCaIndices($assessmentSchema);
     $assessmentParts = [];
     foreach ($activeCaIndices as $index) {
         $assessmentParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
     }
-    $assessmentPattern = implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')';
-    $scoreColspan = 5 + count($activeCaIndices);
+    $assessmentPattern = $isCumulative
+        ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
+        : implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')';
+    $scoreColspan = $isCumulative ? 6 : 5 + count($activeCaIndices);
     $nextTermBeginLabel = '-';
     if (!empty($nextTermBeginDate)) {
         try {
@@ -242,7 +245,7 @@
         </table>
 
         <div class="section-title">
-            REPORT SHEET FOR {{ strtoupper($term?->name ?? '-') }} {{ strtoupper($session?->academic_year ?: $session?->session_name ?: '-') }} SESSION
+            {{ $isCumulative ? 'CUMULATIVE REPORT SHEET' : 'REPORT SHEET' }} FOR {{ strtoupper($term?->name ?? '-') }} {{ strtoupper($session?->academic_year ?: $session?->session_name ?: '-') }} SESSION
         </div>
         <div class="grades-key" style="margin-top: 0; border-top: 0;">
             <strong>ASSESSMENT PATTERN:</strong> {{ strtoupper($assessmentPattern) }}
@@ -291,11 +294,18 @@
             <thead>
                 <tr>
                     <th class="center">SUBJECT</th>
-                    @foreach($activeCaIndices as $index)
-                        <th class="center">C{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
-                    @endforeach
-                    <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
-                    <th class="center">TOTAL</th>
+                    @if($isCumulative)
+                        <th class="center">FIRST TERM</th>
+                        <th class="center">SECOND TERM</th>
+                        <th class="center">THIRD TERM</th>
+                        <th class="center">AVERAGE</th>
+                    @else
+                        @foreach($activeCaIndices as $index)
+                            <th class="center">C{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
+                        @endforeach
+                        <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
+                        <th class="center">TOTAL</th>
+                    @endif
                     <th class="center">GRADE</th>
                     <th class="center">REMARK</th>
                 </tr>
@@ -304,12 +314,19 @@
                 @forelse($rows as $row)
                     <tr>
                         <td>{{ strtoupper($row['subject_name']) }}</td>
-                        @foreach($activeCaIndices as $index)
-                            @php($caValue = $row['ca_breakdown'][$index] ?? null)
-                            <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : (int) $caValue }}</td>
-                        @endforeach
-                        <td class="center">{{ $row['exam'] }}</td>
-                        <td class="center">{{ $row['total'] }}</td>
+                        @if($isCumulative)
+                            <td class="center">{{ $row['first_term_total'] ?? '-' }}</td>
+                            <td class="center">{{ $row['second_term_total'] ?? '-' }}</td>
+                            <td class="center">{{ $row['third_term_total'] ?? '-' }}</td>
+                            <td class="center">{{ $row['average'] ?? '-' }}</td>
+                        @else
+                            @foreach($activeCaIndices as $index)
+                                @php($caValue = $row['ca_breakdown'][$index] ?? null)
+                                <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : (int) $caValue }}</td>
+                            @endforeach
+                            <td class="center">{{ $row['exam'] }}</td>
+                            <td class="center">{{ $row['total'] }}</td>
+                        @endif
                         <td class="center">{{ strtoupper($row['grade']) }}</td>
                         <td class="center">{{ strtoupper($row['remark'] ?? '-') }}</td>
                     </tr>

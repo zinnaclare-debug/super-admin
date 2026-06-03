@@ -44,6 +44,7 @@ class GenerateStudentResultPdfJob implements ShouldQueue
                 (int) $document->school_id,
                 (int) ($payload['class_id'] ?? 0),
                 (int) ($payload['term_id'] ?? 0),
+                (string) ($payload['result_type'] ?? 'term'),
             );
 
             $safeName = trim((string) ($generated['file_name'] ?? 'student_result.pdf')) ?: 'student_result.pdf';

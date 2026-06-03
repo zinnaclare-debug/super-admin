@@ -463,11 +463,25 @@ class ReportsController extends Controller
             'email' => 'nullable|string',
             'academic_session_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
 
         $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
         if ($identifier === '') {
             return response()->json(['message' => 'Provide student email or name'], 422);
+        }
+        $resultType = strtolower(trim((string) ($payload['result_type'] ?? 'term'))) === 'cumulative'
+            ? 'cumulative'
+            : 'term';
+        if ($resultType === 'cumulative') {
+            $term = Term::where('id', (int) $payload['term_id'])
+                ->where('school_id', (int) $request->user()->school_id)
+                ->where('academic_session_id', (int) $payload['academic_session_id'])
+                ->first(['id', 'name']);
+            $termName = strtolower((string) ($term?->name ?? ''));
+            if (!$term || (!str_contains($termName, 'third') && preg_match('/(^|\D)3(rd)?(\D|$)/', $termName) !== 1)) {
+                return response()->json(['message' => 'Cumulative result is only available for third term.'], 422);
+            }
         }
 
         $document = GeneratedDocument::create([
@@ -481,8 +495,9 @@ class ReportsController extends Controller
                 'email' => $payload['email'] ?? null,
                 'academic_session_id' => (int) $payload['academic_session_id'],
                 'term_id' => (int) $payload['term_id'],
+                'result_type' => $resultType,
             ],
-            'file_name' => Str::slug($identifier) . '_student_result.pdf',
+            'file_name' => Str::slug($identifier) . ($resultType === 'cumulative' ? '_cumulative_result.pdf' : '_student_result.pdf'),
         ]);
 
         GenerateSchoolAdminDocumentJob::dispatch((int) $document->id);
@@ -593,7 +608,8 @@ class ReportsController extends Controller
             $schoolId,
             (string) ($payload['student'] ?? $payload['email'] ?? ''),
             (int) ($payload['academic_session_id'] ?? 0),
-            (int) ($payload['term_id'] ?? 0)
+            (int) ($payload['term_id'] ?? 0),
+            (string) ($payload['result_type'] ?? 'term')
         );
     }
 

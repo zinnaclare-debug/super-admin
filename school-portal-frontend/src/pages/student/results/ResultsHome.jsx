@@ -44,6 +44,11 @@ const displayScore = (value) => {
   return Number.isFinite(n) ? n : "-";
 };
 
+const isThirdTermName = (name = "") => {
+  const value = String(name).toLowerCase();
+  return value.includes("third") || /(^|\D)3(rd)?(\D|$)/.test(value);
+};
+
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
@@ -76,10 +81,13 @@ export default function StudentResultsHome() {
   const [requestingPdf, setRequestingPdf] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [pdfJob, setPdfJob] = useState(null);
+  const [resultType, setResultType] = useState("term");
   const [error, setError] = useState("");
 
   const caIndices = useMemo(() => activeCaIndices(assessmentSchema), [assessmentSchema]);
   const isPdfProcessing = pdfJob && ["pending", "processing"].includes(pdfJob.status);
+  const supportsCumulative = Boolean(selected?.supports_cumulative || isThirdTermName(selected?.term_name));
+  const isCumulative = supportsCumulative && resultType === "cumulative";
 
   const loadClasses = async () => {
     setLoadingClasses(true);
@@ -112,6 +120,7 @@ export default function StudentResultsHome() {
         params: {
           class_id: item.class_id,
           term_id: item.term_id,
+          result_type: supportsCumulative ? resultType : "term",
         },
       });
       setResults(res.data?.data || []);
@@ -132,7 +141,13 @@ export default function StudentResultsHome() {
   useEffect(() => {
     setPdfJob(null);
     loadResults(selected);
-  }, [selected]);
+  }, [selected, resultType]);
+
+  useEffect(() => {
+    if (!supportsCumulative && resultType !== "term") {
+      setResultType("term");
+    }
+  }, [supportsCumulative, resultType]);
 
   useEffect(() => {
     if (!pdfJob?.id || !["pending", "processing"].includes(pdfJob.status)) {
@@ -176,6 +191,7 @@ export default function StudentResultsHome() {
       const res = await api.post("/api/student/results/download-jobs", {
         class_id: selected.class_id,
         term_id: selected.term_id,
+        result_type: isCumulative ? "cumulative" : "term",
       });
       setPdfJob(res.data?.data || null);
     } catch (e) {
@@ -309,6 +325,7 @@ export default function StudentResultsHome() {
             <div className="rs-results-head">
               <h3 className="rs-results-title">
                 {selected.class_name} - {selected.term_name}
+                {isCumulative ? " Cumulative" : ""}
               </h3>
               <button
                 className="rs-btn"
@@ -318,6 +335,33 @@ export default function StudentResultsHome() {
                 {pdfActionLabel}
               </button>
             </div>
+
+            {supportsCumulative ? (
+              <div className="rs-meta" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="rs-btn"
+                  style={{ opacity: resultType === "term" ? 1 : 0.72 }}
+                  onClick={() => {
+                    setResultType("term");
+                    setPdfJob(null);
+                  }}
+                >
+                  Normal Third Term Result
+                </button>
+                <button
+                  type="button"
+                  className="rs-btn"
+                  style={{ opacity: resultType === "cumulative" ? 1 : 0.72 }}
+                  onClick={() => {
+                    setResultType("cumulative");
+                    setPdfJob(null);
+                  }}
+                >
+                  Cumulative Result
+                </button>
+              </div>
+            ) : null}
 
             {pdfJob?.status === "pending" || pdfJob?.status === "processing" ? (
               <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>
@@ -348,14 +392,25 @@ export default function StudentResultsHome() {
                     <tr>
                       <th style={{ width: 70 }}>S/N</th>
                       <th>Subject</th>
-                      {caIndices.map((idx) => (
-                        <th key={`ca-head-${idx}`} style={{ width: 80 }}>
-                          CA{idx + 1}
-                        </th>
-                      ))}
-                      <th style={{ width: 80 }}>CA Total</th>
-                      <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
-                      <th style={{ width: 80 }}>Total</th>
+                      {isCumulative ? (
+                        <>
+                          <th style={{ width: 100 }}>First Term</th>
+                          <th style={{ width: 110 }}>Second Term</th>
+                          <th style={{ width: 100 }}>Third Term</th>
+                          <th style={{ width: 90 }}>Average</th>
+                        </>
+                      ) : (
+                        <>
+                          {caIndices.map((idx) => (
+                            <th key={`ca-head-${idx}`} style={{ width: 80 }}>
+                              CA{idx + 1}
+                            </th>
+                          ))}
+                          <th style={{ width: 80 }}>CA Total</th>
+                          <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
+                          <th style={{ width: 80 }}>Total</th>
+                        </>
+                      )}
                       <th style={{ width: 80 }}>Grade</th>
                     </tr>
                   </thead>
@@ -364,20 +419,31 @@ export default function StudentResultsHome() {
                       <tr key={row.term_subject_id}>
                         <td>{idx + 1}</td>
                         <td>{row.subject_name}</td>
-                        {caIndices.map((caIdx) => (
-                          <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
-                            {displayScore(row.ca_breakdown?.[caIdx])}
-                          </td>
-                        ))}
-                        <td>{displayScore(row.ca)}</td>
-                        <td>{displayScore(row.exam)}</td>
-                        <td>{displayScore(row.total)}</td>
+                        {isCumulative ? (
+                          <>
+                            <td>{displayScore(row.first_term_total)}</td>
+                            <td>{displayScore(row.second_term_total)}</td>
+                            <td>{displayScore(row.third_term_total)}</td>
+                            <td>{displayScore(row.average)}</td>
+                          </>
+                        ) : (
+                          <>
+                            {caIndices.map((caIdx) => (
+                              <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
+                                {displayScore(row.ca_breakdown?.[caIdx])}
+                              </td>
+                            ))}
+                            <td>{displayScore(row.ca)}</td>
+                            <td>{displayScore(row.exam)}</td>
+                            <td>{displayScore(row.total)}</td>
+                          </>
+                        )}
                         <td>{row.grade}</td>
                       </tr>
                     ))}
                     {results.length === 0 ? (
                       <tr>
-                        <td colSpan={6 + caIndices.length}>
+                        <td colSpan={isCumulative ? 7 : 6 + caIndices.length}>
                           No result records for this class and term.
                         </td>
                       </tr>

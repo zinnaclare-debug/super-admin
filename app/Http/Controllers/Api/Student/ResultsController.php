@@ -30,6 +30,9 @@ use Throwable;
 
 class ResultsController extends Controller
 {
+    private const RESULT_TYPE_TERM = 'term';
+    private const RESULT_TYPE_CUMULATIVE = 'cumulative';
+
     private function resolveClassTeacherForStudentTerm(
         int $schoolId,
         SchoolClass $class,
@@ -135,6 +138,40 @@ class ResultsController extends Controller
             ->all();
     }
 
+    private function normalizeResultType(?string $value): string
+    {
+        return strtolower(trim((string) $value)) === self::RESULT_TYPE_CUMULATIVE
+            ? self::RESULT_TYPE_CUMULATIVE
+            : self::RESULT_TYPE_TERM;
+    }
+
+    private function termOrderFromName(?string $name): ?int
+    {
+        $value = strtolower(trim((string) $name));
+        if ($value === '') {
+            return null;
+        }
+
+        return match (true) {
+            str_contains($value, 'first') || preg_match('/(^|\D)1(st)?(\D|$)/', $value) === 1 => 1,
+            str_contains($value, 'second') || preg_match('/(^|\D)2(nd)?(\D|$)/', $value) === 1 => 2,
+            str_contains($value, 'third') || preg_match('/(^|\D)3(rd)?(\D|$)/', $value) === 1 => 3,
+            default => null,
+        };
+    }
+
+    private function termSupportsCumulative(Term $term): bool
+    {
+        return $this->termOrderFromName($term->name) === 3;
+    }
+
+    private function assertCumulativeTerm(string $resultType, Term $term): void
+    {
+        if ($resultType === self::RESULT_TYPE_CUMULATIVE && !$this->termSupportsCumulative($term)) {
+            throw new \InvalidArgumentException('Cumulative result is only available for third term.');
+        }
+    }
+
     private function resolveCurrentTermId(int $schoolId, int $sessionId): ?int
     {
         if (Schema::hasColumn('terms', 'is_current')) {
@@ -208,6 +245,7 @@ class ResultsController extends Controller
                     'class_name' => $class->name,
                     'class_level' => $class->level,
                     'term_name' => $term->name,
+                    'supports_cumulative' => $this->termSupportsCumulative($term),
                 ];
             }
         }
@@ -263,12 +301,22 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+        try {
+            $this->assertCumulativeTerm($resultType, $term);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
+        $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, (int) $student->id)
+            : $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
 
         return response()->json([
             'data' => $rows,
             'assessment_schema' => $assessmentSchema,
+            'result_type' => $resultType,
+            'supports_cumulative' => $this->termSupportsCumulative($term),
         ]);
     }
     // GET /api/student/results/download?class_id=1&term_id=2
@@ -284,11 +332,13 @@ class ResultsController extends Controller
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
 
         $schoolId = (int) $user->school_id;
         $classId = (int) $payload['class_id'];
         $termId = (int) $payload['term_id'];
+        $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         $session = AcademicSession::where('school_id', $schoolId)
             ->where('status', 'current')
@@ -328,6 +378,12 @@ class ResultsController extends Controller
         }
 
         try {
+            $this->assertCumulativeTerm($resultType, $term);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        try {
             $generated = $this->buildStudentResultPdfForResolvedStudent(
                 $user,
                 $user,
@@ -336,7 +392,8 @@ class ResultsController extends Controller
                 $term,
                 $class,
                 $classId,
-                $termId
+                $termId,
+                $resultType
             );
 
             return response($generated['pdf_output'], 200, [
@@ -372,11 +429,13 @@ class ResultsController extends Controller
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
 
         $schoolId = (int) $user->school_id;
         $classId = (int) $payload['class_id'];
         $termId = (int) $payload['term_id'];
+        $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         $session = AcademicSession::where('school_id', $schoolId)
             ->where('status', 'current')
@@ -415,9 +474,16 @@ class ResultsController extends Controller
             return response()->json(['message' => 'Term not found'], 404);
         }
 
+        try {
+            $this->assertCumulativeTerm($resultType, $term);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $safeStudent = Str::slug((string) ($user->name ?: 'student'));
         $safeTerm = Str::slug((string) ($term->name ?: 'term'));
         $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+        $suffix = $resultType === self::RESULT_TYPE_CUMULATIVE ? '_cumulative_result' : '_result';
 
         $document = GeneratedDocument::create([
             'school_id' => $schoolId,
@@ -428,8 +494,9 @@ class ResultsController extends Controller
             'payload' => [
                 'class_id' => $classId,
                 'term_id' => $termId,
+                'result_type' => $resultType,
             ],
-            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf",
+            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}{$suffix}.pdf",
         ]);
 
         GenerateStudentResultPdfJob::dispatch((int) $document->id);
@@ -491,7 +558,13 @@ class ResultsController extends Controller
         );
     }
 
-    public function generateStudentResultPdfDocumentForJob(int $requestingUserId, int $schoolId, int $classId, int $termId): array
+    public function generateStudentResultPdfDocumentForJob(
+        int $requestingUserId,
+        int $schoolId,
+        int $classId,
+        int $termId,
+        string $resultType = self::RESULT_TYPE_TERM
+    ): array
     {
         $user = User::where('id', $requestingUserId)
             ->where('school_id', $schoolId)
@@ -541,6 +614,9 @@ class ResultsController extends Controller
             throw new \RuntimeException('Term not found.');
         }
 
+        $resultType = $this->normalizeResultType($resultType);
+        $this->assertCumulativeTerm($resultType, $term);
+
         return $this->buildStudentResultPdfForResolvedStudent(
             $user,
             $user,
@@ -549,7 +625,8 @@ class ResultsController extends Controller
             $term,
             $class,
             $classId,
-            $termId
+            $termId,
+            $resultType
         );
     }
 
@@ -583,7 +660,9 @@ class ResultsController extends Controller
             'email' => 'nullable|string',
             'academic_session_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
+        $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
         if ($identifier === '') {
@@ -612,6 +691,12 @@ class ResultsController extends Controller
             return response()->json(['message' => 'Term not found for selected session'], 404);
         }
 
+        try {
+            $this->assertCumulativeTerm($resultType, $term);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
         if (!$classId) {
             return response()->json(['message' => 'No class enrollment/result found for the selected student, session and term'], 404);
@@ -638,7 +723,8 @@ class ResultsController extends Controller
             $term,
             $class,
             $classId,
-            (int) $term->id
+            (int) $term->id,
+            $resultType
         );
     }
 
@@ -648,7 +734,8 @@ class ResultsController extends Controller
         int $schoolId,
         string $identifier,
         int $academicSessionId,
-        int $termId
+        int $termId,
+        string $resultType = self::RESULT_TYPE_TERM
     ): array {
         $actor = User::where('id', $requestingUserId)
             ->where('school_id', $schoolId)
@@ -689,6 +776,9 @@ class ResultsController extends Controller
             throw new \RuntimeException('Term not found for selected session.');
         }
 
+        $resultType = $this->normalizeResultType($resultType);
+        $this->assertCumulativeTerm($resultType, $term);
+
         $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
         if (!$classId) {
             throw new \RuntimeException('No class enrollment/result found for the selected student, session and term.');
@@ -715,7 +805,8 @@ class ResultsController extends Controller
             $term,
             $class,
             (int) $class->id,
-            (int) $term->id
+            (int) $term->id,
+            $resultType
         );
     }
     // GET /api/school-admin/reports/student-result?student=...&academic_session_id=...&term_id=...
@@ -733,7 +824,9 @@ class ResultsController extends Controller
             'email' => 'nullable|string',
             'academic_session_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
+        $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         $identifier = trim((string) ($payload['student'] ?? $payload['email'] ?? ''));
         if ($identifier === '') {
@@ -760,6 +853,12 @@ class ResultsController extends Controller
             ->first();
         if (!$term) {
             return response()->json(['message' => 'Term not found for selected session'], 404);
+        }
+
+        try {
+            $this->assertCumulativeTerm($resultType, $term);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
         $classId = $this->resolveClassIdForTerm($schoolId, (int) $session->id, (int) $term->id, (int) $student->id);
@@ -801,8 +900,12 @@ class ResultsController extends Controller
         }
 
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, (int) $class->id);
-        $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
-        $summary = $this->summarizeRows($schoolId, $rows);
+        $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->cumulativeSubjectRows($schoolId, (int) $class->id, $session, $term, (int) $student->id)
+            : $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
+        $summary = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->summarizeCumulativeRows($schoolId, $rows)
+            : $this->summarizeRows($schoolId, $rows);
         $totalScore = $summary['total_score'];
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
@@ -877,6 +980,8 @@ class ResultsController extends Controller
                     'average_score' => $summary['graded_subjects_count'] > 0 ? $averageScore : null,
                     'overall_grade' => $overallGrade,
                 ],
+                'result_type' => $resultType,
+                'supports_cumulative' => $this->termSupportsCumulative($term),
                 'teacher_comment' => $teacherComment,
                 'behaviour_summary' => $behaviourSummary,
                 'behaviour_traits' => $behaviourTraits,
@@ -899,8 +1004,12 @@ class ResultsController extends Controller
                     'id' => (int) $term->id,
                     'name' => $term->name,
                 ],
+                'result_type' => $resultType,
+                'supports_cumulative' => $this->termSupportsCumulative($term),
             ],
             'assessment_schema' => $assessmentSchema,
+            'result_type' => $resultType,
+            'supports_cumulative' => $this->termSupportsCumulative($term),
             'message' => count($rows) === 0 ? 'No result records found for the selected criteria.' : null,
         ]);
     }
@@ -1012,15 +1121,20 @@ class ResultsController extends Controller
         Term $term,
         SchoolClass $class,
         int $classId,
-        int $termId
+        int $termId,
+        string $resultType = self::RESULT_TYPE_TERM
     ): array {
         $schoolId = (int) $actor->school_id;
+        $resultType = $this->normalizeResultType($resultType);
+        $this->assertCumulativeTerm($resultType, $term);
 
         @set_time_limit(120);
         @ini_set('memory_limit', '512M');
 
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
-        $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+        $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, (int) $student->id)
+            : $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
 
         $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
             ->where('class_id', $classId)
@@ -1049,13 +1163,17 @@ class ResultsController extends Controller
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
-        $summary = $this->summarizeRows($schoolId, $rows);
+        $summary = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->summarizeCumulativeRows($schoolId, $rows)
+            : $this->summarizeRows($schoolId, $rows);
         $totalScore = $summary['total_score'];
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
         $averageDisplay = $summary['average_display'];
         $showResultPosition = (bool) ($schoolWebsiteContent['show_result_position'] ?? true);
-        $classPositionStats = $this->buildClassPositionStats($schoolId, $classId, $termId);
+        $classPositionStats = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->buildCumulativeClassPositionStats($schoolId, $classId, $session, $term)
+            : $this->buildClassPositionStats($schoolId, $classId, $termId);
         $classPosition = $classPositionStats['positions'][(int) $student->id] ?? null;
         $classSize = (int) ($classPositionStats['class_count'] ?? 0);
         $classPositionDisplay = $classPosition !== null
@@ -1072,15 +1190,9 @@ class ResultsController extends Controller
             ? $this->defaultHeadComment((int) round($averageScore))
             : 'No graded subject available yet.';
 
-        $behaviourTraits = [
-            ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-            ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-            ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-            ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-            ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-            ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-            ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-        ];
+        $behaviourTraits = $resultType === self::RESULT_TYPE_CUMULATIVE
+            ? $this->cumulativeBehaviourTraits($schoolId, (int) $class->id, $session, (int) $student->id)
+            : $this->behaviourTraitsFromRating($behaviour);
 
         $viewData = [
             'school' => $school,
@@ -1109,6 +1221,8 @@ class ResultsController extends Controller
             'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
             'studentPhotoDataUri' => $this->studentPhotoDataUri($studentPhotoPath),
             'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
+            'resultType' => $resultType,
+            'isCumulativeResult' => $resultType === self::RESULT_TYPE_CUMULATIVE,
         ];
 
         $viewDataWithAssets = $viewData;
@@ -1164,10 +1278,11 @@ class ResultsController extends Controller
         $safeStudent = Str::slug((string) ($studentUser->name ?: 'student'));
         $safeTerm = Str::slug((string) ($term->name ?: 'term'));
         $safeSession = Str::slug((string) ($session->academic_year ?: $session->session_name ?: 'session'));
+        $suffix = $resultType === self::RESULT_TYPE_CUMULATIVE ? '_cumulative_result' : '_result';
 
         return [
             'pdf_output' => $pdfOutput,
-            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}_result.pdf",
+            'file_name' => "{$safeStudent}_{$safeSession}_{$safeTerm}{$suffix}.pdf",
         ];
     }
 
@@ -1179,7 +1294,8 @@ class ResultsController extends Controller
         Term $term,
         SchoolClass $class,
         int $classId,
-        int $termId
+        int $termId,
+        string $resultType = self::RESULT_TYPE_TERM
     ) {
         $schoolId = (int) $actor->school_id;
 
@@ -1192,7 +1308,8 @@ class ResultsController extends Controller
                 $term,
                 $class,
                 $classId,
-                $termId
+                $termId,
+                $resultType
             );
 
             return response($generated['pdf_output'], 200, [
@@ -1214,6 +1331,353 @@ class ResultsController extends Controller
                 'message' => 'Unable to generate result PDF. Please check student/session data and branding images.',
             ], 500);
         }
+    }
+
+    private function cumulativeTermsByOrder(int $schoolId, int $sessionId): array
+    {
+        $terms = Term::where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->orderBy('id')
+            ->get(['id', 'name']);
+
+        $ordered = [];
+        foreach ($terms as $index => $term) {
+            $order = $this->termOrderFromName($term->name);
+            if ($order !== null && $order >= 1 && $order <= 3 && !isset($ordered[$order])) {
+                $ordered[$order] = $term;
+            }
+
+            $fallbackOrder = $index + 1;
+            if ($fallbackOrder >= 1 && $fallbackOrder <= 3 && !isset($ordered[$fallbackOrder])) {
+                $ordered[$fallbackOrder] = $term;
+            }
+        }
+
+        return [
+            1 => $ordered[1] ?? null,
+            2 => $ordered[2] ?? null,
+            3 => $ordered[3] ?? null,
+        ];
+    }
+
+    private function gradedTotalFromResultRow(object $row, array $assessmentSchema): ?int
+    {
+        if (!$this->isResultRecordGraded(
+            $row->result_id ?? $row->id ?? null,
+            $row->ca ?? null,
+            $row->exam ?? null,
+            $row->result_created_at ?? $row->created_at ?? null,
+            $row->result_updated_at ?? $row->updated_at ?? null
+        )) {
+            return null;
+        }
+
+        $caBreakdown = AssessmentSchema::normalizeBreakdown(
+            $row->ca_breakdown ?? null,
+            $assessmentSchema,
+            (int) ($row->ca ?? 0)
+        );
+        $exam = max(0, min((int) ($assessmentSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+
+        return AssessmentSchema::breakdownTotal($caBreakdown) + $exam;
+    }
+
+    private function formatCumulativeScore(?float $value)
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        $rounded = round($value, 2);
+        return abs($rounded - round($rounded)) < 0.00001 ? (int) round($rounded) : $rounded;
+    }
+
+    private function cumulativeSubjectRows(
+        int $schoolId,
+        int $classId,
+        AcademicSession $session,
+        Term $selectedTerm,
+        int $studentId
+    ): array {
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
+        $termsByOrder = $this->cumulativeTermsByOrder($schoolId, (int) $session->id);
+        $termIdsByOrder = collect($termsByOrder)
+            ->filter()
+            ->map(fn (Term $term) => (int) $term->id)
+            ->all();
+
+        if (empty($termIdsByOrder)) {
+            return [];
+        }
+
+        $baseSubjects = TermSubject::query()
+            ->where('term_subjects.school_id', $schoolId)
+            ->where('term_subjects.class_id', $classId)
+            ->where('term_subjects.term_id', (int) $selectedTerm->id)
+            ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+            ->when(
+                Schema::hasTable('student_subject_exclusions'),
+                function ($query) use ($schoolId, $classId, $studentId, $session) {
+                    $query->leftJoin('student_subject_exclusions', function ($join) use ($schoolId, $classId, $studentId, $session) {
+                        $join->on('student_subject_exclusions.class_id', '=', 'term_subjects.class_id')
+                            ->on('student_subject_exclusions.subject_id', '=', 'term_subjects.subject_id')
+                            ->where('student_subject_exclusions.school_id', '=', $schoolId)
+                            ->where('student_subject_exclusions.academic_session_id', '=', (int) $session->id)
+                            ->where('student_subject_exclusions.class_id', '=', $classId)
+                            ->where('student_subject_exclusions.student_id', '=', $studentId);
+                    })->whereNull('student_subject_exclusions.id');
+                }
+            )
+            ->select([
+                'term_subjects.id as term_subject_id',
+                'term_subjects.subject_id',
+                'subjects.name as subject_name',
+                'subjects.code as subject_code',
+            ])
+            ->orderBy('subjects.name')
+            ->get();
+
+        if ($baseSubjects->isEmpty()) {
+            return [];
+        }
+
+        $subjectIds = $baseSubjects
+            ->pluck('subject_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $resultRows = TermSubject::query()
+            ->where('term_subjects.school_id', $schoolId)
+            ->where('term_subjects.class_id', $classId)
+            ->whereIn('term_subjects.term_id', array_values($termIdsByOrder))
+            ->whereIn('term_subjects.subject_id', $subjectIds)
+            ->leftJoin('results', function ($join) use ($studentId) {
+                $join->on('results.term_subject_id', '=', 'term_subjects.id')
+                    ->where('results.student_id', '=', $studentId);
+            })
+            ->select([
+                'term_subjects.term_id',
+                'term_subjects.subject_id',
+                'results.id as result_id',
+                'results.ca',
+                'results.ca_breakdown',
+                'results.exam',
+                'results.created_at as result_created_at',
+                'results.updated_at as result_updated_at',
+            ])
+            ->get();
+
+        $totalsBySubjectAndOrder = [];
+        foreach ($resultRows as $row) {
+            $order = array_search((int) $row->term_id, $termIdsByOrder, true);
+            if ($order === false) {
+                continue;
+            }
+
+            $totalsBySubjectAndOrder[(int) $row->subject_id][(int) $order] =
+                $this->gradedTotalFromResultRow($row, $assessmentSchema);
+        }
+
+        return $baseSubjects
+            ->map(function ($subject) use ($totalsBySubjectAndOrder, $schoolId) {
+                $subjectId = (int) $subject->subject_id;
+                $first = $totalsBySubjectAndOrder[$subjectId][1] ?? null;
+                $second = $totalsBySubjectAndOrder[$subjectId][2] ?? null;
+                $third = $totalsBySubjectAndOrder[$subjectId][3] ?? null;
+                $availableScores = array_values(array_filter([$first, $second, $third], fn ($value) => $value !== null));
+                $average = !empty($availableScores)
+                    ? round(array_sum($availableScores) / count($availableScores), 2)
+                    : null;
+
+                return [
+                    'term_subject_id' => (int) $subject->term_subject_id,
+                    'subject_id' => $subjectId,
+                    'subject_name' => $subject->subject_name,
+                    'subject_code' => $subject->subject_code,
+                    'is_cumulative' => true,
+                    'is_graded' => $average !== null,
+                    'first_term_score' => $first,
+                    'second_term_score' => $second,
+                    'third_term_score' => $third,
+                    'first_term_total' => $this->formatCumulativeScore($first === null ? null : (float) $first),
+                    'second_term_total' => $this->formatCumulativeScore($second === null ? null : (float) $second),
+                    'third_term_total' => $this->formatCumulativeScore($third === null ? null : (float) $third),
+                    'average_score' => $average,
+                    'average' => $this->formatCumulativeScore($average),
+                    'total' => $this->formatCumulativeScore($average),
+                    'grade' => $average !== null ? $this->gradeFromTotal($schoolId, (int) round($average)) : '-',
+                    'remark' => $average !== null ? $this->remarkFromTotal($schoolId, (int) round($average)) : '-',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function summarizeCumulativeRows(int $schoolId, array $rows): array
+    {
+        $gradedRows = collect($rows)
+            ->filter(fn ($row) => (bool) ($row['is_graded'] ?? false) && ($row['average_score'] ?? null) !== null)
+            ->values();
+
+        $gradedCount = $gradedRows->count();
+        $totalScore = $gradedCount > 0
+            ? round((float) $gradedRows->sum(fn ($row) => (float) ($row['average_score'] ?? 0)), 2)
+            : 0.0;
+        $averageScore = $gradedCount > 0
+            ? round($totalScore / $gradedCount, 2)
+            : 0.0;
+
+        return [
+            'graded_subjects_count' => $gradedCount,
+            'total_score' => $this->formatCumulativeScore($totalScore),
+            'average_score' => $averageScore,
+            'average_display' => $gradedCount > 0 ? number_format($averageScore, 2) : '-',
+            'overall_grade' => $gradedCount > 0
+                ? $this->gradeFromTotal($schoolId, (int) round($averageScore))
+                : '-',
+        ];
+    }
+
+    private function behaviourTraitDefinitions(): array
+    {
+        return [
+            'handwriting' => 'Handwriting',
+            'speech' => 'Speech',
+            'attitude' => 'Attitude',
+            'reading' => 'Reading',
+            'punctuality' => 'Punctuality',
+            'teamwork' => 'Teamwork',
+            'self_control' => 'Self Control',
+        ];
+    }
+
+    private function behaviourTraitsFromRating(?StudentBehaviourRating $behaviour): array
+    {
+        return collect($this->behaviourTraitDefinitions())
+            ->map(fn (string $label, string $field) => [
+                'label' => $label,
+                'value' => (int) ($behaviour?->{$field} ?? 0),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function cumulativeBehaviourTraits(int $schoolId, int $classId, AcademicSession $session, int $studentId): array
+    {
+        $termIds = collect($this->cumulativeTermsByOrder($schoolId, (int) $session->id))
+            ->filter()
+            ->map(fn (Term $term) => (int) $term->id)
+            ->values()
+            ->all();
+
+        if (empty($termIds)) {
+            return $this->behaviourTraitsFromRating(null);
+        }
+
+        $ratings = StudentBehaviourRating::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('student_id', $studentId)
+            ->whereIn('term_id', $termIds)
+            ->get();
+
+        return collect($this->behaviourTraitDefinitions())
+            ->map(function (string $label, string $field) use ($ratings) {
+                $values = $ratings
+                    ->map(fn ($rating) => (int) ($rating->{$field} ?? 0))
+                    ->filter(fn (int $value) => $value > 0)
+                    ->values();
+
+                return [
+                    'label' => $label,
+                    'value' => $values->isEmpty() ? 0 : (int) round((float) $values->avg()),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildCumulativeClassPositionStats(int $schoolId, int $classId, AcademicSession $session, Term $selectedTerm): array
+    {
+        $studentIdsQuery = Enrollment::query()
+            ->where('enrollments.class_id', $classId)
+            ->where('enrollments.term_id', (int) $selectedTerm->id)
+            ->select('enrollments.student_id');
+
+        if (Schema::hasColumn('enrollments', 'school_id')) {
+            $studentIdsQuery->where('enrollments.school_id', $schoolId);
+        }
+
+        $studentIds = $studentIdsQuery
+            ->distinct()
+            ->pluck('enrollments.student_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($studentIds) && Schema::hasTable('class_students')) {
+            $studentIds = DB::table('class_students')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $session->id)
+                ->where('class_id', $classId)
+                ->pluck('student_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        $rankingRows = [];
+        foreach (array_unique($studentIds) as $studentId) {
+            $summary = $this->summarizeCumulativeRows(
+                $schoolId,
+                $this->cumulativeSubjectRows($schoolId, $classId, $session, $selectedTerm, (int) $studentId)
+            );
+
+            $rankingRows[] = [
+                'student_id' => (int) $studentId,
+                'average' => ($summary['graded_subjects_count'] ?? 0) > 0 ? (float) $summary['average_score'] : null,
+            ];
+        }
+
+        usort($rankingRows, function (array $a, array $b) {
+            if ($a['average'] === null && $b['average'] === null) {
+                return ((int) $a['student_id']) <=> ((int) $b['student_id']);
+            }
+            if ($a['average'] === null) {
+                return 1;
+            }
+            if ($b['average'] === null) {
+                return -1;
+            }
+            if (abs((float) $a['average'] - (float) $b['average']) < 0.00001) {
+                return ((int) $a['student_id']) <=> ((int) $b['student_id']);
+            }
+            return ((float) $b['average']) <=> ((float) $a['average']);
+        });
+
+        $positions = [];
+        $previousAverage = null;
+        $previousRank = 0;
+        foreach ($rankingRows as $index => $row) {
+            if ($row['average'] === null) {
+                continue;
+            }
+
+            $average = (float) $row['average'];
+            $rank = ($previousAverage !== null && abs($average - $previousAverage) < 0.00001)
+                ? $previousRank
+                : ($index + 1);
+
+            $positions[(int) $row['student_id']] = $rank;
+            $previousAverage = $average;
+            $previousRank = $rank;
+        }
+
+        return [
+            'class_count' => count(array_unique($studentIds)),
+            'positions' => $positions,
+        ];
     }
 
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
@@ -1837,6 +2301,7 @@ class ResultsController extends Controller
         $headSignatureDataUri = (string) data_get($viewData, 'headSignatureDataUri', '');
         $behaviourTraits = (array) data_get($viewData, 'behaviourTraits', []);
         $headName = strtoupper((string) data_get($viewData, 'school.head_of_school_name', '-'));
+        $isCumulative = (bool) data_get($viewData, 'isCumulativeResult', data_get($viewData, 'resultType') === self::RESULT_TYPE_CUMULATIVE);
         $timesPresent = (int) data_get($viewData, 'attendance.days_present', 0);
         $timesSchoolOpened = (int) data_get($viewData, 'attendanceSetting.total_school_days', 0);
         $attendanceSummary = $timesSchoolOpened > 0
@@ -1857,11 +2322,17 @@ class ResultsController extends Controller
         foreach ($activeCaIndices as $index) {
             $caSummaryParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
         }
-        $assessmentSummary = implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')';
+        $assessmentSummary = $isCumulative
+            ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
+            : implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')';
 
         $caHeaderHtml = '';
-        foreach ($activeCaIndices as $index) {
-            $caHeaderHtml .= '<th style="width:8%;">C' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
+        if ($isCumulative) {
+            $caHeaderHtml = '<th style="width:10%;">First Term</th><th style="width:10%;">Second Term</th><th style="width:10%;">Third Term</th><th style="width:10%;">Average</th>';
+        } else {
+            foreach ($activeCaIndices as $index) {
+                $caHeaderHtml .= '<th style="width:8%;">C' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
+            }
         }
 
         $rowsHtml = '';
@@ -1872,25 +2343,32 @@ class ResultsController extends Controller
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
             $caCellsHtml = '';
-            foreach ($activeCaIndices as $index) {
-                $caValue = $row['ca_breakdown'][$index] ?? null;
-                $caCellsHtml .= '<td style="text-align:center;">'
-                    . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
-                    . '</td>';
+            if ($isCumulative) {
+                $caCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
+                    . '<td style="text-align:center;">' . e((string) ($row['second_term_total'] ?? '-')) . '</td>'
+                    . '<td style="text-align:center;">' . e((string) ($row['third_term_total'] ?? '-')) . '</td>'
+                    . '<td style="text-align:center;">' . e((string) ($row['average'] ?? '-')) . '</td>';
+                $score = null;
+            } else {
+                foreach ($activeCaIndices as $index) {
+                    $caValue = $row['ca_breakdown'][$index] ?? null;
+                    $caCellsHtml .= '<td style="text-align:center;">'
+                        . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
+                        . '</td>';
+                }
             }
 
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
                 . $caCellsHtml
-                . '<td style="text-align:center;">' . $exam . '</td>'
-                . '<td style="text-align:center;">' . $score . '</td>'
+                . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td><td style="text-align:center;">' . $score . '</td>')
                 . '<td style="text-align:center;">' . e($grade) . '</td>'
                 . '<td>' . e($remark) . '</td>'
                 . '</tr>';
         }
 
         if ($rowsHtml === '') {
-            $rowsHtml = '<tr><td colspan="' . (5 + count($activeCaIndices)) . '" style="text-align:center;">No result data found.</td></tr>';
+            $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 6 : 5 + count($activeCaIndices)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
         $behaviourCellsPerRow = 5;
@@ -1953,7 +2431,7 @@ class ResultsController extends Controller
             . '<table class="grid"><tr><td style="width:80px;">' . $studentPhotoBlock . '</td><td>'
             . '<h1>' . e($schoolName) . '</h1>'
             . '<h2>' . e($schoolLocation) . '</h2>'
-            . '<h2>RESULT SHEET FOR ' . e($termName) . ' - ' . e($sessionName) . '</h2>'
+            . '<h2>' . ($isCumulative ? 'CUMULATIVE RESULT SHEET FOR ' : 'RESULT SHEET FOR ') . e($termName) . ' - ' . e($sessionName) . '</h2>'
             . '</td><td style="width:80px;text-align:right;">' . $schoolLogoBlock . '</td></tr></table>'
             . '<table class="meta">'
             . '<tr><th style="width:20%;">Student</th><td style="width:30%;">' . e($studentName) . '</td><th style="width:20%;">Serial No</th><td style="width:30%;">' . e($studentSerial) . '</td></tr>'
@@ -1969,7 +2447,8 @@ class ResultsController extends Controller
             . '<table>'
             . '<thead><tr><th style="width:30%;">Subject</th>'
             . $caHeaderHtml
-            . '<th style="width:8%;">Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th><th style="width:8%;">Total</th><th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
+            . ($isCumulative ? '' : '<th style="width:8%;">Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th><th style="width:8%;">Total</th>')
+            . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'

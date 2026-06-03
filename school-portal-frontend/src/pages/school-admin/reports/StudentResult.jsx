@@ -15,6 +15,11 @@ const formatMaybeNumber = (value, digits = 2) => {
   return num.toFixed(digits);
 };
 
+const isThirdTermName = (name = "") => {
+  const value = String(name).toLowerCase();
+  return value.includes("third") || /(^|\D)3(rd)?(\D|$)/.test(value);
+};
+
 export default function StudentResult() {
   const [sessions, setSessions] = useState([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -26,6 +31,7 @@ export default function StudentResult() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [resultType, setResultType] = useState("term");
   const { job, setJob, requesting, setRequesting, downloading, isProcessing, downloadGeneratedFile } = useGeneratedDocumentJob();
 
   const selectedSession = useMemo(() => {
@@ -40,6 +46,8 @@ export default function StudentResult() {
   }, [selectedSession, termId]);
 
   const canDownload = studentSearch.trim().length > 0 && selectedSession && selectedTerm;
+  const supportsCumulative = Boolean(selectedTerm && isThirdTermName(selectedTerm.name));
+  const isCumulative = supportsCumulative && resultType === "cumulative";
 
   const resetPdfState = () => {
     setJob(null);
@@ -100,10 +108,17 @@ export default function StudentResult() {
     }
   }, [selectedSession, termId]);
 
+  useEffect(() => {
+    if (!supportsCumulative && resultType !== "term") {
+      setResultType("term");
+    }
+  }, [supportsCumulative, resultType]);
+
   const requestParams = () => {
     const params = { student: studentSearch.trim() };
     if (selectedSession?.id) params.academic_session_id = selectedSession.id;
     if (selectedTerm?.id) params.term_id = selectedTerm.id;
+    params.result_type = isCumulative ? "cumulative" : "term";
     return params;
   };
 
@@ -230,6 +245,7 @@ export default function StudentResult() {
               onChange={(e) => {
                 const value = e.target.value;
                 resetPdfState();
+                setResultType("term");
                 setSessionId(value);
                 const next = sessions.find((item) => String(item.id) === value) || null;
                 const preferred = (next?.terms || []).find((item) => item.is_current) || (next?.terms || [])[0];
@@ -253,6 +269,7 @@ export default function StudentResult() {
               value={String(selectedTerm?.id || "")}
               onChange={(e) => {
                 setTermId(e.target.value);
+                setResultType("term");
                 resetPdfState();
               }}
               disabled={loadingOptions}
@@ -280,6 +297,33 @@ export default function StudentResult() {
           </div>
         </div>
 
+        {supportsCumulative ? (
+          <div className="rs-meta" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="rs-btn"
+              style={{ opacity: resultType === "term" ? 1 : 0.72 }}
+              onClick={() => {
+                setResultType("term");
+                resetPdfState();
+              }}
+            >
+              Normal Third Term Result
+            </button>
+            <button
+              type="button"
+              className="rs-btn"
+              style={{ opacity: resultType === "cumulative" ? 1 : 0.72 }}
+              onClick={() => {
+                setResultType("cumulative");
+                resetPdfState();
+              }}
+            >
+              Cumulative Result
+            </button>
+          </div>
+        ) : null}
+
         {loadingOptions ? <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading filters...</p> : null}
         {job?.status === "failed" ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{job.error_message || "Student result PDF generation failed."}</p> : null}
         {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
@@ -301,7 +345,9 @@ export default function StudentResult() {
         {entry ? (
           <>
             <div className="rs-results-head">
-              <h3 className="rs-results-title">{entry.term?.name || "Term Result"}</h3>
+              <h3 className="rs-results-title">
+                {entry.term?.name || "Term Result"}{entry.result_type === "cumulative" ? " Cumulative" : ""}
+              </h3>
               <span className="rs-meta" style={{ marginTop: 0 }}>
                 <span>{entry.class?.name || "-"}</span>
                 <span>Average: {formatMaybeNumber(entry.summary?.average_score)}</span>
@@ -328,13 +374,24 @@ export default function StudentResult() {
                 <thead>
                   <tr>
                     <th>Subject</th>
-                    <th>CA</th>
-                    <th>Exam</th>
-                    <th>Total</th>
-                    <th>Min</th>
-                    <th>Max</th>
-                    <th>Class Ave</th>
-                    <th>Position</th>
+                    {entry.result_type === "cumulative" ? (
+                      <>
+                        <th>First Term</th>
+                        <th>Second Term</th>
+                        <th>Third Term</th>
+                        <th>Average</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>CA</th>
+                        <th>Exam</th>
+                        <th>Total</th>
+                        <th>Min</th>
+                        <th>Max</th>
+                        <th>Class Ave</th>
+                        <th>Position</th>
+                      </>
+                    )}
                     <th>Grade</th>
                     <th>Remark</th>
                   </tr>
@@ -343,20 +400,31 @@ export default function StudentResult() {
                   {(entry.rows || []).map((row) => (
                     <tr key={row.term_subject_id}>
                       <td>{row.subject_name}</td>
-                      <td>{asDash(row.ca)}</td>
-                      <td>{asDash(row.exam)}</td>
-                      <td>{asDash(row.total)}</td>
-                      <td>{asDash(row.min_score)}</td>
-                      <td>{asDash(row.max_score)}</td>
-                      <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
-                      <td>{row.position_label || "-"}</td>
+                      {entry.result_type === "cumulative" ? (
+                        <>
+                          <td>{asDash(row.first_term_total)}</td>
+                          <td>{asDash(row.second_term_total)}</td>
+                          <td>{asDash(row.third_term_total)}</td>
+                          <td>{asDash(row.average)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{asDash(row.ca)}</td>
+                          <td>{asDash(row.exam)}</td>
+                          <td>{asDash(row.total)}</td>
+                          <td>{asDash(row.min_score)}</td>
+                          <td>{asDash(row.max_score)}</td>
+                          <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
+                          <td>{row.position_label || "-"}</td>
+                        </>
+                      )}
                       <td>{asDash(row.grade)}</td>
                       <td>{asDash(row.remark)}</td>
                     </tr>
                   ))}
                   {(entry.rows || []).length === 0 ? (
                     <tr>
-                      <td colSpan="10">No records found for this student and term.</td>
+                      <td colSpan={entry.result_type === "cumulative" ? 7 : 10}>No records found for this student and term.</td>
                     </tr>
                   ) : null}
                 </tbody>
