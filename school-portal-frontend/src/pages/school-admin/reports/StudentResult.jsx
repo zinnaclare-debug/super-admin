@@ -308,7 +308,7 @@ export default function StudentResult() {
                 resetPdfState();
               }}
             >
-              Normal Third Term Result
+              Term Result
             </button>
             <button
               type="button"

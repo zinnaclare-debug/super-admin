@@ -347,7 +347,7 @@ export default function StudentResultsHome() {
                     setPdfJob(null);
                   }}
                 >
-                  Normal Third Term Result
+                  Term Result
                 </button>
                 <button
                   type="button"

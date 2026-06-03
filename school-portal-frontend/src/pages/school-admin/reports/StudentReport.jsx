@@ -522,7 +522,7 @@ export default function StudentReport() {
                   setResultMessage("");
                 }}
               >
-                Normal Third Term Result
+                Term Result
               </button>
               <button
                 type="button"
