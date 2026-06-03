@@ -22,6 +22,10 @@ class PublicSchoolWebsiteController extends Controller
         $school = $this->tenantSchool($request);
 
         if (! $school) {
+            if ($this->requestLooksLikeTenantHost($request)) {
+                abort(404, 'School website not found for this domain.');
+            }
+
             return response()->json([
                 'is_tenant' => false,
                 'school' => null,
@@ -640,6 +644,30 @@ class PublicSchoolWebsiteController extends Controller
     private function tenantSchool(Request $request): ?School
     {
         return $request->attributes->get((string) config('tenancy.request_key', 'tenant_school'));
+    }
+
+    private function requestLooksLikeTenantHost(Request $request): bool
+    {
+        $host = strtolower(trim($request->getHost()));
+        $host = rtrim(explode(':', $host)[0] ?? $host, '.');
+        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        $centralDomains = array_values(array_unique(array_map(
+            static fn ($domain) => strtolower(trim((string) $domain)),
+            (array) config('tenancy.central_domains', [])
+        )));
+        if (in_array($host, $centralDomains, true)) {
+            return false;
+        }
+
+        $baseDomain = strtolower(trim((string) config('tenancy.base_domain')));
+        if ($baseDomain !== '') {
+            return $host !== $baseDomain && str_ends_with($host, '.' . $baseDomain);
+        }
+
+        return count(explode('.', $host)) >= 3;
     }
 
     private function tenantSchoolOrFail(Request $request): School

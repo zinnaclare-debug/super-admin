@@ -266,11 +266,13 @@ class ResultsController extends Controller
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
+            'result_type' => 'nullable|string|in:term,cumulative',
         ]);
 
         $schoolId = (int) $user->school_id;
         $classId = (int) $payload['class_id'];
         $termId = (int) $payload['term_id'];
+        $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         $session = AcademicSession::where('school_id', $schoolId)
             ->where('status', 'current')

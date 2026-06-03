@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\User;
@@ -34,13 +35,16 @@ class SchoolController extends Controller
     public function destroy(Request $request, School $school)
     {
         $this->validateDeleteCode($request);
+        $schoolId = (int) $school->id;
 
-        DB::transaction(function () use ($school) {
-            User::where('school_id', $school->id)->delete();
-            SchoolFeature::where('school_id', $school->id)->delete();
+        DB::transaction(function () use ($school, $schoolId) {
+            User::where('school_id', $schoolId)->delete();
+            SchoolFeature::where('school_id', $schoolId)->delete();
             $school->delete();
+            $this->deleteResidualSchoolRows($schoolId);
         });
 
+        $this->deleteSchoolStorage($schoolId);
         $this->clearApplicationCache();
 
         return response()->json(['message' => 'School deleted successfully.']);
@@ -891,6 +895,63 @@ class SchoolController extends Controller
             Cache::flush();
         } catch (\Throwable $e) {
             Log::warning('Cache flush failed after school deletion: ' . $e->getMessage());
+        }
+    }
+
+    private function deleteResidualSchoolRows(int $schoolId): void
+    {
+        foreach ($this->databaseTables() as $table) {
+            if (in_array($table, ['schools', 'users'], true) || !Schema::hasColumn($table, 'school_id')) {
+                continue;
+            }
+
+            try {
+                DB::table($table)->where('school_id', $schoolId)->delete();
+            } catch (\Throwable $e) {
+                Log::warning('Residual school row cleanup skipped for table ' . $table, [
+                    'school_id' => $schoolId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function databaseTables(): array
+    {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            $databaseName = DB::getDatabaseName();
+            return collect(DB::select('SHOW TABLES'))
+                ->map(function ($row) use ($databaseName) {
+                    $key = 'Tables_in_' . $databaseName;
+                    return (string) ($row->{$key} ?? array_values((array) $row)[0] ?? '');
+                })
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        if ($driver === 'sqlite') {
+            return collect(DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+                ->map(fn ($row) => (string) $row->name)
+                ->values()
+                ->all();
+        }
+
+        return [];
+    }
+
+    private function deleteSchoolStorage(int $schoolId): void
+    {
+        try {
+            Storage::disk('public')->deleteDirectory("schools/{$schoolId}");
+            Storage::disk('local')->deleteDirectory("generated-documents/school-{$schoolId}");
+        } catch (\Throwable $e) {
+            Log::warning('School storage cleanup failed after deletion', [
+                'school_id' => $schoolId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

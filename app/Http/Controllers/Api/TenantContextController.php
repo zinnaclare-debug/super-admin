@@ -90,7 +90,12 @@ class TenantContextController extends Controller
             $subdomain = $parts[0];
         }
 
-        return School::query()->where('subdomain', $subdomain)->first();
+        $school = School::query()->where('subdomain', $subdomain)->first();
+        if (!$school) {
+            abort(404, 'School website not found.');
+        }
+
+        return $school;
     }
 }
 

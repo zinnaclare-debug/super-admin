@@ -44,6 +44,7 @@ function Home() {
   const [platformContent, setPlatformContent] = useState(DEFAULT_PLATFORM_CONTENT);
   const [loaded, setLoaded] = useState(false);
   const [suspendedMessage, setSuspendedMessage] = useState("");
+  const [notFoundMessage, setNotFoundMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -60,6 +61,8 @@ function Home() {
         } else {
           if (siteResult.reason?.response?.status === 403) {
             setSuspendedMessage(siteResult.reason?.response?.data?.message || "This school account is suspended.");
+          } else if (siteResult.reason?.response?.status === 404) {
+            setNotFoundMessage(siteResult.reason?.response?.data?.message || "School website not found.");
           }
           setSiteData(null);
         }
@@ -83,6 +86,21 @@ function Home() {
 
   if (suspendedMessage) {
     return <SuspendedSchoolNotice message={suspendedMessage} />;
+  }
+
+  if (notFoundMessage) {
+    return (
+      <div className="home-page">
+        <main className="home-main">
+          <section className="home-section">
+            <div className="home-section-head">
+              <h2>School Website Not Found</h2>
+              <p>{notFoundMessage}</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
   }
 
   if (siteData?.is_tenant && siteData?.school) {
