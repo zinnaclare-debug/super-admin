@@ -77,6 +77,16 @@ class SchoolHistoryImportService
         'subject',
         'subject_name',
         'ca',
+        'ca1',
+        'ca_1',
+        'ca2',
+        'ca_2',
+        'ca3',
+        'ca_3',
+        'ca4',
+        'ca_4',
+        'ca5',
+        'ca_5',
         'exam',
         'score',
         'total',
@@ -120,8 +130,26 @@ class SchoolHistoryImportService
         ];
     }
 
-    public static function templateCsv(): string
+    public static function templateCsv(?School $school = null): string
     {
+        $levels = $school
+            ? ClassTemplateSchema::activeLevelKeys(ClassTemplateSchema::normalize($school->class_templates))
+            : ['secondary'];
+        $levelSchemas = $school
+            ? AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $levels)
+            : AssessmentSchema::normalizeLevelSchemas(AssessmentSchema::default(), $levels);
+        $activeCaIndices = [];
+        foreach ($levelSchemas['by_level'] as $schema) {
+            foreach (AssessmentSchema::activeCaIndices($schema) as $index) {
+                $activeCaIndices[$index] = true;
+            }
+        }
+        ksort($activeCaIndices);
+        $activeCaIndices = array_keys($activeCaIndices);
+        if (empty($activeCaIndices)) {
+            $activeCaIndices = [0];
+        }
+
         $headers = [
             'session',
             'term',
@@ -129,25 +157,55 @@ class SchoolHistoryImportService
             'class',
             'department',
             'student_name',
-            'admission_no',
+            'username',
             'email',
             'gender',
             'status',
             'subject',
-            'ca',
+            ...array_map(fn ($index) => 'ca' . ($index + 1), $activeCaIndices),
             'exam',
-            'score',
         ];
 
-        $rows = [
-            $headers,
-            ['2024/2025', 'First Term', 'secondary', 'SS 3', 'Science', 'Ada Example', 'ADM001', 'ada@example.com', 'F', 'graduated', 'Mathematics', '28', '62', ''],
-            ['2024/2025', 'First Term', 'secondary', 'SS 2', 'Science', 'Tunde Example', 'ADM002', 'tunde@example.com', 'M', 'active', 'English Language', '25', '58', ''],
-        ];
+        $rows = [$headers];
+        foreach ($levels as $index => $level) {
+            $schema = $levelSchemas['by_level'][$level] ?? $levelSchemas['default'];
+            $caValues = [];
+            foreach ($activeCaIndices as $caIndex) {
+                $max = (int) ($schema['ca_maxes'][$caIndex] ?? 0);
+                $caValues[] = $max > 0 ? (string) max(1, $max - 2) : '0';
+            }
+
+            $rows[] = [
+                '2024/2025',
+                $index % 2 === 0 ? 'First Term' : 'Second Term',
+                $level,
+                self::exampleClassForLevel($level),
+                $level === 'secondary' ? 'Science' : '',
+                $index === 0 ? 'Ada Example' : 'Tunde Example',
+                $index === 0 ? 'adaexample01' : 'tundeexample01',
+                $index === 0 ? 'ada@example.com' : 'tunde@example.com',
+                $index === 0 ? 'F' : 'M',
+                $level === 'secondary' ? 'graduated' : 'active',
+                $index === 0 ? 'Mathematics' : 'English Language',
+                ...$caValues,
+                (string) max(0, ((int) ($schema['exam_max'] ?? 0)) - 3),
+            ];
+        }
 
         return collect($rows)
             ->map(fn (array $row) => collect($row)->map(fn ($value) => self::csvCell((string) $value))->implode(','))
             ->implode("\n") . "\n";
+    }
+
+    private static function exampleClassForLevel(string $level): string
+    {
+        return match (AssessmentSchema::normalizeLevelKey($level)) {
+            'creche' => 'Creche 1',
+            'pre_nursery' => 'Pre Nursery 1',
+            'nursery' => 'Nursery 1',
+            'primary' => 'Primary 1',
+            default => 'SS 1',
+        };
     }
 
     private static function csvCell(string $value): string
@@ -260,10 +318,17 @@ class SchoolHistoryImportService
                 continue;
             }
 
-            $scores = $this->scores($subjectRow);
+            $assessmentSchema = AssessmentSchema::schemaForLevel($school->assessment_schema, (string) $class->level);
+            $scores = $this->scores($subjectRow, $assessmentSchema);
             if ($scores === null) {
                 $this->warn($lineNumber, "Skipped {$subjectName}: score is not numeric.");
                 continue;
+            }
+            if ($this->usesLegacyTotalOnlyImport($subjectRow)) {
+                $this->warn(
+                    $lineNumber,
+                    "Imported {$subjectName} from a total-only score. The new template supports username plus school-specific CA columns so scores can match the school's assessment record exactly."
+                );
             }
 
             $subject = $this->subject($school, $subjectName);
@@ -276,6 +341,11 @@ class SchoolHistoryImportService
                 'school_id' => (int) $school->id,
                 'ca' => $scores['ca'],
                 'exam' => $scores['exam'],
+                ...(
+                    Schema::hasColumn('results', 'ca_breakdown')
+                        ? ['ca_breakdown' => $scores['ca_breakdown']]
+                        : []
+                ),
             ]);
 
             $this->summary['results_saved']++;
@@ -431,7 +501,7 @@ class SchoolHistoryImportService
 
     private function student(School $school, array $row, string $name, string $level, ?string $status, int $actorUserId): Student
     {
-        $identifier = $this->value($row, ['admission_no', 'admission_number', 'student_id', 'id_number', 'username']);
+        $identifier = $this->value($row, ['username', 'admission_no', 'admission_number', 'student_id', 'id_number']);
         $email = $this->value($row, ['email', 'student_email']);
         $gender = $this->value($row, ['gender', 'sex']);
         $cacheKey = strtolower($identifier ?: $email ?: $name);
@@ -588,6 +658,7 @@ class SchoolHistoryImportService
             return [[
                 'subject' => $subject,
                 'ca' => $this->value($row, ['ca']),
+                'ca_breakdown' => $this->caBreakdownValues($row),
                 'exam' => $this->value($row, ['exam']),
                 'score' => $this->value($row, ['score', 'total', 'total_score']),
             ]];
@@ -611,20 +682,72 @@ class SchoolHistoryImportService
         return $subjects;
     }
 
-    private function scores(array $row): ?array
+    private function caBreakdownValues(array $row): array
+    {
+        return [
+            $this->value($row, ['ca1', 'ca_1']),
+            $this->value($row, ['ca2', 'ca_2']),
+            $this->value($row, ['ca3', 'ca_3']),
+            $this->value($row, ['ca4', 'ca_4']),
+            $this->value($row, ['ca5', 'ca_5']),
+        ];
+    }
+
+    private function scores(array $row, array $assessmentSchema): ?array
     {
         $ca = trim((string) ($row['ca'] ?? ''));
+        $caBreakdownRaw = is_array($row['ca_breakdown'] ?? null) ? $row['ca_breakdown'] : [];
         $exam = trim((string) ($row['exam'] ?? ''));
         $score = trim((string) ($row['score'] ?? ''));
+        $hasCaBreakdown = collect($caBreakdownRaw)->contains(fn ($value) => trim((string) $value) !== '');
+
+        if ($hasCaBreakdown) {
+            foreach ($caBreakdownRaw as $value) {
+                if (trim((string) $value) !== '' && !is_numeric($value)) {
+                    return null;
+                }
+            }
+            if ($exam !== '' && !is_numeric($exam)) {
+                return null;
+            }
+
+            $breakdown = [];
+            foreach ($caBreakdownRaw as $index => $value) {
+                $max = (int) ($assessmentSchema['ca_maxes'][$index] ?? 0);
+                $number = $this->scoreNumber((string) $value);
+                if ($number > $max) {
+                    return null;
+                }
+                $breakdown[$index] = $number;
+            }
+
+            $examNumber = $this->scoreNumber($exam);
+            if ($examNumber > (int) ($assessmentSchema['exam_max'] ?? 0)) {
+                return null;
+            }
+
+            return [
+                'ca' => AssessmentSchema::breakdownTotal($breakdown),
+                'ca_breakdown' => $breakdown,
+                'exam' => $examNumber,
+            ];
+        }
 
         if ($ca !== '' || $exam !== '') {
             if (($ca !== '' && !is_numeric($ca)) || ($exam !== '' && !is_numeric($exam))) {
                 return null;
             }
 
+            $breakdown = AssessmentSchema::normalizeBreakdown(null, $assessmentSchema, $this->scoreNumber($ca));
+            $examNumber = $this->scoreNumber($exam);
+            if ($examNumber > (int) ($assessmentSchema['exam_max'] ?? 0)) {
+                return null;
+            }
+
             return [
-                'ca' => $this->scoreNumber($ca),
-                'exam' => $this->scoreNumber($exam),
+                'ca' => AssessmentSchema::breakdownTotal($breakdown),
+                'ca_breakdown' => $breakdown,
+                'exam' => $examNumber,
             ];
         }
 
@@ -632,10 +755,11 @@ class SchoolHistoryImportService
             return null;
         }
 
-        return [
-            'ca' => 0,
-            'exam' => $this->scoreNumber($score),
-        ];
+        if ($this->scoreNumber($score) > (int) ($assessmentSchema['total_max'] ?? 100)) {
+            return null;
+        }
+
+        return $this->legacyTotalToSchemaScores($this->scoreNumber($score), $assessmentSchema);
     }
 
     private function scoreNumber(string $value): int
@@ -645,6 +769,100 @@ class SchoolHistoryImportService
         }
 
         return max(0, min(100, (int) round((float) $value)));
+    }
+
+    private function usesLegacyTotalOnlyImport(array $row): bool
+    {
+        $ca = trim((string) ($row['ca'] ?? ''));
+        $caBreakdownRaw = is_array($row['ca_breakdown'] ?? null) ? $row['ca_breakdown'] : [];
+        $exam = trim((string) ($row['exam'] ?? ''));
+        $score = trim((string) ($row['score'] ?? ''));
+
+        $hasCaBreakdown = collect($caBreakdownRaw)->contains(fn ($value) => trim((string) $value) !== '');
+
+        return $score !== '' && $ca === '' && $exam === '' && !$hasCaBreakdown;
+    }
+
+    private function legacyTotalToSchemaScores(int $totalScore, array $assessmentSchema): array
+    {
+        $normalizedSchema = AssessmentSchema::normalizeSchema($assessmentSchema);
+        $caMaxes = $normalizedSchema['ca_maxes'] ?? [0, 0, 0, 0, 0];
+        $caTotalMax = array_sum(array_map(fn ($value) => (int) $value, $caMaxes));
+        $examMax = (int) ($normalizedSchema['exam_max'] ?? 0);
+        $totalMax = max(1, (int) ($normalizedSchema['total_max'] ?? 100));
+
+        if ($totalScore <= 0 || ($caTotalMax <= 0 && $examMax <= 0)) {
+            return [
+                'ca' => 0,
+                'ca_breakdown' => array_fill(0, 5, 0),
+                'exam' => 0,
+            ];
+        }
+
+        $caTarget = $caTotalMax > 0
+            ? min($caTotalMax, max(0, (int) round(($totalScore / $totalMax) * $caTotalMax)))
+            : 0;
+        $examScore = max(0, min($examMax, $totalScore - $caTarget));
+
+        if (($caTarget + $examScore) !== $totalScore) {
+            $remaining = $totalScore - ($caTarget + $examScore);
+            if ($remaining > 0 && $examScore < $examMax) {
+                $shift = min($remaining, $examMax - $examScore);
+                $examScore += $shift;
+                $remaining -= $shift;
+            }
+            if ($remaining > 0 && $caTarget < $caTotalMax) {
+                $caTarget += min($remaining, $caTotalMax - $caTarget);
+            }
+        }
+
+        $breakdown = array_fill(0, 5, 0);
+        if ($caTarget > 0 && $caTotalMax > 0) {
+            $fractions = [];
+            $assigned = 0;
+            foreach ($caMaxes as $index => $max) {
+                $slotMax = (int) $max;
+                if ($slotMax <= 0) {
+                    $fractions[$index] = 0;
+                    continue;
+                }
+
+                $rawShare = ($caTarget * $slotMax) / $caTotalMax;
+                $slotValue = min($slotMax, (int) floor($rawShare));
+                $breakdown[$index] = $slotValue;
+                $assigned += $slotValue;
+                $fractions[$index] = $rawShare - $slotValue;
+            }
+
+            $remaining = $caTarget - $assigned;
+            while ($remaining > 0) {
+                $nextIndex = null;
+                $nextFraction = -1;
+                foreach ($caMaxes as $index => $max) {
+                    $slotMax = (int) $max;
+                    if ($slotMax <= 0 || $breakdown[$index] >= $slotMax) {
+                        continue;
+                    }
+                    if ($fractions[$index] > $nextFraction) {
+                        $nextIndex = $index;
+                        $nextFraction = $fractions[$index];
+                    }
+                }
+
+                if ($nextIndex === null) {
+                    break;
+                }
+
+                $breakdown[$nextIndex]++;
+                $remaining--;
+            }
+        }
+
+        return [
+            'ca' => AssessmentSchema::breakdownTotal($breakdown),
+            'ca_breakdown' => $breakdown,
+            'exam' => $examScore,
+        ];
     }
 
     private function subject(School $school, string $name): Subject

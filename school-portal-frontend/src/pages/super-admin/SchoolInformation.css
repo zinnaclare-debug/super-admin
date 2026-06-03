@@ -227,6 +227,43 @@
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.sai-level-exam-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.sai-level-exam-card {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.sai-level-exam-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sai-level-exam-head h4 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.sai-level-exam-head span {
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #1e40af;
+  background: #dbeafe;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .sai-meta {
   margin-top: 10px;
   display: flex;

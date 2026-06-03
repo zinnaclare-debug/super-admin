@@ -264,10 +264,11 @@ class ResultsController extends Controller
         }
 
         $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
 
         return response()->json([
             'data' => $rows,
-            'assessment_schema' => $this->assessmentSchemaForSchool($schoolId),
+            'assessment_schema' => $assessmentSchema,
         ]);
     }
     // GET /api/student/results/download?class_id=1&term_id=2
@@ -799,8 +800,8 @@ class ResultsController extends Controller
             return response()->json(['message' => 'Class not found'], 404);
         }
 
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, (int) $class->id);
         $rows = $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
-        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
         $summary = $this->summarizeRows($schoolId, $rows);
         $totalScore = $summary['total_score'];
         $averageScore = $summary['average_score'];
@@ -1018,6 +1019,7 @@ class ResultsController extends Controller
         @set_time_limit(120);
         @ini_set('memory_limit', '512M');
 
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $rows = $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
 
         $behaviour = StudentBehaviourRating::where('school_id', $schoolId)
@@ -1047,7 +1049,6 @@ class ResultsController extends Controller
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
 
-        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
         $summary = $this->summarizeRows($schoolId, $rows);
         $totalScore = $summary['total_score'];
         $averageScore = $summary['average_score'];
@@ -1217,7 +1218,7 @@ class ResultsController extends Controller
 
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
-        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $subjects = TermSubject::query()
@@ -1259,7 +1260,7 @@ class ResultsController extends Controller
             ->get();
 
         $termSubjectIds = $subjects->pluck('term_subject_id')->map(fn ($id) => (int) $id)->all();
-        $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds);
+        $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds, $assessmentSchema);
 
         return $subjects
             ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema, $schoolId) {
@@ -1319,11 +1320,12 @@ class ResultsController extends Controller
             ->all();
     }
 
-    private function buildSubjectStats(int $schoolId, array $termSubjectIds): array
+    private function buildSubjectStats(int $schoolId, array $termSubjectIds, ?array $assessmentSchema = null): array
     {
         if (empty($termSubjectIds)) {
             return [];
         }
+        $assessmentSchema = $assessmentSchema ?: $this->assessmentSchemaForSchool($schoolId);
 
         $rowsQuery = DB::table('results')
             ->where('results.school_id', $schoolId)
@@ -1433,7 +1435,7 @@ class ResultsController extends Controller
 
     private function buildClassPositionStats(int $schoolId, int $classId, int $termId): array
     {
-        $assessmentSchema = $this->assessmentSchemaForSchool($schoolId);
+        $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $enrolledStudentIdsQuery = Enrollment::query()
@@ -1649,6 +1651,38 @@ class ResultsController extends Controller
         $cache[$schoolId] = AssessmentSchema::normalizeSchema($schema);
 
         return $cache[$schoolId];
+    }
+
+    private function assessmentSchemaForClass(int $schoolId, int $classId): array
+    {
+        static $cache = [];
+        $cacheKey = $schoolId . ':' . $classId;
+
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        $row = DB::table('classes')
+            ->join('schools', 'schools.id', '=', 'classes.school_id')
+            ->where('classes.id', $classId)
+            ->where('classes.school_id', $schoolId)
+            ->select(['classes.level', 'schools.assessment_schema'])
+            ->first();
+
+        if (!$row) {
+            $cache[$cacheKey] = $this->assessmentSchemaForSchool($schoolId);
+            return $cache[$cacheKey];
+        }
+
+        $rawSchema = $row->assessment_schema;
+        if (is_string($rawSchema)) {
+            $decoded = json_decode($rawSchema, true);
+            $rawSchema = is_array($decoded) ? $decoded : null;
+        }
+
+        $cache[$cacheKey] = AssessmentSchema::schemaForLevel($rawSchema, $row->level ?? null);
+
+        return $cache[$cacheKey];
     }
 
     private function gradingSchemaForSchool(int $schoolId): array

@@ -63,19 +63,38 @@ const toAbsoluteUrl = (u) => {
 
 const normalizeExamRecord = (record) => {
   const raw = record || {};
+  const schema = raw.default && typeof raw.default === "object" ? raw.default : raw;
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_EXAM_RECORD.ca_maxes;
+  const schemaCaMaxes = Array.isArray(schema.ca_maxes) ? schema.ca_maxes : caMaxes;
   const normalizedCa = Array.from({ length: 5 }, (_, idx) => {
-    const value = Number(caMaxes[idx] || 0);
+    const value = Number(schemaCaMaxes[idx] || 0);
     return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;
   });
   const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
-  const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
+  const requestedExam = Number(schema.exam_max ?? 100 - caTotal);
   const examMax = Number.isFinite(requestedExam) ? Math.max(0, Math.min(100, Math.round(requestedExam))) : 0;
 
   return {
     ca_maxes: normalizedCa,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
+  };
+};
+
+const normalizeExamRecordsByLevel = (raw, levels = []) => {
+  const base = normalizeExamRecord(raw?.default || raw || DEFAULT_EXAM_RECORD);
+  const sourceByLevel = raw?.by_level && typeof raw.by_level === "object" ? raw.by_level : {};
+  const byLevel = {};
+
+  levels.forEach((level) => {
+    const key = String(level?.key || "").trim();
+    if (!key) return;
+    byLevel[key] = normalizeExamRecord(sourceByLevel[key] || base);
+  });
+
+  return {
+    default: base,
+    by_level: byLevel,
   };
 };
 
@@ -162,9 +181,13 @@ export default function SchoolInformation() {
   const signatureInputRef = useRef(null);
   const historyInputRef = useRef(null);
 
-  const [examRecord, setExamRecord] = useState(DEFAULT_EXAM_RECORD);
+  const [examRecord, setExamRecord] = useState(() => normalizeExamRecordsByLevel(DEFAULT_EXAM_RECORD, []));
   const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows([]));
   const [classTemplates, setClassTemplates] = useState([]);
+  const activeEducationLevels = useMemo(
+    () => classTemplates.filter((section) => section.enabled && section.key),
+    [classTemplates]
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -188,10 +211,15 @@ export default function SchoolInformation() {
         setContactEmail(brandingData.contact_email ?? "");
         setContactPhone(brandingData.contact_phone ?? "");
         setPaystackSubaccountCode(brandingData.paystack_subaccount_code ?? "");
-        setExamRecord(normalizeExamRecord(payload.exam_record));
         setGradingRows(normalizeGradingRows(payload.grading_schema));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
+        setExamRecord(
+          normalizeExamRecordsByLevel(
+            payload.exam_record,
+            normalizedClassTemplates.filter((section) => section.enabled && section.key)
+          )
+        );
       } catch (err) {
         alert(err?.response?.data?.message || "Failed to load school information.");
       } finally {
@@ -202,10 +230,19 @@ export default function SchoolInformation() {
     load();
   }, [schoolId]);
 
-  const examDraftCaTotal = useMemo(
-    () => examRecord.ca_maxes.reduce((sum, val) => sum + Number(val || 0), 0),
-    [examRecord]
-  );
+  const examDraftSummaries = useMemo(() => {
+    const summaries = {};
+    activeEducationLevels.forEach((level) => {
+      const record = normalizeExamRecord(examRecord.by_level?.[level.key] || examRecord.default);
+      const caTotal = record.ca_maxes.reduce((sum, val) => sum + Number(val || 0), 0);
+      summaries[level.key] = {
+        caTotal,
+        expectedExam: Math.max(0, 100 - caTotal),
+        total: caTotal + Number(record.exam_max || 0),
+      };
+    });
+    return summaries;
+  }, [activeEducationLevels, examRecord]);
 
   const pickFile = async (event, kind) => {
     const file = event.target.files?.[0] || null;
@@ -346,53 +383,80 @@ export default function SchoolInformation() {
     }
   };
 
-  const updateExamDraftCa = (index, value) => {
+  const updateExamDraftCa = (levelKey, index, value) => {
     const parsed = Number(value);
     const sanitized = Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : 0;
     setExamRecord((prev) => {
-      const caMaxes = [...prev.ca_maxes];
+      const current = normalizeExamRecord(prev.by_level?.[levelKey] || prev.default);
+      const caMaxes = [...current.ca_maxes];
       caMaxes[index] = sanitized;
-      return { ...prev, ca_maxes: caMaxes };
+      return {
+        ...prev,
+        by_level: {
+          ...(prev.by_level || {}),
+          [levelKey]: { ...current, ca_maxes: caMaxes },
+        },
+      };
     });
   };
 
-  const updateExamDraftExam = (value) => {
+  const updateExamDraftExam = (levelKey, value) => {
     const parsed = Number(value);
     const sanitized = Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : 0;
-    setExamRecord((prev) => ({ ...prev, exam_max: sanitized }));
+    setExamRecord((prev) => {
+      const current = normalizeExamRecord(prev.by_level?.[levelKey] || prev.default);
+      return {
+        ...prev,
+        by_level: {
+          ...(prev.by_level || {}),
+          [levelKey]: { ...current, exam_max: sanitized },
+        },
+      };
+    });
   };
 
   const saveExamRecord = async () => {
-    const caMaxes = Array.from({ length: 5 }, (_, idx) => {
-      const n = Number(examRecord.ca_maxes?.[idx] || 0);
-      return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
-    });
-    const examMaxRaw = Number(examRecord.exam_max || 0);
-    const examMax = Number.isFinite(examMaxRaw) ? Math.max(0, Math.min(100, Math.round(examMaxRaw))) : 0;
-    const caTotal = caMaxes.reduce((sum, val) => sum + val, 0);
-
-    if (caTotal <= 0) {
-      alert("At least one CA score must be greater than zero.");
+    if (!activeEducationLevels.length) {
+      alert("Enable at least one education level before saving exam records.");
       return;
     }
 
-    if (caTotal + examMax !== 100) {
-      alert("Total of CA maxima and exam maximum must be exactly 100.");
-      return;
+    const byLevel = {};
+    for (const level of activeEducationLevels) {
+      const record = normalizeExamRecord(examRecord.by_level?.[level.key] || examRecord.default);
+      const caMaxes = Array.from({ length: 5 }, (_, idx) => {
+        const n = Number(record.ca_maxes?.[idx] || 0);
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+      });
+      const examMaxRaw = Number(record.exam_max || 0);
+      const examMax = Number.isFinite(examMaxRaw) ? Math.max(0, Math.min(100, Math.round(examMaxRaw))) : 0;
+      const caTotal = caMaxes.reduce((sum, val) => sum + val, 0);
+
+      if (caTotal <= 0) {
+        alert(`${level.label || level.key}: At least one CA score must be greater than zero.`);
+        return;
+      }
+
+      if (caTotal + examMax !== 100) {
+        alert(`${level.label || level.key}: Total of CA maxima and exam maximum must be exactly 100.`);
+        return;
+      }
+
+      byLevel[level.key] = { ca_maxes: caMaxes, exam_max: examMax };
     }
 
     setSavingExamRecord(true);
     try {
-      const payload = { ca_maxes: caMaxes, exam_max: examMax };
+      const payload = { by_level: byLevel };
       const res = await api.put(`/api/super-admin/schools/${schoolId}/information/exam-record`, payload);
-      setExamRecord(normalizeExamRecord(res.data?.data || payload));
-      alert("Exam record updated.");
+      setExamRecord(normalizeExamRecordsByLevel(res.data?.data || payload, activeEducationLevels));
+      alert("Exam records updated.");
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
       const firstValidationError = Object.values(err?.response?.data?.errors || {})
         .flat()
         .find(Boolean);
-      alert(firstValidationError || apiMessage || "Failed to save exam record.");
+      alert(firstValidationError || apiMessage || "Failed to save exam records.");
     } finally {
       setSavingExamRecord(false);
     }
@@ -809,40 +873,61 @@ export default function SchoolInformation() {
       </section>
 
       <section className="sai-card">
-        <h3>Exam Record</h3>
-        <p className="sai-note">Configure CA1-CA5 and exam maximum. CA total plus exam must be 100.</p>
-        <div className="sai-exam-grid">
-          {[0, 1, 2, 3, 4].map((index) => (
-            <div key={`ca-record-${index}`} className="sai-field">
-              <label>CA {index + 1}</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={examRecord.ca_maxes[index]}
-                onChange={(e) => updateExamDraftCa(index, e.target.value)}
-              />
-            </div>
-          ))}
-          <div className="sai-field">
-            <label>Exam</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={examRecord.exam_max}
-              onChange={(e) => updateExamDraftExam(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="sai-meta">
-          <span>CA total: {examDraftCaTotal}</span>
-          <span>Expected exam: {Math.max(0, 100 - examDraftCaTotal)}</span>
-          <span>Total: {examDraftCaTotal + Number(examRecord.exam_max || 0)}</span>
+        <h3>Exam Records By Education Level</h3>
+        <p className="sai-note">
+          Configure CA1-CA5 and exam maximum for each enabled education level. Each level must total 100.
+        </p>
+        <div className="sai-level-exam-list">
+          {activeEducationLevels.length === 0 ? (
+            <p className="sai-note">No education level is enabled for this school yet.</p>
+          ) : (
+            activeEducationLevels.map((level) => {
+              const record = normalizeExamRecord(examRecord.by_level?.[level.key] || examRecord.default);
+              const summary = examDraftSummaries[level.key] || { caTotal: 0, expectedExam: 100, total: 0 };
+
+              return (
+                <div key={`exam-record-${level.key}`} className="sai-level-exam-card">
+                  <div className="sai-level-exam-head">
+                    <h4>{level.label || level.key}</h4>
+                    <span>{level.key}</span>
+                  </div>
+                  <div className="sai-exam-grid">
+                    {[0, 1, 2, 3, 4].map((index) => (
+                      <div key={`${level.key}-ca-record-${index}`} className="sai-field">
+                        <label>CA {index + 1}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={record.ca_maxes[index]}
+                          onChange={(e) => updateExamDraftCa(level.key, index, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                    <div className="sai-field">
+                      <label>Exam</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={record.exam_max}
+                        onChange={(e) => updateExamDraftExam(level.key, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="sai-meta">
+                    <span>CA total: {summary.caTotal}</span>
+                    <span>Expected exam: {summary.expectedExam}</span>
+                    <span>Total: {summary.total}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
         <div className="sai-actions">
           <button type="button" onClick={saveExamRecord} disabled={savingExamRecord}>
-            {savingExamRecord ? "Saving..." : "Save Exam Record"}
+            {savingExamRecord ? "Saving..." : "Save Exam Records"}
           </button>
         </div>
       </section>
@@ -1029,9 +1114,9 @@ export default function SchoolInformation() {
         </div>
 
         <div className="sai-history-guide">
-          <span>Required: session, term, class, student_name.</span>
-          <span>Long format: add subject, ca, exam or score.</span>
-          <span>Wide format: put subject names as columns with numeric scores.</span>
+          <span>Required: session, term, class, student_name, username.</span>
+          <span>Template format: use the downloaded CSV so each school gets the right CA columns for its assessment schema.</span>
+          <span>Legacy wide format with subject total scores is still accepted and auto-distributed into the school CA/exam structure.</span>
           <span>Status can be active, inactive, or graduated. Blank status is auto-detected.</span>
         </div>
 

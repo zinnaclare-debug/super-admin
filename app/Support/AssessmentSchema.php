@@ -18,6 +18,10 @@ class AssessmentSchema
         $base = self::default();
 
         $schema = is_array($raw) ? $raw : [];
+        if (isset($schema['default']) && is_array($schema['default'])) {
+            $schema = $schema['default'];
+        }
+
         $caMaxes = isset($schema['ca_maxes']) && is_array($schema['ca_maxes'])
             ? $schema['ca_maxes']
             : $base['ca_maxes'];
@@ -40,6 +44,70 @@ class AssessmentSchema
             'exam_max' => $examMax,
             'total_max' => 100,
         ];
+    }
+
+    public static function normalizeLevelKey(?string $level): ?string
+    {
+        $normalized = strtolower(trim((string) $level));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?: '';
+        $normalized = trim($normalized, '_');
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    public static function normalizeLevelSchemas(mixed $raw, array $levels = []): array
+    {
+        $source = is_array($raw) ? $raw : [];
+        $defaultSchema = self::normalizeSchema($source['default'] ?? $source);
+        $byLevelSource = isset($source['by_level']) && is_array($source['by_level'])
+            ? $source['by_level']
+            : [];
+
+        $normalizedLevels = [];
+        foreach ($levels as $level) {
+            $levelKey = self::normalizeLevelKey((string) $level);
+            if ($levelKey !== null) {
+                $normalizedLevels[] = $levelKey;
+            }
+        }
+        $normalizedLevels = array_values(array_unique($normalizedLevels));
+
+        if (empty($normalizedLevels)) {
+            $normalizedLevels = array_values(array_unique(array_filter(array_map(
+                fn ($level) => self::normalizeLevelKey((string) $level),
+                array_keys($byLevelSource)
+            ))));
+        }
+
+        $byLevel = [];
+        foreach ($normalizedLevels as $levelKey) {
+            $levelSchema = null;
+            foreach ($byLevelSource as $rawKey => $rawSchema) {
+                if (self::normalizeLevelKey((string) $rawKey) === $levelKey) {
+                    $levelSchema = $rawSchema;
+                    break;
+                }
+            }
+
+            $byLevel[$levelKey] = self::normalizeSchema(is_array($levelSchema) ? $levelSchema : $defaultSchema);
+        }
+
+        return [
+            'default' => $defaultSchema,
+            'by_level' => $byLevel,
+        ];
+    }
+
+    public static function schemaForLevel(mixed $raw, ?string $level): array
+    {
+        $normalized = self::normalizeLevelSchemas($raw);
+        $levelKey = self::normalizeLevelKey($level);
+
+        if ($levelKey !== null && isset($normalized['by_level'][$levelKey])) {
+            return self::normalizeSchema($normalized['by_level'][$levelKey]);
+        }
+
+        return self::normalizeSchema($normalized['default'] ?? $raw);
     }
 
     public static function activeCaIndices(array $schema): array
@@ -120,4 +188,3 @@ class AssessmentSchema
         return implode(', ', $parts);
     }
 }
-

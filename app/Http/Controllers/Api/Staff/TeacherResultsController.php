@@ -92,7 +92,6 @@ class TeacherResultsController extends Controller
     $user = $request->user();
     $schoolId = $user->school_id;
     $school = School::find((int) $schoolId);
-    $assessmentSchema = AssessmentSchema::normalizeSchema($school?->assessment_schema);
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
@@ -118,6 +117,10 @@ class TeacherResultsController extends Controller
         'terms.name as term_name',
       ])
       ->first();
+    $assessmentSchema = AssessmentSchema::schemaForLevel(
+      $school?->assessment_schema,
+      $subjectSummary->class_level ?? null
+    );
 
     // Build the class list from current term enrollments first, then layer exclusions/results on top.
     $canUseDepartments = Schema::hasTable('class_departments')
@@ -240,7 +243,7 @@ class TeacherResultsController extends Controller
     $user = $request->user();
     $schoolId = $user->school_id;
     $school = School::find((int) $schoolId);
-    $assessmentSchema = AssessmentSchema::normalizeSchema($school?->assessment_schema);
+    $assessmentSchema = $this->assessmentSchemaForTermSubject($school, $termSubject);
     $caMaxes = $assessmentSchema['ca_maxes'];
     $examMax = (int) $assessmentSchema['exam_max'];
     $caTotalMax = array_sum($caMaxes);
@@ -382,6 +385,16 @@ class TeacherResultsController extends Controller
   {
     $schema = School::where('id', $schoolId)->value('grading_schema');
     return GradingSchema::gradeForTotal($schema, $total);
+  }
+
+  private function assessmentSchemaForTermSubject(?School $school, TermSubject $termSubject): array
+  {
+    $classLevel = DB::table('classes')
+      ->where('id', (int) $termSubject->class_id)
+      ->where('school_id', (int) $termSubject->school_id)
+      ->value('level');
+
+    return AssessmentSchema::schemaForLevel($school?->assessment_schema, $classLevel);
   }
 }
 

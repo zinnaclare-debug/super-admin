@@ -223,7 +223,10 @@ class SchoolController extends Controller
                 'head_of_school_name' => $school->head_of_school_name,
                 'head_signature_url' => $this->storageUrl($school->head_signature_path),
             ],
-            'exam_record' => AssessmentSchema::normalizeSchema($school->assessment_schema),
+            'exam_record' => AssessmentSchema::normalizeLevelSchemas(
+                $school->assessment_schema,
+                ClassTemplateSchema::activeLevelKeys($normalizedClassTemplates)
+            ),
             'grading_schema' => GradingSchema::normalize($school->grading_schema),
             'class_templates' => $this->attachDepartmentTemplatesToClassTemplates(
                 $normalizedClassTemplates,
@@ -336,38 +339,81 @@ class SchoolController extends Controller
     public function updateInformationExamRecord(Request $request, School $school)
     {
         $payload = $request->validate([
-            'ca_maxes' => 'required|array|size:5',
-            'ca_maxes.*' => 'required|integer|min:0|max:100',
-            'exam_max' => 'required|integer|min:0|max:100',
+            'ca_maxes' => 'nullable|array|size:5',
+            'ca_maxes.*' => 'required_with:ca_maxes|integer|min:0|max:100',
+            'exam_max' => 'nullable|integer|min:0|max:100',
+            'by_level' => 'nullable|array',
+            'by_level.*.ca_maxes' => 'required_with:by_level|array|size:5',
+            'by_level.*.ca_maxes.*' => 'required|integer|min:0|max:100',
+            'by_level.*.exam_max' => 'required_with:by_level|integer|min:0|max:100',
         ]);
 
-        $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes']));
-        $caTotal = array_sum($caMaxes);
-        $examMax = (int) $payload['exam_max'];
+        $normalizedClassTemplates = ClassTemplateSchema::normalize($school->class_templates);
+        $activeLevels = ClassTemplateSchema::activeLevelKeys($normalizedClassTemplates);
 
-        if ($caTotal <= 0) {
-            return response()->json([
-                'message' => 'At least one CA score must be greater than zero.',
-            ], 422);
+        if (!empty($payload['by_level']) && is_array($payload['by_level'])) {
+            $byLevel = [];
+            $levelErrors = [];
+
+            foreach ($activeLevels as $levelKey) {
+                $submitted = $payload['by_level'][$levelKey] ?? null;
+                if (!is_array($submitted)) {
+                    $levelErrors[] = "Exam record for {$levelKey} is required.";
+                    continue;
+                }
+
+                $caMaxes = array_map(fn ($value) => (int) $value, array_values($submitted['ca_maxes'] ?? []));
+                $examMax = (int) ($submitted['exam_max'] ?? 0);
+                $validationMessage = $this->validateAssessmentSchemaParts($caMaxes, $examMax);
+                if ($validationMessage !== null) {
+                    $levelErrors[] = "{$levelKey}: {$validationMessage}";
+                    continue;
+                }
+
+                $byLevel[$levelKey] = AssessmentSchema::normalizeSchema([
+                    'ca_maxes' => $caMaxes,
+                    'exam_max' => $examMax,
+                ]);
+            }
+
+            if (!empty($levelErrors)) {
+                return response()->json([
+                    'message' => implode(' ', $levelErrors),
+                ], 422);
+            }
+
+            $existing = AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $activeLevels);
+            $schema = [
+                'default' => AssessmentSchema::normalizeSchema($existing['default'] ?? []),
+                'by_level' => $byLevel,
+            ];
+        } else {
+            $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes'] ?? []));
+            $examMax = (int) ($payload['exam_max'] ?? 0);
+            $validationMessage = $this->validateAssessmentSchemaParts($caMaxes, $examMax);
+
+            if ($validationMessage !== null) {
+                return response()->json([
+                    'message' => $validationMessage,
+                ], 422);
+            }
+
+            $default = AssessmentSchema::normalizeSchema([
+                'ca_maxes' => $caMaxes,
+                'exam_max' => $examMax,
+            ]);
+            $schema = AssessmentSchema::normalizeLevelSchemas([
+                'default' => $default,
+                'by_level' => array_fill_keys($activeLevels, $default),
+            ], $activeLevels);
         }
-
-        if (($caTotal + $examMax) !== 100) {
-            return response()->json([
-                'message' => 'Total of all CA maxima and exam maximum must be exactly 100.',
-            ], 422);
-        }
-
-        $schema = AssessmentSchema::normalizeSchema([
-            'ca_maxes' => $caMaxes,
-            'exam_max' => $examMax,
-        ]);
 
         $school->assessment_schema = $schema;
         $school->save();
 
         return response()->json([
             'message' => 'Exam record updated successfully',
-            'data' => $schema,
+            'data' => AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $activeLevels),
         ]);
     }
 
@@ -390,6 +436,25 @@ class SchoolController extends Controller
             'message' => 'Grading system updated successfully.',
             'data' => $schema,
         ]);
+    }
+
+    private function validateAssessmentSchemaParts(array $caMaxes, int $examMax): ?string
+    {
+        if (count($caMaxes) !== 5) {
+            return 'CA maxima must contain CA1 to CA5.';
+        }
+
+        $caTotal = array_sum(array_map(fn ($value) => (int) $value, $caMaxes));
+
+        if ($caTotal <= 0) {
+            return 'At least one CA score must be greater than zero.';
+        }
+
+        if (($caTotal + $examMax) !== 100) {
+            return 'Total of all CA maxima and exam maximum must be exactly 100.';
+        }
+
+        return null;
     }
 
     public function updateInformationClassTemplates(Request $request, School $school)
@@ -456,7 +521,7 @@ class SchoolController extends Controller
     {
         $fileName = Str::slug($school->name ?: 'school') . '-history-import-template.csv';
 
-        return response(SchoolHistoryImportService::templateCsv(), 200, [
+        return response(SchoolHistoryImportService::templateCsv($school), 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
