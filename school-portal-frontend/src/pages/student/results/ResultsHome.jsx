@@ -46,7 +46,7 @@ const displayScore = (value) => {
 
 const isThirdTermName = (name = "") => {
   const value = String(name).toLowerCase();
-  return value.includes("third") || /(^|\D)3(rd)?(\D|$)/.test(value);
+  return value.includes("third") || value.includes("three") || /(^|\D)3(rd)?(\D|$)/.test(value);
 };
 
 function fileNameFromHeaders(headers, fallback) {
@@ -312,6 +312,11 @@ export default function StudentResultsHome() {
                   <p className="rs-card-meta">
                     {item.class_level} | {item.term_name}
                   </p>
+                  {item.supports_cumulative || isThirdTermName(item.term_name) ? (
+                    <p className="rs-card-meta" style={{ marginTop: 6 }}>
+                      Cumulative Result available
+                    </p>
+                  ) : null}
                 </button>
               );
             })}

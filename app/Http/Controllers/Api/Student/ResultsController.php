@@ -155,7 +155,7 @@ class ResultsController extends Controller
         return match (true) {
             str_contains($value, 'first') || preg_match('/(^|\D)1(st)?(\D|$)/', $value) === 1 => 1,
             str_contains($value, 'second') || preg_match('/(^|\D)2(nd)?(\D|$)/', $value) === 1 => 2,
-            str_contains($value, 'third') || preg_match('/(^|\D)3(rd)?(\D|$)/', $value) === 1 => 3,
+            str_contains($value, 'third') || str_contains($value, 'three') || preg_match('/(^|\D)3(rd)?(\D|$)/', $value) === 1 => 3,
             default => null,
         };
     }
