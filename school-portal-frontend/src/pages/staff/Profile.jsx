@@ -5,9 +5,21 @@ import proudArt from "../../assets/profile/proud-self.svg";
 import "../shared/ProfileShowcase.css";
 import { compressProfilePhoto, PROFILE_PHOTO_GUIDE } from "../../utils/profileImage";
 
+const staffFormFromData = (data) => ({
+  email: data?.user?.email || data?.email || "",
+  position: data?.staff_position || data?.position || data?.staff?.position || "",
+  education_level: data?.education_level || data?.staff?.education_level || "",
+  sex: data?.sex || data?.staff?.sex || "",
+  dob: data?.dob || data?.staff?.dob || "",
+  address: data?.address || data?.staff?.address || "",
+});
+
 export default function StaffProfile() {
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(staffFormFromData(null));
 
   const [photoFile, setPhotoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -31,10 +43,30 @@ export default function StaffProfile() {
         }
         return incoming;
       });
+      setForm(staffFormFromData(incoming));
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to load staff profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const saveProfile = async () => {
+    setSaving(true);
+    try {
+      const res = await api.put("/api/staff/profile", form);
+      const incoming = res.data.data || res.data;
+      setMe(incoming || null);
+      setForm(staffFormFromData(incoming));
+      setEditing(false);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to update staff profile");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -219,19 +251,52 @@ export default function StaffProfile() {
 
           <article className="pf-card">
             <h3>Account</h3>
-            <div className="pf-kv">
-              {accountRows.map(([label, value]) => (
-                <div className="pf-row" key={label}>
-                  <span className="pf-row-label">{label}</span>
-                  <span className="pf-row-value">{value}</span>
+            {!editing ? (
+              <div className="pf-kv">
+                {accountRows.map(([label, value]) => (
+                  <div className="pf-row" key={label}>
+                    <span className="pf-row-label">{label}</span>
+                    <span className="pf-row-value">{value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="pf-kv">
+                <div className="pf-row">
+                  <span className="pf-row-label">Name</span>
+                  <span className="pf-row-value">{me.name || me.user?.name || "-"}</span>
                 </div>
-              ))}
-            </div>
+                <div className="pf-row">
+                  <span className="pf-row-label">Username</span>
+                  <span className="pf-row-value">{me.username || me.user?.username || "-"}</span>
+                </div>
+                <label className="pf-row">
+                  <span className="pf-row-label">Email</span>
+                  <input className="pf-input" type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
+                </label>
+                <div className="pf-row">
+                  <span className="pf-row-label">Role</span>
+                  <span className="pf-row-value">{me.role || me.user?.role || "staff"}</span>
+                </div>
+              </div>
+            )}
 
             <div className="pf-actions">
-              <button className="pf-btn" onClick={load}>
-                Refresh
-              </button>
+              {editing ? (
+                <>
+                  <button className="pf-btn" onClick={saveProfile} disabled={saving}>
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button className="pf-btn" onClick={() => { setEditing(false); setForm(staffFormFromData(me)); }} disabled={saving}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="pf-btn" onClick={() => setEditing(true)}>Edit Profile</button>
+                  <button className="pf-btn" onClick={load}>Refresh</button>
+                </>
+              )}
             </div>
           </article>
         </div>
@@ -239,14 +304,39 @@ export default function StaffProfile() {
         <div className="pf-grid" style={{ marginTop: 12 }}>
           <article className="pf-card">
             <h3>Staff Details</h3>
-            <div className="pf-kv">
-              {staffRows.map(([label, value]) => (
-                <div className="pf-row" key={label}>
-                  <span className="pf-row-label">{label}</span>
-                  <span className="pf-row-value">{value}</span>
-                </div>
-              ))}
-            </div>
+            {!editing ? (
+              <div className="pf-kv">
+                {staffRows.map(([label, value]) => (
+                  <div className="pf-row" key={label}>
+                    <span className="pf-row-label">{label}</span>
+                    <span className="pf-row-value">{value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="pf-kv">
+                <label className="pf-row">
+                  <span className="pf-row-label">Position</span>
+                  <input className="pf-input" value={form.position} onChange={(e) => setField("position", e.target.value)} />
+                </label>
+                <label className="pf-row">
+                  <span className="pf-row-label">Education Level</span>
+                  <input className="pf-input" value={form.education_level} onChange={(e) => setField("education_level", e.target.value)} />
+                </label>
+                <label className="pf-row">
+                  <span className="pf-row-label">Sex</span>
+                  <input className="pf-input" value={form.sex} onChange={(e) => setField("sex", e.target.value)} />
+                </label>
+                <label className="pf-row">
+                  <span className="pf-row-label">Date of Birth</span>
+                  <input className="pf-input" type="date" value={form.dob || ""} onChange={(e) => setField("dob", e.target.value)} />
+                </label>
+                <label className="pf-row">
+                  <span className="pf-row-label">Address</span>
+                  <textarea className="pf-input" value={form.address} onChange={(e) => setField("address", e.target.value)} rows={3} />
+                </label>
+              </div>
+            )}
           </article>
         </div>
       </section>

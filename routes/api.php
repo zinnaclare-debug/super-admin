@@ -491,6 +491,7 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::post('/staff/attendant/sign-out', [StaffAttendantController::class, 'signOut'])
         ->middleware('feature:attendant');
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
+    Route::put('/staff/profile', [StaffProfileController::class, 'update']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);
     Route::get('/staff/features', [FeatureAccessController::class, 'staffFeatures']);
@@ -568,6 +569,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
         ->middleware('feature:announcements');
     Route::get('/student/features', [FeatureAccessController::class, 'studentFeatures']);
     Route::get('/student/profile', [\App\Http\Controllers\Api\Student\ProfileController::class, 'me']);
+    Route::put('/student/profile', [\App\Http\Controllers\Api\Student\ProfileController::class, 'update']);
     Route::get('/student/school-fees', [StudentSchoolFeesController::class, 'index'])
         ->middleware('feature:school fees');
     Route::post('/student/school-fees/initialize', [StudentSchoolFeesController::class, 'initialize'])

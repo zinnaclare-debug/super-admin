@@ -12,6 +12,7 @@ use App\Models\School;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\Term;
+use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
@@ -144,5 +145,82 @@ class ProfileController extends Controller
                 'photo_url' => $photoUrl,
             ]
         ]);
+    }
+
+    public function update(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->role === 'student', 403);
+
+        $schoolId = (int) $user->school_id;
+        $payload = $request->validate([
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'sex' => ['nullable', 'string', 'max:30'],
+            'religion' => ['nullable', 'string', 'max:80'],
+            'dob' => ['nullable', 'date'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'guardian' => ['nullable', 'array'],
+            'guardian.name' => ['nullable', 'string', 'max:255'],
+            'guardian.email' => ['nullable', 'email', 'max:255'],
+            'guardian.mobile' => ['nullable', 'string', 'max:30'],
+            'guardian.location' => ['nullable', 'string', 'max:255'],
+            'guardian.state_of_origin' => ['nullable', 'string', 'max:120'],
+            'guardian.occupation' => ['nullable', 'string', 'max:120'],
+            'guardian.relationship' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $student = Student::where('user_id', $user->id)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$student) {
+            return response()->json(['message' => 'Student record not found'], 404);
+        }
+
+        if (array_key_exists('email', $payload)) {
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            $user->email = $email !== '' ? $email : $user->email;
+            $user->save();
+        }
+
+        $studentUpdates = [];
+        foreach (['sex', 'religion', 'dob', 'address'] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $value = is_string($payload[$field] ?? null) ? trim((string) $payload[$field]) : ($payload[$field] ?? null);
+                $studentUpdates[$field] = $value !== '' ? $value : null;
+            }
+        }
+
+        if (!empty($studentUpdates)) {
+            $student->fill($studentUpdates)->save();
+        }
+
+        if (array_key_exists('guardian', $payload) && is_array($payload['guardian'])) {
+            $guardianPayload = $payload['guardian'];
+            $guardianUpdates = [];
+            foreach (['name', 'email', 'mobile', 'location', 'state_of_origin', 'occupation', 'relationship'] as $field) {
+                if (array_key_exists($field, $guardianPayload)) {
+                    $value = trim((string) ($guardianPayload[$field] ?? ''));
+                    $guardianUpdates[$field] = $value !== '' ? $value : null;
+                }
+            }
+
+            if (!empty($guardianUpdates)) {
+                Guardian::updateOrCreate(
+                    [
+                        'user_id' => (int) $user->id,
+                        'school_id' => $schoolId,
+                    ],
+                    $guardianUpdates
+                );
+            }
+        }
+
+        return $this->me($request);
     }
 }

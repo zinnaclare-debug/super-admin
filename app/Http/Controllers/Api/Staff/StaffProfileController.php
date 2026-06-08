@@ -7,6 +7,7 @@ use App\Models\SchoolClass;
 use App\Models\School;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class StaffProfileController extends Controller
 {
@@ -75,6 +76,58 @@ class StaffProfileController extends Controller
                 'classes' => $classes,
             ]
         ]);
+    }
+
+    public function update(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        if ($user->role !== 'staff') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $staffProfile = $user->staffProfile;
+        if (!$staffProfile) {
+            return response()->json(['message' => 'Staff profile not found'], 404);
+        }
+
+        $payload = $request->validate([
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'sex' => ['nullable', 'string', 'max:30'],
+            'dob' => ['nullable', 'date'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'position' => ['nullable', 'string', 'max:120'],
+            'education_level' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        if (array_key_exists('email', $payload)) {
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            $user->email = $email !== '' ? $email : $user->email;
+            $user->save();
+        }
+
+        $updates = [];
+        foreach (['sex', 'dob', 'address', 'position', 'education_level'] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $value = is_string($payload[$field] ?? null) ? trim((string) $payload[$field]) : ($payload[$field] ?? null);
+                $updates[$field] = $value !== '' ? $value : null;
+            }
+        }
+
+        if (!empty($updates)) {
+            $staffProfile->fill($updates)->save();
+        }
+
+        return $this->show($request);
     }
 
     /**

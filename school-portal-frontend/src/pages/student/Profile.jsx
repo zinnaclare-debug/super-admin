@@ -4,10 +4,35 @@ import profileArt from "../../assets/profile/profile-card.svg";
 import proudArt from "../../assets/profile/proud-self.svg";
 import "../shared/ProfileShowcase.css";
 
+const profileFormFromData = (data) => ({
+  email: data?.user?.email || "",
+  sex: data?.student?.sex || "",
+  religion: data?.student?.religion || "",
+  dob: data?.student?.dob || "",
+  address: data?.student?.address || "",
+  guardian: {
+    name: data?.guardian?.name || "",
+    relationship: data?.guardian?.relationship || "",
+    email: data?.guardian?.email || "",
+    mobile: data?.guardian?.mobile || "",
+    occupation: data?.guardian?.occupation || "",
+    location: data?.guardian?.location || "",
+    state_of_origin: data?.guardian?.state_of_origin || "",
+  },
+});
+
 export default function StudentProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(profileFormFromData(null));
   const [error, setError] = useState("");
+
+  const applyProfile = (data) => {
+    setProfile(data);
+    setForm(profileFormFromData(data));
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -15,7 +40,7 @@ export default function StudentProfile() {
       setError("");
       try {
         const res = await api.get("/api/student/profile");
-        setProfile(res.data?.data || null);
+        applyProfile(res.data?.data || null);
       } catch (e) {
         setError(e?.response?.data?.message || "Failed to load profile");
       } finally {
@@ -24,6 +49,34 @@ export default function StudentProfile() {
     };
     load();
   }, []);
+
+  const setField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const setGuardianField = (field, value) => {
+    setForm((current) => ({
+      ...current,
+      guardian: {
+        ...(current.guardian || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveProfile = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await api.put("/api/student/profile", form);
+      applyProfile(res.data?.data || null);
+      setEditing(false);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
@@ -125,13 +178,60 @@ export default function StudentProfile() {
             <div className="pf-grid pf-grid--top">
               <article className="pf-card">
                 <h3>Student Details</h3>
-                <div className="pf-kv">
-                  {studentRows.map(([label, value]) => (
-                    <div className="pf-row" key={label}>
-                      <span className="pf-row-label">{label}</span>
-                      <span className="pf-row-value">{value}</span>
+                {!editing ? (
+                  <div className="pf-kv">
+                    {studentRows.map(([label, value]) => (
+                      <div className="pf-row" key={label}>
+                        <span className="pf-row-label">{label}</span>
+                        <span className="pf-row-value">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pf-kv">
+                    <div className="pf-row">
+                      <span className="pf-row-label">Name</span>
+                      <span className="pf-row-value">{user.name || "-"}</span>
                     </div>
-                  ))}
+                    <div className="pf-row">
+                      <span className="pf-row-label">Username</span>
+                      <span className="pf-row-value">{user.username || "-"}</span>
+                    </div>
+                    <label className="pf-row">
+                      <span className="pf-row-label">Email</span>
+                      <input className="pf-input" type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
+                    </label>
+                    <label className="pf-row">
+                      <span className="pf-row-label">Sex</span>
+                      <input className="pf-input" value={form.sex} onChange={(e) => setField("sex", e.target.value)} />
+                    </label>
+                    <label className="pf-row">
+                      <span className="pf-row-label">Religion</span>
+                      <input className="pf-input" value={form.religion} onChange={(e) => setField("religion", e.target.value)} />
+                    </label>
+                    <label className="pf-row">
+                      <span className="pf-row-label">Date of Birth</span>
+                      <input className="pf-input" type="date" value={form.dob || ""} onChange={(e) => setField("dob", e.target.value)} />
+                    </label>
+                    <label className="pf-row">
+                      <span className="pf-row-label">Address</span>
+                      <textarea className="pf-input" value={form.address} onChange={(e) => setField("address", e.target.value)} rows={3} />
+                    </label>
+                  </div>
+                )}
+                <div className="pf-actions">
+                  {editing ? (
+                    <>
+                      <button className="pf-btn" onClick={saveProfile} disabled={saving}>
+                        {saving ? "Saving..." : "Save Changes"}
+                      </button>
+                      <button className="pf-btn" onClick={() => { setEditing(false); setForm(profileFormFromData(profile)); }} disabled={saving}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button className="pf-btn" onClick={() => setEditing(true)}>Edit Profile</button>
+                  )}
                 </div>
               </article>
 
@@ -158,7 +258,29 @@ export default function StudentProfile() {
 
               <article className="pf-card">
                 <h3>Guardian Details</h3>
-                {guardianRows.length > 0 ? (
+                {editing ? (
+                  <div className="pf-kv">
+                    {[
+                      ["name", "Name"],
+                      ["relationship", "Relationship"],
+                      ["email", "Email"],
+                      ["mobile", "Mobile"],
+                      ["occupation", "Occupation"],
+                      ["location", "Location"],
+                      ["state_of_origin", "State of Origin"],
+                    ].map(([field, label]) => (
+                      <label className="pf-row" key={field}>
+                        <span className="pf-row-label">{label}</span>
+                        <input
+                          className="pf-input"
+                          type={field === "email" ? "email" : "text"}
+                          value={form.guardian?.[field] || ""}
+                          onChange={(e) => setGuardianField(field, e.target.value)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ) : guardianRows.length > 0 ? (
                   <div className="pf-kv">
                     {guardianRows.map(([label, value]) => (
                       <div className="pf-row" key={label}>
