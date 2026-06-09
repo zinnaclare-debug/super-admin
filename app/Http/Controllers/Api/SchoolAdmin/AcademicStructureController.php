@@ -32,9 +32,11 @@ class AcademicStructureController extends Controller
             ->all();
 
         if (empty($selectedLevels)) {
-            $selectedLevels = SchoolClass::query()
+            $selectedLevelsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
-                ->where('academic_session_id', $session->id)
+                ->where('academic_session_id', $session->id);
+
+            $selectedLevels = $this->onlyTemplateActive($selectedLevelsQuery, 'classes')
                 ->pluck('level')
                 ->map(fn ($level) => strtolower(trim((string) $level)))
                 ->filter(fn ($level) => $level !== '')
@@ -45,18 +47,21 @@ class AcademicStructureController extends Controller
 
         $levels = [];
         foreach ($selectedLevels as $level) {
+            $classesQuery = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('level', $level);
+            $departmentsQuery = LevelDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('level', $level);
+
             $levels[] = [
                 'level' => $level,
-                'classes' => SchoolClass::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', $session->id)
-                    ->where('level', $level)
+                'classes' => $this->onlyTemplateActive($classesQuery, 'classes')
                     ->orderBy('id')
                     ->get(),
-                'departments' => LevelDepartment::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', $session->id)
-                    ->where('level', $level)
+                'departments' => $this->onlyTemplateActive($departmentsQuery, 'level_departments')
                     ->orderBy('name')
                     ->get(),
             ];
@@ -102,9 +107,11 @@ class AcademicStructureController extends Controller
             ->values()
             ->all();
         if (empty($allowedLevels)) {
-            $allowedLevels = SchoolClass::query()
+            $allowedLevelsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
-                ->where('academic_session_id', $session->id)
+                ->where('academic_session_id', $session->id);
+
+            $allowedLevels = $this->onlyTemplateActive($allowedLevelsQuery, 'classes')
                 ->pluck('level')
                 ->map(fn ($level) => strtolower(trim((string) $level)))
                 ->filter(fn ($level) => $level !== '')
@@ -121,19 +128,25 @@ class AcademicStructureController extends Controller
                 'level' => $requestedLevel,
                 'name' => trim((string) $payload['name']),
             ]);
+            $this->setModelTemplateActive($department, 'level_departments', true);
+            $department->save();
 
-            $classes = SchoolClass::query()
+            $classesQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', $session->id)
-                ->where('level', $requestedLevel)
+                ->where('level', $requestedLevel);
+
+            $classes = $this->onlyTemplateActive($classesQuery, 'classes')
                 ->get(['id']);
 
             foreach ($classes as $classRow) {
-                ClassDepartment::firstOrCreate([
+                $classDepartment = ClassDepartment::firstOrCreate([
                     'school_id' => $schoolId,
                     'class_id' => $classRow->id,
                     'name' => $department->name,
                 ]);
+                $this->setModelTemplateActive($classDepartment, 'class_departments', true);
+                $classDepartment->save();
             }
 
             return response()->json(['data' => $department], 201);
@@ -181,10 +194,12 @@ class AcademicStructureController extends Controller
             $department->name = $newName;
             $department->save();
 
-            $classes = SchoolClass::query()
+            $classesQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', (int) $session->id)
-                ->where('level', (string) $department->level)
+                ->where('level', (string) $department->level);
+
+            $classes = $this->onlyTemplateActive($classesQuery, 'classes')
                 ->get(['id']);
 
             foreach ($classes as $classRow) {
@@ -247,10 +262,12 @@ class AcademicStructureController extends Controller
 
             $department->delete();
 
-            $classIds = SchoolClass::query()
+            $classIdsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', (int) $session->id)
-                ->where('level', $level)
+                ->where('level', $level);
+
+            $classIds = $this->onlyTemplateActive($classIdsQuery, 'classes')
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
                 ->values();
@@ -358,6 +375,22 @@ class AcademicStructureController extends Controller
         $term->delete();
 
         return response()->json(['message' => 'Term deleted']);
+    }
+
+    private function onlyTemplateActive($query, string $table)
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $query->where($table . '.is_template_active', true);
+        }
+
+        return $query;
+    }
+
+    private function setModelTemplateActive(object $model, string $table, bool $active): void
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $model->is_template_active = $active;
+        }
     }
 
     public function setCurrentTerm(Request $request, Term $term)

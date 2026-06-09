@@ -15,6 +15,7 @@ class SchoolClass extends Model
         'academic_session_id',
         'level',
         'name',
+        'is_template_active',
         'class_teacher_user_id',
     ];
 

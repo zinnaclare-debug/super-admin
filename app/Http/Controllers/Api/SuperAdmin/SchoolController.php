@@ -477,6 +477,11 @@ class SchoolController extends Controller
             'class_templates.*.classes.*.department_names.*' => 'nullable|string|max:80',
         ]);
 
+        $previousTemplates = ClassTemplateSchema::normalize($school->class_templates);
+        $previousDepartmentTemplateMapByClass = DepartmentTemplateSync::normalizeClassTemplateMap(
+            $school->department_templates ?? [],
+            $previousTemplates
+        );
         $normalized = ClassTemplateSchema::normalize($payload['class_templates'] ?? []);
         $active = ClassTemplateSchema::activeSections($normalized);
 
@@ -500,14 +505,28 @@ class SchoolController extends Controller
             $normalized
         );
 
-        $school->class_templates = $normalized;
-        $school->department_templates = DepartmentTemplateSync::serializeClassTemplateMap(
+        DB::transaction(function () use (
+            $school,
+            $normalized,
             $departmentTemplateMapByClass,
-            $normalized
-        );
-        $school->save();
+            $previousTemplates,
+            $previousDepartmentTemplateMapByClass
+        ) {
+            $school->class_templates = $normalized;
+            $school->department_templates = DepartmentTemplateSync::serializeClassTemplateMap(
+                $departmentTemplateMapByClass,
+                $normalized
+            );
+            $school->save();
 
-        $this->syncClassTemplatesToExistingSessions($school, $normalized, $departmentTemplateMapByClass);
+            $this->syncClassTemplatesToExistingSessions(
+                $school,
+                $normalized,
+                $departmentTemplateMapByClass,
+                $previousTemplates,
+                $previousDepartmentTemplateMapByClass
+            );
+        });
 
         $departmentTemplateMapByLevel = DepartmentTemplateSync::normalizeLevelTemplateMap([
             'by_class' => $departmentTemplateMapByClass,
@@ -547,6 +566,11 @@ class SchoolController extends Controller
             );
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'History import failed. Check session, term, class, level, subject, and score spelling. '
+                    . 'Technical detail: ' . Str::limit($e->getMessage(), 180),
+            ], 422);
         }
 
         return response()->json([
@@ -702,7 +726,9 @@ class SchoolController extends Controller
     private function syncClassTemplatesToExistingSessions(
         School $school,
         array $templates,
-        ?array $departmentTemplateMapByClass = null
+        ?array $departmentTemplateMapByClass = null,
+        ?array $previousTemplates = null,
+        ?array $previousDepartmentTemplateMapByClass = null
     ): void
     {
         $schoolId = (int) $school->id;
@@ -715,6 +741,13 @@ class SchoolController extends Controller
         $departmentTemplateMapByClass = $departmentTemplateMapByClass
             ? DepartmentTemplateSync::normalizeClassTemplateMap(['by_class' => $departmentTemplateMapByClass], $templates)
             : DepartmentTemplateSync::normalizeClassTemplateMap($school->department_templates ?? [], $templates);
+        $previousTemplates = ClassTemplateSchema::normalize($previousTemplates ?? []);
+        $previousDepartmentTemplateMapByClass = DepartmentTemplateSync::normalizeClassTemplateMap(
+            ['by_class' => ($previousDepartmentTemplateMapByClass ?? [])],
+            $previousTemplates
+        );
+        $newRowsByLevel = $this->indexedClassTemplateRows($templates);
+        $previousRowsByLevel = $this->indexedClassTemplateRows($previousTemplates);
 
         $sessions = AcademicSession::query()
             ->where('school_id', $schoolId)
@@ -724,31 +757,470 @@ class SchoolController extends Controller
             $session->levels = $activeLevels;
             $session->save();
 
-            foreach ($activeSections as $section) {
-                $level = strtolower(trim((string) ($section['key'] ?? '')));
-                if ($level === '') {
-                    continue;
-                }
+            foreach ($newRowsByLevel as $level => $rows) {
+                foreach ($rows as $index => $row) {
+                    if (!($row['enabled'] ?? false)) {
+                        continue;
+                    }
 
-                $classNames = ClassTemplateSchema::activeClassNames($section);
+                    $class = $this->syncTemplateClassRow(
+                        $schoolId,
+                        (int) $session->id,
+                        $level,
+                        trim((string) ($row['name'] ?? '')),
+                        $previousRowsByLevel[$level][$index]['name'] ?? null
+                    );
 
-                foreach ($classNames as $className) {
-                    SchoolClass::firstOrCreate([
-                        'school_id' => $schoolId,
-                        'academic_session_id' => (int) $session->id,
-                        'level' => $level,
-                        'name' => $className,
-                    ]);
+                    if ($class) {
+                        $this->syncTemplateClassDepartments(
+                            $schoolId,
+                            (int) $session->id,
+                            $level,
+                            $class,
+                            $this->departmentNamesForTemplateClass($departmentTemplateMapByClass, $level, (string) $row['name']),
+                            $this->departmentNamesForTemplateClass(
+                                $previousDepartmentTemplateMapByClass,
+                                $level,
+                                (string) ($previousRowsByLevel[$level][$index]['name'] ?? '')
+                            )
+                        );
+                    }
                 }
             }
 
-            DepartmentTemplateSync::syncClassTemplatesToSession(
+            $this->removeUncheckedTemplateRows(
                 $schoolId,
                 (int) $session->id,
-                $templates,
-                ['by_class' => $departmentTemplateMapByClass]
+                $previousRowsByLevel,
+                $newRowsByLevel,
+                $previousDepartmentTemplateMapByClass
             );
         }
+    }
+
+    private function indexedClassTemplateRows(array $templates): array
+    {
+        $rowsByLevel = [];
+
+        foreach (ClassTemplateSchema::normalize($templates) as $section) {
+            $level = strtolower(trim((string) ($section['key'] ?? '')));
+            if ($level === '') {
+                continue;
+            }
+
+            $sectionEnabled = (bool) ($section['enabled'] ?? false);
+            $rowsByLevel[$level] = [];
+            $classes = is_array($section['classes'] ?? null) ? $section['classes'] : [];
+
+            foreach ($classes as $index => $classRow) {
+                $name = trim((string) (is_array($classRow) ? ($classRow['name'] ?? '') : $classRow));
+                if ($name === '') {
+                    continue;
+                }
+
+                $rowsByLevel[$level][$index] = [
+                    'name' => $name,
+                    'enabled' => $sectionEnabled && (bool) (is_array($classRow) ? ($classRow['enabled'] ?? true) : true),
+                ];
+            }
+        }
+
+        return $rowsByLevel;
+    }
+
+    private function syncTemplateClassRow(
+        int $schoolId,
+        int $sessionId,
+        string $level,
+        string $newName,
+        ?string $previousName = null
+    ): ?SchoolClass {
+        if ($newName === '') {
+            return null;
+        }
+
+        $existing = $this->findSessionClass($schoolId, $sessionId, $level, $newName);
+        $previousName = trim((string) $previousName);
+        $previous = $previousName !== '' && strcasecmp($previousName, $newName) !== 0
+            ? $this->findSessionClass($schoolId, $sessionId, $level, $previousName)
+            : null;
+
+        if ($previous) {
+            if ($existing && (int) $existing->id !== (int) $previous->id) {
+                if (!$this->classHasRealUsage((int) $existing->id)) {
+                    $existing->delete();
+                    $previous->name = $newName;
+                    $this->setModelTemplateActive($previous, 'classes', true);
+                    $previous->save();
+
+                    return $previous->fresh();
+                }
+
+                if (!$this->classHasRealUsage((int) $previous->id)) {
+                    $previous->delete();
+                    $this->setModelTemplateActive($existing, 'classes', true);
+                    $existing->save();
+
+                    return $existing;
+                }
+
+                $this->setModelTemplateActive($existing, 'classes', true);
+                $existing->save();
+                return $existing;
+            }
+
+            $previous->name = $newName;
+            $this->setModelTemplateActive($previous, 'classes', true);
+            $previous->save();
+
+            return $previous->fresh();
+        }
+
+        if ($existing) {
+            $this->setModelTemplateActive($existing, 'classes', true);
+            $existing->save();
+            return $existing;
+        }
+
+        return SchoolClass::query()->create(array_merge([
+            'school_id' => $schoolId,
+            'academic_session_id' => $sessionId,
+            'level' => $level,
+            'name' => $newName,
+        ], $this->templateActiveValues('classes', true)));
+    }
+
+    private function findSessionClass(int $schoolId, int $sessionId, string $level, string $name): ?SchoolClass
+    {
+        return SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('level', $level)
+            ->whereRaw('LOWER(name) = ?', [strtolower(trim($name))])
+            ->first();
+    }
+
+    private function syncTemplateClassDepartments(
+        int $schoolId,
+        int $sessionId,
+        string $level,
+        SchoolClass $class,
+        array $newNames,
+        array $previousNames
+    ): void {
+        foreach ($newNames as $index => $newName) {
+            $newName = trim((string) $newName);
+            if ($newName === '') {
+                continue;
+            }
+
+            $previousName = trim((string) ($previousNames[$index] ?? ''));
+            $this->syncLevelDepartmentRow($schoolId, $sessionId, $level, $newName, $previousName);
+            $this->syncClassDepartmentRow($schoolId, (int) $class->id, $newName, $previousName);
+        }
+
+        foreach ($previousNames as $index => $previousName) {
+            $previousName = trim((string) $previousName);
+            $newName = trim((string) ($newNames[$index] ?? ''));
+            if ($previousName === '' || $newName !== '') {
+                continue;
+            }
+
+            $this->deleteClassDepartmentIfUnused($schoolId, (int) $class->id, $previousName);
+            $this->deleteLevelDepartmentIfUnused($schoolId, $sessionId, $level, $previousName);
+        }
+    }
+
+    private function syncLevelDepartmentRow(
+        int $schoolId,
+        int $sessionId,
+        string $level,
+        string $newName,
+        string $previousName = ''
+    ): void {
+        $existing = $this->findLevelDepartment($schoolId, $sessionId, $level, $newName);
+        $previous = $previousName !== '' && strcasecmp($previousName, $newName) !== 0
+            ? $this->findLevelDepartment($schoolId, $sessionId, $level, $previousName)
+            : null;
+
+        if ($previous) {
+            if ($existing && (int) $existing->id !== (int) $previous->id) {
+                DB::table('level_departments')->where('id', (int) $previous->id)->delete();
+                DB::table('level_departments')->where('id', (int) $existing->id)->update(array_merge(
+                    $this->templateActiveValues('level_departments', true),
+                    ['updated_at' => now()]
+                ));
+                return;
+            }
+
+            DB::table('level_departments')->where('id', (int) $previous->id)->update([
+                'name' => $newName,
+                ...$this->templateActiveValues('level_departments', true),
+                'updated_at' => now(),
+            ]);
+            return;
+        }
+
+        if (!$existing) {
+            DB::table('level_departments')->insert(array_merge([
+                'school_id' => $schoolId,
+                'academic_session_id' => $sessionId,
+                'level' => $level,
+                'name' => $newName,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ], $this->templateActiveValues('level_departments', true)));
+        } else {
+            DB::table('level_departments')->where('id', (int) $existing->id)->update(array_merge(
+                $this->templateActiveValues('level_departments', true),
+                ['updated_at' => now()]
+            ));
+        }
+    }
+
+    private function syncClassDepartmentRow(
+        int $schoolId,
+        int $classId,
+        string $newName,
+        string $previousName = ''
+    ): void {
+        $existing = $this->findClassDepartment($schoolId, $classId, $newName);
+        $previous = $previousName !== '' && strcasecmp($previousName, $newName) !== 0
+            ? $this->findClassDepartment($schoolId, $classId, $previousName)
+            : null;
+
+        if ($previous) {
+            if ($existing && (int) $existing->id !== (int) $previous->id) {
+                $this->mergeClassDepartmentRows((int) $previous->id, (int) $existing->id);
+                return;
+            }
+
+            DB::table('class_departments')->where('id', (int) $previous->id)->update([
+                'name' => $newName,
+                ...$this->templateActiveValues('class_departments', true),
+                'updated_at' => now(),
+            ]);
+            return;
+        }
+
+        if (!$existing) {
+            DB::table('class_departments')->insert(array_merge([
+                'school_id' => $schoolId,
+                'class_id' => $classId,
+                'name' => $newName,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ], $this->templateActiveValues('class_departments', true)));
+        } else {
+            DB::table('class_departments')->where('id', (int) $existing->id)->update(array_merge(
+                $this->templateActiveValues('class_departments', true),
+                ['updated_at' => now()]
+            ));
+        }
+    }
+
+    private function findLevelDepartment(int $schoolId, int $sessionId, string $level, string $name): ?object
+    {
+        return DB::table('level_departments')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('level', $level)
+            ->whereRaw('LOWER(name) = ?', [strtolower(trim($name))])
+            ->first();
+    }
+
+    private function findClassDepartment(int $schoolId, int $classId, string $name): ?object
+    {
+        return DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->whereRaw('LOWER(name) = ?', [strtolower(trim($name))])
+            ->first();
+    }
+
+    private function mergeClassDepartmentRows(int $sourceId, int $targetId): void
+    {
+        if (Schema::hasTable('enrollments') && Schema::hasColumn('enrollments', 'department_id')) {
+            DB::table('enrollments')->where('department_id', $sourceId)->update([
+                'department_id' => $targetId,
+                'updated_at' => now(),
+            ]);
+        }
+
+        $sourceTeacherId = Schema::hasColumn('class_departments', 'class_teacher_user_id')
+            ? DB::table('class_departments')->where('id', $sourceId)->value('class_teacher_user_id')
+            : null;
+
+        if ($sourceTeacherId && Schema::hasColumn('class_departments', 'class_teacher_user_id')) {
+            DB::table('class_departments')
+                ->where('id', $targetId)
+                ->whereNull('class_teacher_user_id')
+                ->update(['class_teacher_user_id' => $sourceTeacherId, 'updated_at' => now()]);
+        }
+
+        DB::table('class_departments')->where('id', $sourceId)->delete();
+        DB::table('class_departments')->where('id', $targetId)->update(array_merge(
+            $this->templateActiveValues('class_departments', true),
+            ['updated_at' => now()]
+        ));
+    }
+
+    private function removeUncheckedTemplateRows(
+        int $schoolId,
+        int $sessionId,
+        array $previousRowsByLevel,
+        array $newRowsByLevel,
+        array $previousDepartmentTemplateMapByClass
+    ): void {
+        foreach ($previousRowsByLevel as $level => $previousRows) {
+            foreach ($previousRows as $index => $previousRow) {
+                if (!($previousRow['enabled'] ?? false)) {
+                    continue;
+                }
+
+                $newRow = $newRowsByLevel[$level][$index] ?? null;
+                if ($newRow && ($newRow['enabled'] ?? false)) {
+                    continue;
+                }
+
+                $class = $this->findSessionClass($schoolId, $sessionId, $level, (string) ($previousRow['name'] ?? ''));
+                if (!$class) {
+                    continue;
+                }
+
+                foreach ($this->departmentNamesForTemplateClass(
+                    $previousDepartmentTemplateMapByClass,
+                    $level,
+                    (string) ($previousRow['name'] ?? '')
+                ) as $departmentName) {
+                    $this->deleteClassDepartmentIfUnused($schoolId, (int) $class->id, $departmentName);
+                    $this->deleteLevelDepartmentIfUnused($schoolId, $sessionId, $level, $departmentName);
+                }
+
+                if ($this->classHasRealUsage((int) $class->id)) {
+                    $this->markTemplateInactive('classes', (int) $class->id);
+                    continue;
+                }
+
+                $class->delete();
+            }
+        }
+    }
+
+    private function classHasRealUsage(int $classId): bool
+    {
+        foreach ([
+            'class_students',
+            'enrollments',
+            'term_subjects',
+            'term_attendance_settings',
+            'student_attendances',
+            'student_subject_exclusions',
+            'student_behaviour_ratings',
+        ] as $table) {
+            if (
+                Schema::hasTable($table)
+                && Schema::hasColumn($table, 'class_id')
+                && DB::table($table)->where('class_id', $classId)->exists()
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function deleteClassDepartmentIfUnused(int $schoolId, int $classId, string $name): void
+    {
+        $department = $this->findClassDepartment($schoolId, $classId, $name);
+        if (!$department) {
+            return;
+        }
+
+        if (
+            Schema::hasTable('enrollments')
+            && Schema::hasColumn('enrollments', 'department_id')
+            && DB::table('enrollments')->where('department_id', (int) $department->id)->exists()
+        ) {
+            $this->markTemplateInactive('class_departments', (int) $department->id);
+            return;
+        }
+
+        DB::table('class_departments')->where('id', (int) $department->id)->delete();
+    }
+
+    private function deleteLevelDepartmentIfUnused(int $schoolId, int $sessionId, string $level, string $name): void
+    {
+        $department = $this->findLevelDepartment($schoolId, $sessionId, $level, $name);
+        if (!$department) {
+            return;
+        }
+
+        $classIds = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->where('level', $level)
+            ->pluck('id')
+            ->all();
+
+        $hasClassDepartment = !empty($classIds)
+            && DB::table('class_departments')
+                ->whereIn('class_id', $classIds)
+                ->whereRaw('LOWER(name) = ?', [strtolower(trim($name))])
+                ->exists();
+
+        if (!$hasClassDepartment) {
+            DB::table('level_departments')->where('id', (int) $department->id)->delete();
+            return;
+        }
+
+        $this->markTemplateInactive('level_departments', (int) $department->id);
+    }
+
+    private function departmentNamesForTemplateClass(array $map, string $level, string $className): array
+    {
+        $rows = is_array($map[$level] ?? null) ? $map[$level] : [];
+        $needle = strtolower(trim($className));
+
+        foreach ($rows as $name => $row) {
+            if (strtolower(trim((string) $name)) !== $needle || !is_array($row)) {
+                continue;
+            }
+
+            if (!($row['enabled'] ?? false)) {
+                return [];
+            }
+
+            return DepartmentTemplateSync::normalizeTemplateNames($row['names'] ?? []);
+        }
+
+        return [];
+    }
+
+    private function templateActiveValues(string $table, bool $active): array
+    {
+        return Schema::hasColumn($table, 'is_template_active')
+            ? ['is_template_active' => $active]
+            : [];
+    }
+
+    private function setModelTemplateActive(object $model, string $table, bool $active): void
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $model->is_template_active = $active;
+        }
+    }
+
+    private function markTemplateInactive(string $table, int $id): void
+    {
+        if (!Schema::hasColumn($table, 'is_template_active')) {
+            return;
+        }
+
+        DB::table($table)->where('id', $id)->update([
+            'is_template_active' => false,
+            'updated_at' => now(),
+        ]);
     }
 
     private function buildDepartmentTemplateMapFromClassTemplates(array $rawTemplates, array $normalizedTemplates): array

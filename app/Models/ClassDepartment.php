@@ -13,6 +13,7 @@ class ClassDepartment extends Model
         'school_id',
         'class_id',
         'name',
+        'is_template_active',
         'class_teacher_user_id',
     ];
 

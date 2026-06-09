@@ -159,10 +159,12 @@ class AcademicSessionController extends Controller
             ->all();
 
         if (empty($levels)) {
-            $levels = SchoolClass::query()
+            $levelsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', $session->id)
-                ->orderBy('id')
+                ->orderBy('id');
+
+            $levels = $this->onlyTemplateActive($levelsQuery, 'classes')
                 ->pluck('level')
                 ->map(fn ($value) => strtolower(trim((string) $value)))
                 ->filter(fn ($value) => $value !== '')
@@ -173,18 +175,21 @@ class AcademicSessionController extends Controller
 
         $data = [];
         foreach ($levels as $level) {
+            $classesQuery = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('level', $level);
+            $departmentsQuery = LevelDepartment::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->where('level', $level);
+
             $data[] = [
                 'level' => $level,
-                'classes' => SchoolClass::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', $session->id)
-                    ->where('level', $level)
+                'classes' => $this->onlyTemplateActive($classesQuery, 'classes')
                     ->orderBy('id')
                     ->get(),
-                'departments' => LevelDepartment::query()
-                    ->where('school_id', $schoolId)
-                    ->where('academic_session_id', $session->id)
-                    ->where('level', $level)
+                'departments' => $this->onlyTemplateActive($departmentsQuery, 'level_departments')
                     ->orderBy('name')
                     ->get(),
             ];
@@ -256,9 +261,11 @@ class AcademicSessionController extends Controller
             ->all();
 
         if (empty($allowedLevels)) {
-            $allowedLevels = SchoolClass::query()
+            $allowedLevelsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
-                ->where('academic_session_id', $session->id)
+                ->where('academic_session_id', $session->id);
+
+            $allowedLevels = $this->onlyTemplateActive($allowedLevelsQuery, 'classes')
                 ->pluck('level')
                 ->map(fn ($value) => strtolower(trim((string) $value)))
                 ->filter(fn ($value) => $value !== '')
@@ -279,12 +286,12 @@ class AcademicSessionController extends Controller
             return response()->json(['message' => 'Department already exists'], 409);
         }
 
-        $department = LevelDepartment::create([
+        $department = LevelDepartment::create(array_merge([
             'school_id' => $schoolId,
             'academic_session_id' => $session->id,
             'level' => $requestedLevel,
             'name' => trim((string) $payload['name']),
-        ]);
+        ], $this->templateActiveValues('level_departments', true)));
 
         return response()->json(['data' => $department], 201);
     }
@@ -694,6 +701,22 @@ class AcademicSessionController extends Controller
         }
 
         return null;
+    }
+
+    private function onlyTemplateActive($query, string $table)
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $query->where($table . '.is_template_active', true);
+        }
+
+        return $query;
+    }
+
+    private function templateActiveValues(string $table, bool $active): array
+    {
+        return Schema::hasColumn($table, 'is_template_active')
+            ? ['is_template_active' => $active]
+            : [];
     }
 
     private function nextClassProgressionRank(?int $currentRank): ?int

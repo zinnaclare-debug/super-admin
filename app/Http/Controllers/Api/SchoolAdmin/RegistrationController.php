@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class RegistrationController extends Controller
 {
@@ -82,6 +83,7 @@ class RegistrationController extends Controller
             $classesQuery->whereRaw('LOWER(level) = ?', [$educationLevel]);
         }
 
+        $this->onlyTemplateActive($classesQuery, 'classes');
         $classes = $classesQuery->get(['id', 'name', 'level', 'academic_session_id']);
 
         return response()->json([
@@ -306,22 +308,16 @@ class RegistrationController extends Controller
         $invalidRows = 0;
 
         foreach ($rows as $index => $row) {
-            $validated = $importType === 'student'
-                ? $this->validateBulkStudentRow(
-                    $school,
-                    $schoolId,
-                    $currentSession,
-                    $row,
-                    $usedUsernames,
-                    $usedEmails
-                )
-                : $this->validateBulkStaffRow(
-                    $school,
-                    $schoolId,
-                    $row,
-                    $usedUsernames,
-                    $usedEmails
-                );
+            $validated = $this->validateBulkRowSafely(
+                $importType,
+                $school,
+                $schoolId,
+                $currentSession,
+                $row,
+                $index + 2,
+                $usedUsernames,
+                $usedEmails
+            );
 
             if ($validated['ok']) {
                 $validRows++;
@@ -420,22 +416,16 @@ class RegistrationController extends Controller
         $invalidRows = 0;
 
         foreach ($rows as $index => $row) {
-            $validated = $importType === 'student'
-                ? $this->validateBulkStudentRow(
-                    $school,
-                    $schoolId,
-                    $currentSession,
-                    $row,
-                    $usedUsernames,
-                    $usedEmails
-                )
-                : $this->validateBulkStaffRow(
-                    $school,
-                    $schoolId,
-                    $row,
-                    $usedUsernames,
-                    $usedEmails
-                );
+            $validated = $this->validateBulkRowSafely(
+                $importType,
+                $school,
+                $schoolId,
+                $currentSession,
+                $row,
+                $index + 2,
+                $usedUsernames,
+                $usedEmails
+            );
 
             $previewRows[] = $this->buildBulkPreviewRow($validated, $index + 2, $importType);
 
@@ -467,83 +457,115 @@ class RegistrationController extends Controller
         $actorUserId = (int) $request->user()->id;
         $createdRows = [];
 
-        DB::transaction(function () use ($schoolId, $actorUserId, $validPayloads, $importType, &$createdRows) {
-            foreach ($validPayloads as $item) {
-                $data = $item['data'];
+        $currentImportRow = null;
+        try {
+            DB::transaction(function () use ($schoolId, $actorUserId, $validPayloads, $importType, &$createdRows, &$currentImportRow) {
+                foreach ($validPayloads as $item) {
+                    $currentImportRow = $item;
+                    $data = $item['data'];
 
-                $user = User::create([
-                    'school_id' => $schoolId,
-                    'name' => $data['name'],
-                    'username' => $data['username'],
-                    'email' => $data['email'],
-                    'password' => Hash::make($data['password']),
-                    'role' => $importType,
-                ]);
-
-                UserCredentialStore::sync($user, $data['password'], $actorUserId);
-
-                if ($importType === 'student') {
-                    $studentPayload = [
-                        'user_id' => $user->id,
+                    $user = User::create([
                         'school_id' => $schoolId,
-                        'sex' => $data['sex'],
-                        'religion' => $data['religion'],
-                        'dob' => $data['dob'],
-                        'address' => $data['address'],
-                    ];
-                    if (Schema::hasColumn('students', 'education_level')) {
-                        $studentPayload['education_level'] = $data['education_level'];
-                    }
+                        'name' => $data['name'],
+                        'username' => $data['username'],
+                        'email' => $data['email'],
+                        'password' => Hash::make($data['password']),
+                        'role' => $importType,
+                    ]);
 
-                    $student = Student::create($studentPayload);
-                    $class = SchoolClass::query()
-                        ->where('school_id', $schoolId)
-                        ->where('id', (int) $data['class_id'])
-                        ->firstOrFail();
-                    $this->enrollStudentInClassSession(
-                        $schoolId,
-                        $student,
-                        $class,
-                        $data['session_term_ids'],
-                        $data['department_id']
-                    );
+                    UserCredentialStore::sync($user, $data['password'], $actorUserId);
 
-                    if (!empty($data['guardian_name'])) {
-                        Guardian::create([
-                            'school_id' => $schoolId,
+                    if ($importType === 'student') {
+                        $studentPayload = [
                             'user_id' => $user->id,
-                            'name' => $data['guardian_name'],
-                            'email' => $data['guardian_email'],
-                            'mobile' => $data['guardian_mobile'],
-                            'location' => $data['guardian_location'],
-                            'state_of_origin' => $data['guardian_state_of_origin'],
-                            'occupation' => $data['guardian_occupation'],
-                            'relationship' => $data['guardian_relationship'],
+                            'school_id' => $schoolId,
+                            'sex' => $data['sex'],
+                            'religion' => $data['religion'],
+                            'dob' => $data['dob'],
+                            'address' => $data['address'],
+                        ];
+                        if (Schema::hasColumn('students', 'education_level')) {
+                            $studentPayload['education_level'] = $data['education_level'];
+                        }
+
+                        $student = Student::create($studentPayload);
+                        $class = SchoolClass::query()
+                            ->where('school_id', $schoolId)
+                            ->where('id', (int) $data['class_id'])
+                            ->firstOrFail();
+                        $this->enrollStudentInClassSession(
+                            $schoolId,
+                            $student,
+                            $class,
+                            $data['session_term_ids'],
+                            $data['department_id']
+                        );
+
+                        if (!empty($data['guardian_name'])) {
+                            Guardian::create([
+                                'school_id' => $schoolId,
+                                'user_id' => $user->id,
+                                'name' => $data['guardian_name'],
+                                'email' => $data['guardian_email'],
+                                'mobile' => $data['guardian_mobile'],
+                                'location' => $data['guardian_location'],
+                                'state_of_origin' => $data['guardian_state_of_origin'],
+                                'occupation' => $data['guardian_occupation'],
+                                'relationship' => $data['guardian_relationship'],
+                            ]);
+                        }
+                    } else {
+                        Staff::create([
+                            'user_id' => $user->id,
+                            'school_id' => $schoolId,
+                            'sex' => $data['sex'],
+                            'dob' => $data['dob'],
+                            'address' => $data['address'],
+                            'position' => $data['staff_position'],
+                            'education_level' => $data['education_level'],
                         ]);
                     }
-                } else {
-                    Staff::create([
-                        'user_id' => $user->id,
-                        'school_id' => $schoolId,
-                        'sex' => $data['sex'],
-                        'dob' => $data['dob'],
-                        'address' => $data['address'],
-                        'position' => $data['staff_position'],
-                        'education_level' => $data['education_level'],
-                    ]);
-                }
 
-                $createdRows[] = [
-                    'row_number' => $item['row_number'],
-                    'name' => $data['name'],
-                    'username' => $data['username'],
-                    'password' => $data['password'],
-                    'class_name' => $data['class_name'] ?? null,
-                    'department_name' => $data['department_name'] ?? null,
-                    'staff_position' => $data['staff_position'] ?? null,
-                ];
-            }
-        });
+                    $createdRows[] = [
+                        'row_number' => $item['row_number'],
+                        'name' => $data['name'],
+                        'username' => $data['username'],
+                        'password' => $data['password'],
+                        'class_name' => $data['class_name'] ?? null,
+                        'department_name' => $data['department_name'] ?? null,
+                        'staff_position' => $data['staff_position'] ?? null,
+                    ];
+                }
+            });
+        } catch (Throwable $exception) {
+            $rowNumber = (int) ($currentImportRow['row_number'] ?? 0);
+            $rowName = trim((string) data_get($currentImportRow, 'data.name', ''));
+            $label = $rowNumber > 0
+                ? 'Row ' . $rowNumber . ($rowName !== '' ? " ({$rowName})" : '')
+                : 'Bulk import';
+
+            return response()->json([
+                'message' => $label . ': ' . $this->friendlyBulkExceptionMessage($exception),
+                'data' => [
+                    'import_type' => $importType,
+                    'failed_row' => $rowNumber ?: null,
+                    'rows' => $rowNumber > 0 ? [[
+                        'row_number' => $rowNumber,
+                        'status' => 'invalid',
+                        'errors' => [$this->friendlyBulkExceptionMessage($exception)],
+                        'data' => [
+                            'name' => data_get($currentImportRow, 'data.name'),
+                            'email' => data_get($currentImportRow, 'data.email'),
+                            'username' => data_get($currentImportRow, 'data.username'),
+                            'education_level' => data_get($currentImportRow, 'data.education_level'),
+                            'class_name' => data_get($currentImportRow, 'data.class_name'),
+                            'department_name' => data_get($currentImportRow, 'data.department_name'),
+                            'staff_position' => data_get($currentImportRow, 'data.staff_position'),
+                        ],
+                    ]] : [],
+                ],
+            ], 422);
+        }
 
         $message = $importType === 'student'
             ? 'Bulk student registration completed successfully.'
@@ -736,6 +758,52 @@ class RegistrationController extends Controller
         return $row;
     }
 
+    private function validateBulkRowSafely(
+        string $importType,
+        School $school,
+        int $schoolId,
+        ?AcademicSession $currentSession,
+        array $row,
+        int $rowNumber,
+        array &$usedUsernames,
+        array &$usedEmails
+    ): array {
+        try {
+            return $importType === 'student'
+                ? $this->validateBulkStudentRow(
+                    $school,
+                    $schoolId,
+                    $currentSession,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                )
+                : $this->validateBulkStaffRow(
+                    $school,
+                    $schoolId,
+                    $row,
+                    $usedUsernames,
+                    $usedEmails
+                );
+        } catch (Throwable $exception) {
+            return [
+                'ok' => false,
+                'errors' => [
+                    "Row {$rowNumber} could not be checked: " . $this->friendlyBulkExceptionMessage($exception),
+                ],
+                'data' => [
+                    'name' => $this->csvValue($row, ['name', 'full_name', 'student_name', 'staff_name']),
+                    'email' => $this->csvValue($row, ['email', 'student_email', 'staff_email']),
+                    'username' => $this->csvValue($row, ['username', 'user_name', 'login_username']),
+                    'education_level' => $this->normalizeEducationLevel($this->csvValue($row, ['education_level', 'level'])),
+                    'class_name' => $this->csvValue($row, ['class_name', 'class']),
+                    'department_name' => $this->csvValue($row, ['department_name', 'department']),
+                    'staff_position' => $this->csvValue($row, ['staff_position', 'position']),
+                ],
+            ];
+        }
+    }
+
     private function parseBulkCsv(UploadedFile $file, string $importType): array
     {
         $path = $file->getRealPath();
@@ -882,6 +950,7 @@ class RegistrationController extends Controller
             $classQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', (int) $currentSession->id);
+            $this->onlyTemplateActive($classQuery, 'classes');
 
             if ($classIdInput !== null) {
                 if (!ctype_digit($classIdInput)) {
@@ -900,7 +969,14 @@ class RegistrationController extends Controller
             }
 
             if (!$class && ($classIdInput !== null || $classNameInput !== null)) {
-                $errors[] = 'Class not found in current session.';
+                $availableClasses = $currentSession
+                    ? $this->availableClassNamesForSession($schoolId, (int) $currentSession->id)
+                    : [];
+                $classInput = $classNameInput ?? $classIdInput ?? '';
+                $errors[] = 'Class "' . $classInput . '" was not found in current session '
+                    . '"' . ($currentSession?->session_name ?? $currentSession?->academic_year ?? 'selected session') . '". '
+                    . 'Check the spelling/capitalization.'
+                    . (!empty($availableClasses) ? ' Available classes: ' . $this->formatBulkList($availableClasses) . '.' : '');
             }
         }
 
@@ -911,12 +987,13 @@ class RegistrationController extends Controller
         if ($class) {
             $classLevel = $this->normalizeEducationLevel((string) $class->level);
             if ($educationLevel !== null && $educationLevel !== $classLevel) {
-                $errors[] = 'Education level does not match selected class level.';
+                $errors[] = 'Education level "' . $educationLevel . '" does not match selected class level "'
+                    . $classLevel . '". Use the level that belongs to the class, or leave education_level blank.';
             }
             $educationLevel = $classLevel;
 
             if (!$this->isValidEducationLevel($schoolId, $educationLevel)) {
-                $errors[] = 'Education level is invalid.';
+                $errors[] = $this->invalidEducationLevelMessage($school, $educationLevel);
             }
 
             $sessionTermIds = Term::query()
@@ -956,7 +1033,9 @@ class RegistrationController extends Controller
                         fn ($department) => strtolower((string) $department->name) === strtolower($departmentNameInput)
                     );
                     if (!$resolved) {
-                        $errors[] = 'Department name is invalid for selected class.';
+                        $errors[] = 'Department "' . $departmentNameInput . '" is invalid for selected class "'
+                            . $class->name . '". Available departments: '
+                            . $this->formatBulkList($classDepartments->pluck('name')->all()) . '.';
                     } else {
                         $departmentId = (int) $resolved->id;
                         $departmentName = (string) $resolved->name;
@@ -1094,7 +1173,7 @@ class RegistrationController extends Controller
 
         $educationLevel = $this->normalizeEducationLevel($this->csvValue($row, ['education_level', 'level']));
         if ($educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
-            $errors[] = 'Education level is invalid.';
+            $errors[] = $this->invalidEducationLevelMessage($school, $educationLevel);
         }
 
         $username = $this->csvValue($row, ['username', 'user_name', 'login_username']);
@@ -1360,9 +1439,11 @@ class RegistrationController extends Controller
         ?int $departmentId,
         ?string $educationLevel
     ): array {
-        $class = SchoolClass::query()
+        $classQuery = SchoolClass::query()
             ->where('school_id', $schoolId)
-            ->where('id', $classId)
+            ->where('id', $classId);
+
+        $class = $this->onlyTemplateActive($classQuery, 'classes')
             ->first();
 
         if (!$class) {
@@ -1542,9 +1623,12 @@ class RegistrationController extends Controller
             return collect();
         }
 
-        return ClassDepartment::query()
+        $departmentsQuery = ClassDepartment::query()
             ->where('school_id', $schoolId)
-            ->where('class_id', $class->id)
+            ->where('class_id', $class->id);
+        $this->onlyTemplateActive($departmentsQuery, 'class_departments');
+
+        return $departmentsQuery
             ->orderBy('name')
             ->get(['id', 'name'])
             ->filter(fn ($department) => in_array(
@@ -1577,11 +1661,13 @@ class RegistrationController extends Controller
             if ($departmentName === '') {
                 continue;
             }
-            ClassDepartment::firstOrCreate([
+            $department = ClassDepartment::firstOrCreate([
                 'school_id' => $schoolId,
                 'class_id' => $class->id,
                 'name' => $departmentName,
             ]);
+            $this->setModelTemplateActive($department, 'class_departments', true);
+            $department->save();
         }
 
         return $templateNames;
@@ -1650,6 +1736,18 @@ class RegistrationController extends Controller
         return $normalized !== '' ? $normalized : null;
     }
 
+    private function invalidEducationLevelMessage(?School $school, ?string $level): string
+    {
+        $accepted = $this->activeEducationLevelKeys($school);
+        $message = 'Education level "' . ($level ?: 'blank') . '" is invalid or misspelled.';
+
+        if (!empty($accepted)) {
+            $message .= ' Use one of: ' . $this->formatBulkList($accepted) . '.';
+        }
+
+        return $message;
+    }
+
     private function activeEducationLevelKeys(?School $school): array
     {
         if (!$school) {
@@ -1659,6 +1757,70 @@ class RegistrationController extends Controller
         return ClassTemplateSchema::activeLevelKeys(
             ClassTemplateSchema::normalize($school->class_templates)
         );
+    }
+
+    private function availableClassNamesForSession(int $schoolId, int $sessionId): array
+    {
+        $query = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->orderBy('level')
+            ->orderBy('name');
+
+        return $this->onlyTemplateActive($query, 'classes')
+            ->pluck('name')
+            ->map(fn ($name) => (string) $name)
+            ->values()
+            ->all();
+    }
+
+    private function formatBulkList(array $items, int $limit = 12): string
+    {
+        $values = collect($items)
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->unique(fn ($item) => strtolower($item))
+            ->values();
+
+        $shown = $values->take($limit)->all();
+        $suffix = $values->count() > $limit ? ', and ' . ($values->count() - $limit) . ' more' : '';
+
+        return implode(', ', $shown) . $suffix;
+    }
+
+    private function friendlyBulkExceptionMessage(Throwable $exception): string
+    {
+        if ($exception instanceof ValidationException) {
+            $first = collect($exception->errors())->flatten()->first();
+            if ($first) {
+                return (string) $first;
+            }
+        }
+
+        $message = $exception->getMessage();
+        $lowerMessage = strtolower($message);
+
+        if (str_contains($lowerMessage, 'duplicate') || str_contains($lowerMessage, 'integrity constraint')) {
+            if (str_contains($lowerMessage, 'email')) {
+                return 'Email already exists. Change the email in this row and try again.';
+            }
+            if (str_contains($lowerMessage, 'username')) {
+                return 'Username already exists. Change the username in this row and try again.';
+            }
+
+            return 'Duplicate value found. Check username, email, admission number, or other unique fields in this row.';
+        }
+
+        if (str_contains($lowerMessage, 'no query results')) {
+            return 'A referenced record was not found. Check class, department, session, or term spelling in this row.';
+        }
+
+        if (str_contains($lowerMessage, 'foreign key')) {
+            return 'A related record is missing. Check class, department, session, or term values in this row.';
+        }
+
+        return 'Unable to process this row. Check spelling, required fields, and duplicate username/email. Technical detail: '
+            . Str::limit($message, 180);
     }
 
     private function exampleClassNameForLevel(?School $school, string $level): string
@@ -1672,11 +1834,13 @@ class RegistrationController extends Controller
                 ->value('id');
 
             if ($currentSessionId) {
-                $currentClassName = SchoolClass::query()
+                $currentClassQuery = SchoolClass::query()
                     ->where('school_id', (int) $school->id)
                     ->where('academic_session_id', (int) $currentSessionId)
                     ->whereRaw('LOWER(level) = ?', [$level])
-                    ->orderBy('id')
+                    ->orderBy('id');
+
+                $currentClassName = $this->onlyTemplateActive($currentClassQuery, 'classes')
                     ->value('name');
 
                 if ($currentClassName) {
@@ -1713,9 +1877,11 @@ class RegistrationController extends Controller
             return false;
         }
 
-        $existsInClasses = SchoolClass::query()
+        $existsQuery = SchoolClass::query()
             ->where('school_id', $schoolId)
-            ->whereRaw('LOWER(level) = ?', [$normalizedLevel])
+            ->whereRaw('LOWER(level) = ?', [$normalizedLevel]);
+
+        $existsInClasses = $this->onlyTemplateActive($existsQuery, 'classes')
             ->exists();
         if ($existsInClasses) {
             return true;
@@ -1745,6 +1911,20 @@ class RegistrationController extends Controller
             ? $relativeOrAbsolute
             : url($relativeOrAbsolute);
     }
+
+    private function onlyTemplateActive($query, string $table)
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $query->where($table . '.is_template_active', true);
+        }
+
+        return $query;
+    }
+
+    private function setModelTemplateActive(object $model, string $table, bool $active): void
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $model->is_template_active = $active;
+        }
+    }
 }
-
-

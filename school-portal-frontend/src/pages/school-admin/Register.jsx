@@ -28,6 +28,18 @@ const parseFileName = (headers, fallback = "student_bulk_template.csv") => {
   return plainMatch?.[1] || fallback;
 };
 
+const bulkUploadErrorMessage = (err, fallback) => {
+  const base = err?.response?.data?.message || err.message || fallback;
+  const rows = Array.isArray(err?.response?.data?.data?.rows) ? err.response.data.data.rows : [];
+  const firstInvalid = rows.find((row) => Array.isArray(row.errors) && row.errors.length > 0);
+
+  if (!firstInvalid) {
+    return base;
+  }
+
+  return `${base}\n\nFirst error: Row ${firstInvalid.row_number}: ${firstInvalid.errors.join("; ")}`;
+};
+
 export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -489,7 +501,7 @@ export default function Register() {
       if (responseData) {
         setBulkPreviewData(responseData);
       }
-      alert(err?.response?.data?.message || err.message || "Bulk preview failed");
+      alert(bulkUploadErrorMessage(err, "Bulk preview failed"));
     } finally {
       setBulkPreviewing(false);
     }
@@ -537,7 +549,7 @@ export default function Register() {
       if (responseData) {
         setBulkPreviewData(responseData);
       }
-      alert(err?.response?.data?.message || err.message || "Bulk import failed");
+      alert(bulkUploadErrorMessage(err, "Bulk import failed"));
     } finally {
       setBulkImporting(false);
     }

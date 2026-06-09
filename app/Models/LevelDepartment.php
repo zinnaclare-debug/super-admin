@@ -11,5 +11,6 @@ class LevelDepartment extends Model
         'academic_session_id',
         'level',
         'name',
+        'is_template_active',
     ];
 }
