@@ -168,9 +168,6 @@ export default function AcademicSessionDetails() {
             ))}
           </div>
 
-          <div className="payx-state payx-state--warn">
-            Department creation and updates are managed from <strong>Super Admin - School Information</strong>.
-          </div>
         </>
       )}
     </AcademicPageShell>

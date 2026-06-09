@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncSchoolClassTemplatesJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -508,9 +509,7 @@ class SchoolController extends Controller
         DB::transaction(function () use (
             $school,
             $normalized,
-            $departmentTemplateMapByClass,
-            $previousTemplates,
-            $previousDepartmentTemplateMapByClass
+            $departmentTemplateMapByClass
         ) {
             $school->class_templates = $normalized;
             $school->department_templates = DepartmentTemplateSync::serializeClassTemplateMap(
@@ -518,22 +517,22 @@ class SchoolController extends Controller
                 $normalized
             );
             $school->save();
-
-            $this->syncClassTemplatesToExistingSessions(
-                $school,
-                $normalized,
-                $departmentTemplateMapByClass,
-                $previousTemplates,
-                $previousDepartmentTemplateMapByClass
-            );
         });
+
+        SyncSchoolClassTemplatesJob::dispatch(
+            (int) $school->id,
+            $normalized,
+            $departmentTemplateMapByClass,
+            $previousTemplates,
+            $previousDepartmentTemplateMapByClass
+        );
 
         $departmentTemplateMapByLevel = DepartmentTemplateSync::normalizeLevelTemplateMap([
             'by_class' => $departmentTemplateMapByClass,
         ]);
 
         return response()->json([
-            'message' => 'Class templates saved successfully.',
+            'message' => 'Class templates saved successfully. Existing sessions are syncing in the background.',
             'data' => $this->attachDepartmentTemplatesToClassTemplates($normalized, $departmentTemplateMapByClass),
             'department_templates_by_class' => $departmentTemplateMapByClass,
             'department_templates_by_level' => $departmentTemplateMapByLevel,
@@ -723,7 +722,7 @@ class SchoolController extends Controller
             : url($relativeOrAbsolute);
     }
 
-    private function syncClassTemplatesToExistingSessions(
+    public function syncClassTemplatesToExistingSessions(
         School $school,
         array $templates,
         ?array $departmentTemplateMapByClass = null,
@@ -788,6 +787,12 @@ class SchoolController extends Controller
                 }
             }
 
+            $this->deactivateClassesOutsideCurrentTemplate($schoolId, (int) $session->id, $newRowsByLevel);
+            $this->deactivateLevelDepartmentsOutsideCurrentTemplate(
+                $schoolId,
+                (int) $session->id,
+                $departmentTemplateMapByClass
+            );
             $this->removeUncheckedTemplateRows(
                 $schoolId,
                 (int) $session->id,
@@ -929,6 +934,8 @@ class SchoolController extends Controller
             $this->deleteClassDepartmentIfUnused($schoolId, (int) $class->id, $previousName);
             $this->deleteLevelDepartmentIfUnused($schoolId, $sessionId, $level, $previousName);
         }
+
+        $this->deactivateClassDepartmentsOutsideTemplate($schoolId, (int) $class->id, $newNames);
     }
 
     private function syncLevelDepartmentRow(
@@ -1104,6 +1111,119 @@ class SchoolController extends Controller
 
                 $class->delete();
             }
+        }
+    }
+
+    private function deactivateClassesOutsideCurrentTemplate(int $schoolId, int $sessionId, array $newRowsByLevel): void
+    {
+        if (!Schema::hasColumn('classes', 'is_template_active')) {
+            return;
+        }
+
+        foreach ($newRowsByLevel as $level => $rows) {
+            $activeNames = collect($rows)
+                ->filter(fn (array $row) => (bool) ($row['enabled'] ?? false))
+                ->map(fn (array $row) => strtolower(trim((string) ($row['name'] ?? ''))))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $classes = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $sessionId)
+                ->where('level', $level)
+                ->get(['id', 'name']);
+
+            foreach ($classes as $class) {
+                $className = strtolower(trim((string) $class->name));
+                if (in_array($className, $activeNames, true)) {
+                    continue;
+                }
+
+                $this->markTemplateInactive('classes', (int) $class->id);
+                $this->deactivateAllClassDepartments($schoolId, (int) $class->id);
+            }
+        }
+    }
+
+    private function deactivateClassDepartmentsOutsideTemplate(int $schoolId, int $classId, array $activeNames): void
+    {
+        if (!Schema::hasColumn('class_departments', 'is_template_active')) {
+            return;
+        }
+
+        $activeNames = collect($activeNames)
+            ->map(fn ($name) => strtolower(trim((string) $name)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->get(['id', 'name'])
+            ->each(function ($department) use ($activeNames) {
+                if (in_array(strtolower(trim((string) $department->name)), $activeNames, true)) {
+                    return;
+                }
+
+                $this->markTemplateInactive('class_departments', (int) $department->id);
+            });
+    }
+
+    private function deactivateAllClassDepartments(int $schoolId, int $classId): void
+    {
+        if (!Schema::hasColumn('class_departments', 'is_template_active')) {
+            return;
+        }
+
+        DB::table('class_departments')
+            ->where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->update([
+                'is_template_active' => false,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function deactivateLevelDepartmentsOutsideCurrentTemplate(
+        int $schoolId,
+        int $sessionId,
+        array $departmentTemplateMapByClass
+    ): void {
+        if (!Schema::hasColumn('level_departments', 'is_template_active')) {
+            return;
+        }
+
+        foreach ($departmentTemplateMapByClass as $level => $classRows) {
+            $activeNames = collect(is_array($classRows) ? $classRows : [])
+                ->flatMap(function ($row) {
+                    if (!is_array($row) || !($row['enabled'] ?? false)) {
+                        return [];
+                    }
+
+                    return $row['names'] ?? [];
+                })
+                ->map(fn ($name) => strtolower(trim((string) $name)))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            DB::table('level_departments')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $sessionId)
+                ->where('level', $level)
+                ->get(['id', 'name'])
+                ->each(function ($department) use ($activeNames) {
+                    if (in_array(strtolower(trim((string) $department->name)), $activeNames, true)) {
+                        return;
+                    }
+
+                    $this->markTemplateInactive('level_departments', (int) $department->id);
+                });
         }
     }
 
