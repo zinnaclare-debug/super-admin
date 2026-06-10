@@ -126,12 +126,12 @@ export default function Register() {
 
   useEffect(() => {
     if (!educationLevels.length) {
-      setBulkTemplateLevel("");
+      setBulkTemplateLevel("all");
       return;
     }
 
     setBulkTemplateLevel((current) =>
-      current && educationLevels.includes(current) ? current : educationLevels[0]
+      current === "all" || educationLevels.includes(current) ? current : "all"
     );
   }, [educationLevels]);
 
@@ -460,7 +460,7 @@ export default function Register() {
       const res = await api.get("/api/school-admin/register/bulk/template", {
         params: {
           import_type: bulkImportType,
-          education_level: bulkTemplateLevel || undefined,
+          education_level: bulkTemplateLevel && bulkTemplateLevel !== "all" ? bulkTemplateLevel : undefined,
         },
         responseType: "blob",
       });
@@ -875,20 +875,21 @@ export default function Register() {
 
               {educationLevels.length > 0 && (
                 <label style={{ display: "grid", gap: 6 }}>
-                  <span>Template Education Level</span>
+                  <span>Template Scope</span>
                   <select
                     value={bulkTemplateLevel}
                     onChange={(e) => setBulkTemplateLevel(e.target.value)}
                     style={{ width: "100%" }}
                   >
+                    <option value="all">All active levels in one CSV</option>
                     {educationLevels.map((level) => (
                       <option key={level} value={level}>
-                        {prettyLevel(level)} ({level})
+                        Only {prettyLevel(level)} ({level})
                       </option>
                     ))}
                   </select>
                   <small style={{ opacity: 0.75 }}>
-                    The CSV will use this exact education_level value.
+                    Use all levels to upload creche, primary, secondary, and other enabled levels together.
                   </small>
                 </label>
               )}

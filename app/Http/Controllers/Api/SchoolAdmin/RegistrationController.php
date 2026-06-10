@@ -235,9 +235,14 @@ class RegistrationController extends Controller
         $importType = $payload['import_type'] ?? 'student';
         $school = $request->user()->school;
         $activeLevels = $this->activeEducationLevelKeys($school);
-        $templateLevel = $this->normalizeEducationLevel($payload['education_level'] ?? null);
+        $requestedLevel = strtolower(trim((string) ($payload['education_level'] ?? '')));
+        $mixedLevelTemplate = $requestedLevel === ''
+            || in_array($requestedLevel, ['all', 'all_levels', 'mixed'], true);
+        $templateLevel = $mixedLevelTemplate
+            ? null
+            : $this->normalizeEducationLevel($payload['education_level'] ?? null);
 
-        if ($templateLevel !== null && !in_array($templateLevel, $activeLevels, true)) {
+        if (!$mixedLevelTemplate && $templateLevel !== null && !in_array($templateLevel, $activeLevels, true)) {
             throw ValidationException::withMessages([
                 'education_level' => [
                     'Education level is not enabled for this school. Use one of: '
@@ -246,14 +251,21 @@ class RegistrationController extends Controller
             ]);
         }
 
-        $templateLevel = $templateLevel ?: ($activeLevels[0] ?? 'primary');
-        $exampleClassName = $this->exampleClassNameForLevel($school, $templateLevel);
+        $templateLevels = $mixedLevelTemplate
+            ? ($activeLevels ?: ['primary'])
+            : [$templateLevel ?: ($activeLevels[0] ?? 'primary')];
 
-        ['headers' => $headers, 'example' => $example, 'filename' => $filename] = $this->bulkTemplateDefinition(
+        $exampleClassNames = [];
+        foreach ($templateLevels as $level) {
+            $exampleClassNames[$level] = $this->exampleClassNameForLevel($school, $level);
+        }
+
+        ['headers' => $headers, 'examples' => $examples, 'filename' => $filename] = $this->bulkTemplateDefinition(
             $importType,
-            $templateLevel,
+            $templateLevels,
             $activeLevels,
-            $exampleClassName
+            $exampleClassNames,
+            $mixedLevelTemplate
         );
 
         $encode = fn (array $row) => implode(',', array_map(function ($value) {
@@ -262,7 +274,9 @@ class RegistrationController extends Controller
             return "\"{$escaped}\"";
         }, $row));
 
-        $csv = $encode($headers) . "\n" . $encode($example) . "\n";
+        $csv = $encode($headers) . "\n" . collect($examples)
+            ->map(fn (array $example) => $encode($example))
+            ->implode("\n") . "\n";
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -645,13 +659,20 @@ class RegistrationController extends Controller
 
     private function bulkTemplateDefinition(
         string $importType,
-        string $templateLevel,
+        array $templateLevels,
         array $activeLevels,
-        string $exampleClassName
+        array $exampleClassNames,
+        bool $mixedLevelTemplate
     ): array
     {
-        $acceptedLevels = implode(' | ', $activeLevels ?: [$templateLevel]);
-        $templateLevelForFile = preg_replace('/[^a-z0-9_]+/i', '_', $templateLevel) ?: 'level';
+        $firstLevel = $templateLevels[0] ?? ($activeLevels[0] ?? 'primary');
+        $acceptedLevels = implode(' | ', $activeLevels ?: $templateLevels ?: [$firstLevel]);
+        $templateLevelForFile = $mixedLevelTemplate
+            ? 'all_levels'
+            : (preg_replace('/[^a-z0-9_]+/i', '_', $firstLevel) ?: 'level');
+        $templateNote = $mixedLevelTemplate
+            ? 'You can mix enabled education levels in one file. Each row must use its own exact education_level and class_name/class_id from the current session.'
+            : 'Use the exact education_level value shown in this template.';
 
         if ($importType === 'staff') {
             return [
@@ -668,19 +689,19 @@ class RegistrationController extends Controller
                     'accepted_education_levels',
                     'template_note',
                 ],
-                'example' => [
-                    'Samuel Adeyemi',
-                    'samuel.ade@example.com',
+                'examples' => collect($templateLevels)->map(fn (string $level, int $index) => [
+                    $index === 0 ? 'Samuel Adeyemi' : 'Teacher ' . ucwords(str_replace('_', ' ', $level)),
+                    $index === 0 ? 'samuel.ade@example.com' : 'teacher.' . str_replace('_', '.', $level) . '@example.com',
                     'Pass1234',
                     '',
-                    $templateLevel,
-                    'Mathematics Teacher',
+                    $level,
+                    $level === 'secondary' ? 'Mathematics Teacher' : 'Class Teacher',
                     'M',
                     '1990-08-12',
                     '12 School Road',
                     $acceptedLevels,
-                    'Use the exact education_level value shown in this template.',
-                ],
+                    $templateNote,
+                ])->values()->all(),
                 'filename' => "staff_bulk_template_{$templateLevelForFile}.csv",
             ];
         }
@@ -708,14 +729,14 @@ class RegistrationController extends Controller
                 'accepted_education_levels',
                 'template_note',
             ],
-            'example' => [
-                'Amina Yusuf',
-                'amina@example.com',
+            'examples' => collect($templateLevels)->map(fn (string $level, int $index) => [
+                $index === 0 ? 'Amina Yusuf' : 'Student ' . ucwords(str_replace('_', ' ', $level)),
+                $index === 0 ? 'amina@example.com' : 'student.' . str_replace('_', '.', $level) . '@example.com',
                 'Pass1234',
                 '',
-                $templateLevel,
-                $exampleClassName,
-                $templateLevel === 'secondary' ? 'Science' : '',
+                $level,
+                $exampleClassNames[$level] ?? $this->exampleClassNameForLevel(null, $level),
+                $level === 'secondary' ? 'Science' : '',
                 'F',
                 'Islam',
                 '2012-01-15',
@@ -728,8 +749,8 @@ class RegistrationController extends Controller
                 'Trader',
                 'mother',
                 $acceptedLevels,
-                'Use the exact education_level value shown in this template.',
-            ],
+                $templateNote,
+            ])->values()->all(),
             'filename' => "student_bulk_template_{$templateLevelForFile}.csv",
         ];
     }
@@ -941,6 +962,10 @@ class RegistrationController extends Controller
         }
 
         $educationLevel = $this->normalizeEducationLevel($this->csvValue($row, ['education_level', 'level']));
+        $educationLevelInvalid = $educationLevel !== null && !$this->isValidEducationLevel($schoolId, $educationLevel);
+        if ($educationLevelInvalid) {
+            $errors[] = $this->invalidEducationLevelMessage($school, $educationLevel);
+        }
 
         $classIdInput = $this->csvValue($row, ['class_id']);
         $classNameInput = $this->csvValue($row, ['class_name', 'class']);
@@ -961,7 +986,12 @@ class RegistrationController extends Controller
                         ->first();
                 }
             } elseif ($classNameInput !== null) {
-                $class = (clone $classQuery)
+                $classLookupQuery = clone $classQuery;
+                if ($educationLevel !== null && !$educationLevelInvalid) {
+                    $classLookupQuery->whereRaw('LOWER(level) = ?', [$educationLevel]);
+                }
+
+                $class = $classLookupQuery
                     ->whereRaw('LOWER(name) = ?', [strtolower($classNameInput)])
                     ->first();
             } else {
@@ -992,7 +1022,7 @@ class RegistrationController extends Controller
             }
             $educationLevel = $classLevel;
 
-            if (!$this->isValidEducationLevel($schoolId, $educationLevel)) {
+            if (!$educationLevelInvalid && !$this->isValidEducationLevel($schoolId, $educationLevel)) {
                 $errors[] = $this->invalidEducationLevelMessage($school, $educationLevel);
             }
 
