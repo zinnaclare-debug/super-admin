@@ -7,12 +7,14 @@ use App\Models\AcademicSession;
 use App\Models\CbtExam;
 use App\Models\CbtExamQuestion;
 use App\Models\Enrollment;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\StudentSubjectExclusion;
 use App\Models\Term;
 use App\Models\Subject;
 use App\Models\TermSubject;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,7 @@ class AcademicsController extends Controller
     public function index(Request $request)
     {
         $schoolId = $request->user()->school_id;
+        $school = School::query()->find($schoolId);
 
         $session = AcademicSession::where('school_id', $schoolId)
             ->where('status', 'current')
@@ -39,7 +42,33 @@ class AcademicsController extends Controller
             ], 200);
         }
 
-        $activeLevels = collect((array) ($session->levels ?? []))
+        $templateSections = ClassTemplateSchema::activeSections(
+            ClassTemplateSchema::normalize($school?->class_templates)
+        );
+        $activeLevels = collect($templateSections)
+            ->map(fn (array $section) => strtolower(trim((string) ($section['key'] ?? ''))))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $activeTemplateClassNamesByLevel = collect($templateSections)
+            ->mapWithKeys(function (array $section) {
+                $level = strtolower(trim((string) ($section['key'] ?? '')));
+
+                return [
+                    $level => collect(ClassTemplateSchema::activeClassNames($section))
+                        ->map(fn ($name) => strtolower(trim((string) $name)))
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->filter(fn (array $names, string $level) => $level !== '' && !empty($names))
+            ->all();
+
+        if (empty($activeLevels)) {
+            $activeLevels = collect((array) ($session->levels ?? []))
             ->map(function ($item) {
                 if (is_array($item)) {
                     return isset($item['level']) ? strtolower($item['level']) : null;
@@ -50,11 +79,14 @@ class AcademicsController extends Controller
             ->unique()
             ->values()
             ->toArray();
+        }
 
         if (empty($activeLevels)) {
-            $activeLevels = SchoolClass::query()
+            $activeLevelsQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
-                ->where('academic_session_id', $session->id)
+                ->where('academic_session_id', $session->id);
+
+            $activeLevels = $this->onlyTemplateActive($activeLevelsQuery, 'classes')
                 ->pluck('level')
                 ->map(fn ($level) => strtolower(trim((string) $level)))
                 ->filter()
@@ -72,7 +104,19 @@ class AcademicsController extends Controller
             $classesQuery->whereIn('level', $activeLevels);
         }
 
-        $classes = $classesQuery->get();
+        $classes = $this->onlyTemplateActive($classesQuery, 'classes')
+            ->get()
+            ->filter(function (SchoolClass $class) use ($activeTemplateClassNamesByLevel) {
+                if (empty($activeTemplateClassNamesByLevel)) {
+                    return true;
+                }
+
+                $level = strtolower(trim((string) $class->level));
+                $name = strtolower(trim((string) $class->name));
+
+                return in_array($name, $activeTemplateClassNamesByLevel[$level] ?? [], true);
+            })
+            ->values();
 
         return response()->json([
             'data' => [
@@ -264,6 +308,15 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
                 'code' => $subject->code,
             ],
         ]);
+    }
+
+    private function onlyTemplateActive($query, string $table)
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $query->where($table . '.is_template_active', true);
+        }
+
+        return $query;
     }
 
     /**

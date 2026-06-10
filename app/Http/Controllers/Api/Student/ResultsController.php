@@ -138,6 +138,72 @@ class ResultsController extends Controller
             ->all();
     }
 
+    private function resultPeriodIsOpen(?School $school, AcademicSession $session, Term $term): bool
+    {
+        if ((string) $session->status !== 'current') {
+            return true;
+        }
+
+        if (Schema::hasColumn('terms', 'is_current') && !(bool) ($term->is_current ?? false)) {
+            return true;
+        }
+
+        return (bool) ($school?->results_published);
+    }
+
+    private function resultLockedMessage(AcademicSession $session, Term $term): string
+    {
+        return (string) $session->status === 'current' && (bool) ($term->is_current ?? false)
+            ? 'Current term result has not been published yet. Please check back after Super Admin publishes it.'
+            : 'This result is not available yet.';
+    }
+
+    private function resolveStudentResultSelection(User $user, int $classId, int $termId): array
+    {
+        $schoolId = (int) $user->school_id;
+        $school = $user->school ?: $user->school()->first();
+
+        $student = Student::where('user_id', $user->id)
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$student) {
+            throw new \RuntimeException('Student record not found.');
+        }
+
+        $term = Term::where('id', $termId)
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$term) {
+            throw new \RuntimeException('Term not found.');
+        }
+
+        $session = AcademicSession::where('id', (int) $term->academic_session_id)
+            ->where('school_id', $schoolId)
+            ->first();
+        if (!$session) {
+            throw new \RuntimeException('Academic session not found.');
+        }
+
+        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+        if (!in_array($classId, $classIds, true)) {
+            throw new \RuntimeException('You are not enrolled in the selected class for this session.');
+        }
+
+        $class = SchoolClass::where('id', $classId)
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', (int) $session->id)
+            ->first();
+        if (!$class) {
+            throw new \RuntimeException('Class not found.');
+        }
+
+        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
+            throw new \RuntimeException($this->resultLockedMessage($session, $term));
+        }
+
+        return [$school, $student, $session, $term, $class];
+    }
+
     private function normalizeResultType(?string $value): string
     {
         return strtolower(trim((string) $value)) === self::RESULT_TYPE_CUMULATIVE
@@ -196,19 +262,8 @@ class ResultsController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'student', 403);
 
-        if (!$user->school || !$user->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $schoolId = (int) $user->school_id;
-
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->where('status', 'current')
-            ->first();
-
-        if (!$session) {
-            return response()->json(['data' => []]);
-        }
+        $school = $user->school ?: $user->school()->first();
 
         $student = Student::where('user_id', $user->id)
             ->where('school_id', $schoolId)
@@ -218,35 +273,50 @@ class ResultsController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
-        if (empty($classIds)) {
-            return response()->json(['data' => []]);
-        }
-
-        $classes = SchoolClass::where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->whereIn('id', $classIds)
-            ->orderBy('level')
-            ->orderBy('name')
-            ->get(['id', 'name', 'level'])
-            ->keyBy('id');
-
-        $terms = Term::where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->orderBy('id')
-            ->get(['id', 'name']);
-
         $items = [];
-        foreach ($classes as $class) {
+        $sessions = AcademicSession::where('school_id', $schoolId)
+            ->orderByDesc('id')
+            ->get(['id', 'session_name', 'academic_year', 'status']);
+
+        foreach ($sessions as $session) {
+            $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
+            if (empty($classIds)) {
+                continue;
+            }
+
+            $classes = SchoolClass::where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->whereIn('id', $classIds)
+                ->orderBy('level')
+                ->orderBy('name')
+                ->get(['id', 'name', 'level'])
+                ->keyBy('id');
+
+            $terms = Term::where('school_id', $schoolId)
+                ->where('academic_session_id', $session->id)
+                ->orderBy('id')
+                ->get(['id', 'name', 'is_current']);
+
+            foreach ($classes as $class) {
             foreach ($terms as $term) {
+                $isOpen = $this->resultPeriodIsOpen($school, $session, $term);
                 $items[] = [
+                    'academic_session_id' => (int) $session->id,
+                    'session_name' => $session->session_name,
+                    'academic_year' => $session->academic_year,
+                    'session_status' => $session->status,
                     'class_id' => (int) $class->id,
                     'term_id' => (int) $term->id,
                     'class_name' => $class->name,
                     'class_level' => $class->level,
                     'term_name' => $term->name,
+                    'term_is_current' => (bool) ($term->is_current ?? false),
+                    'is_current_period' => (string) $session->status === 'current' && (bool) ($term->is_current ?? false),
+                    'results_open' => $isOpen,
+                    'locked_message' => $isOpen ? null : $this->resultLockedMessage($session, $term),
                     'supports_cumulative' => $this->termSupportsCumulative($term),
                 ];
+            }
             }
         }
 
@@ -259,10 +329,6 @@ class ResultsController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'student', 403);
 
-        if (!$user->school || !$user->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
@@ -274,33 +340,10 @@ class ResultsController extends Controller
         $termId = (int) $payload['term_id'];
         $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->where('status', 'current')
-            ->first();
-
-        if (!$session) {
-            return response()->json(['data' => []]);
-        }
-
-        $student = Student::where('user_id', $user->id)
-            ->where('school_id', $schoolId)
-            ->first();
-
-        if (!$student) {
-            return response()->json(['data' => []]);
-        }
-
-        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
-        if (!in_array($classId, $classIds, true)) {
-            return response()->json(['data' => []]);
-        }
-
-        $term = Term::where('id', $termId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$term) {
-            return response()->json(['data' => []]);
+        try {
+            [, $student, $session, $term] = $this->resolveStudentResultSelection($user, $classId, $termId);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage(), 'data' => []], 403);
         }
 
         try {
@@ -327,10 +370,6 @@ class ResultsController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'student', 403);
 
-        if (!$user->school || !$user->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
@@ -342,41 +381,10 @@ class ResultsController extends Controller
         $termId = (int) $payload['term_id'];
         $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->where('status', 'current')
-            ->first();
-
-        if (!$session) {
-            return response()->json(['message' => 'No current session found'], 422);
-        }
-
-        $student = Student::where('user_id', $user->id)
-            ->where('school_id', $schoolId)
-            ->first();
-
-        if (!$student) {
-            return response()->json(['message' => 'Student record not found'], 404);
-        }
-
-        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
-        if (!in_array($classId, $classIds, true)) {
-            return response()->json(['message' => 'You are not enrolled in the selected class for this session'], 403);
-        }
-
-        $class = SchoolClass::where('id', $classId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$class) {
-            return response()->json(['message' => 'Class not found'], 404);
-        }
-
-        $term = Term::where('id', $termId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$term) {
-            return response()->json(['message' => 'Term not found'], 404);
+        try {
+            [, $student, $session, $term, $class] = $this->resolveStudentResultSelection($user, $classId, $termId);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
         }
 
         try {
@@ -424,10 +432,6 @@ class ResultsController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'student', 403);
 
-        if (!$user->school || !$user->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $payload = $request->validate([
             'class_id' => 'required|integer',
             'term_id' => 'required|integer',
@@ -439,41 +443,10 @@ class ResultsController extends Controller
         $termId = (int) $payload['term_id'];
         $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->where('status', 'current')
-            ->first();
-
-        if (!$session) {
-            return response()->json(['message' => 'No current session found'], 422);
-        }
-
-        $student = Student::where('user_id', $user->id)
-            ->where('school_id', $schoolId)
-            ->first();
-
-        if (!$student) {
-            return response()->json(['message' => 'Student record not found'], 404);
-        }
-
-        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
-        if (!in_array($classId, $classIds, true)) {
-            return response()->json(['message' => 'You are not enrolled in the selected class for this session'], 403);
-        }
-
-        $class = SchoolClass::where('id', $classId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$class) {
-            return response()->json(['message' => 'Class not found'], 404);
-        }
-
-        $term = Term::where('id', $termId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$term) {
-            return response()->json(['message' => 'Term not found'], 404);
+        try {
+            [, , $session, $term] = $this->resolveStudentResultSelection($user, $classId, $termId);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
         }
 
         try {
@@ -576,45 +549,7 @@ class ResultsController extends Controller
             throw new \RuntimeException('Student user not found for document generation.');
         }
 
-        $school = $user->school ?: $user->school()->first();
-        if (!$school || !$school->results_published) {
-            throw new \RuntimeException('Results are not published for this school.');
-        }
-
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->where('status', 'current')
-            ->first();
-        if (!$session) {
-            throw new \RuntimeException('No current session found.');
-        }
-
-        $student = Student::where('user_id', $user->id)
-            ->where('school_id', $schoolId)
-            ->first();
-        if (!$student) {
-            throw new \RuntimeException('Student record not found.');
-        }
-
-        $classIds = $this->currentSessionClassIds($schoolId, (int) $session->id, (int) $student->id);
-        if (!in_array($classId, $classIds, true)) {
-            throw new \RuntimeException('Student is not enrolled in the selected class for this session.');
-        }
-
-        $class = SchoolClass::where('id', $classId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$class) {
-            throw new \RuntimeException('Class not found.');
-        }
-
-        $term = Term::where('id', $termId)
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $session->id)
-            ->first();
-        if (!$term) {
-            throw new \RuntimeException('Term not found.');
-        }
+        [, $student, $session, $term, $class] = $this->resolveStudentResultSelection($user, $classId, $termId);
 
         $resultType = $this->normalizeResultType($resultType);
         $this->assertCumulativeTerm($resultType, $term);

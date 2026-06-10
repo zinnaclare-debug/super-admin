@@ -263,6 +263,59 @@
   background: #f8fafc;
 }
 
+.rs-section-block {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.rs-card-btn--locked {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.rs-card-btn--compact {
+  width: 100%;
+  text-align: left;
+}
+
+.rs-accordion,
+.rs-term-accordion {
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.rs-accordion summary,
+.rs-term-accordion summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  padding: 14px 16px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.rs-accordion summary small,
+.rs-term-accordion summary small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rs-term-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.rs-term-accordion {
+  background: #f8fafc;
+}
+
 @media (max-width: 980px) {
   .rs-hero {
     grid-template-columns: 1fr;

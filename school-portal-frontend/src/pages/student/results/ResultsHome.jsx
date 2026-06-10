@@ -49,6 +49,12 @@ const isThirdTermName = (name = "") => {
   return value.includes("third") || value.includes("three") || /(^|\D)3(rd)?(\D|$)/.test(value);
 };
 
+const sessionLabel = (item) =>
+  item?.academic_year || item?.session_name || `Session ${item?.academic_session_id || ""}`.trim();
+
+const itemSupportsCumulative = (item) =>
+  Boolean(item?.supports_cumulative || isThirdTermName(item?.term_name));
+
 function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
   const match = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
@@ -86,8 +92,28 @@ export default function StudentResultsHome() {
 
   const caIndices = useMemo(() => activeCaIndices(assessmentSchema), [assessmentSchema]);
   const isPdfProcessing = pdfJob && ["pending", "processing"].includes(pdfJob.status);
-  const supportsCumulative = Boolean(selected?.supports_cumulative || isThirdTermName(selected?.term_name));
+  const supportsCumulative = itemSupportsCumulative(selected);
   const isCumulative = supportsCumulative && resultType === "cumulative";
+  const currentItems = useMemo(() => classes.filter((item) => item.is_current_period), [classes]);
+  const historyGroups = useMemo(() => {
+    const historyItems = classes.filter((item) => !item.is_current_period);
+    const grouped = new Map();
+
+    historyItems.forEach((item) => {
+      const key = String(item.academic_session_id || "unknown");
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: key,
+          label: sessionLabel(item),
+          status: item.session_status,
+          items: [],
+        });
+      }
+      grouped.get(key).items.push(item);
+    });
+
+    return Array.from(grouped.values());
+  }, [classes]);
 
   const loadClasses = async () => {
     setLoadingClasses(true);
@@ -96,7 +122,13 @@ export default function StudentResultsHome() {
       const res = await api.get("/api/student/results/classes");
       const items = res.data?.data || [];
       setClasses(items);
-      setSelected(items.length > 0 ? items[0] : null);
+      setSelected(
+        items.find((item) => item.is_current_period && item.results_open) ||
+          items.find((item) => item.is_current_period) ||
+          items.find((item) => item.results_open) ||
+          items[0] ||
+          null
+      );
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load assigned classes");
       setClasses([]);
@@ -113,6 +145,13 @@ export default function StudentResultsHome() {
       return;
     }
 
+    if (!item.results_open) {
+      setResults([]);
+      setAssessmentSchema(DEFAULT_SCHEMA);
+      setError(item.locked_message || "This result is not available yet.");
+      return;
+    }
+
     setLoadingResults(true);
     setError("");
     try {
@@ -120,7 +159,7 @@ export default function StudentResultsHome() {
         params: {
           class_id: item.class_id,
           term_id: item.term_id,
-          result_type: supportsCumulative ? resultType : "term",
+          result_type: itemSupportsCumulative(item) ? resultType : "term",
         },
       });
       setResults(res.data?.data || []);
@@ -184,7 +223,7 @@ export default function StudentResultsHome() {
   }, [pdfJob]);
 
   const startResultPdfGeneration = async () => {
-    if (!selected) return;
+    if (!selected || !selected.results_open) return;
     setRequestingPdf(true);
     setError("");
     try {
@@ -202,7 +241,7 @@ export default function StudentResultsHome() {
   };
 
   const downloadGeneratedResultPdf = async () => {
-    if (!selected || !pdfJob?.id) return;
+    if (!selected || !selected.results_open || !pdfJob?.id) return;
     setDownloading(true);
     try {
       const res = await api.get(`/api/student/results/download-jobs/${pdfJob.id}/file`, {
@@ -251,7 +290,7 @@ export default function StudentResultsHome() {
   })();
 
   const handlePdfAction = () => {
-    if (isPdfProcessing || requestingPdf) {
+    if (!selected?.results_open || isPdfProcessing || requestingPdf) {
       return;
     }
 
@@ -298,38 +337,101 @@ export default function StudentResultsHome() {
         ) : null}
 
         {!loadingClasses && classes.length > 0 ? (
-          <div className="rs-cards">
-            {classes.map((item) => {
-              const isActive =
-                selected?.class_id === item.class_id && selected?.term_id === item.term_id;
-              return (
-                <button
-                  key={`${item.class_id}-${item.term_id}`}
-                  className={`rs-card-btn${isActive ? " rs-card-btn--active" : ""}`}
-                  onClick={() => setSelected(item)}
-                >
-                  <h3 className="rs-card-title">{item.class_name}</h3>
-                  <p className="rs-card-meta">
-                    {item.class_level} | {item.term_name}
-                  </p>
-                  {item.supports_cumulative || isThirdTermName(item.term_name) ? (
-                    <p className="rs-card-meta" style={{ marginTop: 6 }}>
-                      Cumulative Result available
-                    </p>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <div className="rs-section-block">
+              <div className="rs-results-head">
+                <h3 className="rs-results-title">Current Term Result</h3>
+                <span className="rs-card-meta">
+                  {currentItems.length ? currentItems[0].term_name : "No current term"}
+                </span>
+              </div>
+              <div className="rs-cards">
+                {currentItems.length > 0 ? currentItems.map((item) => {
+                  const isActive =
+                    selected?.class_id === item.class_id && selected?.term_id === item.term_id;
+                  return (
+                    <button
+                      key={`current-${item.class_id}-${item.term_id}`}
+                      className={`rs-card-btn${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`}
+                      onClick={() => {
+                        setPdfJob(null);
+                        setSelected(item);
+                      }}
+                    >
+                      <h3 className="rs-card-title">{item.class_name}</h3>
+                      <p className="rs-card-meta">
+                        {item.class_level} | {sessionLabel(item)} | {item.term_name}
+                      </p>
+                      <p className="rs-card-meta" style={{ marginTop: 6 }}>
+                        {item.results_open ? "Published and ready" : item.locked_message || "Awaiting publication"}
+                      </p>
+                    </button>
+                  );
+                }) : (
+                  <p className="rs-state rs-state--empty">No current term result record found.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rs-section-block">
+              <h3 className="rs-results-title">Past Results</h3>
+              {historyGroups.length > 0 ? historyGroups.map((group) => (
+                <details className="rs-accordion" key={group.id}>
+                  <summary>
+                    <span>{group.label}</span>
+                    <small>{group.items.length} term record{group.items.length === 1 ? "" : "s"}</small>
+                  </summary>
+                  <div className="rs-term-list">
+                    {group.items.map((item) => {
+                      const isActive =
+                        selected?.class_id === item.class_id && selected?.term_id === item.term_id;
+                      return (
+                        <details className="rs-term-accordion" key={`${item.class_id}-${item.term_id}`}>
+                          <summary>
+                            <span>{item.term_name}</span>
+                            <small>{item.class_name}</small>
+                          </summary>
+                          <button
+                            type="button"
+                            className={`rs-card-btn rs-card-btn--compact${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`}
+                            onClick={() => {
+                              setPdfJob(null);
+                              setSelected(item);
+                            }}
+                          >
+                            <h3 className="rs-card-title">{item.class_name}</h3>
+                            <p className="rs-card-meta">
+                              {item.class_level} | {item.term_name}
+                            </p>
+                            {itemSupportsCumulative(item) ? (
+                              <p className="rs-card-meta" style={{ marginTop: 6 }}>Cumulative Result available</p>
+                            ) : null}
+                          </button>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </details>
+              )) : (
+                <p className="rs-state rs-state--empty">Past results will appear here after a term or session becomes past.</p>
+              )}
+            </div>
+          </>
         ) : null}
 
         {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
 
-        {selected ? (
+        {selected && !selected.results_open ? (
+          <p className="rs-state rs-state--empty" style={{ marginTop: 14 }}>
+            {selected.locked_message || "This result is not available yet."}
+          </p>
+        ) : null}
+
+        {selected && selected.results_open ? (
           <>
             <div className="rs-results-head">
               <h3 className="rs-results-title">
-                {selected.class_name} - {selected.term_name}
+                {selected.class_name} - {sessionLabel(selected)} - {selected.term_name}
                 {isCumulative ? " Cumulative" : ""}
               </h3>
               <button
