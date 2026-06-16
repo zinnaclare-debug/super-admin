@@ -95,8 +95,6 @@ const normalizeExamRecord = (record) => {
   const requestedExam = Number(schema.exam_max ?? 100 - caTotal);
   const examMax = Number.isFinite(requestedExam) ? Math.max(0, Math.min(100, Math.round(requestedExam))) : 0;
 
-  const opacity = Number(source.watermark_opacity ?? DEFAULT_RESULT_TEMPLATE.watermark_opacity);
-
   return {
     ca_maxes: normalizedCa,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
@@ -168,6 +166,7 @@ const normalizeResultTemplate = (raw) => {
   const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const thirdTerm = source.third_term && typeof source.third_term === "object" ? source.third_term : {};
   const cumulative = source.cumulative && typeof source.cumulative === "object" ? source.cumulative : {};
+  const opacity = Number(source.watermark_opacity ?? DEFAULT_RESULT_TEMPLATE.watermark_opacity);
 
   return {
     ...DEFAULT_RESULT_TEMPLATE,
