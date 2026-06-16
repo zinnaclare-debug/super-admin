@@ -89,6 +89,7 @@ export default function StudentResultsHome() {
   const [selected, setSelected] = useState(null);
   const [results, setResults] = useState([]);
   const [assessmentSchema, setAssessmentSchema] = useState(DEFAULT_SCHEMA);
+  const [resultTemplate, setResultTemplate] = useState(null);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [requestingPdf, setRequestingPdf] = useState(false);
@@ -101,6 +102,16 @@ export default function StudentResultsHome() {
   const isPdfProcessing = pdfJob && ["pending", "processing"].includes(pdfJob.status);
   const supportsCumulative = itemSupportsCumulative(selected);
   const isCumulative = supportsCumulative && resultType === "cumulative";
+  const showThirdTermPreviousTotals =
+    !isCumulative &&
+    Boolean(
+      resultTemplate?.show_third_term_previous_totals ||
+        results.some((row) =>
+          Object.prototype.hasOwnProperty.call(row || {}, "first_term_total") ||
+          Object.prototype.hasOwnProperty.call(row || {}, "second_term_total") ||
+          Object.prototype.hasOwnProperty.call(row || {}, "third_term_total")
+        )
+    );
   const currentItems = useMemo(() => classes.filter((item) => item.is_current_period), [classes]);
   const historyGroups = useMemo(() => {
     const historyItems = classes.filter((item) => !item.is_current_period);
@@ -149,12 +160,14 @@ export default function StudentResultsHome() {
     if (!item) {
       setResults([]);
       setAssessmentSchema(DEFAULT_SCHEMA);
+      setResultTemplate(null);
       return;
     }
 
     if (!item.results_open) {
       setResults([]);
       setAssessmentSchema(DEFAULT_SCHEMA);
+      setResultTemplate(null);
       setError("");
       return;
     }
@@ -171,10 +184,12 @@ export default function StudentResultsHome() {
       });
       setResults(res.data?.data || []);
       setAssessmentSchema(normalizeSchema(res.data?.assessment_schema));
+      setResultTemplate(res.data?.result_template || null);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load results");
       setResults([]);
       setAssessmentSchema(DEFAULT_SCHEMA);
+      setResultTemplate(null);
     } finally {
       setLoadingResults(false);
     }
@@ -409,6 +424,13 @@ export default function StudentResultsHome() {
                       <th style={{ width: 80 }}>CA Total</th>
                       <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
                       <th style={{ width: 80 }}>Total</th>
+                      {showThirdTermPreviousTotals ? (
+                        <>
+                          <th style={{ width: 100 }}>First Term</th>
+                          <th style={{ width: 110 }}>Second Term</th>
+                          <th style={{ width: 100 }}>Third Term</th>
+                        </>
+                      ) : null}
                     </>
                   )}
                   <th style={{ width: 80 }}>Grade</th>
@@ -436,6 +458,13 @@ export default function StudentResultsHome() {
                         <td>{displayScore(row.ca)}</td>
                         <td>{displayScore(row.exam)}</td>
                         <td>{displayScore(row.total)}</td>
+                        {showThirdTermPreviousTotals ? (
+                          <>
+                            <td>{displayScore(row.first_term_total)}</td>
+                            <td>{displayScore(row.second_term_total)}</td>
+                            <td>{displayScore(row.third_term_total)}</td>
+                          </>
+                        ) : null}
                       </>
                     )}
                     <td>{row.grade}</td>
@@ -443,7 +472,7 @@ export default function StudentResultsHome() {
                 ))}
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={isCumulative ? 7 : 6 + caIndices.length}>
+                    <td colSpan={isCumulative ? 7 : 6 + caIndices.length + (showThirdTermPreviousTotals ? 3 : 0)}>
                       No result records for this class and term.
                     </td>
                   </tr>

@@ -33,6 +33,17 @@ const isThirdTermName = (name = "") => {
   return value.includes("third") || /(^|\D)3(rd)?(\D|$)/.test(value);
 };
 
+const shouldShowThirdTermPreviousTotals = (entry) =>
+  entry?.result_type !== "cumulative" &&
+  Boolean(
+    entry?.result_template?.show_third_term_previous_totals ||
+      (entry?.rows || []).some((row) =>
+        Object.prototype.hasOwnProperty.call(row || {}, "first_term_total") ||
+        Object.prototype.hasOwnProperty.call(row || {}, "second_term_total") ||
+        Object.prototype.hasOwnProperty.call(row || {}, "third_term_total")
+      )
+  );
+
 const downloadCsv = (rows, context) => {
   if (!rows?.length) return;
 
@@ -155,6 +166,7 @@ export default function StudentReport() {
   const canResultDownload = Boolean(resultEmail.trim()) && Boolean(selectedResultSession) && Boolean(selectedResultTerm);
   const supportsResultCumulative = Boolean(selectedResultTerm && isThirdTermName(selectedResultTerm.name));
   const isResultCumulative = supportsResultCumulative && resultType === "cumulative";
+  const showResultThirdTermPreviousTotals = shouldShowThirdTermPreviousTotals(resultEntry);
   const totalSummaryPages = Math.max(1, Math.ceil(rows.length / STUDENT_REPORT_PAGE_SIZE));
 
   const paginatedRows = useMemo(() => {
@@ -589,6 +601,13 @@ export default function StudentReport() {
                           <th>CA</th>
                           <th>Exam</th>
                           <th>Total</th>
+                          {showResultThirdTermPreviousTotals ? (
+                            <>
+                              <th>First Term</th>
+                              <th>Second Term</th>
+                              <th>Third Term</th>
+                            </>
+                          ) : null}
                           <th>Min</th>
                           <th>Max</th>
                           <th>Class Ave</th>
@@ -615,6 +634,13 @@ export default function StudentReport() {
                             <td>{asDash(row.ca)}</td>
                             <td>{asDash(row.exam)}</td>
                             <td>{asDash(row.total)}</td>
+                            {showResultThirdTermPreviousTotals ? (
+                              <>
+                                <td>{asDash(row.first_term_total)}</td>
+                                <td>{asDash(row.second_term_total)}</td>
+                                <td>{asDash(row.third_term_total)}</td>
+                              </>
+                            ) : null}
                             <td>{asDash(row.min_score)}</td>
                             <td>{asDash(row.max_score)}</td>
                             <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>

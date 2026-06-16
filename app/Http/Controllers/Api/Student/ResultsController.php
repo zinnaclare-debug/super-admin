@@ -239,6 +239,55 @@ class ResultsController extends Controller
         }
     }
 
+    private function resultPdfTemplateForSchool(?School $school, string $resultType, Term $term): array
+    {
+        return ResultPdfTemplate::forPdf(
+            $school?->result_template_config,
+            $this->normalizeResultType($resultType),
+            $term->name ?? null
+        );
+    }
+
+    private function addThirdTermPreviousTotalsToRows(
+        int $schoolId,
+        int $classId,
+        AcademicSession $session,
+        Term $term,
+        int $studentId,
+        string $resultType,
+        ?School $school,
+        array $rows,
+        ?array $resultTemplate = null
+    ): array {
+        $resultType = $this->normalizeResultType($resultType);
+        $resultTemplate ??= $this->resultPdfTemplateForSchool($school, $resultType, $term);
+
+        if (
+            $resultType !== self::RESULT_TYPE_TERM
+            || !(bool) ($resultTemplate['show_third_term_previous_totals'] ?? false)
+        ) {
+            return $rows;
+        }
+
+        $cumulativeRowsBySubject = collect(
+            $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, $studentId)
+        )->keyBy(fn ($row) => (int) ($row['subject_id'] ?? 0));
+
+        return collect($rows)
+            ->map(function (array $row) use ($cumulativeRowsBySubject) {
+                $subjectId = (int) ($row['subject_id'] ?? 0);
+                $cumulativeRow = $subjectId > 0 ? $cumulativeRowsBySubject->get($subjectId) : null;
+
+                return array_merge($row, [
+                    'first_term_total' => $cumulativeRow['first_term_total'] ?? '-',
+                    'second_term_total' => $cumulativeRow['second_term_total'] ?? '-',
+                    'third_term_total' => $cumulativeRow['third_term_total'] ?? ($row['total'] ?? '-'),
+                ]);
+            })
+            ->values()
+            ->all();
+    }
+
     private function resolveCurrentTermId(int $schoolId, int $sessionId): ?int
     {
         if (Schema::hasColumn('terms', 'is_current')) {
@@ -342,7 +391,7 @@ class ResultsController extends Controller
         $resultType = $this->normalizeResultType($payload['result_type'] ?? null);
 
         try {
-            [, $student, $session, $term] = $this->resolveStudentResultSelection($user, $classId, $termId);
+            [$school, $student, $session, $term] = $this->resolveStudentResultSelection($user, $classId, $termId);
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage(), 'data' => []], 403);
         }
@@ -357,10 +406,23 @@ class ResultsController extends Controller
         $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, (int) $student->id)
             : $this->subjectRows($schoolId, $classId, $termId, (int) $student->id);
+        $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
+        $rows = $this->addThirdTermPreviousTotalsToRows(
+            $schoolId,
+            $classId,
+            $session,
+            $term,
+            (int) $student->id,
+            $resultType,
+            $school,
+            $rows,
+            $resultTemplate
+        );
 
         return response()->json([
             'data' => $rows,
             'assessment_schema' => $assessmentSchema,
+            'result_template' => $resultTemplate,
             'result_type' => $resultType,
             'supports_cumulative' => $this->termSupportsCumulative($term),
         ]);
@@ -841,6 +903,19 @@ class ResultsController extends Controller
         $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->cumulativeSubjectRows($schoolId, (int) $class->id, $session, $term, (int) $student->id)
             : $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
+        $school = $actor->school ?: $actor->school()->first();
+        $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
+        $rows = $this->addThirdTermPreviousTotalsToRows(
+            $schoolId,
+            (int) $class->id,
+            $session,
+            $term,
+            (int) $student->id,
+            $resultType,
+            $school,
+            $rows,
+            $resultTemplate
+        );
         $summary = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->summarizeCumulativeRows($schoolId, $rows)
             : $this->summarizeRows($schoolId, $rows);
@@ -925,6 +1000,7 @@ class ResultsController extends Controller
                 'behaviour_traits' => $behaviourTraits,
                 'rows' => $rows,
                 'assessment_schema' => $assessmentSchema,
+                'result_template' => $resultTemplate,
             ]],
             'context' => [
                 'student' => [
@@ -944,8 +1020,10 @@ class ResultsController extends Controller
                 ],
                 'result_type' => $resultType,
                 'supports_cumulative' => $this->termSupportsCumulative($term),
+                'result_template' => $resultTemplate,
             ],
             'assessment_schema' => $assessmentSchema,
+            'result_template' => $resultTemplate,
             'result_type' => $resultType,
             'supports_cumulative' => $this->termSupportsCumulative($term),
             'message' => count($rows) === 0 ? 'No result records found for the selected criteria.' : null,
@@ -1100,33 +1178,18 @@ class ResultsController extends Controller
         $school = $actor->school ?: $actor->school()->first();
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
-        $resultTemplate = ResultPdfTemplate::forPdf(
-            $school?->result_template_config,
+        $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
+        $rows = $this->addThirdTermPreviousTotalsToRows(
+            $schoolId,
+            $classId,
+            $session,
+            $term,
+            (int) $student->id,
             $resultType,
-            $term->name ?? null
+            $school,
+            $rows,
+            $resultTemplate
         );
-        if (
-            $resultType === self::RESULT_TYPE_TERM
-            && (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false)
-        ) {
-            $cumulativeRowsBySubject = collect(
-                $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, (int) $student->id)
-            )->keyBy(fn ($row) => (int) ($row['subject_id'] ?? 0));
-
-            $rows = collect($rows)
-                ->map(function (array $row) use ($cumulativeRowsBySubject) {
-                    $subjectId = (int) ($row['subject_id'] ?? 0);
-                    $cumulativeRow = $subjectId > 0 ? $cumulativeRowsBySubject->get($subjectId) : null;
-
-                    return array_merge($row, [
-                        'first_term_total' => $cumulativeRow['first_term_total'] ?? '-',
-                        'second_term_total' => $cumulativeRow['second_term_total'] ?? '-',
-                        'third_term_total' => $cumulativeRow['third_term_total'] ?? ($row['total'] ?? '-'),
-                    ]);
-                })
-                ->values()
-                ->all();
-        }
 
         $summary = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->summarizeCumulativeRows($schoolId, $rows)
