@@ -1,4 +1,11 @@
 @php($embedded = (bool) ($embedded ?? false))
+@php
+    $resultTemplate = \App\Support\ResultPdfTemplate::normalize($resultTemplate ?? []);
+    $templatePrimaryColor = $resultTemplate['primary_color'] ?? '#111827';
+    $templateAccentColor = $resultTemplate['accent_color'] ?? '#1d4ed8';
+    $templateWatermarkOpacity = $resultTemplate['watermark_opacity'] ?? 0.07;
+    $templateIsCompact = ($resultTemplate['layout'] ?? 'classic') === 'compact';
+@endphp
 @if(!$embedded)
 <!DOCTYPE html>
 <html lang="en">
@@ -10,13 +17,13 @@
         @page { margin: 18px; }
         body {
             font-family: Arial, Helvetica, DejaVu Sans, sans-serif;
-            font-size: 7px;
-            color: #111827;
+            font-size: {{ $templateIsCompact ? '6.5px' : '7px' }};
+            color: {{ $templatePrimaryColor }};
         }
         .sheet {
             position: relative;
-            border: 1px solid #d1d5db;
-            padding: 10px;
+            border: 1px solid {{ $templateAccentColor }};
+            padding: {{ $templateIsCompact ? '8px' : '10px' }};
             overflow: hidden;
         }
         .watermark {
@@ -26,7 +33,7 @@
             width: 320px;
             height: 320px;
             margin-left: -160px;
-            opacity: 0.07;
+            opacity: {{ $templateWatermarkOpacity }};
             z-index: 0;
             object-fit: contain;
         }
@@ -39,7 +46,7 @@
             border-collapse: collapse;
         }
         .header td {
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 6px;
             vertical-align: middle;
         }
@@ -63,7 +70,7 @@
         }
         .section-title {
             margin-top: 8px;
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             border-bottom: 0;
             text-align: center;
             font-weight: bold;
@@ -76,7 +83,7 @@
         .psycho td, .psycho th,
         .comment td, .comment th,
         .key-rate td, .key-rate th {
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 4px 6px;
         }
         .meta th, .scores th, .psycho th, .comment th, .key-rate th {
@@ -87,7 +94,7 @@
         .small { font-size: 10px; }
         .grades-key {
             margin-top: 4px;
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 4px 6px;
             font-size: 10px;
         }
@@ -102,7 +109,7 @@
         }
         .signature-box {
             margin-top: 6px;
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 6px;
             min-height: 60px;
         }
@@ -127,7 +134,7 @@
         }
         .key-rating-line {
             margin-top: 0;
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             border-top: 0;
             padding: 4px 6px;
             font-size: 10px;
@@ -135,7 +142,7 @@
         }
         .footer-container {
             margin-top: 8px;
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 6px;
         }
         .comment-layout {
@@ -153,7 +160,7 @@
         }
         .signature-panel th,
         .signature-panel td {
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 4px 6px;
         }
         .signature-panel th {
@@ -173,7 +180,7 @@
         }
         .info-box th,
         .info-box td {
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             padding: 5px 6px;
         }
         .info-box th {
@@ -182,7 +189,7 @@
             width: 28%;
         }
         .signature-only {
-            border: 1px solid #111;
+            border: 1px solid {{ $templatePrimaryColor }};
             min-height: 126px;
             display: flex;
             align-items: center;
@@ -200,6 +207,15 @@
     $timesOpened = (int) ($attendanceSetting?->total_school_days ?? 0);
     $totalObtainable = max(1, count($rows)) * 100;
     $isCumulative = (bool) ($isCumulativeResult ?? (($resultType ?? 'term') === 'cumulative'));
+    $showStudentPhoto = (bool) ($resultTemplate['show_student_photo'] ?? true);
+    $showSchoolLogo = (bool) ($resultTemplate['show_school_logo'] ?? true);
+    $showWatermark = (bool) ($resultTemplate['show_watermark'] ?? true);
+    $showAttendance = (bool) ($resultTemplate['show_attendance'] ?? true);
+    $showBehaviour = (bool) ($resultTemplate['show_behaviour'] ?? true);
+    $showSignature = (bool) ($resultTemplate['show_signature'] ?? true);
+    $showThirdTermPreviousTotals = (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false);
+    $showCumulativeTermTotals = (bool) data_get($resultTemplate, 'cumulative.show_term_totals', true);
+    $showCumulativeAverage = (bool) data_get($resultTemplate, 'cumulative.show_average', true);
     $assessmentSchema = \App\Support\AssessmentSchema::normalizeSchema($assessmentSchema ?? []);
     $activeCaIndices = \App\Support\AssessmentSchema::activeCaIndices($assessmentSchema);
     $assessmentParts = [];
@@ -207,9 +223,17 @@
         $assessmentParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
     }
     $assessmentPattern = $isCumulative
-        ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
-        : implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')';
-    $scoreColspan = $isCumulative ? 6 : 5 + count($activeCaIndices);
+        ? trim(($showCumulativeTermTotals ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '') . ($showCumulativeAverage ? ' | AVERAGE' : ''), ' |')
+        : implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')' . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '');
+    $scoreColspan = 3;
+    if ($isCumulative) {
+        $scoreColspan += $showCumulativeTermTotals ? 3 : 0;
+        $scoreColspan += $showCumulativeAverage ? 1 : 0;
+    } else {
+        $scoreColspan += count($activeCaIndices);
+        $scoreColspan += 2;
+        $scoreColspan += $showThirdTermPreviousTotals ? 3 : 0;
+    }
     $nextTermBeginLabel = '-';
     if (!empty($nextTermBeginDate)) {
         try {
@@ -220,7 +244,7 @@
     }
 @endphp
 <div class="sheet">
-    @if($schoolLogoDataUri)
+    @if($showWatermark && $schoolLogoDataUri)
         <img class="watermark" src="{{ $schoolLogoDataUri }}" alt="">
     @endif
 
@@ -228,7 +252,7 @@
         <table class="header">
             <tr>
                 <td style="width: 88px;" class="center">
-                    @if($studentPhotoDataUri)
+                    @if($showStudentPhoto && $studentPhotoDataUri)
                         <img class="id-photo" src="{{ $studentPhotoDataUri }}" alt="Student Photo">
                     @endif
                 </td>
@@ -237,7 +261,7 @@
                     <p>{{ strtoupper($school?->location ?? 'SCHOOL LOCATION') }}</p>
                 </td>
                 <td style="width: 88px;" class="center">
-                    @if($schoolLogoDataUri)
+                    @if($showSchoolLogo && $schoolLogoDataUri)
                         <img class="school-logo" src="{{ $schoolLogoDataUri }}" alt="School Logo">
                     @endif
                 </td>
@@ -277,8 +301,8 @@
                 </tr>
             @endif
             <tr>
-                <th>ATTENDANCE</th>
-                <td>{{ $timesPresent }}/{{ $timesOpened }}</td>
+                <th>{{ $showAttendance ? 'ATTENDANCE' : 'TERM' }}</th>
+                <td>{{ $showAttendance ? ($timesPresent . '/' . $timesOpened) : strtoupper($term?->name ?? '-') }}</td>
                 <th>TOTAL STUDENTS</th>
                 <td>{{ $classSize ?? '-' }}</td>
             </tr>
@@ -295,16 +319,25 @@
                 <tr>
                     <th class="center">SUBJECT</th>
                     @if($isCumulative)
-                        <th class="center">FIRST TERM</th>
-                        <th class="center">SECOND TERM</th>
-                        <th class="center">THIRD TERM</th>
-                        <th class="center">AVERAGE</th>
+                        @if($showCumulativeTermTotals)
+                            <th class="center">FIRST TERM</th>
+                            <th class="center">SECOND TERM</th>
+                            <th class="center">THIRD TERM</th>
+                        @endif
+                        @if($showCumulativeAverage)
+                            <th class="center">AVERAGE</th>
+                        @endif
                     @else
                         @foreach($activeCaIndices as $index)
                             <th class="center">C{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
                         @endforeach
                         <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
                         <th class="center">TOTAL</th>
+                        @if($showThirdTermPreviousTotals)
+                            <th class="center">FIRST TERM</th>
+                            <th class="center">SECOND TERM</th>
+                            <th class="center">THIRD TERM</th>
+                        @endif
                     @endif
                     <th class="center">GRADE</th>
                     <th class="center">REMARK</th>
@@ -315,10 +348,14 @@
                     <tr>
                         <td>{{ strtoupper($row['subject_name']) }}</td>
                         @if($isCumulative)
-                            <td class="center">{{ $row['first_term_total'] ?? '-' }}</td>
-                            <td class="center">{{ $row['second_term_total'] ?? '-' }}</td>
-                            <td class="center">{{ $row['third_term_total'] ?? '-' }}</td>
-                            <td class="center">{{ $row['average'] ?? '-' }}</td>
+                            @if($showCumulativeTermTotals)
+                                <td class="center">{{ $row['first_term_total'] ?? '-' }}</td>
+                                <td class="center">{{ $row['second_term_total'] ?? '-' }}</td>
+                                <td class="center">{{ $row['third_term_total'] ?? '-' }}</td>
+                            @endif
+                            @if($showCumulativeAverage)
+                                <td class="center">{{ $row['average'] ?? '-' }}</td>
+                            @endif
                         @else
                             @foreach($activeCaIndices as $index)
                                 @php($caValue = $row['ca_breakdown'][$index] ?? null)
@@ -326,6 +363,11 @@
                             @endforeach
                             <td class="center">{{ $row['exam'] }}</td>
                             <td class="center">{{ $row['total'] }}</td>
+                            @if($showThirdTermPreviousTotals)
+                                <td class="center">{{ $row['first_term_total'] ?? '-' }}</td>
+                                <td class="center">{{ $row['second_term_total'] ?? '-' }}</td>
+                                <td class="center">{{ $row['third_term_total'] ?? '-' }}</td>
+                            @endif
                         @endif
                         <td class="center">{{ strtoupper($row['grade']) }}</td>
                         <td class="center">{{ strtoupper($row['remark'] ?? '-') }}</td>
@@ -343,42 +385,44 @@
             {{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}
         </div>
 
-        @php
-            $traitPerRow = 5;
-            $traitRows = collect($behaviourTraits ?? [])->values()->chunk($traitPerRow);
-            if ($traitRows->isEmpty()) {
-                $traitRows = collect([collect()]);
-            }
-        @endphp
-        <table class="psycho psycho-horizontal" style="margin-top: 8px;">
-            <thead>
-                <tr>
-                    @for($i = 0; $i < $traitPerRow; $i++)
-                        <th style="width: 16%;">PSYCHOMOTOR</th>
-                        <th class="rate" style="width: 4%;">RATE</th>
-                    @endfor
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($traitRows as $rowTraits)
+        @if($showBehaviour)
+            @php
+                $traitPerRow = 5;
+                $traitRows = collect($behaviourTraits ?? [])->values()->chunk($traitPerRow);
+                if ($traitRows->isEmpty()) {
+                    $traitRows = collect([collect()]);
+                }
+            @endphp
+            <table class="psycho psycho-horizontal" style="margin-top: 8px;">
+                <thead>
                     <tr>
                         @for($i = 0; $i < $traitPerRow; $i++)
-                            @php($trait = $rowTraits->get($i))
-                            <td>{{ strtoupper((string)($trait['label'] ?? '')) }}</td>
-                            <td class="rate">{{ $trait['value'] ?? '' }}</td>
+                            <th style="width: 16%;">PSYCHOMOTOR</th>
+                            <th class="rate" style="width: 4%;">RATE</th>
                         @endfor
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
-        <div class="key-rating-line">
-            <strong>KEY RATING:</strong>
-            5 - EXCELLENT
-            &nbsp;&nbsp;&nbsp; 4 - VERY GOOD
-            &nbsp;&nbsp;&nbsp; 3 - SATISFACTORY
-            &nbsp;&nbsp;&nbsp; 2 - POOR
-            &nbsp;&nbsp;&nbsp; 1 - VERY POOR
-        </div>
+                </thead>
+                <tbody>
+                    @foreach($traitRows as $rowTraits)
+                        <tr>
+                            @for($i = 0; $i < $traitPerRow; $i++)
+                                @php($trait = $rowTraits->get($i))
+                                <td>{{ strtoupper((string)($trait['label'] ?? '')) }}</td>
+                                <td class="rate">{{ $trait['value'] ?? '' }}</td>
+                            @endfor
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            <div class="key-rating-line">
+                <strong>KEY RATING:</strong>
+                5 - EXCELLENT
+                &nbsp;&nbsp;&nbsp; 4 - VERY GOOD
+                &nbsp;&nbsp;&nbsp; 3 - SATISFACTORY
+                &nbsp;&nbsp;&nbsp; 2 - POOR
+                &nbsp;&nbsp;&nbsp; 1 - VERY POOR
+            </div>
+        @endif
 
         <div class="footer-container">
             <table class="comment-layout" style="margin-top: 0;">
@@ -410,15 +454,17 @@
                         </table>
                     </td>
                     <td style="width: 2%;"></td>
-                    <td style="width: 24%;">
-                        <div class="signature-only">
-                            @if($headSignatureDataUri)
-                                <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
-                            @else
-                                <div class="signature-placeholder"></div>
-                            @endif
-                        </div>
-                    </td>
+                    @if($showSignature)
+                        <td style="width: 24%;">
+                            <div class="signature-only">
+                                @if($headSignatureDataUri)
+                                    <img class="signature" src="{{ $headSignatureDataUri }}" alt="Head Signature">
+                                @else
+                                    <div class="signature-placeholder"></div>
+                                @endif
+                            </div>
+                        </td>
+                    @endif
                 </tr>
             </table>
         </div>

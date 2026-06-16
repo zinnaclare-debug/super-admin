@@ -22,6 +22,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\GradingSchema;
+use App\Support\ResultPdfTemplate;
 use App\Support\SchoolHistoryImportService;
 use App\Support\SchoolSubscriptionBilling;
 use App\Support\UserCredentialStore;
@@ -233,6 +234,7 @@ class SchoolController extends Controller
                 ClassTemplateSchema::activeLevelKeys($normalizedClassTemplates)
             ),
             'grading_schema' => GradingSchema::normalize($school->grading_schema),
+            'result_template_config' => ResultPdfTemplate::normalize($school->result_template_config),
             'class_templates' => $this->attachDepartmentTemplatesToClassTemplates(
                 $normalizedClassTemplates,
                 $departmentTemplateMapByClass
@@ -440,6 +442,36 @@ class SchoolController extends Controller
         return response()->json([
             'message' => 'Grading system updated successfully.',
             'data' => $schema,
+        ]);
+    }
+
+    public function updateInformationResultTemplate(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'layout' => 'nullable|string|in:classic,compact',
+            'primary_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'accent_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'watermark_opacity' => 'nullable|numeric|min:0|max:0.2',
+            'show_student_photo' => 'nullable|boolean',
+            'show_school_logo' => 'nullable|boolean',
+            'show_watermark' => 'nullable|boolean',
+            'show_attendance' => 'nullable|boolean',
+            'show_behaviour' => 'nullable|boolean',
+            'show_signature' => 'nullable|boolean',
+            'show_result_position' => 'nullable|boolean',
+            'third_term' => 'nullable|array',
+            'third_term.show_previous_term_totals' => 'nullable|boolean',
+            'cumulative' => 'nullable|array',
+            'cumulative.show_term_totals' => 'nullable|boolean',
+            'cumulative.show_average' => 'nullable|boolean',
+        ]);
+
+        $school->result_template_config = ResultPdfTemplate::normalize($payload);
+        $school->save();
+
+        return response()->json([
+            'message' => 'Result PDF template updated successfully.',
+            'data' => ResultPdfTemplate::normalize($school->result_template_config),
         ]);
     }
 

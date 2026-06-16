@@ -18,6 +18,7 @@ use App\Models\TermSubject;
 use App\Models\User;
 use App\Support\AssessmentSchema;
 use App\Support\GradingSchema;
+use App\Support\ResultPdfTemplate;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -1099,6 +1100,33 @@ class ResultsController extends Controller
         $school = $actor->school ?: $actor->school()->first();
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
+        $resultTemplate = ResultPdfTemplate::forPdf(
+            $school?->result_template_config,
+            $resultType,
+            $term->name ?? null
+        );
+        if (
+            $resultType === self::RESULT_TYPE_TERM
+            && (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false)
+        ) {
+            $cumulativeRowsBySubject = collect(
+                $this->cumulativeSubjectRows($schoolId, $classId, $session, $term, (int) $student->id)
+            )->keyBy(fn ($row) => (int) ($row['subject_id'] ?? 0));
+
+            $rows = collect($rows)
+                ->map(function (array $row) use ($cumulativeRowsBySubject) {
+                    $subjectId = (int) ($row['subject_id'] ?? 0);
+                    $cumulativeRow = $subjectId > 0 ? $cumulativeRowsBySubject->get($subjectId) : null;
+
+                    return array_merge($row, [
+                        'first_term_total' => $cumulativeRow['first_term_total'] ?? '-',
+                        'second_term_total' => $cumulativeRow['second_term_total'] ?? '-',
+                        'third_term_total' => $cumulativeRow['third_term_total'] ?? ($row['total'] ?? '-'),
+                    ]);
+                })
+                ->values()
+                ->all();
+        }
 
         $summary = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->summarizeCumulativeRows($schoolId, $rows)
@@ -1107,7 +1135,8 @@ class ResultsController extends Controller
         $averageScore = $summary['average_score'];
         $overallGrade = $summary['overall_grade'];
         $averageDisplay = $summary['average_display'];
-        $showResultPosition = (bool) ($schoolWebsiteContent['show_result_position'] ?? true);
+        $showResultPosition = (bool) ($schoolWebsiteContent['show_result_position'] ?? true)
+            && (bool) ($resultTemplate['show_result_position'] ?? true);
         $classPositionStats = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->buildCumulativeClassPositionStats($schoolId, $classId, $session, $term)
             : $this->buildClassPositionStats($schoolId, $classId, $termId);
@@ -1155,6 +1184,7 @@ class ResultsController extends Controller
             'classTeacher' => $classTeacher,
             'behaviourTraits' => $behaviourTraits,
             'assessmentSchema' => $assessmentSchema,
+            'resultTemplate' => $resultTemplate,
             'schoolLogoDataUri' => $this->toDataUri($school?->logo_path),
             'studentPhotoDataUri' => $this->studentPhotoDataUri($studentPhotoPath),
             'headSignatureDataUri' => $this->toDataUri($school?->head_signature_path),
@@ -1647,6 +1677,7 @@ class ResultsController extends Controller
             })
             ->select([
                 'term_subjects.id as term_subject_id',
+                'term_subjects.subject_id',
                 'subjects.name as subject_name',
                 'subjects.code as subject_code',
                 'results.id as result_id',
@@ -1700,6 +1731,7 @@ class ResultsController extends Controller
 
                 return [
                     'term_subject_id' => $termSubjectId,
+                    'subject_id' => (int) $r->subject_id,
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
                     'is_graded' => $isGraded,

@@ -11,6 +11,27 @@ const DEFAULT_EXAM_RECORD = {
   total_max: 100,
 };
 
+const DEFAULT_RESULT_TEMPLATE = {
+  layout: "classic",
+  primary_color: "#111827",
+  accent_color: "#1D4ED8",
+  watermark_opacity: 0.07,
+  show_student_photo: true,
+  show_school_logo: true,
+  show_watermark: true,
+  show_attendance: true,
+  show_behaviour: true,
+  show_signature: true,
+  show_result_position: true,
+  third_term: {
+    show_previous_term_totals: true,
+  },
+  cumulative: {
+    show_term_totals: true,
+    show_average: true,
+  },
+};
+
 const MAX_GRADING_ROWS = 10;
 const EMPTY_GRADING_ROW = { from: "", to: "", grade: "", remark: "" };
 
@@ -73,6 +94,8 @@ const normalizeExamRecord = (record) => {
   const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
   const requestedExam = Number(schema.exam_max ?? 100 - caTotal);
   const examMax = Number.isFinite(requestedExam) ? Math.max(0, Math.min(100, Math.round(requestedExam))) : 0;
+
+  const opacity = Number(source.watermark_opacity ?? DEFAULT_RESULT_TEMPLATE.watermark_opacity);
 
   return {
     ca_maxes: normalizedCa,
@@ -141,6 +164,39 @@ const parseDepartmentCsv = (value) =>
     .filter(Boolean)
     .filter((name, index, arr) => arr.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index);
 
+const normalizeResultTemplate = (raw) => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const thirdTerm = source.third_term && typeof source.third_term === "object" ? source.third_term : {};
+  const cumulative = source.cumulative && typeof source.cumulative === "object" ? source.cumulative : {};
+
+  return {
+    ...DEFAULT_RESULT_TEMPLATE,
+    ...source,
+    layout: ["classic", "compact"].includes(source.layout) ? source.layout : DEFAULT_RESULT_TEMPLATE.layout,
+    primary_color: /^#[0-9a-fA-F]{6}$/.test(String(source.primary_color || ""))
+      ? source.primary_color
+      : DEFAULT_RESULT_TEMPLATE.primary_color,
+    accent_color: /^#[0-9a-fA-F]{6}$/.test(String(source.accent_color || ""))
+      ? source.accent_color
+      : DEFAULT_RESULT_TEMPLATE.accent_color,
+    watermark_opacity: Number.isFinite(opacity)
+      ? Math.max(0, Math.min(0.2, opacity))
+      : DEFAULT_RESULT_TEMPLATE.watermark_opacity,
+    third_term: {
+      ...DEFAULT_RESULT_TEMPLATE.third_term,
+      ...thirdTerm,
+      show_previous_term_totals:
+        thirdTerm.show_previous_term_totals ?? DEFAULT_RESULT_TEMPLATE.third_term.show_previous_term_totals,
+    },
+    cumulative: {
+      ...DEFAULT_RESULT_TEMPLATE.cumulative,
+      ...cumulative,
+      show_term_totals: cumulative.show_term_totals ?? DEFAULT_RESULT_TEMPLATE.cumulative.show_term_totals,
+      show_average: cumulative.show_average ?? DEFAULT_RESULT_TEMPLATE.cumulative.show_average,
+    },
+  };
+};
+
 export default function SchoolInformation() {
   const navigate = useNavigate();
   const { schoolId } = useParams();
@@ -148,6 +204,7 @@ export default function SchoolInformation() {
   const [savingBranding, setSavingBranding] = useState(false);
   const [savingExamRecord, setSavingExamRecord] = useState(false);
   const [savingGradingSchema, setSavingGradingSchema] = useState(false);
+  const [savingResultTemplate, setSavingResultTemplate] = useState(false);
   const [savingClassTemplates, setSavingClassTemplates] = useState(false);
   const [importingHistory, setImportingHistory] = useState(false);
   const [historyFile, setHistoryFile] = useState(null);
@@ -183,6 +240,7 @@ export default function SchoolInformation() {
 
   const [examRecord, setExamRecord] = useState(() => normalizeExamRecordsByLevel(DEFAULT_EXAM_RECORD, []));
   const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows([]));
+  const [resultTemplate, setResultTemplate] = useState(() => normalizeResultTemplate(DEFAULT_RESULT_TEMPLATE));
   const [classTemplates, setClassTemplates] = useState([]);
   const activeEducationLevels = useMemo(
     () => classTemplates.filter((section) => section.enabled && section.key),
@@ -212,6 +270,7 @@ export default function SchoolInformation() {
         setContactPhone(brandingData.contact_phone ?? "");
         setPaystackSubaccountCode(brandingData.paystack_subaccount_code ?? "");
         setGradingRows(normalizeGradingRows(payload.grading_schema));
+        setResultTemplate(normalizeResultTemplate(payload.result_template_config));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
         setExamRecord(
@@ -549,6 +608,41 @@ export default function SchoolInformation() {
       setSavingGradingSchema(false);
     }
   };
+
+  const updateResultTemplate = (field, value) => {
+    setResultTemplate((prev) => normalizeResultTemplate({ ...prev, [field]: value }));
+  };
+
+  const updateNestedResultTemplate = (group, field, value) => {
+    setResultTemplate((prev) =>
+      normalizeResultTemplate({
+        ...prev,
+        [group]: {
+          ...(prev[group] || {}),
+          [field]: value,
+        },
+      })
+    );
+  };
+
+  const saveResultTemplate = async () => {
+    const payload = normalizeResultTemplate(resultTemplate);
+    setSavingResultTemplate(true);
+    try {
+      const res = await api.put(`/api/super-admin/schools/${schoolId}/information/result-template`, payload);
+      setResultTemplate(normalizeResultTemplate(res.data?.data || payload));
+      alert("Result PDF template updated.");
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || apiMessage || "Failed to save result PDF template.");
+    } finally {
+      setSavingResultTemplate(false);
+    }
+  };
+
   const updateSection = (index, next) => {
     setClassTemplates((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...next } : item)));
   };
@@ -998,6 +1092,153 @@ export default function SchoolInformation() {
         <div className="sai-actions">
           <button type="button" onClick={saveGradingSchema} disabled={savingGradingSchema}>
             {savingGradingSchema ? "Saving..." : "Save Grading System"}
+          </button>
+        </div>
+      </section>
+
+      <section className="sai-card sai-result-template-card">
+        <h3>Result PDF Template</h3>
+        <p className="sai-note">
+          Configure how this school&apos;s normal result PDF and cumulative result PDF should appear. The CA columns
+          still come from the school&apos;s exam records above.
+        </p>
+
+        <div className="sai-grid">
+          <div className="sai-field">
+            <label>Layout Style</label>
+            <select
+              value={resultTemplate.layout}
+              onChange={(e) => updateResultTemplate("layout", e.target.value)}
+            >
+              <option value="classic">Classic full result</option>
+              <option value="compact">Compact result</option>
+            </select>
+          </div>
+
+          <div className="sai-field">
+            <label>Primary Colour</label>
+            <input
+              type="color"
+              value={resultTemplate.primary_color}
+              onChange={(e) => updateResultTemplate("primary_color", e.target.value)}
+            />
+          </div>
+
+          <div className="sai-field">
+            <label>Accent Colour</label>
+            <input
+              type="color"
+              value={resultTemplate.accent_color}
+              onChange={(e) => updateResultTemplate("accent_color", e.target.value)}
+            />
+          </div>
+
+          <div className="sai-field">
+            <label>Watermark Opacity</label>
+            <input
+              type="number"
+              min="0"
+              max="0.2"
+              step="0.01"
+              value={resultTemplate.watermark_opacity}
+              onChange={(e) => updateResultTemplate("watermark_opacity", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="sai-result-template-grid">
+          <div className="sai-template-option-card">
+            <h4>Visible Sections</h4>
+            <div className="sai-check-stack">
+              {[
+                ["show_student_photo", "Show student photo"],
+                ["show_school_logo", "Show school logo"],
+                ["show_watermark", "Use school logo as watermark"],
+                ["show_attendance", "Show attendance"],
+                ["show_behaviour", "Show behaviour rating"],
+                ["show_signature", "Show head signature"],
+                ["show_result_position", "Show class position"],
+              ].map(([key, label]) => (
+                <label className="sai-check sai-check-card sai-check-card--compact" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(resultTemplate[key])}
+                    onChange={(e) => updateResultTemplate(key, e.target.checked)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="sai-template-option-card">
+            <h4>Third Term Normal Result</h4>
+            <p className="sai-note">
+              When enabled, the normal third-term PDF shows CA + exam + third-term total, then first and second
+              term totals beside it. Cumulative PDF remains separate.
+            </p>
+            <label className="sai-check sai-check-card sai-check-card--compact">
+              <input
+                type="checkbox"
+                checked={Boolean(resultTemplate.third_term?.show_previous_term_totals)}
+                onChange={(e) =>
+                  updateNestedResultTemplate("third_term", "show_previous_term_totals", e.target.checked)
+                }
+              />
+              <span>Show first/second/third term totals on third-term normal PDF</span>
+            </label>
+          </div>
+
+          <div className="sai-template-option-card">
+            <h4>Cumulative Result</h4>
+            <div className="sai-check-stack">
+              <label className="sai-check sai-check-card sai-check-card--compact">
+                <input
+                  type="checkbox"
+                  checked={Boolean(resultTemplate.cumulative?.show_term_totals)}
+                  onChange={(e) => updateNestedResultTemplate("cumulative", "show_term_totals", e.target.checked)}
+                />
+                <span>Show first, second, and third term totals</span>
+              </label>
+              <label className="sai-check sai-check-card sai-check-card--compact">
+                <input
+                  type="checkbox"
+                  checked={Boolean(resultTemplate.cumulative?.show_average)}
+                  onChange={(e) => updateNestedResultTemplate("cumulative", "show_average", e.target.checked)}
+                />
+                <span>Show cumulative average</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="sai-result-template-preview">
+          <div
+            className="sai-result-template-mini"
+            style={{
+              "--template-primary": resultTemplate.primary_color,
+              "--template-accent": resultTemplate.accent_color,
+            }}
+          >
+            <div className="sai-result-mini-head">
+              <span>Photo</span>
+              <strong>{school?.name || "School Name"}</strong>
+              <span>Logo</span>
+            </div>
+            <div className="sai-result-mini-title">REPORT SHEET</div>
+            <div className="sai-result-mini-row">
+              <span>Subject</span>
+              <span>CA</span>
+              <span>Exam</span>
+              <span>Total</span>
+              {resultTemplate.third_term?.show_previous_term_totals ? <span>1st/2nd/3rd</span> : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="sai-actions">
+          <button type="button" onClick={saveResultTemplate} disabled={savingResultTemplate}>
+            {savingResultTemplate ? "Saving..." : "Save Result PDF Template"}
           </button>
         </div>
       </section>
