@@ -148,7 +148,7 @@ export default function StudentResultsHome() {
     if (!item.results_open) {
       setResults([]);
       setAssessmentSchema(DEFAULT_SCHEMA);
-      setError(item.locked_message || "This result is not available yet.");
+      setError("");
       return;
     }
 
@@ -302,6 +302,153 @@ export default function StudentResultsHome() {
     startResultPdfGeneration();
   };
 
+  const renderSelectedResultPanel = () => {
+    if (!selected) return null;
+
+    if (!selected.results_open) {
+      return (
+        <p className="rs-state rs-state--empty" style={{ marginTop: 14 }}>
+          {selected.locked_message || "This result is not available yet."}
+        </p>
+      );
+    }
+
+    return (
+      <>
+        <div className="rs-results-head">
+          <h3 className="rs-results-title">
+            {selected.class_name} - {sessionLabel(selected)} - {selected.term_name}
+            {isCumulative ? " Cumulative" : ""}
+          </h3>
+          <button
+            className="rs-btn"
+            onClick={handlePdfAction}
+            disabled={loadingResults || requestingPdf || downloading || isPdfProcessing}
+          >
+            {pdfActionLabel}
+          </button>
+        </div>
+
+        {supportsCumulative ? (
+          <div className="rs-meta" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="rs-btn"
+              style={{ opacity: resultType === "term" ? 1 : 0.72 }}
+              onClick={() => {
+                setResultType("term");
+                setPdfJob(null);
+              }}
+            >
+              Term Result
+            </button>
+            <button
+              type="button"
+              className="rs-btn"
+              style={{ opacity: resultType === "cumulative" ? 1 : 0.72 }}
+              onClick={() => {
+                setResultType("cumulative");
+                setPdfJob(null);
+              }}
+            >
+              Cumulative Result
+            </button>
+          </div>
+        ) : null}
+
+        {pdfJob?.status === "pending" || pdfJob?.status === "processing" ? (
+          <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>
+            {pdfJob.status === "processing"
+              ? "Your result PDF is being prepared for this school. We will keep checking until it is ready."
+              : "Your result PDF request is in queue. Processing will begin shortly."}
+          </p>
+        ) : null}
+
+        {pdfJob?.status === "completed" ? (
+          <p className="rs-state" style={{ marginTop: 10 }}>
+            Your result PDF is ready. Click the button above to download it.
+          </p>
+        ) : null}
+
+        {pdfJob?.status === "failed" ? (
+          <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>
+            {pdfJob.error_message || "Result PDF generation failed. Please try again."}
+          </p>
+        ) : null}
+
+        {loadingResults ? (
+          <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>
+        ) : (
+          <div className="rs-table-wrap">
+            <table className="rs-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 70 }}>S/N</th>
+                  <th>Subject</th>
+                  {isCumulative ? (
+                    <>
+                      <th style={{ width: 100 }}>First Term</th>
+                      <th style={{ width: 110 }}>Second Term</th>
+                      <th style={{ width: 100 }}>Third Term</th>
+                      <th style={{ width: 90 }}>Average</th>
+                    </>
+                  ) : (
+                    <>
+                      {caIndices.map((idx) => (
+                        <th key={`ca-head-${idx}`} style={{ width: 80 }}>
+                          CA{idx + 1}
+                        </th>
+                      ))}
+                      <th style={{ width: 80 }}>CA Total</th>
+                      <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
+                      <th style={{ width: 80 }}>Total</th>
+                    </>
+                  )}
+                  <th style={{ width: 80 }}>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row, idx) => (
+                  <tr key={row.term_subject_id}>
+                    <td>{idx + 1}</td>
+                    <td>{row.subject_name}</td>
+                    {isCumulative ? (
+                      <>
+                        <td>{displayScore(row.first_term_total)}</td>
+                        <td>{displayScore(row.second_term_total)}</td>
+                        <td>{displayScore(row.third_term_total)}</td>
+                        <td>{displayScore(row.average)}</td>
+                      </>
+                    ) : (
+                      <>
+                        {caIndices.map((caIdx) => (
+                          <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
+                            {displayScore(row.ca_breakdown?.[caIdx])}
+                          </td>
+                        ))}
+                        <td>{displayScore(row.ca)}</td>
+                        <td>{displayScore(row.exam)}</td>
+                        <td>{displayScore(row.total)}</td>
+                      </>
+                    )}
+                    <td>{row.grade}</td>
+                  </tr>
+                ))}
+                {results.length === 0 ? (
+                  <tr>
+                    <td colSpan={isCumulative ? 7 : 6 + caIndices.length}>
+                      No result records for this class and term.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="rs-page rs-page--student">
       <section className="rs-hero">
@@ -350,22 +497,28 @@ export default function StudentResultsHome() {
                   const isActive =
                     selected?.class_id === item.class_id && selected?.term_id === item.term_id;
                   return (
-                    <button
+                    <div
+                      className={`rs-period-block${isActive ? " rs-period-block--active" : ""}`}
                       key={`current-${item.class_id}-${item.term_id}`}
-                      className={`rs-card-btn${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`}
-                      onClick={() => {
-                        setPdfJob(null);
-                        setSelected(item);
-                      }}
                     >
-                      <h3 className="rs-card-title">{item.class_name}</h3>
-                      <p className="rs-card-meta">
-                        {item.class_level} | {sessionLabel(item)} | {item.term_name}
-                      </p>
-                      <p className="rs-card-meta" style={{ marginTop: 6 }}>
-                        {item.results_open ? "Published and ready" : item.locked_message || "Awaiting publication"}
-                      </p>
-                    </button>
+                      <button
+                        type="button"
+                        className={`rs-card-btn${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`}
+                        onClick={() => {
+                          setPdfJob(null);
+                          setSelected(item);
+                        }}
+                      >
+                        <h3 className="rs-card-title">{item.class_name}</h3>
+                        <p className="rs-card-meta">
+                          {item.class_level} | {sessionLabel(item)} | {item.term_name}
+                        </p>
+                        <p className="rs-card-meta" style={{ marginTop: 6 }}>
+                          {item.results_open ? "Published and ready" : item.locked_message || "Awaiting publication"}
+                        </p>
+                      </button>
+                      {isActive ? <div className="rs-inline-result">{renderSelectedResultPanel()}</div> : null}
+                    </div>
                   );
                 }) : (
                   <p className="rs-state rs-state--empty">No current term result record found.</p>
@@ -386,7 +539,11 @@ export default function StudentResultsHome() {
                       const isActive =
                         selected?.class_id === item.class_id && selected?.term_id === item.term_id;
                       return (
-                        <details className="rs-term-accordion" key={`${item.class_id}-${item.term_id}`}>
+                        <details
+                          className="rs-term-accordion"
+                          key={`${item.class_id}-${item.term_id}`}
+                          open={isActive || undefined}
+                        >
                           <summary>
                             <span>{item.term_name}</span>
                             <small>{item.class_name}</small>
@@ -407,6 +564,7 @@ export default function StudentResultsHome() {
                               <p className="rs-card-meta" style={{ marginTop: 6 }}>Cumulative Result available</p>
                             ) : null}
                           </button>
+                          {isActive ? <div className="rs-inline-result">{renderSelectedResultPanel()}</div> : null}
                         </details>
                       );
                     })}
@@ -420,147 +578,6 @@ export default function StudentResultsHome() {
         ) : null}
 
         {error ? <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>{error}</p> : null}
-
-        {selected && !selected.results_open ? (
-          <p className="rs-state rs-state--empty" style={{ marginTop: 14 }}>
-            {selected.locked_message || "This result is not available yet."}
-          </p>
-        ) : null}
-
-        {selected && selected.results_open ? (
-          <>
-            <div className="rs-results-head">
-              <h3 className="rs-results-title">
-                {selected.class_name} - {sessionLabel(selected)} - {selected.term_name}
-                {isCumulative ? " Cumulative" : ""}
-              </h3>
-              <button
-                className="rs-btn"
-                onClick={handlePdfAction}
-                disabled={loadingResults || requestingPdf || downloading || isPdfProcessing}
-              >
-                {pdfActionLabel}
-              </button>
-            </div>
-
-            {supportsCumulative ? (
-              <div className="rs-meta" style={{ marginTop: 10 }}>
-                <button
-                  type="button"
-                  className="rs-btn"
-                  style={{ opacity: resultType === "term" ? 1 : 0.72 }}
-                  onClick={() => {
-                    setResultType("term");
-                    setPdfJob(null);
-                  }}
-                >
-                  Term Result
-                </button>
-                <button
-                  type="button"
-                  className="rs-btn"
-                  style={{ opacity: resultType === "cumulative" ? 1 : 0.72 }}
-                  onClick={() => {
-                    setResultType("cumulative");
-                    setPdfJob(null);
-                  }}
-                >
-                  Cumulative Result
-                </button>
-              </div>
-            ) : null}
-
-            {pdfJob?.status === "pending" || pdfJob?.status === "processing" ? (
-              <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>
-                {pdfJob.status === "processing"
-                  ? "Your result PDF is being prepared for this school. We will keep checking until it is ready."
-                  : "Your result PDF request is in queue. Processing will begin shortly."}
-              </p>
-            ) : null}
-
-            {pdfJob?.status === "completed" ? (
-              <p className="rs-state" style={{ marginTop: 10 }}>
-                Your result PDF is ready. Click the button above to download it.
-              </p>
-            ) : null}
-
-            {pdfJob?.status === "failed" ? (
-              <p className="rs-state rs-state--error" style={{ marginTop: 10 }}>
-                {pdfJob.error_message || "Result PDF generation failed. Please try again."}
-              </p>
-            ) : null}
-
-            {loadingResults ? (
-              <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>
-            ) : (
-              <div className="rs-table-wrap">
-                <table className="rs-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 70 }}>S/N</th>
-                      <th>Subject</th>
-                      {isCumulative ? (
-                        <>
-                          <th style={{ width: 100 }}>First Term</th>
-                          <th style={{ width: 110 }}>Second Term</th>
-                          <th style={{ width: 100 }}>Third Term</th>
-                          <th style={{ width: 90 }}>Average</th>
-                        </>
-                      ) : (
-                        <>
-                          {caIndices.map((idx) => (
-                            <th key={`ca-head-${idx}`} style={{ width: 80 }}>
-                              CA{idx + 1}
-                            </th>
-                          ))}
-                          <th style={{ width: 80 }}>CA Total</th>
-                          <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
-                          <th style={{ width: 80 }}>Total</th>
-                        </>
-                      )}
-                      <th style={{ width: 80 }}>Grade</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((row, idx) => (
-                      <tr key={row.term_subject_id}>
-                        <td>{idx + 1}</td>
-                        <td>{row.subject_name}</td>
-                        {isCumulative ? (
-                          <>
-                            <td>{displayScore(row.first_term_total)}</td>
-                            <td>{displayScore(row.second_term_total)}</td>
-                            <td>{displayScore(row.third_term_total)}</td>
-                            <td>{displayScore(row.average)}</td>
-                          </>
-                        ) : (
-                          <>
-                            {caIndices.map((caIdx) => (
-                              <td key={`ca-cell-${row.term_subject_id}-${caIdx}`}>
-                                {displayScore(row.ca_breakdown?.[caIdx])}
-                              </td>
-                            ))}
-                            <td>{displayScore(row.ca)}</td>
-                            <td>{displayScore(row.exam)}</td>
-                            <td>{displayScore(row.total)}</td>
-                          </>
-                        )}
-                        <td>{row.grade}</td>
-                      </tr>
-                    ))}
-                    {results.length === 0 ? (
-                      <tr>
-                        <td colSpan={isCumulative ? 7 : 6 + caIndices.length}>
-                          No result records for this class and term.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        ) : null}
       </section>
     </div>
   );

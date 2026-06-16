@@ -13,6 +13,7 @@ const NO_BACK_EXACT_PATHS = new Set([
   "/school/admin/teacher_report",
   "/school/admin/student_report",
   "/school/admin/student_result",
+  "/school/admin/class-progress",
   "/school/admin/teaching",
   "/school/admin/attendant",
   "/school/admin/website",
@@ -34,6 +35,7 @@ const HEADERLESS_PREFIXES = [
   "/school/admin/entrance-exam",
   "/school/admin/announcements",
   "/school/admin/student_result",
+  "/school/admin/class-progress",
   "/school/admin/teaching",
   "/school/admin/attendant",
 ];
@@ -52,6 +54,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/school/admin/teacher_report")) return "Teacher Report";
   if (pathname.startsWith("/school/admin/student_report")) return "Student Report";
   if (pathname.startsWith("/school/admin/student_result")) return "Student Result";
+  if (pathname.startsWith("/school/admin/class-progress")) return "Class Progress";
   if (pathname.startsWith("/school/admin/announcements")) return "Announcement Desk";
   if (pathname.startsWith("/school/admin/teaching")) return "Teaching";
   if (pathname.startsWith("/school/admin/attendant")) return "Staff Attendance";

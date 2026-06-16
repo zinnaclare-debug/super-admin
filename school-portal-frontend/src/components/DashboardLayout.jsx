@@ -227,6 +227,7 @@ function DashboardLayout() {
     () =>
       features
         .filter((f) => f.enabled && f.category === "general")
+        .filter((f) => String(f.feature || "").toLowerCase() !== "class progress")
         .sort((a, b) => featureSortLabel(a.feature).localeCompare(featureSortLabel(b.feature))),
     [features]
   );
@@ -263,7 +264,12 @@ function DashboardLayout() {
     [features]
   );
   const classProgressEnabled = useMemo(
-    () => features.some((f) => String((f?.feature ?? f) || "").toLowerCase() === "class progress"),
+    () =>
+      features.some(
+        (f) =>
+          (typeof f !== "object" || f?.enabled !== false) &&
+          String((f?.feature ?? f) || "").toLowerCase() === "class progress"
+      ),
     [features]
   );
 
@@ -344,6 +350,8 @@ function DashboardLayout() {
       "announcement desk": "announcements",
       website: "website",
       entrance_exam: "entrance-exam",
+      "class progress": "class-progress",
+      class_progress: "class-progress",
       teaching: "teaching",
       attendant: "attendant",
     };
@@ -416,6 +424,11 @@ function DashboardLayout() {
             {schoolAdminPromotionEnabled ? (
               <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle} onClick={composeNavClick()}>
                 {isCompactSidebar && !isMobile ? "PROMOTION" : "Promotion"}
+              </NavLink>
+            ) : null}
+            {classProgressEnabled ? (
+              <NavLink to="/school/admin/class-progress" title="Class Progress" style={linkStyle} onClick={composeNavClick()}>
+                {isCompactSidebar && !isMobile ? "CLASS PROGRESS" : "Class Progress"}
               </NavLink>
             ) : null}
 
@@ -744,6 +757,11 @@ function DashboardLayout() {
               {schoolAdminPromotionEnabled ? (
                 <NavLink to="/school/admin/promotion" title="Promotion" style={linkStyle}>
                   {isCompactSidebar ? "PROMOTION" : "Promotion"}
+                </NavLink>
+              ) : null}
+              {classProgressEnabled ? (
+                <NavLink to="/school/admin/class-progress" title="Class Progress" style={linkStyle}>
+                  {isCompactSidebar ? "CLASS PROGRESS" : "Class Progress"}
                 </NavLink>
               ) : null}
 

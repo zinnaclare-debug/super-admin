@@ -59,6 +59,7 @@ import EntranceExamAdmin from "./pages/school-admin/EntranceExamAdmin";
 import EntranceExamClassQuestions from "./pages/school-admin/EntranceExamClassQuestions";
 import SchoolAdminTeaching from "./pages/school-admin/Teaching";
 import SchoolAdminFeatureLayout from "./pages/school-admin/SchoolAdminFeatureLayout";
+import SchoolAdminClassProgress from "./pages/school-admin/ClassProgress";
 
 
 
@@ -221,6 +222,7 @@ function App() {
         <Route path="admin/student_report" element={<StudentReport />} />
         <Route path="admin/student_result" element={<StudentResult />} />
         <Route path="admin/announcements" element={<AnnouncementDesk />} />
+        <Route path="admin/class-progress" element={<RequireFeature feature="class progress"><SchoolAdminClassProgress /></RequireFeature>} />
         <Route path="admin/teaching" element={<RequireFeature feature="teaching"><SchoolAdminTeaching /></RequireFeature>} />
         <Route path="admin/attendant" element={<RequireFeature feature="attendant"><SchoolAdminAttendant /></RequireFeature>} />
         <Route path="admin/website" element={<RequireFeature feature="website"><WebsiteAdmin /></RequireFeature>} />

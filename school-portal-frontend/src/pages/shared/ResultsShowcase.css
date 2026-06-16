@@ -154,6 +154,16 @@
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
 }
 
+.rs-period-block {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rs-period-block--active {
+  grid-column: 1 / -1;
+}
+
 .rs-card-btn {
   border: 1px solid #dbeafe;
   border-radius: 14px;
@@ -314,6 +324,16 @@
 
 .rs-term-accordion {
   background: #f8fafc;
+}
+
+.rs-inline-result {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(147, 197, 253, 0.75);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
 }
 
 @media (max-width: 980px) {

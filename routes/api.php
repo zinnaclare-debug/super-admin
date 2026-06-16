@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SchoolAdmin\TranscriptController;
 use App\Http\Controllers\Api\SchoolAdmin\AnnouncementController as SchoolAdminAnnouncementController;
 use App\Http\Controllers\Api\SchoolAdmin\TeachingController as SchoolAdminTeachingController;
 use App\Http\Controllers\Api\SchoolAdmin\AttendantController as SchoolAdminAttendantController;
+use App\Http\Controllers\Api\SchoolAdmin\ClassProgressController as SchoolAdminClassProgressController;
 
 use App\Http\Controllers\Api\Staff\TeacherResultsController;
 use App\Http\Controllers\Api\Staff\StaffProfileController;
@@ -118,6 +119,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::post('/super-admin/schools/{school}/information/branding', [SchoolController::class, 'upsertInformationBranding']);
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
     Route::put('/super-admin/schools/{school}/information/grading-schema', [SchoolController::class, 'updateInformationGradingSchema']);
+    Route::put('/super-admin/schools/{school}/information/result-template', [SchoolController::class, 'updateInformationResultTemplate']);
     Route::put('/super-admin/schools/{school}/information/class-templates', [SchoolController::class, 'updateInformationClassTemplates']);
     Route::get('/super-admin/schools/{school}/information/history-import/template', [SchoolController::class, 'downloadHistoryImportTemplate']);
     Route::post('/super-admin/schools/{school}/information/history-import', [SchoolController::class, 'importHistory']);
@@ -246,6 +248,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:attendant');
     Route::get('/school-admin/attendant/history/{term}/download/pdf', [SchoolAdminAttendantController::class, 'downloadTermPdf'])
         ->middleware('feature:attendant');
+    Route::get('/school-admin/class-progress', [SchoolAdminClassProgressController::class, 'index'])
+        ->middleware('feature:class progress');
 
     // âœ… Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
