@@ -2349,6 +2349,9 @@ class ResultsController extends Controller
             }
         }
         $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
+        $resultTemplate = (array) data_get($viewData, 'resultTemplate', []);
+        $showThirdTermPreviousTotals = !$isCumulative
+            && (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false);
         $caSummaryParts = [];
         $activeCaIndices = AssessmentSchema::activeCaIndices($assessmentSchema);
         foreach ($activeCaIndices as $index) {
@@ -2357,7 +2360,8 @@ class ResultsController extends Controller
         }
         $assessmentSummary = $isCumulative
             ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
-            : implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')';
+            : implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')'
+                . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '');
 
         $caHeaderHtml = '';
         if ($isCumulative) {
@@ -2368,6 +2372,9 @@ class ResultsController extends Controller
                 $caHeaderHtml .= '<th style="width:8%;">' . e(strtoupper($caLabel)) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
             }
         }
+        $thirdTermHeaderHtml = $showThirdTermPreviousTotals
+            ? '<th style="width:8%;">First Term</th><th style="width:8%;">Second Term</th><th style="width:8%;">Third Term</th>'
+            : '';
 
         $rowsHtml = '';
         foreach ((array) data_get($viewData, 'rows', []) as $row) {
@@ -2377,6 +2384,7 @@ class ResultsController extends Controller
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
             $caCellsHtml = '';
+            $thirdTermCellsHtml = '';
             if ($isCumulative) {
                 $caCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
                     . '<td style="text-align:center;">' . e((string) ($row['second_term_total'] ?? '-')) . '</td>'
@@ -2390,19 +2398,25 @@ class ResultsController extends Controller
                         . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
                         . '</td>';
                 }
+                if ($showThirdTermPreviousTotals) {
+                    $thirdTermCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
+                        . '<td style="text-align:center;">' . e((string) ($row['second_term_total'] ?? '-')) . '</td>'
+                        . '<td style="text-align:center;">' . e((string) ($row['third_term_total'] ?? '-')) . '</td>';
+                }
             }
 
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
                 . $caCellsHtml
                 . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td><td style="text-align:center;">' . $score . '</td>')
+                . $thirdTermCellsHtml
                 . '<td style="text-align:center;">' . e($grade) . '</td>'
                 . '<td>' . e($remark) . '</td>'
                 . '</tr>';
         }
 
         if ($rowsHtml === '') {
-            $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 6 : 5 + count($activeCaIndices)) . '" style="text-align:center;">No result data found.</td></tr>';
+            $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 6 : 5 + count($activeCaIndices) + ($showThirdTermPreviousTotals ? 3 : 0)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
         $behaviourCellsPerRow = 5;
@@ -2482,6 +2496,7 @@ class ResultsController extends Controller
             . '<thead><tr><th style="width:30%;">Subject</th>'
             . $caHeaderHtml
             . ($isCumulative ? '' : '<th style="width:8%;">Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th><th style="width:8%;">Total</th>')
+            . $thirdTermHeaderHtml
             . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
