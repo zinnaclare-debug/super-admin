@@ -348,10 +348,14 @@ class SchoolController extends Controller
         $payload = $request->validate([
             'ca_maxes' => 'nullable|array|size:5',
             'ca_maxes.*' => 'required_with:ca_maxes|integer|min:0|max:100',
+            'ca_labels' => 'nullable|array|size:5',
+            'ca_labels.*' => 'nullable|string|max:30',
             'exam_max' => 'nullable|integer|min:0|max:100',
             'by_level' => 'nullable|array',
             'by_level.*.ca_maxes' => 'required_with:by_level|array|size:5',
             'by_level.*.ca_maxes.*' => 'required|integer|min:0|max:100',
+            'by_level.*.ca_labels' => 'nullable|array|size:5',
+            'by_level.*.ca_labels.*' => 'nullable|string|max:30',
             'by_level.*.exam_max' => 'required_with:by_level|integer|min:0|max:100',
         ]);
 
@@ -370,6 +374,7 @@ class SchoolController extends Controller
                 }
 
                 $caMaxes = array_map(fn ($value) => (int) $value, array_values($submitted['ca_maxes'] ?? []));
+                $caLabels = $this->normalizeCaLabels($submitted['ca_labels'] ?? []);
                 $examMax = (int) ($submitted['exam_max'] ?? 0);
                 $validationMessage = $this->validateAssessmentSchemaParts($caMaxes, $examMax);
                 if ($validationMessage !== null) {
@@ -379,6 +384,7 @@ class SchoolController extends Controller
 
                 $byLevel[$levelKey] = AssessmentSchema::normalizeSchema([
                     'ca_maxes' => $caMaxes,
+                    'ca_labels' => $caLabels,
                     'exam_max' => $examMax,
                 ]);
             }
@@ -396,6 +402,7 @@ class SchoolController extends Controller
             ];
         } else {
             $caMaxes = array_map(fn ($value) => (int) $value, array_values($payload['ca_maxes'] ?? []));
+            $caLabels = $this->normalizeCaLabels($payload['ca_labels'] ?? []);
             $examMax = (int) ($payload['exam_max'] ?? 0);
             $validationMessage = $this->validateAssessmentSchemaParts($caMaxes, $examMax);
 
@@ -407,6 +414,7 @@ class SchoolController extends Controller
 
             $default = AssessmentSchema::normalizeSchema([
                 'ca_maxes' => $caMaxes,
+                'ca_labels' => $caLabels,
                 'exam_max' => $examMax,
             ]);
             $schema = AssessmentSchema::normalizeLevelSchemas([
@@ -492,6 +500,17 @@ class SchoolController extends Controller
         }
 
         return null;
+    }
+
+    private function normalizeCaLabels(array $labels): array
+    {
+        $normalized = [];
+        for ($i = 0; $i < 5; $i++) {
+            $label = trim((string) ($labels[$i] ?? ''));
+            $normalized[$i] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($i + 1);
+        }
+
+        return $normalized;
     }
 
     public function updateInformationClassTemplates(Request $request, School $school)

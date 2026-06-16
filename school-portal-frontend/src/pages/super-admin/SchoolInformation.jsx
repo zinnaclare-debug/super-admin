@@ -7,6 +7,7 @@ import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profile
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DEFAULT_EXAM_RECORD = {
   ca_maxes: [30, 0, 0, 0, 0],
+  ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   exam_max: 70,
   total_max: 100,
 };
@@ -87,9 +88,18 @@ const normalizeExamRecord = (record) => {
   const schema = raw.default && typeof raw.default === "object" ? raw.default : raw;
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_EXAM_RECORD.ca_maxes;
   const schemaCaMaxes = Array.isArray(schema.ca_maxes) ? schema.ca_maxes : caMaxes;
+  const caLabels = Array.isArray(schema.ca_labels)
+    ? schema.ca_labels
+    : Array.isArray(raw.ca_labels)
+      ? raw.ca_labels
+      : DEFAULT_EXAM_RECORD.ca_labels;
   const normalizedCa = Array.from({ length: 5 }, (_, idx) => {
     const value = Number(schemaCaMaxes[idx] || 0);
     return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;
+  });
+  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => {
+    const label = String(caLabels[idx] || "").trim();
+    return label ? label.slice(0, 30) : `CA${idx + 1}`;
   });
   const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
   const requestedExam = Number(schema.exam_max ?? 100 - caTotal);
@@ -97,6 +107,7 @@ const normalizeExamRecord = (record) => {
 
   return {
     ca_maxes: normalizedCa,
+    ca_labels: normalizedLabels,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
   };
@@ -458,6 +469,21 @@ export default function SchoolInformation() {
     });
   };
 
+  const updateExamDraftCaLabel = (levelKey, index, value) => {
+    setExamRecord((prev) => {
+      const current = normalizeExamRecord(prev.by_level?.[levelKey] || prev.default);
+      const caLabels = [...current.ca_labels];
+      caLabels[index] = String(value || "").slice(0, 30);
+      return {
+        ...prev,
+        by_level: {
+          ...(prev.by_level || {}),
+          [levelKey]: { ...current, ca_labels: caLabels },
+        },
+      };
+    });
+  };
+
   const updateExamDraftExam = (levelKey, value) => {
     const parsed = Number(value);
     const sanitized = Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : 0;
@@ -486,6 +512,10 @@ export default function SchoolInformation() {
         const n = Number(record.ca_maxes?.[idx] || 0);
         return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
       });
+      const caLabels = Array.from({ length: 5 }, (_, idx) => {
+        const label = String(record.ca_labels?.[idx] || "").trim();
+        return label ? label.slice(0, 30) : `CA${idx + 1}`;
+      });
       const examMaxRaw = Number(record.exam_max || 0);
       const examMax = Number.isFinite(examMaxRaw) ? Math.max(0, Math.min(100, Math.round(examMaxRaw))) : 0;
       const caTotal = caMaxes.reduce((sum, val) => sum + val, 0);
@@ -500,7 +530,7 @@ export default function SchoolInformation() {
         return;
       }
 
-      byLevel[level.key] = { ca_maxes: caMaxes, exam_max: examMax };
+      byLevel[level.key] = { ca_maxes: caMaxes, ca_labels: caLabels, exam_max: examMax };
     }
 
     setSavingExamRecord(true);
@@ -968,7 +998,7 @@ export default function SchoolInformation() {
       <section className="sai-card">
         <h3>Exam Records By Education Level</h3>
         <p className="sai-note">
-          Configure CA1-CA5 and exam maximum for each enabled education level. Each level must total 100.
+          Configure each CA name, CA maximum, and exam maximum for each enabled education level. Each level must total 100.
         </p>
         <div className="sai-level-exam-list">
           {activeEducationLevels.length === 0 ? (
@@ -987,7 +1017,15 @@ export default function SchoolInformation() {
                   <div className="sai-exam-grid">
                     {[0, 1, 2, 3, 4].map((index) => (
                       <div key={`${level.key}-ca-record-${index}`} className="sai-field">
-                        <label>CA {index + 1}</label>
+                        <label>CA {index + 1} Name</label>
+                        <input
+                          type="text"
+                          maxLength="30"
+                          value={record.ca_labels[index]}
+                          onChange={(e) => updateExamDraftCaLabel(level.key, index, e.target.value)}
+                          placeholder={`CA${index + 1}`}
+                        />
+                        <label style={{ marginTop: 8 }}>{record.ca_labels[index] || `CA${index + 1}`} Max</label>
                         <input
                           type="number"
                           min="0"

@@ -220,7 +220,8 @@
     $activeCaIndices = \App\Support\AssessmentSchema::activeCaIndices($assessmentSchema);
     $assessmentParts = [];
     foreach ($activeCaIndices as $index) {
-        $assessmentParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
+        $caLabel = (string) ($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1)));
+        $assessmentParts[] = $caLabel . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
     }
     $assessmentPattern = $isCumulative
         ? trim(($showCumulativeTermTotals ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '') . ($showCumulativeAverage ? ' | AVERAGE' : ''), ' |')
@@ -329,7 +330,7 @@
                         @endif
                     @else
                         @foreach($activeCaIndices as $index)
-                            <th class="center">C{{ $index + 1 }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
+                            <th class="center">{{ strtoupper($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1))) }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
                         @endforeach
                         <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
                         <th class="center">TOTAL</th>

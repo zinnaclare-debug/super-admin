@@ -5,6 +5,7 @@ import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 
 const DEFAULT_SCHEMA = {
   ca_maxes: [30, 0, 0, 0, 0],
+  ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   exam_max: 70,
   total_max: 100,
 };
@@ -23,13 +24,19 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeSchema = (schema) => {
   const raw = schema || {};
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
+  const caLabels = Array.isArray(raw.ca_labels) ? raw.ca_labels : DEFAULT_SCHEMA.ca_labels;
   const normalizedCa = Array.from({ length: 5 }, (_, idx) => clamp(Number(caMaxes[idx] || 0), 0, 100));
+  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => {
+    const label = String(caLabels[idx] || "").trim();
+    return label || `CA${idx + 1}`;
+  });
   const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
   const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
   const examMax = caTotal + requestedExam === 100 ? clamp(requestedExam, 0, 100) : clamp(100 - caTotal, 0, 100);
 
   return {
     ca_maxes: normalizedCa,
+    ca_labels: normalizedLabels,
     exam_max: examMax,
     total_max: 100,
   };
@@ -98,7 +105,10 @@ export default function SubjectScores() {
   const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
   const caIndices = useMemo(() => activeCaIndices(schema), [schema]);
   const caPattern = useMemo(
-    () => caIndices.map((idx) => `CA${idx + 1}(${schema.ca_maxes[idx]})`).join(" | ") + ` | EXAM(${schema.exam_max})`,
+    () =>
+      caIndices
+        .map((idx) => `${schema.ca_labels?.[idx] || `CA${idx + 1}`}(${schema.ca_maxes[idx]})`)
+        .join(" | ") + ` | EXAM(${schema.exam_max})`,
     [caIndices, schema]
   );
 
@@ -287,7 +297,7 @@ export default function SubjectScores() {
               <th>Student</th>
               {caIndices.map((idx) => (
                 <th key={`ca-head-${idx}`} style={{ width: 110 }}>
-                  CA{idx + 1} ({schema.ca_maxes[idx]})
+                  {schema.ca_labels?.[idx] || `CA${idx + 1}`} ({schema.ca_maxes[idx]})
                 </th>
               ))}
               <th style={{ width: 110 }}>CA Total</th>

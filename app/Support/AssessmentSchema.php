@@ -8,6 +8,7 @@ class AssessmentSchema
     {
         return [
             'ca_maxes' => [30, 0, 0, 0, 0],
+            'ca_labels' => ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],
             'exam_max' => 70,
             'total_max' => 100,
         ];
@@ -25,10 +26,16 @@ class AssessmentSchema
         $caMaxes = isset($schema['ca_maxes']) && is_array($schema['ca_maxes'])
             ? $schema['ca_maxes']
             : $base['ca_maxes'];
+        $caLabels = isset($schema['ca_labels']) && is_array($schema['ca_labels'])
+            ? $schema['ca_labels']
+            : $base['ca_labels'];
 
         $normalized = [];
+        $labels = [];
         for ($i = 0; $i < 5; $i++) {
             $normalized[$i] = max(0, (int) ($caMaxes[$i] ?? 0));
+            $label = trim((string) ($caLabels[$i] ?? ''));
+            $labels[$i] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($i + 1);
         }
 
         $caTotalMax = array_sum($normalized);
@@ -41,6 +48,7 @@ class AssessmentSchema
 
         return [
             'ca_maxes' => $normalized,
+            'ca_labels' => $labels,
             'exam_max' => $examMax,
             'total_max' => 100,
         ];
@@ -182,7 +190,8 @@ class AssessmentSchema
         foreach (self::activeCaIndices($normalizedSchema) as $index) {
             $score = (int) ($breakdown[$index] ?? 0);
             $max = (int) ($normalizedSchema['ca_maxes'][$index] ?? 0);
-            $parts[] = 'CA' . ($index + 1) . ': ' . $score . '/' . $max;
+            $label = (string) ($normalizedSchema['ca_labels'][$index] ?? ('CA' . ($index + 1)));
+            $parts[] = $label . ': ' . $score . '/' . $max;
         }
 
         return implode(', ', $parts);

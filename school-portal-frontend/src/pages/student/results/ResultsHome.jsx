@@ -7,6 +7,7 @@ import "../../shared/ResultsShowcase.css";
 
 const DEFAULT_SCHEMA = {
   ca_maxes: [30, 0, 0, 0, 0],
+  ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   exam_max: 70,
   total_max: 100,
 };
@@ -14,9 +15,14 @@ const DEFAULT_SCHEMA = {
 const normalizeSchema = (schema) => {
   const raw = schema || {};
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
+  const caLabels = Array.isArray(raw.ca_labels) ? raw.ca_labels : DEFAULT_SCHEMA.ca_labels;
   const normalizedCa = Array.from({ length: 5 }, (_, idx) => {
     const n = Number(caMaxes[idx] || 0);
     return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+  });
+  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => {
+    const label = String(caLabels[idx] || "").trim();
+    return label || `CA${idx + 1}`;
   });
   const caTotal = normalizedCa.reduce((sum, value) => sum + value, 0);
   const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
@@ -24,6 +30,7 @@ const normalizeSchema = (schema) => {
 
   return {
     ca_maxes: normalizedCa,
+    ca_labels: normalizedLabels,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
   };
@@ -396,7 +403,7 @@ export default function StudentResultsHome() {
                     <>
                       {caIndices.map((idx) => (
                         <th key={`ca-head-${idx}`} style={{ width: 80 }}>
-                          CA{idx + 1}
+                          {assessmentSchema.ca_labels?.[idx] || `CA${idx + 1}`}
                         </th>
                       ))}
                       <th style={{ width: 80 }}>CA Total</th>

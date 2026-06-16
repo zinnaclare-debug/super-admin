@@ -2289,7 +2289,8 @@ class ResultsController extends Controller
         $caSummaryParts = [];
         $activeCaIndices = AssessmentSchema::activeCaIndices($assessmentSchema);
         foreach ($activeCaIndices as $index) {
-            $caSummaryParts[] = 'CA' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
+            $caLabel = (string) ($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1)));
+            $caSummaryParts[] = $caLabel . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')';
         }
         $assessmentSummary = $isCumulative
             ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
@@ -2300,7 +2301,8 @@ class ResultsController extends Controller
             $caHeaderHtml = '<th style="width:10%;">First Term</th><th style="width:10%;">Second Term</th><th style="width:10%;">Third Term</th><th style="width:10%;">Average</th>';
         } else {
             foreach ($activeCaIndices as $index) {
-                $caHeaderHtml .= '<th style="width:8%;">C' . ($index + 1) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
+                $caLabel = (string) ($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1)));
+                $caHeaderHtml .= '<th style="width:8%;">' . e(strtoupper($caLabel)) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
             }
         }
 
