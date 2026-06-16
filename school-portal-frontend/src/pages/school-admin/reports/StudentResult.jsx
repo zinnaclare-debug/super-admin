@@ -31,6 +31,16 @@ const shouldShowThirdTermPreviousTotals = (entry) =>
       )
   );
 
+const activeCaIndicesForEntry = (entry) => {
+  const caMaxes = Array.isArray(entry?.assessment_schema?.ca_maxes)
+    ? entry.assessment_schema.ca_maxes
+    : [30, 0, 0, 0, 0];
+  const indices = caMaxes
+    .map((max, idx) => (Number(max) > 0 ? idx : null))
+    .filter((idx) => idx !== null);
+  return indices.length ? indices : [0];
+};
+
 export default function StudentResult() {
   const [sessions, setSessions] = useState([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -60,6 +70,7 @@ export default function StudentResult() {
   const supportsCumulative = Boolean(selectedTerm && isThirdTermName(selectedTerm.name));
   const isCumulative = supportsCumulative && resultType === "cumulative";
   const showThirdTermPreviousTotals = shouldShowThirdTermPreviousTotals(entry);
+  const entryCaIndices = activeCaIndicesForEntry(entry);
 
   const resetPdfState = () => {
     setJob(null);
@@ -395,20 +406,30 @@ export default function StudentResult() {
                       </>
                     ) : (
                       <>
-                        <th>CA</th>
-                        <th>Exam</th>
-                        <th>Total</th>
                         {showThirdTermPreviousTotals ? (
                           <>
-                            <th>First Term</th>
-                            <th>Second Term</th>
-                            <th>Third Term</th>
+                            {entryCaIndices.map((idx) => (
+                              <th key={`ca-head-${idx}`}>
+                                {entry.assessment_schema?.ca_labels?.[idx] || `CA${idx + 1}`}
+                              </th>
+                            ))}
+                            <th>Third Term Exam</th>
+                            <th>First Term Total</th>
+                            <th>Second Term Total</th>
+                            <th>Total Score</th>
+                            <th>Total Average</th>
                           </>
-                        ) : null}
-                        <th>Min</th>
-                        <th>Max</th>
-                        <th>Class Ave</th>
-                        <th>Position</th>
+                        ) : (
+                          <>
+                            <th>CA</th>
+                            <th>Exam</th>
+                            <th>Total</th>
+                            <th>Min</th>
+                            <th>Max</th>
+                            <th>Class Ave</th>
+                            <th>Position</th>
+                          </>
+                        )}
                       </>
                     )}
                     <th>Grade</th>
@@ -428,24 +449,34 @@ export default function StudentResult() {
                         </>
                       ) : (
                         <>
-                          <td>{asDash(row.ca)}</td>
-                          <td>{asDash(row.exam)}</td>
-                          <td>{asDash(row.total)}</td>
                           {showThirdTermPreviousTotals ? (
                             <>
+                              {entryCaIndices.map((idx) => (
+                                <td key={`ca-cell-${row.term_subject_id}-${idx}`}>
+                                  {asDash(row.ca_breakdown?.[idx])}
+                                </td>
+                              ))}
+                              <td>{asDash(row.exam)}</td>
                               <td>{asDash(row.first_term_total)}</td>
                               <td>{asDash(row.second_term_total)}</td>
-                              <td>{asDash(row.third_term_total)}</td>
+                              <td>{asDash(row.combined_total_score)}</td>
+                              <td>{asDash(row.combined_average)}</td>
                             </>
-                          ) : null}
-                          <td>{asDash(row.min_score)}</td>
-                          <td>{asDash(row.max_score)}</td>
-                          <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
-                          <td>{row.position_label || "-"}</td>
+                          ) : (
+                            <>
+                              <td>{asDash(row.ca)}</td>
+                              <td>{asDash(row.exam)}</td>
+                              <td>{asDash(row.total)}</td>
+                              <td>{asDash(row.min_score)}</td>
+                              <td>{asDash(row.max_score)}</td>
+                              <td>{row.is_graded ? formatMaybeNumber(row.class_average) : "-"}</td>
+                              <td>{row.position_label || "-"}</td>
+                            </>
+                          )}
                         </>
                       )}
-                      <td>{asDash(row.grade)}</td>
-                      <td>{asDash(row.remark)}</td>
+                      <td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade)}</td>
+                      <td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_remark || row.remark : row.remark)}</td>
                     </tr>
                   ))}
                   {(entry.rows || []).length === 0 ? (

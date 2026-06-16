@@ -248,6 +248,15 @@ class ResultsController extends Controller
         );
     }
 
+    private function scoreNumber(mixed $value): ?float
+    {
+        if ($value === null || $value === '' || $value === '-') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
     private function addThirdTermPreviousTotalsToRows(
         int $schoolId,
         int $classId,
@@ -274,14 +283,31 @@ class ResultsController extends Controller
         )->keyBy(fn ($row) => (int) ($row['subject_id'] ?? 0));
 
         return collect($rows)
-            ->map(function (array $row) use ($cumulativeRowsBySubject) {
+            ->map(function (array $row) use ($cumulativeRowsBySubject, $schoolId) {
                 $subjectId = (int) ($row['subject_id'] ?? 0);
                 $cumulativeRow = $subjectId > 0 ? $cumulativeRowsBySubject->get($subjectId) : null;
+                $firstScore = $this->scoreNumber($cumulativeRow['first_term_score'] ?? $cumulativeRow['first_term_total'] ?? null);
+                $secondScore = $this->scoreNumber($cumulativeRow['second_term_score'] ?? $cumulativeRow['second_term_total'] ?? null);
+                $thirdScore = $this->scoreNumber($cumulativeRow['third_term_score'] ?? $cumulativeRow['third_term_total'] ?? $row['total'] ?? null);
+                $availableScores = array_values(array_filter(
+                    [$firstScore, $secondScore, $thirdScore],
+                    fn ($score) => $score !== null
+                ));
+                $combinedTotal = !empty($availableScores) ? round(array_sum($availableScores), 2) : null;
+                $combinedAverage = $combinedTotal !== null ? round($combinedTotal / count($availableScores), 2) : null;
 
                 return array_merge($row, [
                     'first_term_total' => $cumulativeRow['first_term_total'] ?? '-',
                     'second_term_total' => $cumulativeRow['second_term_total'] ?? '-',
                     'third_term_total' => $cumulativeRow['third_term_total'] ?? ($row['total'] ?? '-'),
+                    'combined_total_score' => $this->formatCumulativeScore($combinedTotal),
+                    'combined_average' => $this->formatCumulativeScore($combinedAverage),
+                    'third_term_combined_grade' => $combinedAverage !== null
+                        ? $this->gradeFromTotal($schoolId, (int) round($combinedAverage))
+                        : ($row['grade'] ?? '-'),
+                    'third_term_combined_remark' => $combinedAverage !== null
+                        ? $this->remarkFromTotal($schoolId, (int) round($combinedAverage))
+                        : ($row['remark'] ?? '-'),
                 ]);
             })
             ->values()
@@ -2360,8 +2386,8 @@ class ResultsController extends Controller
         }
         $assessmentSummary = $isCumulative
             ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
-            : implode(', ', $caSummaryParts) . ' | EXAM (' . ((int) $assessmentSchema['exam_max']) . ')'
-                . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '');
+            : implode(', ', $caSummaryParts) . ' | THIRD TERM EXAM (' . ((int) $assessmentSchema['exam_max']) . ')'
+                . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | TOTAL SCORE | TOTAL AVERAGE' : ' | TOTAL');
 
         $caHeaderHtml = '';
         if ($isCumulative) {
@@ -2373,7 +2399,7 @@ class ResultsController extends Controller
             }
         }
         $thirdTermHeaderHtml = $showThirdTermPreviousTotals
-            ? '<th style="width:8%;">First Term</th><th style="width:8%;">Second Term</th><th style="width:8%;">Third Term</th>'
+            ? '<th style="width:8%;">First Term Total</th><th style="width:8%;">Second Term Total</th><th style="width:8%;">Total Score</th><th style="width:8%;">Total Average</th>'
             : '';
 
         $rowsHtml = '';
@@ -2401,17 +2427,24 @@ class ResultsController extends Controller
                 if ($showThirdTermPreviousTotals) {
                     $thirdTermCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
                         . '<td style="text-align:center;">' . e((string) ($row['second_term_total'] ?? '-')) . '</td>'
-                        . '<td style="text-align:center;">' . e((string) ($row['third_term_total'] ?? '-')) . '</td>';
+                        . '<td style="text-align:center;">' . e((string) ($row['combined_total_score'] ?? '-')) . '</td>'
+                        . '<td style="text-align:center;">' . e((string) ($row['combined_average'] ?? '-')) . '</td>';
                 }
             }
+            $gradeDisplay = $showThirdTermPreviousTotals
+                ? strtoupper((string) ($row['third_term_combined_grade'] ?? $row['grade'] ?? '-'))
+                : $grade;
+            $remarkDisplay = $showThirdTermPreviousTotals
+                ? strtoupper((string) ($row['third_term_combined_remark'] ?? $row['remark'] ?? '-'))
+                : $remark;
 
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
                 . $caCellsHtml
-                . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td><td style="text-align:center;">' . $score . '</td>')
+                . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td>' . ($showThirdTermPreviousTotals ? '' : '<td style="text-align:center;">' . $score . '</td>'))
                 . $thirdTermCellsHtml
-                . '<td style="text-align:center;">' . e($grade) . '</td>'
-                . '<td>' . e($remark) . '</td>'
+                . '<td style="text-align:center;">' . e($gradeDisplay) . '</td>'
+                . '<td>' . e($remarkDisplay) . '</td>'
                 . '</tr>';
         }
 
@@ -2495,7 +2528,7 @@ class ResultsController extends Controller
             . '<table>'
             . '<thead><tr><th style="width:30%;">Subject</th>'
             . $caHeaderHtml
-            . ($isCumulative ? '' : '<th style="width:8%;">Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th><th style="width:8%;">Total</th>')
+            . ($isCumulative ? '' : '<th style="width:8%;">Third Term Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th>' . ($showThirdTermPreviousTotals ? '' : '<th style="width:8%;">Total</th>'))
             . $thirdTermHeaderHtml
             . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'

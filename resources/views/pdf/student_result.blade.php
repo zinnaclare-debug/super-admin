@@ -225,15 +225,16 @@
     }
     $assessmentPattern = $isCumulative
         ? trim(($showCumulativeTermTotals ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '') . ($showCumulativeAverage ? ' | AVERAGE' : ''), ' |')
-        : implode(' | ', $assessmentParts) . ' | EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')' . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '');
+        : implode(' | ', $assessmentParts)
+            . ' | THIRD TERM EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')'
+            . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | TOTAL SCORE | TOTAL AVERAGE' : ' | TOTAL');
     $scoreColspan = 3;
     if ($isCumulative) {
         $scoreColspan += $showCumulativeTermTotals ? 3 : 0;
         $scoreColspan += $showCumulativeAverage ? 1 : 0;
     } else {
         $scoreColspan += count($activeCaIndices);
-        $scoreColspan += 2;
-        $scoreColspan += $showThirdTermPreviousTotals ? 3 : 0;
+        $scoreColspan += $showThirdTermPreviousTotals ? 5 : 2;
     }
     $nextTermBeginLabel = '-';
     if (!empty($nextTermBeginDate)) {
@@ -332,12 +333,14 @@
                         @foreach($activeCaIndices as $index)
                             <th class="center">{{ strtoupper($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1))) }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
                         @endforeach
-                        <th class="center">EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
-                        <th class="center">TOTAL</th>
+                        <th class="center">THIRD TERM EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
                         @if($showThirdTermPreviousTotals)
-                            <th class="center">FIRST TERM</th>
-                            <th class="center">SECOND TERM</th>
-                            <th class="center">THIRD TERM</th>
+                            <th class="center">FIRST TERM TOTAL</th>
+                            <th class="center">SECOND TERM TOTAL</th>
+                            <th class="center">TOTAL SCORE</th>
+                            <th class="center">TOTAL AVERAGE</th>
+                        @else
+                            <th class="center">TOTAL</th>
                         @endif
                     @endif
                     <th class="center">GRADE</th>
@@ -363,15 +366,17 @@
                                 <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : (int) $caValue }}</td>
                             @endforeach
                             <td class="center">{{ $row['exam'] }}</td>
-                            <td class="center">{{ $row['total'] }}</td>
                             @if($showThirdTermPreviousTotals)
                                 <td class="center">{{ $row['first_term_total'] ?? '-' }}</td>
                                 <td class="center">{{ $row['second_term_total'] ?? '-' }}</td>
-                                <td class="center">{{ $row['third_term_total'] ?? '-' }}</td>
+                                <td class="center">{{ $row['combined_total_score'] ?? '-' }}</td>
+                                <td class="center">{{ $row['combined_average'] ?? '-' }}</td>
+                            @else
+                                <td class="center">{{ $row['total'] }}</td>
                             @endif
                         @endif
-                        <td class="center">{{ strtoupper($row['grade']) }}</td>
-                        <td class="center">{{ strtoupper($row['remark'] ?? '-') }}</td>
+                        <td class="center">{{ strtoupper($showThirdTermPreviousTotals ? ($row['third_term_combined_grade'] ?? $row['grade']) : $row['grade']) }}</td>
+                        <td class="center">{{ strtoupper($showThirdTermPreviousTotals ? ($row['third_term_combined_remark'] ?? $row['remark'] ?? '-') : ($row['remark'] ?? '-')) }}</td>
                     </tr>
                 @empty
                     <tr>

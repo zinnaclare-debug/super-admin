@@ -421,16 +421,21 @@ export default function StudentResultsHome() {
                           {assessmentSchema.ca_labels?.[idx] || `CA${idx + 1}`}
                         </th>
                       ))}
-                      <th style={{ width: 80 }}>CA Total</th>
-                      <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
-                      <th style={{ width: 80 }}>Total</th>
                       {showThirdTermPreviousTotals ? (
                         <>
-                          <th style={{ width: 100 }}>First Term</th>
-                          <th style={{ width: 110 }}>Second Term</th>
-                          <th style={{ width: 100 }}>Third Term</th>
+                          <th style={{ width: 100 }}>Third Term Exam ({assessmentSchema.exam_max})</th>
+                          <th style={{ width: 110 }}>First Term Total</th>
+                          <th style={{ width: 120 }}>Second Term Total</th>
+                          <th style={{ width: 100 }}>Total Score</th>
+                          <th style={{ width: 110 }}>Total Average</th>
                         </>
-                      ) : null}
+                      ) : (
+                        <>
+                          <th style={{ width: 80 }}>CA Total</th>
+                          <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
+                          <th style={{ width: 80 }}>Total</th>
+                        </>
+                      )}
                     </>
                   )}
                   <th style={{ width: 80 }}>Grade</th>
@@ -455,24 +460,29 @@ export default function StudentResultsHome() {
                             {displayScore(row.ca_breakdown?.[caIdx])}
                           </td>
                         ))}
-                        <td>{displayScore(row.ca)}</td>
-                        <td>{displayScore(row.exam)}</td>
-                        <td>{displayScore(row.total)}</td>
                         {showThirdTermPreviousTotals ? (
                           <>
+                            <td>{displayScore(row.exam)}</td>
                             <td>{displayScore(row.first_term_total)}</td>
                             <td>{displayScore(row.second_term_total)}</td>
-                            <td>{displayScore(row.third_term_total)}</td>
+                            <td>{displayScore(row.combined_total_score)}</td>
+                            <td>{displayScore(row.combined_average)}</td>
                           </>
-                        ) : null}
+                        ) : (
+                          <>
+                            <td>{displayScore(row.ca)}</td>
+                            <td>{displayScore(row.exam)}</td>
+                            <td>{displayScore(row.total)}</td>
+                          </>
+                        )}
                       </>
                     )}
-                    <td>{row.grade}</td>
+                    <td>{showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade}</td>
                   </tr>
                 ))}
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={isCumulative ? 7 : 6 + caIndices.length + (showThirdTermPreviousTotals ? 3 : 0)}>
+                    <td colSpan={isCumulative ? 7 : caIndices.length + (showThirdTermPreviousTotals ? 8 : 6)}>
                       No result records for this class and term.
                     </td>
                   </tr>
