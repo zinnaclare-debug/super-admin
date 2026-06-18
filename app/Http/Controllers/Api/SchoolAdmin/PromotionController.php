@@ -29,10 +29,12 @@ class PromotionController extends Controller
             ], 422);
         }
 
-        $classes = SchoolClass::where('school_id', $schoolId)
+        $classesQuery = SchoolClass::where('school_id', $schoolId)
             ->where('academic_session_id', $session->id)
             ->orderBy('level')
-            ->orderBy('id')
+            ->orderBy('id');
+
+        $classes = $this->onlyTemplateActive($classesQuery, 'classes')
             ->get(['id', 'name', 'level']);
 
         $levels = $classes
@@ -77,6 +79,12 @@ class PromotionController extends Controller
         if ((int) $class->academic_session_id !== (int) $session->id) {
             return response()->json([
                 'message' => 'Promotion is only available for classes in the current academic session.',
+            ], 422);
+        }
+
+        if (!$this->classIsTemplateActive($class)) {
+            return response()->json([
+                'message' => 'This class is no longer active for this school. Refresh promotion and choose an active class.',
             ], 422);
         }
 
@@ -171,6 +179,12 @@ class PromotionController extends Controller
         if ((int) $class->academic_session_id !== (int) $session->id) {
             return response()->json([
                 'message' => 'Promotion is only available for classes in the current academic session.',
+            ], 422);
+        }
+
+        if (!$this->classIsTemplateActive($class)) {
+            return response()->json([
+                'message' => 'This class is no longer active for this school. Refresh promotion and choose an active class.',
             ], 422);
         }
 
@@ -368,9 +382,11 @@ class PromotionController extends Controller
 
     private function resolveNextClassInSession(int $schoolId, int $targetSessionId, SchoolClass $sourceClass): ?SchoolClass
     {
-        $classes = SchoolClass::query()
+        $classesQuery = SchoolClass::query()
             ->where('school_id', $schoolId)
-            ->where('academic_session_id', $targetSessionId)
+            ->where('academic_session_id', $targetSessionId);
+
+        $classes = $this->onlyTemplateActive($classesQuery, 'classes')
             ->get(['id', 'name', 'level']);
 
         if ($classes->isEmpty()) {
@@ -462,10 +478,12 @@ class PromotionController extends Controller
             ->search(fn ($item) => $item['level'] === $sourceLevel && $item['name'] === $sourceName);
 
         if ($sourceIndex === false) {
-            $sourceSessionClasses = SchoolClass::query()
+            $sourceSessionClassesQuery = SchoolClass::query()
                 ->where('school_id', $schoolId)
                 ->where('academic_session_id', $sourceClass->academic_session_id)
-                ->orderBy('id')
+                ->orderBy('id');
+
+            $sourceSessionClasses = $this->onlyTemplateActive($sourceSessionClassesQuery, 'classes')
                 ->get(['id', 'name', 'level']);
 
             $levelClasses = $sourceSessionClasses
@@ -627,10 +645,12 @@ class PromotionController extends Controller
 
     private function syncClassDepartmentsFromLevel(int $schoolId, SchoolClass $class): void
     {
-        $levelDepartments = LevelDepartment::query()
+        $levelDepartmentsQuery = LevelDepartment::query()
             ->where('school_id', $schoolId)
             ->where('academic_session_id', $class->academic_session_id)
-            ->where('level', $class->level)
+            ->where('level', $class->level);
+
+        $levelDepartments = $this->onlyTemplateActive($levelDepartmentsQuery, 'level_departments')
             ->get(['name']);
 
         foreach ($levelDepartments as $department) {
@@ -663,5 +683,23 @@ class PromotionController extends Controller
         }
 
         return [$session, $term];
+    }
+
+    private function onlyTemplateActive($query, string $table)
+    {
+        if (Schema::hasColumn($table, 'is_template_active')) {
+            $query->where($table . '.is_template_active', true);
+        }
+
+        return $query;
+    }
+
+    private function classIsTemplateActive(SchoolClass $class): bool
+    {
+        if (!Schema::hasColumn('classes', 'is_template_active')) {
+            return true;
+        }
+
+        return (bool) $class->is_template_active;
     }
 }
