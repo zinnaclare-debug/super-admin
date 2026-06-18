@@ -2386,7 +2386,7 @@ class ResultsController extends Controller
         }
         $assessmentSummary = $isCumulative
             ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL | AVERAGE'
-            : implode(', ', $caSummaryParts) . ' | THIRD TERM EXAM (' . ((int) $assessmentSchema['exam_max']) . ')'
+            : implode(', ', $caSummaryParts) . ' | ' . ($showThirdTermPreviousTotals ? 'THIRD TERM EXAM' : 'EXAM') . ' (' . ((int) $assessmentSchema['exam_max']) . ')'
                 . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | TOTAL SCORE | TOTAL AVERAGE' : ' | TOTAL');
 
         $caHeaderHtml = '';
@@ -2528,7 +2528,7 @@ class ResultsController extends Controller
             . '<table>'
             . '<thead><tr><th style="width:30%;">Subject</th>'
             . $caHeaderHtml
-            . ($isCumulative ? '' : '<th style="width:8%;">Third Term Exam (' . ((int) $assessmentSchema['exam_max']) . ')</th>' . ($showThirdTermPreviousTotals ? '' : '<th style="width:8%;">Total</th>'))
+            . ($isCumulative ? '' : '<th style="width:8%;">' . ($showThirdTermPreviousTotals ? 'Third Term Exam' : 'Exam') . ' (' . ((int) $assessmentSchema['exam_max']) . ')</th>' . ($showThirdTermPreviousTotals ? '' : '<th style="width:8%;">Total</th>'))
             . $thirdTermHeaderHtml
             . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'

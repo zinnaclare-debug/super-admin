@@ -226,7 +226,7 @@
     $assessmentPattern = $isCumulative
         ? trim(($showCumulativeTermTotals ? 'FIRST TERM TOTAL | SECOND TERM TOTAL | THIRD TERM TOTAL' : '') . ($showCumulativeAverage ? ' | AVERAGE' : ''), ' |')
         : implode(' | ', $assessmentParts)
-            . ' | THIRD TERM EXAM (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')'
+            . ' | ' . ($showThirdTermPreviousTotals ? 'THIRD TERM EXAM' : 'EXAM') . ' (' . ((int) ($assessmentSchema['exam_max'] ?? 0)) . ')'
             . ($showThirdTermPreviousTotals ? ' | FIRST TERM TOTAL | SECOND TERM TOTAL | TOTAL SCORE | TOTAL AVERAGE' : ' | TOTAL');
     $scoreColspan = 3;
     if ($isCumulative) {
@@ -333,7 +333,7 @@
                         @foreach($activeCaIndices as $index)
                             <th class="center">{{ strtoupper($assessmentSchema['ca_labels'][$index] ?? ('CA' . ($index + 1))) }} ({{ (int) ($assessmentSchema['ca_maxes'][$index] ?? 0) }})</th>
                         @endforeach
-                        <th class="center">THIRD TERM EXAM ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
+                        <th class="center">{{ $showThirdTermPreviousTotals ? 'THIRD TERM EXAM' : 'EXAM' }} ({{ (int) ($assessmentSchema['exam_max'] ?? 0) }})</th>
                         @if($showThirdTermPreviousTotals)
                             <th class="center">FIRST TERM TOTAL</th>
                             <th class="center">SECOND TERM TOTAL</th>
