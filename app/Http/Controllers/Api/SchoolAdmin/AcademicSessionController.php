@@ -51,7 +51,7 @@ class AcademicSessionController extends Controller
             $activeSections = ClassTemplateSchema::activeSections($classTemplates);
             if (empty($activeSections)) {
                 return response()->json([
-                    'message' => 'No class template configured. Ask Super Admin to set class templates in School Information first.',
+                    'message' => 'No class template configured. Set class templates in School Information first.',
                 ], 422);
             }
 
@@ -132,14 +132,14 @@ class AcademicSessionController extends Controller
     public function destroy(Request $request, AcademicSession $session)
     {
         return response()->json([
-            'message' => 'Only super admin can delete academic sessions.',
+            'message' => 'Only platform administrators can delete academic sessions.',
         ], 403);
     }
 
     public function setStatus(Request $request, AcademicSession $session)
     {
         return response()->json([
-            'message' => 'Only super admin can change academic session status.',
+            'message' => 'Only platform administrators can change academic session status.',
         ], 403);
     }
 

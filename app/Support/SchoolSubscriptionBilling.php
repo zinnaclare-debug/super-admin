@@ -363,7 +363,7 @@ class SchoolSubscriptionBilling
         ?SchoolSubscriptionInvoice $pendingInvoice
     ): string {
         if ($settings->manual_status_override) {
-            return 'Status is currently controlled manually by Super Admin.';
+            return 'Status is currently controlled manually by the platform.';
         }
 
         return match ($status) {
@@ -371,7 +371,7 @@ class SchoolSubscriptionBilling
                 ? 'A yearly subscription has been paid for the current academic session.'
                 : 'A termly subscription has been paid for the current school term.',
             self::STATUS_PENDING => $pendingInvoice && $pendingInvoice->status === 'pending_manual_review'
-                ? 'A bank transfer submission is waiting for Super Admin approval.'
+                ? 'A bank transfer submission is waiting for review.'
                 : 'Payment is required before subscription access becomes active.',
             default => '',
         };

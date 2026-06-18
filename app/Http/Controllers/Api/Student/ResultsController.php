@@ -155,7 +155,7 @@ class ResultsController extends Controller
     private function resultLockedMessage(AcademicSession $session, Term $term): string
     {
         return (string) $session->status === 'current' && (bool) ($term->is_current ?? false)
-            ? 'Current term result has not been published yet. Please check back after Super Admin publishes it.'
+            ? 'Current term result has not been published yet. Please check back later.'
             : 'This result is not available yet.';
     }
 
@@ -677,10 +677,6 @@ class ResultsController extends Controller
         $actor = $request->user();
         abort_unless($actor->role === 'school_admin', 403);
 
-        if (!$actor->school || !$actor->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $payload = $request->validate([
             'student' => 'nullable|string',
             'email' => 'nullable|string',
@@ -715,6 +711,10 @@ class ResultsController extends Controller
             ->first();
         if (!$term) {
             return response()->json(['message' => 'Term not found for selected session'], 404);
+        }
+        $school = $actor->school ?: $actor->school()->first();
+        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
+            return response()->json(['message' => $this->resultLockedMessage($session, $term)], 403);
         }
 
         try {
@@ -772,9 +772,6 @@ class ResultsController extends Controller
         }
 
         $school = $actor->school ?: $actor->school()->first();
-        if (!$school || !$school->results_published) {
-            throw new \RuntimeException('Results are not yet published for your school.');
-        }
 
         $identifier = trim($identifier);
         if ($identifier === '') {
@@ -800,6 +797,9 @@ class ResultsController extends Controller
             ->first();
         if (!$term) {
             throw new \RuntimeException('Term not found for selected session.');
+        }
+        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
+            throw new \RuntimeException($this->resultLockedMessage($session, $term));
         }
 
         $resultType = $this->normalizeResultType($resultType);
@@ -841,10 +841,6 @@ class ResultsController extends Controller
         $actor = $request->user();
         abort_unless($actor->role === 'school_admin', 403);
 
-        if (!$actor->school || !$actor->school->results_published) {
-            return response()->json(['message' => 'Results are not yet published for your school'], 403);
-        }
-
         $payload = $request->validate([
             'student' => 'nullable|string',
             'email' => 'nullable|string',
@@ -879,6 +875,10 @@ class ResultsController extends Controller
             ->first();
         if (!$term) {
             return response()->json(['message' => 'Term not found for selected session'], 404);
+        }
+        $school = $actor->school ?: $actor->school()->first();
+        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
+            return response()->json(['message' => $this->resultLockedMessage($session, $term)], 403);
         }
 
         try {
@@ -929,7 +929,6 @@ class ResultsController extends Controller
         $rows = $resultType === self::RESULT_TYPE_CUMULATIVE
             ? $this->cumulativeSubjectRows($schoolId, (int) $class->id, $session, $term, (int) $student->id)
             : $this->subjectRows($schoolId, (int) $class->id, (int) $term->id, (int) $student->id);
-        $school = $actor->school ?: $actor->school()->first();
         $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
         $rows = $this->addThirdTermPreviousTotalsToRows(
             $schoolId,

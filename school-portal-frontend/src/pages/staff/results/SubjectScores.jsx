@@ -210,7 +210,7 @@ export default function SubjectScores() {
 
   const saveAll = async () => {
     if (resultsPublished) {
-      alert("Results have been published by the super admin. Staff can edit again after results are unpublished.");
+      alert("Results have been published. Staff can edit again after results are unpublished.");
       return;
     }
 
@@ -239,7 +239,7 @@ export default function SubjectScores() {
 
       {resultsPublished ? (
         <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 14, fontWeight: 600 }}>
-          Results are currently published by the super admin. Staff editing is locked until the results are unpublished.
+          Results are currently published. Staff editing is locked until the results are unpublished.
         </div>
       ) : null}
 

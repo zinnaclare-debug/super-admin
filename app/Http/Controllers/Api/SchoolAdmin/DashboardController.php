@@ -116,7 +116,7 @@ class DashboardController extends Controller
             || $request->hasFile('head_signature')
         ) {
             return response()->json([
-                'message' => 'Head of school name, logo, and signature are managed by Super Admin (School Information).',
+                'message' => 'Head of school name, logo, and signature are managed in School Information.',
             ], 403);
         }
 
@@ -220,7 +220,7 @@ class DashboardController extends Controller
     public function upsertExamRecord(Request $request)
     {
         return response()->json([
-            'message' => 'Exam record is managed by Super Admin (School Information).',
+            'message' => 'Exam record is managed in School Information.',
         ], 403);
     }
 
@@ -239,21 +239,21 @@ class DashboardController extends Controller
     public function storeDepartmentTemplate(Request $request)
     {
         return response()->json([
-            'message' => 'Department templates are managed by Super Admin (School Information -> Class Templates).',
+            'message' => 'Department templates are managed in School Information -> Class Templates.',
         ], 403);
     }
 
     public function updateDepartmentTemplate(Request $request)
     {
         return response()->json([
-            'message' => 'Department templates are managed by Super Admin (School Information -> Class Templates).',
+            'message' => 'Department templates are managed in School Information -> Class Templates.',
         ], 403);
     }
 
     public function deleteDepartmentTemplate(Request $request)
     {
         return response()->json([
-            'message' => 'Department templates are managed by Super Admin (School Information -> Class Templates).',
+            'message' => 'Department templates are managed in School Information -> Class Templates.',
         ], 403);
     }
 
@@ -272,7 +272,7 @@ class DashboardController extends Controller
     public function upsertClassTemplates(Request $request)
     {
         return response()->json([
-            'message' => 'Class templates are managed by Super Admin (School Information).',
+            'message' => 'Class templates are managed in School Information.',
         ], 403);
     }
 

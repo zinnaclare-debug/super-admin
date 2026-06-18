@@ -713,7 +713,7 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        // optional: prevent disabling self / prevent disabling super admins
+        // optional: prevent disabling self / prevent disabling platform administrators
         if ($user->role === 'super_admin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }

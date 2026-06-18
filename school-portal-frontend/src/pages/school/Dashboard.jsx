@@ -313,7 +313,7 @@ function SchoolDashboard() {
         <div className="sd-branding__form">
           <div className="sd-section-head">
             <h2>School Information</h2>
-            <p>Update contact details here. Logo, head details, exam record, class templates, and department setup are managed by Super Admin.</p>
+            <p>Update contact details here. Logo, head details, exam record, class templates, and department setup are managed in School Information.</p>
           </div>
 
           <div className="sd-field-grid">

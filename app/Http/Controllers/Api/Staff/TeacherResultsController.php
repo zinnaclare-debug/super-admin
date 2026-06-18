@@ -263,7 +263,7 @@ class TeacherResultsController extends Controller
 
     if ($school?->results_published) {
       return response()->json([
-        'message' => 'Results have been published by the super admin. Staff can edit again after results are unpublished.',
+        'message' => 'Results have been published. Staff can edit again after results are unpublished.',
       ], 423);
     }
 

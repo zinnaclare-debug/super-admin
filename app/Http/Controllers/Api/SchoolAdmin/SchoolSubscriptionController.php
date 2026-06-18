@@ -179,7 +179,7 @@ class SchoolSubscriptionController extends Controller
         }
 
         if ($settings->manual_status_override === SchoolSubscriptionBilling::STATUS_ACTIVE) {
-            return response()->json(['message' => 'Subscription is already marked active by Super Admin.'], 422);
+            return response()->json(['message' => 'Subscription is already marked active by the platform.'], 422);
         }
 
         if (SchoolSubscriptionBilling::findActiveCoverageInvoice((int) $school->id, (int) $session->id, (int) $term->id)) {
@@ -362,7 +362,7 @@ class SchoolSubscriptionController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Bank transfer receipt submitted for Super Admin review.',
+            'message' => 'Bank transfer receipt submitted for review.',
             'data' => [
                 'invoice' => SchoolSubscriptionBilling::invoicePayload($invoice),
                 'bank_details' => [

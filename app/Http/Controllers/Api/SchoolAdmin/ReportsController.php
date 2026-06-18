@@ -23,36 +23,18 @@ class ReportsController extends Controller
     // GET /api/school-admin/reports/student-result/options
     public function studentResultOptions(Request $request)
     {
-        if (! $this->resultsPublished($request)) {
-            return response()->json([
-                'message' => 'Results are not yet published for your school.',
-            ], 403);
-        }
-
         return app(TranscriptController::class)->options($request);
     }
 
     // GET /api/school-admin/reports/student-result?email=...&academic_session_id=...&term_id=...
     public function studentResult(Request $request)
     {
-        if (! $this->resultsPublished($request)) {
-            return response()->json([
-                'message' => 'Results are not yet published for your school.',
-            ], 403);
-        }
-
         return app(StudentResultsController::class)->showForSchoolAdmin($request);
     }
 
     // GET /api/school-admin/reports/student-result/download?email=...&academic_session_id=...&term_id=...
     public function studentResultDownload(Request $request)
     {
-        if (! $this->resultsPublished($request)) {
-            return response()->json([
-                'message' => 'Results are not yet published for your school.',
-            ], 403);
-        }
-
         return app(StudentResultsController::class)->downloadForSchoolAdmin($request);
     }
 
@@ -452,12 +434,6 @@ class ReportsController extends Controller
     }
     public function requestStudentResultDownloadJob(Request $request)
     {
-        if (!$this->resultsPublished($request)) {
-            return response()->json([
-                'message' => 'Results are not yet published for your school.',
-            ], 403);
-        }
-
         $payload = $request->validate([
             'student' => 'nullable|string',
             'email' => 'nullable|string',
@@ -470,6 +446,15 @@ class ReportsController extends Controller
         if ($identifier === '') {
             return response()->json(['message' => 'Provide student email or name'], 422);
         }
+
+        if ($this->currentTermResultIsLocked(
+            $request,
+            (int) $payload['academic_session_id'],
+            (int) $payload['term_id']
+        )) {
+            return response()->json(['message' => $this->currentTermResultLockedMessage()], 403);
+        }
+
         $resultType = strtolower(trim((string) ($payload['result_type'] ?? 'term'))) === 'cumulative'
             ? 'cumulative'
             : 'term';
@@ -598,11 +583,6 @@ class ReportsController extends Controller
 
     public function generateStudentResultPdfDocumentForJob(int $requestingUserId, int $schoolId, array $payload): array
     {
-        $user = $this->resolveSchoolAdminDocumentUser($requestingUserId, $schoolId);
-        if (!($user->school?->results_published ?? $user->school()->value('results_published'))) {
-            throw new \RuntimeException('Results are not yet published for your school.');
-        }
-
         return app(StudentResultsController::class)->generateSchoolAdminStudentResultPdfDocumentForJob(
             $requestingUserId,
             $schoolId,
@@ -2284,10 +2264,34 @@ class ReportsController extends Controller
         }
     }
 
-    private function resultsPublished(Request $request): bool
+    private function currentTermResultIsLocked(Request $request, int $sessionId, int $termId): bool
     {
         $school = $request->user()?->school;
-        return (bool) ($school?->results_published);
+        if (!$school || (bool) $school->results_published) {
+            return false;
+        }
+
+        $term = Term::query()
+            ->where('school_id', (int) $request->user()->school_id)
+            ->where('academic_session_id', $sessionId)
+            ->where('id', $termId)
+            ->first(['id', 'is_current']);
+
+        if (!$term || !(bool) ($term->is_current ?? false)) {
+            return false;
+        }
+
+        $sessionStatus = AcademicSession::query()
+            ->where('school_id', (int) $request->user()->school_id)
+            ->where('id', $sessionId)
+            ->value('status');
+
+        return (string) $sessionStatus === 'current';
+    }
+
+    private function currentTermResultLockedMessage(): string
+    {
+        return 'Current term result has not been published yet. Please check back later.';
     }
 }
 

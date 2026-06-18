@@ -13,7 +13,7 @@ class FeatureAccessController extends Controller
 
         if (!$school) return [];
 
-        // from DB (super admin controls enabled/disabled)
+        // from DB (platform controls enabled/disabled)
         $enabled = $school->features()
             ->where('enabled', true)
             ->pluck('feature')
@@ -63,10 +63,6 @@ class FeatureAccessController extends Controller
             if ($hasDependent && in_array('subjects', $allowed, true)) {
                 $final[] = 'subjects';
             }
-        }
-
-        if ($school && !$school->results_published) {
-            $final = array_values(array_filter($final, fn ($feature) => $feature !== 'results'));
         }
 
         return response()->json(['data' => $final], 200);

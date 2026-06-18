@@ -48,7 +48,7 @@ function SchoolFeatures() {
   return (
     <div>
       <h1>General Features</h1>
-      <p>Features enabled by the Super Admin for your school.</p>
+      <p>Features enabled for your school.</p>
 
       <FeatureTable
         features={generalFeatures}

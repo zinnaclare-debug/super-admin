@@ -36,7 +36,6 @@ function DashboardLayout() {
   });
 
   const [features, setFeatures] = useState([]);
-  const [resultsPublished, setResultsPublished] = useState(false);
   const [canAccessClassTeacherFeatures, setCanAccessClassTeacherFeatures] = useState(false);
   const [showAdminFeatures, setShowAdminFeatures] = useState(false);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
@@ -126,15 +125,12 @@ function DashboardLayout() {
     if (!user?.role) return;
 
     if (user.role === "school_admin") {
-      Promise.all([
-        api.get("/api/schools/features"),
-        api.get("/api/school-admin/stats").catch(() => null),
-      ])
-        .then(([featuresRes, statsRes]) => {
+      api
+        .get("/api/schools/features")
+        .then((featuresRes) => {
           const data = featuresRes?.data?.data || [];
           setFeatures(data);
           setStoredFeatures(data);
-          setResultsPublished(Boolean(statsRes?.data?.results_published));
         })
         .catch(() => {});
       return;
@@ -235,13 +231,9 @@ function DashboardLayout() {
   const adminFeatures = useMemo(
     () =>
       features
-        .filter((f) => {
-          if (!f.enabled || f.category !== "admin") return false;
-          if (String(f.feature || "").toLowerCase() === "student_result" && !resultsPublished) return false;
-          return true;
-        })
+        .filter((f) => f.enabled && f.category === "admin")
         .sort((a, b) => featureSortLabel(a.feature).localeCompare(featureSortLabel(b.feature))),
-    [features, resultsPublished]
+    [features]
   );
   const schoolAdminPaymentsEnabled = useMemo(
     () =>
@@ -282,7 +274,7 @@ function DashboardLayout() {
     if (!user?.role) return "";
     switch (user.role) {
       case "super_admin":
-        return "Super Admin";
+        return "Platform Admin";
       case "school_admin":
         return "School Admin";
       case "staff":
