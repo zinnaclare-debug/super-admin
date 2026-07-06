@@ -173,6 +173,13 @@ const parseDepartmentCsv = (value) =>
     .filter(Boolean)
     .filter((name, index, arr) => arr.findIndex((item) => item.toLowerCase() === name.toLowerCase()) === index);
 
+const formatLoginDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
+
 const normalizeResultTemplate = (raw) => {
   const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const thirdTerm = source.third_term && typeof source.third_term === "object" ? source.third_term : {};
@@ -220,6 +227,7 @@ export default function SchoolInformation() {
   const [historyFile, setHistoryFile] = useState(null);
   const [makeLatestSessionCurrent, setMakeLatestSessionCurrent] = useState(false);
   const [historyImportResult, setHistoryImportResult] = useState(null);
+  const [schoolAdminLogins, setSchoolAdminLogins] = useState([]);
 
   const [school, setSchool] = useState(null);
   const [branding, setBranding] = useState({
@@ -283,6 +291,7 @@ export default function SchoolInformation() {
         setResultTemplate(normalizeResultTemplate(payload.result_template_config));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
+        setSchoolAdminLogins(Array.isArray(payload.school_admin_logins) ? payload.school_admin_logins : []);
         setExamRecord(
           normalizeExamRecordsByLevel(
             payload.exam_record,
@@ -1428,6 +1437,65 @@ export default function SchoolInformation() {
           <button type="button" onClick={importSchoolHistory} disabled={importingHistory || !historyFile}>
             {importingHistory ? "Importing..." : "Import School History"}
           </button>
+        </div>
+
+        <div className="sai-login-audit">
+          <div className="sai-section-head">
+            <div>
+              <h3>School Admin Login</h3>
+              <p className="sai-note">
+                Latest successful school-admin sign-ins captured from IP address and browser/device headers.
+              </p>
+            </div>
+            <span className="sai-login-count">{schoolAdminLogins.length} records</span>
+          </div>
+
+          <div className="sai-table-wrap">
+            <table className="sai-login-table">
+              <thead>
+                <tr>
+                  <th>S/N</th>
+                  <th>Admin</th>
+                  <th>Login Time</th>
+                  <th>IP Address</th>
+                  <th>Device</th>
+                  <th>Browser</th>
+                  <th>Platform</th>
+                  <th>PC Name</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schoolAdminLogins.length > 0 ? (
+                  schoolAdminLogins.map((row, index) => (
+                    <tr key={row.id || `${row.admin_email}-${index}`}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <strong>{row.admin_name || "-"}</strong>
+                        <small>{row.admin_email || "-"}</small>
+                      </td>
+                      <td>{formatLoginDate(row.logged_in_at)}</td>
+                      <td>{row.ip_address || row.forwarded_ip || "-"}</td>
+                      <td>
+                        <strong>{row.device_type || "Unknown"}</strong>
+                        <small>{row.device_model || "Model unavailable"}</small>
+                      </td>
+                      <td>{row.browser || "-"}</td>
+                      <td>{row.platform || "-"}</td>
+                      <td>{row.pc_name || "Not exposed by browser"}</td>
+                      <td>{row.location_label || "IP only"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="sai-empty-row">
+                      No school-admin login has been captured yet. New successful logins will appear here.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {historyImportResult?.summary ? (

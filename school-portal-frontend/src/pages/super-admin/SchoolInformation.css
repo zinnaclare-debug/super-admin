@@ -189,6 +189,72 @@
   font-size: 13px;
 }
 
+.sai-login-audit {
+  margin-top: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 28%),
+    #ffffff;
+}
+
+.sai-login-count {
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sai-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sai-login-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sai-login-table th,
+.sai-login-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+  color: #0f172a;
+}
+
+.sai-login-table th {
+  color: #475569;
+  background: #f8fafc;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sai-login-table td strong,
+.sai-login-table td small {
+  display: block;
+}
+
+.sai-login-table td small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.sai-empty-row {
+  color: #64748b !important;
+  text-align: center !important;
+}
+
 .sai-preview {
   width: 96px;
   height: 64px;

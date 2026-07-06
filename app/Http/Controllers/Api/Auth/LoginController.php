@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\School;
+use App\Models\SchoolAdminLoginAudit;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\DeviceInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class LoginController extends Controller
@@ -84,6 +87,7 @@ class LoginController extends Controller
         // Keep existing tokens so the same account can stay logged in on multiple devices.
         // If you later want limits, prune old tokens with a retention policy instead of deleting all.
         $token = $user->createToken('auth-token')->plainTextToken;
+        $this->recordSchoolAdminLogin($request, $user);
         $schoolName = '';
         if ($tenantSchool) {
             $schoolName = (string) ($tenantSchool->name ?? '');
@@ -156,5 +160,38 @@ class LoginController extends Controller
         }
 
         return $school;
+    }
+
+    private function recordSchoolAdminLogin(Request $request, User $user): void
+    {
+        if ($user->role !== User::ROLE_SCHOOL_ADMIN || empty($user->school_id)) {
+            return;
+        }
+
+        try {
+            $userAgent = substr((string) $request->userAgent(), 0, 2000);
+            $deviceInfo = DeviceInfo::fromUserAgent($userAgent);
+
+            SchoolAdminLoginAudit::query()->create([
+                'school_id' => (int) $user->school_id,
+                'user_id' => (int) $user->id,
+                'ip_address' => $request->ip(),
+                'forwarded_ip' => substr((string) $request->header('x-forwarded-for', ''), 0, 255) ?: null,
+                'user_agent' => $userAgent,
+                'device_info' => $deviceInfo,
+                'device_type' => $deviceInfo['device_type'] ?? null,
+                'device_model' => $deviceInfo['device_model'] ?? null,
+                'browser' => $deviceInfo['browser'] ?? null,
+                'platform' => $deviceInfo['platform'] ?? null,
+                'pc_name' => null,
+                'location_label' => null,
+                'logged_in_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('School admin login audit failed: ' . $e->getMessage(), [
+                'user_id' => (int) $user->id,
+                'school_id' => (int) $user->school_id,
+            ]);
+        }
     }
 }

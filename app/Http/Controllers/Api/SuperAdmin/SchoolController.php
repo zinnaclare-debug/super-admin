@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\School;
 use App\Models\SchoolFeature;
+use App\Models\SchoolAdminLoginAudit;
 use App\Models\AcademicSession;
 use App\Models\SchoolClass;
 use App\Models\Term;
@@ -242,7 +243,39 @@ class SchoolController extends Controller
             'department_templates' => DepartmentTemplateSync::flattenClassTemplateNames($departmentTemplateMapByClass),
             'department_templates_by_class' => $departmentTemplateMapByClass,
             'department_templates_by_level' => $departmentTemplateMapByLevel,
+            'school_admin_logins' => $this->schoolAdminLoginAudits($school),
         ]);
+    }
+
+    private function schoolAdminLoginAudits(School $school): array
+    {
+        if (!Schema::hasTable('school_admin_login_audits')) {
+            return [];
+        }
+
+        return SchoolAdminLoginAudit::query()
+            ->with('user:id,name,email')
+            ->where('school_id', (int) $school->id)
+            ->orderByDesc('logged_in_at')
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get()
+            ->map(fn (SchoolAdminLoginAudit $audit) => [
+                'id' => (int) $audit->id,
+                'admin_name' => $audit->user?->name,
+                'admin_email' => $audit->user?->email,
+                'ip_address' => $audit->ip_address,
+                'forwarded_ip' => $audit->forwarded_ip,
+                'device_type' => $audit->device_type,
+                'device_model' => $audit->device_model,
+                'browser' => $audit->browser,
+                'platform' => $audit->platform,
+                'pc_name' => $audit->pc_name,
+                'location_label' => $audit->location_label,
+                'logged_in_at' => optional($audit->logged_in_at)->toISOString(),
+            ])
+            ->values()
+            ->all();
     }
 
     public function upsertInformationBranding(Request $request, School $school)
