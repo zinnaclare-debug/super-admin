@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
@@ -84,10 +85,14 @@ class LoginController extends Controller
             ], 403);
         }
 
-        // Keep existing tokens so the same account can stay logged in on multiple devices.
-        // If you later want limits, prune old tokens with a retention policy instead of deleting all.
-        $token = $user->createToken('auth-token')->plainTextToken;
-        $this->recordSchoolAdminLogin($request, $user);
+        $loginLimitResponse = $this->ensureSchoolAdminCanLogin($user);
+        if ($loginLimitResponse) {
+            return $loginLimitResponse;
+        }
+
+        $newAccessToken = $user->createToken($this->authTokenName($request, $user));
+        $token = $newAccessToken->plainTextToken;
+        $this->recordSchoolAdminLogin($request, $user, (int) $newAccessToken->accessToken->id);
         $schoolName = '';
         if ($tenantSchool) {
             $schoolName = (string) ($tenantSchool->name ?? '');
@@ -162,7 +167,55 @@ class LoginController extends Controller
         return $school;
     }
 
-    private function recordSchoolAdminLogin(Request $request, User $user): void
+    private function authTokenName(Request $request, User $user): string
+    {
+        if ($user->role !== User::ROLE_SCHOOL_ADMIN) {
+            return 'auth-token';
+        }
+
+        $deviceInfo = DeviceInfo::fromUserAgent(substr((string) $request->userAgent(), 0, 2000));
+        $label = implode(' | ', array_filter([
+            $deviceInfo['device_type'] ?? null,
+            $deviceInfo['device_model'] ?? null,
+            $deviceInfo['browser'] ?? null,
+            $deviceInfo['platform'] ?? null,
+        ]));
+
+        return Str::limit('school-admin login' . ($label ? ': ' . $label : ''), 120, '');
+    }
+
+    private function ensureSchoolAdminCanLogin(User $user)
+    {
+        if ($user->role !== User::ROLE_SCHOOL_ADMIN || empty($user->school_id)) {
+            return null;
+        }
+
+        $school = School::query()->find((int) $user->school_id);
+        $maximumDevices = $this->schoolAdminLoginLimit($school);
+        $activeDevices = $user->tokens()->count();
+
+        if ($activeDevices >= $maximumDevices) {
+            return response()->json([
+                'code' => 'school_admin_login_limit_reached',
+                'message' => "Login limit reached. This school admin account already has {$activeDevices} active device(s). Ask Super Admin to log out an active device or increase the allowed login limit.",
+                'allowed_logins' => $maximumDevices,
+                'active_logins' => $activeDevices,
+            ], 403);
+        }
+
+        return null;
+    }
+
+    private function schoolAdminLoginLimit(?School $school): int
+    {
+        if (!$school || !Schema::hasColumn('schools', 'school_admin_login_limit')) {
+            return 2;
+        }
+
+        return max(1, min(50, (int) ($school->school_admin_login_limit ?: 2)));
+    }
+
+    private function recordSchoolAdminLogin(Request $request, User $user, ?int $tokenId = null): void
     {
         if ($user->role !== User::ROLE_SCHOOL_ADMIN || empty($user->school_id)) {
             return;
@@ -172,7 +225,7 @@ class LoginController extends Controller
             $userAgent = substr((string) $request->userAgent(), 0, 2000);
             $deviceInfo = DeviceInfo::fromUserAgent($userAgent);
 
-            SchoolAdminLoginAudit::query()->create([
+            $auditPayload = [
                 'school_id' => (int) $user->school_id,
                 'user_id' => (int) $user->id,
                 'ip_address' => $request->ip(),
@@ -186,7 +239,13 @@ class LoginController extends Controller
                 'pc_name' => null,
                 'location_label' => null,
                 'logged_in_at' => now(),
-            ]);
+            ];
+
+            if (Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')) {
+                $auditPayload['personal_access_token_id'] = $tokenId;
+            }
+
+            SchoolAdminLoginAudit::query()->create($auditPayload);
         } catch (\Throwable $e) {
             Log::warning('School admin login audit failed: ' . $e->getMessage(), [
                 'user_id' => (int) $user->id,

@@ -28,12 +28,14 @@ class School extends Model
         'slug',
         'subdomain',
         'status',
+        'school_admin_login_limit',
         'paystack_subaccount_code',
         'results_published',
     ];
 
     protected $casts = [
         'results_published' => 'boolean',
+        'school_admin_login_limit' => 'integer',
         'assessment_schema' => 'array',
         'grading_schema' => 'array',
         'result_template_config' => 'array',

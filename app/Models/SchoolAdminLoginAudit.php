@@ -10,6 +10,7 @@ class SchoolAdminLoginAudit extends Model
     protected $fillable = [
         'school_id',
         'user_id',
+        'personal_access_token_id',
         'ip_address',
         'forwarded_ip',
         'user_agent',

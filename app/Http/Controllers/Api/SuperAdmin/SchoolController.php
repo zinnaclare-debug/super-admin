@@ -220,6 +220,7 @@ class SchoolController extends Controller
                 'name' => $school->name,
                 'subdomain' => $school->subdomain,
                 'email' => $school->email,
+                'school_admin_login_limit' => $this->schoolAdminLoginLimit($school),
             ],
             'branding' => [
                 'school_location' => $school->location,
@@ -243,8 +244,155 @@ class SchoolController extends Controller
             'department_templates' => DepartmentTemplateSync::flattenClassTemplateNames($departmentTemplateMapByClass),
             'department_templates_by_class' => $departmentTemplateMapByClass,
             'department_templates_by_level' => $departmentTemplateMapByLevel,
+            'school_admin_active_devices' => $this->schoolAdminActiveDevices($school),
             'school_admin_logins' => $this->schoolAdminLoginAudits($school),
         ]);
+    }
+
+    public function updateSchoolAdminLoginLimit(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'allowed_logins' => 'required|integer|min:1|max:50',
+        ]);
+
+        if (!Schema::hasColumn('schools', 'school_admin_login_limit')) {
+            return response()->json([
+                'message' => 'Run database migrations before saving school admin login limits.',
+            ], 422);
+        }
+
+        $school->school_admin_login_limit = (int) $payload['allowed_logins'];
+        $school->save();
+
+        return response()->json([
+            'message' => 'School admin login limit updated.',
+            'allowed_logins' => $this->schoolAdminLoginLimit($school),
+            'active_devices' => $this->schoolAdminActiveDevices($school),
+        ]);
+    }
+
+    public function destroySchoolAdminActiveDevice(School $school, int $tokenId)
+    {
+        if (!Schema::hasTable('personal_access_tokens')) {
+            return response()->json([
+                'message' => 'Active login token table is not available.',
+            ], 422);
+        }
+
+        $token = DB::table('personal_access_tokens as tokens')
+            ->join('users', function ($join) {
+                $join->on('users.id', '=', 'tokens.tokenable_id')
+                    ->where('tokens.tokenable_type', User::class);
+            })
+            ->where('tokens.id', $tokenId)
+            ->where('users.school_id', (int) $school->id)
+            ->where('users.role', User::ROLE_SCHOOL_ADMIN)
+            ->select('tokens.id')
+            ->first();
+
+        if (!$token) {
+            return response()->json([
+                'message' => 'Active school-admin device was not found for this school.',
+            ], 404);
+        }
+
+        DB::table('personal_access_tokens')->where('id', (int) $token->id)->delete();
+
+        return response()->json([
+            'message' => 'Active school-admin device logged out.',
+            'active_devices' => $this->schoolAdminActiveDevices($school),
+        ]);
+    }
+
+    private function schoolAdminLoginLimit(School $school): int
+    {
+        if (!Schema::hasColumn('schools', 'school_admin_login_limit')) {
+            return 2;
+        }
+
+        return max(1, min(50, (int) ($school->school_admin_login_limit ?: 2)));
+    }
+
+    private function schoolAdminActiveDevices(School $school): array
+    {
+        if (!Schema::hasTable('personal_access_tokens')) {
+            return [];
+        }
+
+        $tokens = DB::table('personal_access_tokens as tokens')
+            ->join('users', function ($join) {
+                $join->on('users.id', '=', 'tokens.tokenable_id')
+                    ->where('tokens.tokenable_type', User::class);
+            })
+            ->where('users.school_id', (int) $school->id)
+            ->where('users.role', User::ROLE_SCHOOL_ADMIN)
+            ->orderByDesc('tokens.last_used_at')
+            ->orderByDesc('tokens.created_at')
+            ->orderByDesc('tokens.id')
+            ->select([
+                'tokens.id',
+                'tokens.name as token_name',
+                'tokens.last_used_at',
+                'tokens.created_at',
+                'users.id as user_id',
+                'users.name as admin_name',
+                'users.email as admin_email',
+            ])
+            ->get();
+
+        $tokenIds = $tokens->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $auditsByToken = collect();
+
+        if (
+            !empty($tokenIds)
+            && Schema::hasTable('school_admin_login_audits')
+            && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')
+        ) {
+            $auditsByToken = SchoolAdminLoginAudit::query()
+                ->whereIn('personal_access_token_id', $tokenIds)
+                ->orderByDesc('logged_in_at')
+                ->get()
+                ->unique('personal_access_token_id')
+                ->keyBy('personal_access_token_id');
+        }
+
+        return $tokens
+            ->map(function ($token) use ($auditsByToken) {
+                $audit = $auditsByToken->get((int) $token->id);
+
+                return [
+                    'token_id' => (int) $token->id,
+                    'admin_id' => (int) $token->user_id,
+                    'admin_name' => $token->admin_name,
+                    'admin_email' => $token->admin_email,
+                    'token_name' => $token->token_name,
+                    'ip_address' => $audit?->ip_address,
+                    'device_type' => $audit?->device_type,
+                    'device_model' => $audit?->device_model,
+                    'browser' => $audit?->browser,
+                    'platform' => $audit?->platform,
+                    'pc_name' => $audit?->pc_name,
+                    'location_label' => $audit?->location_label,
+                    'created_at' => $this->dateToIsoString($token->created_at),
+                    'last_used_at' => $this->dateToIsoString($token->last_used_at),
+                    'logged_in_at' => optional($audit?->logged_in_at)->toISOString(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function dateToIsoString($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->toISOString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function schoolAdminLoginAudits(School $school): array

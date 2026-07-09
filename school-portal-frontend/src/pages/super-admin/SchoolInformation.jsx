@@ -227,7 +227,11 @@ export default function SchoolInformation() {
   const [historyFile, setHistoryFile] = useState(null);
   const [makeLatestSessionCurrent, setMakeLatestSessionCurrent] = useState(false);
   const [historyImportResult, setHistoryImportResult] = useState(null);
+  const [schoolAdminLoginLimit, setSchoolAdminLoginLimit] = useState(2);
+  const [schoolAdminActiveDevices, setSchoolAdminActiveDevices] = useState([]);
   const [schoolAdminLogins, setSchoolAdminLogins] = useState([]);
+  const [savingLoginLimit, setSavingLoginLimit] = useState(false);
+  const [loggingOutTokenId, setLoggingOutTokenId] = useState(null);
 
   const [school, setSchool] = useState(null);
   const [branding, setBranding] = useState({
@@ -273,6 +277,7 @@ export default function SchoolInformation() {
         const payload = res.data || {};
         const brandingData = payload.branding || {};
         setSchool(payload.school || null);
+        setSchoolAdminLoginLimit(Number(payload.school?.school_admin_login_limit || 2));
         setBranding({
           school_location: brandingData.school_location ?? "",
           contact_email: brandingData.contact_email ?? "",
@@ -291,6 +296,9 @@ export default function SchoolInformation() {
         setResultTemplate(normalizeResultTemplate(payload.result_template_config));
         const normalizedClassTemplates = normalizeTemplates(payload.class_templates);
         setClassTemplates(normalizedClassTemplates);
+        setSchoolAdminActiveDevices(
+          Array.isArray(payload.school_admin_active_devices) ? payload.school_admin_active_devices : []
+        );
         setSchoolAdminLogins(Array.isArray(payload.school_admin_logins) ? payload.school_admin_logins : []);
         setExamRecord(
           normalizeExamRecordsByLevel(
@@ -875,6 +883,50 @@ export default function SchoolInformation() {
     }
   };
 
+  const saveSchoolAdminLoginLimit = async () => {
+    const allowedLogins = Number(schoolAdminLoginLimit);
+    if (!Number.isInteger(allowedLogins) || allowedLogins < 1 || allowedLogins > 50) {
+      alert("Allowed active logins must be a number from 1 to 50.");
+      return;
+    }
+
+    setSavingLoginLimit(true);
+    try {
+      const res = await api.put(`/api/super-admin/schools/${schoolId}/information/school-admin-login-limit`, {
+        allowed_logins: allowedLogins,
+      });
+      setSchoolAdminLoginLimit(Number(res.data?.allowed_logins || allowedLogins));
+      setSchoolAdminActiveDevices(Array.isArray(res.data?.active_devices) ? res.data.active_devices : []);
+      alert(res.data?.message || "School admin login limit updated.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to save school admin login limit.");
+    } finally {
+      setSavingLoginLimit(false);
+    }
+  };
+
+  const logoutSchoolAdminDevice = async (device) => {
+    if (!device?.token_id) return;
+
+    const label = device.admin_email || device.admin_name || "this school admin";
+    if (!window.confirm(`Log out ${label} from this active device?`)) {
+      return;
+    }
+
+    setLoggingOutTokenId(device.token_id);
+    try {
+      const res = await api.delete(
+        `/api/super-admin/schools/${schoolId}/information/school-admin-devices/${device.token_id}`
+      );
+      setSchoolAdminActiveDevices(Array.isArray(res.data?.active_devices) ? res.data.active_devices : []);
+      alert(res.data?.message || "Active device logged out.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to log out active device.");
+    } finally {
+      setLoggingOutTokenId(null);
+    }
+  };
+
   if (loading) {
     return <p>Loading school information...</p>;
   }
@@ -1444,12 +1496,88 @@ export default function SchoolInformation() {
             <div>
               <h3>School Admin Login</h3>
               <p className="sai-note">
-                Latest successful school-admin sign-ins captured from IP address and browser/device headers.
+                Control how many active devices school admins can use, then log out any active device when needed.
               </p>
             </div>
-            <span className="sai-login-count">{schoolAdminLogins.length} records</span>
+            <span className="sai-login-count">
+              {schoolAdminActiveDevices.length} active / {schoolAdminLoginLimit || 2} allowed
+            </span>
           </div>
 
+          <div className="sai-login-limit-panel">
+            <div className="sai-field">
+              <label>Allowed Active School Admin Logins</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={schoolAdminLoginLimit}
+                onChange={(e) => setSchoolAdminLoginLimit(e.target.value)}
+              />
+            </div>
+            <button type="button" onClick={saveSchoolAdminLoginLimit} disabled={savingLoginLimit}>
+              {savingLoginLimit ? "Saving..." : "Save Login Limit"}
+            </button>
+          </div>
+
+          <h4 className="sai-login-subtitle">Active Devices</h4>
+          <div className="sai-table-wrap">
+            <table className="sai-login-table">
+              <thead>
+                <tr>
+                  <th>S/N</th>
+                  <th>Admin</th>
+                  <th>Device</th>
+                  <th>IP Address</th>
+                  <th>Browser</th>
+                  <th>Platform</th>
+                  <th>Last Used</th>
+                  <th>Login Time</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schoolAdminActiveDevices.length > 0 ? (
+                  schoolAdminActiveDevices.map((row, index) => (
+                    <tr key={row.token_id || `${row.admin_email}-${index}`}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <strong>{row.admin_name || "-"}</strong>
+                        <small>{row.admin_email || "-"}</small>
+                      </td>
+                      <td>
+                        <strong>{row.device_type || "Active session"}</strong>
+                        <small>{row.device_model || row.token_name || "Device details pending next login"}</small>
+                      </td>
+                      <td>{row.ip_address || "-"}</td>
+                      <td>{row.browser || "-"}</td>
+                      <td>{row.platform || "-"}</td>
+                      <td>{formatLoginDate(row.last_used_at || row.created_at)}</td>
+                      <td>{formatLoginDate(row.logged_in_at || row.created_at)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="sai-danger-btn"
+                          onClick={() => logoutSchoolAdminDevice(row)}
+                          disabled={loggingOutTokenId === row.token_id}
+                        >
+                          {loggingOutTokenId === row.token_id ? "Logging out..." : "Log out"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="sai-empty-row">
+                      No active school-admin device is currently logged in for this school.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h4 className="sai-login-subtitle">Recent Login History</h4>
           <div className="sai-table-wrap">
             <table className="sai-login-table">
               <thead>
