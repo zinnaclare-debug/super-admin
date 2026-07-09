@@ -287,7 +287,7 @@ class SchoolController extends Controller
             ->where('tokens.id', $tokenId)
             ->where('users.school_id', (int) $school->id)
             ->where('users.role', User::ROLE_SCHOOL_ADMIN)
-            ->select('tokens.id')
+            ->select('tokens.id', 'users.id as user_id')
             ->first();
 
         if (!$token) {
@@ -296,7 +296,32 @@ class SchoolController extends Controller
             ], 404);
         }
 
-        DB::table('personal_access_tokens')->where('id', (int) $token->id)->delete();
+        $tokenIdsToDelete = [(int) $token->id];
+
+        if (
+            Schema::hasTable('school_admin_login_audits')
+            && Schema::hasColumn('school_admin_login_audits', 'device_key')
+            && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')
+        ) {
+            $deviceKey = SchoolAdminLoginAudit::query()
+                ->where('personal_access_token_id', (int) $token->id)
+                ->value('device_key');
+
+            if ($deviceKey) {
+                $tokenIdsToDelete = SchoolAdminLoginAudit::query()
+                    ->where('user_id', (int) $token->user_id)
+                    ->where('device_key', $deviceKey)
+                    ->whereNotNull('personal_access_token_id')
+                    ->pluck('personal_access_token_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->push((int) $token->id)
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+
+        DB::table('personal_access_tokens')->whereIn('id', $tokenIdsToDelete)->delete();
 
         return response()->json([
             'message' => 'Active school-admin device logged out.',
@@ -341,7 +366,9 @@ class SchoolController extends Controller
             ->get();
 
         $tokenIds = $tokens->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $userIds = $tokens->pluck('user_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $auditsByToken = collect();
+        $latestAuditsByUser = collect();
 
         if (
             !empty($tokenIds)
@@ -356,12 +383,24 @@ class SchoolController extends Controller
                 ->keyBy('personal_access_token_id');
         }
 
+        if (!empty($userIds) && Schema::hasTable('school_admin_login_audits')) {
+            $latestAuditsByUser = SchoolAdminLoginAudit::query()
+                ->whereIn('user_id', $userIds)
+                ->orderByDesc('logged_in_at')
+                ->orderByDesc('id')
+                ->get()
+                ->unique('user_id')
+                ->keyBy('user_id');
+        }
+
         return $tokens
             ->map(function ($token) use ($auditsByToken) {
                 $audit = $auditsByToken->get((int) $token->id);
 
                 return [
+                    'device_group_key' => $this->schoolAdminDeviceGroupKey($token, $audit),
                     'token_id' => (int) $token->id,
+                    'token_ids' => [(int) $token->id],
                     'admin_id' => (int) $token->user_id,
                     'admin_name' => $token->admin_name,
                     'admin_email' => $token->admin_email,
@@ -378,8 +417,49 @@ class SchoolController extends Controller
                     'logged_in_at' => optional($audit?->logged_in_at)->toISOString(),
                 ];
             })
+            ->map(function (array $row) use ($latestAuditsByUser) {
+                if ($row['browser'] || $row['platform'] || $row['ip_address']) {
+                    return $row;
+                }
+
+                $fallback = $latestAuditsByUser->get((int) $row['admin_id']);
+                if (!$fallback) {
+                    return $row;
+                }
+
+                return array_merge($row, [
+                    'ip_address' => $fallback->ip_address,
+                    'device_type' => $row['device_type'] ?: $fallback->device_type,
+                    'device_model' => $row['device_model'] ?: $fallback->device_model,
+                    'browser' => $fallback->browser,
+                    'platform' => $fallback->platform,
+                    'pc_name' => $fallback->pc_name,
+                    'location_label' => $fallback->location_label,
+                    'logged_in_at' => $row['logged_in_at'] ?: optional($fallback->logged_in_at)->toISOString(),
+                ]);
+            })
+            ->groupBy('device_group_key')
+            ->map(function ($rows) {
+                $primary = $rows
+                    ->sortByDesc(fn ($row) => $row['last_used_at'] ?: ($row['logged_in_at'] ?: $row['created_at']))
+                    ->first();
+                $primary['token_ids'] = $rows->pluck('token_id')->map(fn ($id) => (int) $id)->values()->all();
+                unset($primary['device_group_key']);
+
+                return $primary;
+            })
+            ->sortByDesc(fn ($row) => $row['last_used_at'] ?: ($row['logged_in_at'] ?: $row['created_at']))
             ->values()
             ->all();
+    }
+
+    private function schoolAdminDeviceGroupKey(object $token, ?SchoolAdminLoginAudit $audit): string
+    {
+        if ($audit && Schema::hasColumn('school_admin_login_audits', 'device_key') && !empty($audit->device_key)) {
+            return 'user:' . (int) $token->user_id . ':device:' . $audit->device_key;
+        }
+
+        return 'user:' . (int) $token->user_id . ':token-name:' . sha1((string) $token->token_name);
     }
 
     private function dateToIsoString($value): ?string
@@ -406,8 +486,12 @@ class SchoolController extends Controller
             ->where('school_id', (int) $school->id)
             ->orderByDesc('logged_in_at')
             ->orderByDesc('id')
-            ->limit(30)
+            ->limit(200)
             ->get()
+            ->groupBy(fn (SchoolAdminLoginAudit $audit) => $this->schoolAdminAuditDeviceGroupKey($audit))
+            ->map(fn ($rows) => $rows->sortByDesc(fn (SchoolAdminLoginAudit $audit) => optional($audit->logged_in_at)->timestamp ?? 0)->first())
+            ->sortByDesc(fn (SchoolAdminLoginAudit $audit) => optional($audit->logged_in_at)->timestamp ?? 0)
+            ->take(30)
             ->map(fn (SchoolAdminLoginAudit $audit) => [
                 'id' => (int) $audit->id,
                 'admin_name' => $audit->user?->name,
@@ -424,6 +508,23 @@ class SchoolController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    private function schoolAdminAuditDeviceGroupKey(SchoolAdminLoginAudit $audit): string
+    {
+        if (Schema::hasColumn('school_admin_login_audits', 'device_key') && !empty($audit->device_key)) {
+            return 'user:' . (int) $audit->user_id . ':device:' . $audit->device_key;
+        }
+
+        $fallback = implode('|', array_filter([
+            $audit->user_agent,
+            $audit->device_type,
+            $audit->device_model,
+            $audit->browser,
+            $audit->platform,
+        ]));
+
+        return 'user:' . (int) $audit->user_id . ':fallback:' . sha1($fallback ?: (string) $audit->id);
     }
 
     public function upsertInformationBranding(Request $request, School $school)

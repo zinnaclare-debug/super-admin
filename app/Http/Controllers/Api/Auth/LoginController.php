@@ -85,6 +85,9 @@ class LoginController extends Controller
             ], 403);
         }
 
+        $deviceKey = $this->schoolAdminDeviceKey($request, $user);
+        $this->replaceExistingSchoolAdminDeviceToken($user, $deviceKey);
+
         $loginLimitResponse = $this->ensureSchoolAdminCanLogin($user);
         if ($loginLimitResponse) {
             return $loginLimitResponse;
@@ -92,7 +95,7 @@ class LoginController extends Controller
 
         $newAccessToken = $user->createToken($this->authTokenName($request, $user));
         $token = $newAccessToken->plainTextToken;
-        $this->recordSchoolAdminLogin($request, $user, (int) $newAccessToken->accessToken->id);
+        $this->recordSchoolAdminLogin($request, $user, (int) $newAccessToken->accessToken->id, $deviceKey);
         $schoolName = '';
         if ($tenantSchool) {
             $schoolName = (string) ($tenantSchool->name ?? '');
@@ -184,6 +187,50 @@ class LoginController extends Controller
         return Str::limit('school-admin login' . ($label ? ': ' . $label : ''), 120, '');
     }
 
+    private function schoolAdminDeviceKey(Request $request, User $user): ?string
+    {
+        if ($user->role !== User::ROLE_SCHOOL_ADMIN) {
+            return null;
+        }
+
+        $userAgent = strtolower(trim((string) $request->userAgent()));
+        if ($userAgent === '') {
+            return null;
+        }
+
+        return hash('sha256', $userAgent);
+    }
+
+    private function replaceExistingSchoolAdminDeviceToken(User $user, ?string $deviceKey): void
+    {
+        if (
+            $user->role !== User::ROLE_SCHOOL_ADMIN
+            || empty($deviceKey)
+            || !Schema::hasTable('school_admin_login_audits')
+            || !Schema::hasColumn('school_admin_login_audits', 'device_key')
+            || !Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')
+        ) {
+            return;
+        }
+
+        $tokenIds = SchoolAdminLoginAudit::query()
+            ->where('user_id', (int) $user->id)
+            ->where('device_key', $deviceKey)
+            ->whereNotNull('personal_access_token_id')
+            ->pluck('personal_access_token_id')
+            ->map(static fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($tokenIds)) {
+            return;
+        }
+
+        $user->tokens()->whereIn('id', $tokenIds)->delete();
+    }
+
     private function ensureSchoolAdminCanLogin(User $user)
     {
         if ($user->role !== User::ROLE_SCHOOL_ADMIN || empty($user->school_id)) {
@@ -215,7 +262,7 @@ class LoginController extends Controller
         return max(1, min(50, (int) ($school->school_admin_login_limit ?: 2)));
     }
 
-    private function recordSchoolAdminLogin(Request $request, User $user, ?int $tokenId = null): void
+    private function recordSchoolAdminLogin(Request $request, User $user, ?int $tokenId = null, ?string $deviceKey = null): void
     {
         if ($user->role !== User::ROLE_SCHOOL_ADMIN || empty($user->school_id)) {
             return;
@@ -243,6 +290,10 @@ class LoginController extends Controller
 
             if (Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')) {
                 $auditPayload['personal_access_token_id'] = $tokenId;
+            }
+
+            if (Schema::hasColumn('school_admin_login_audits', 'device_key')) {
+                $auditPayload['device_key'] = $deviceKey;
             }
 
             SchoolAdminLoginAudit::query()->create($auditPayload);

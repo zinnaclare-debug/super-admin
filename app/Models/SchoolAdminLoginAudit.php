@@ -11,6 +11,7 @@ class SchoolAdminLoginAudit extends Model
         'school_id',
         'user_id',
         'personal_access_token_id',
+        'device_key',
         'ip_address',
         'forwarded_ip',
         'user_agent',
