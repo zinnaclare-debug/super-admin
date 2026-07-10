@@ -885,8 +885,8 @@ export default function SchoolInformation() {
 
   const saveSchoolAdminLoginLimit = async () => {
     const allowedLogins = Number(schoolAdminLoginLimit);
-    if (!Number.isInteger(allowedLogins) || allowedLogins < 1 || allowedLogins > 50) {
-      alert("Allowed active logins must be a number from 1 to 50.");
+    if (!Number.isInteger(allowedLogins) || allowedLogins < 1 || allowedLogins > 500) {
+      alert("Allowed active logins must be a number from 1 to 500.");
       return;
     }
 
@@ -1510,7 +1510,7 @@ export default function SchoolInformation() {
               <input
                 type="number"
                 min="1"
-                max="50"
+                max="500"
                 value={schoolAdminLoginLimit}
                 onChange={(e) => setSchoolAdminLoginLimit(e.target.value)}
               />

@@ -252,7 +252,7 @@ class SchoolController extends Controller
     public function updateSchoolAdminLoginLimit(Request $request, School $school)
     {
         $payload = $request->validate([
-            'allowed_logins' => 'required|integer|min:1|max:50',
+            'allowed_logins' => 'required|integer|min:1|max:500',
         ]);
 
         if (!Schema::hasColumn('schools', 'school_admin_login_limit')) {
@@ -335,7 +335,7 @@ class SchoolController extends Controller
             return 2;
         }
 
-        return max(1, min(50, (int) ($school->school_admin_login_limit ?: 2)));
+        return max(1, min(500, (int) ($school->school_admin_login_limit ?: 2)));
     }
 
     private function schoolAdminActiveDevices(School $school): array

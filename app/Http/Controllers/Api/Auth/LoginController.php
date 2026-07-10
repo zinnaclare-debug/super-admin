@@ -239,12 +239,12 @@ class LoginController extends Controller
 
         $school = School::query()->find((int) $user->school_id);
         $maximumDevices = $this->schoolAdminLoginLimit($school);
-        $activeDevices = $user->tokens()->count();
+        $activeDevices = $this->activeSchoolAdminDeviceCount($user);
 
         if ($activeDevices >= $maximumDevices) {
             return response()->json([
                 'code' => 'school_admin_login_limit_reached',
-                'message' => "Login limit reached. This school admin account already has {$activeDevices} active device(s). Ask Super Admin to log out an active device or increase the allowed login limit.",
+                'message' => 'Maximum number of allowed school-admin logins reached.',
                 'allowed_logins' => $maximumDevices,
                 'active_logins' => $activeDevices,
             ], 403);
@@ -253,13 +253,58 @@ class LoginController extends Controller
         return null;
     }
 
+    private function activeSchoolAdminDeviceCount(User $user): int
+    {
+        $tokens = $user->tokens()
+            ->orderByDesc('last_used_at')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get(['id', 'name']);
+
+        if ($tokens->isEmpty()) {
+            return 0;
+        }
+
+        $auditsByToken = collect();
+        if (
+            Schema::hasTable('school_admin_login_audits')
+            && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')
+        ) {
+            $auditsByToken = SchoolAdminLoginAudit::query()
+                ->whereIn('personal_access_token_id', $tokens->pluck('id')->all())
+                ->orderByDesc('logged_in_at')
+                ->orderByDesc('id')
+                ->get()
+                ->unique('personal_access_token_id')
+                ->keyBy('personal_access_token_id');
+        }
+
+        return $tokens
+            ->map(fn ($token) => $this->activeSchoolAdminDeviceGroupKey($token, $auditsByToken->get((int) $token->id)))
+            ->unique()
+            ->count();
+    }
+
+    private function activeSchoolAdminDeviceGroupKey(object $token, ?SchoolAdminLoginAudit $audit): string
+    {
+        if (
+            $audit
+            && Schema::hasColumn('school_admin_login_audits', 'device_key')
+            && !empty($audit->device_key)
+        ) {
+            return 'device:' . $audit->device_key;
+        }
+
+        return 'token-name:' . sha1((string) $token->name);
+    }
+
     private function schoolAdminLoginLimit(?School $school): int
     {
         if (!$school || !Schema::hasColumn('schools', 'school_admin_login_limit')) {
             return 2;
         }
 
-        return max(1, min(50, (int) ($school->school_admin_login_limit ?: 2)));
+        return max(1, min(500, (int) ($school->school_admin_login_limit ?: 2)));
     }
 
     private function recordSchoolAdminLogin(Request $request, User $user, ?int $tokenId = null, ?string $deviceKey = null): void
