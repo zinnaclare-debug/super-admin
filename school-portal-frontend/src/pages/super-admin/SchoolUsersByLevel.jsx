@@ -52,18 +52,12 @@ function SchoolUsersByLevel() {
         <button onClick={() => navigate("/super-admin/users")}>Back to Schools</button>
       </div>
 
-      <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div className="sa-filter-list">
         <button
           onClick={async () => {
             setSelectedLevel("");
             await load("");
-          }}
-          style={{
-            padding: "8px 10px",
-            borderRadius: 6,
-            border: selectedLevel === "" ? "1px solid #2563eb" : "1px solid #ccc",
-            background: selectedLevel === "" ? "#eff6ff" : "#fff",
-          }}
+          }} className={`sa-filter-button ${selectedLevel === "" ? "is-selected" : ""}`}
         >
           All
         </button>
@@ -73,13 +67,7 @@ function SchoolUsersByLevel() {
             onClick={async () => {
               setSelectedLevel(lvl.key);
               await load(lvl.key);
-            }}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 6,
-              border: selectedLevel === lvl.key ? "1px solid #2563eb" : "1px solid #ccc",
-              background: selectedLevel === lvl.key ? "#eff6ff" : "#fff",
-            }}
+            }} className={`sa-filter-button ${selectedLevel === lvl.key ? "is-selected" : ""}`}
           >
             {lvl.label} ({lvl.count})
           </button>

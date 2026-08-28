@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import FeatureModal from "../../components/FeatureModal";
@@ -138,69 +138,70 @@ function SuperAdminSchools() {
 
         <tbody>
           {schools.map((school) => (
-            <tr key={school.id}>
-              <td>
-                <button
-                  onClick={() => navigate(`/super-admin/schools/${school.id}/academic-sessions`)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#2563eb",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    textDecoration: "underline",
-                    padding: 0,
-                  }}
-                >
-                  {school.name}
-                </button>
-              </td>
+            <Fragment key={school.id}>
+              <tr>
+                <td>
+                  <button
+                    onClick={() => navigate(`/super-admin/schools/${school.id}/academic-sessions`)}
+                    className="sa-table-link"
+                  >
+                    {school.name}
+                  </button>
+                </td>
 
-              <td>{school.email}</td>
+                <td>{school.email}</td>
 
-              <td>
-                <span className={`sa-status ${school.status === "active" ? "sa-status--active" : "sa-status--suspended"}`}>{school.status === "active" ? "Active" : "Suspended"}</span>
-              </td>
+                <td>
+                  <span className={`sa-status ${school.status === "active" ? "sa-status--active" : "sa-status--suspended"}`}>{school.status === "active" ? "Active" : "Suspended"}</span>
+                </td>
 
-              <td>
-                <button
-                  onClick={() => {
-                    setSelectedSchool(school);
-                    setShowFeatureModal(true);
-                  }}
-                  className="btn btn-sm btn-outline-primary"
-                >
-                  Manage Features
-                </button>
+                <td>
+                  <button
+                    onClick={() => {
+                      setSelectedSchool(school);
+                      setShowFeatureModal(true);
+                    }}
+                    className="btn btn-sm btn-outline-primary"
+                  >
+                    Manage Features
+                  </button>
 
-                <button
-                  style={{ marginLeft: 10 }}
-                  onClick={() => toggleSchool(school)}
-                >
-                  {school.status === "active" ? "Disable" : "Enable"}
-                </button>
-
-                {school.admin && (
                   <button
                     style={{ marginLeft: 10 }}
-                    onClick={() => resetAdminPassword(school)}
-                    disabled={resettingAdminId === school.admin.id}
+                    onClick={() => toggleSchool(school)}
                   >
-                    {resettingAdminId === school.admin.id ? "Resetting..." : "Reset Admin Password"}
+                    {school.status === "active" ? "Disable" : "Enable"}
                   </button>
-                )}
-              </td>
-            </tr>
+
+                  {school.admin && (
+                    <button
+                      style={{ marginLeft: 10 }}
+                      onClick={() => resetAdminPassword(school)}
+                      disabled={resettingAdminId === school.admin.id}
+                    >
+                      {resettingAdminId === school.admin.id ? "Resetting..." : "Reset Admin Password"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+
+              {showFeatureModal && selectedSchool?.id === school.id && (
+                <tr className="sa-feature-row">
+                  <td colSpan="4">
+                    <FeatureModal
+                      school={selectedSchool}
+                      onClose={() => {
+                        setShowFeatureModal(false);
+                        setSelectedSchool(null);
+                      }}
+                    />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table></div>
-
-      {showFeatureModal && selectedSchool && (
-        <FeatureModal
-          school={selectedSchool}
-          onClose={() => setShowFeatureModal(false)}
-        />
-      )}
     </div>
   );
 }

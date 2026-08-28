@@ -136,3 +136,36 @@
   .super-admin-shell .sai-top { align-items: stretch; }
   .super-admin-shell .sai-top > button { width: 100%; }
 }
+.super-admin-shell .sa-table-link {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #0f4c81;
+  text-align: left;
+  text-decoration: underline;
+  box-shadow: none;
+}
+.super-admin-shell .sa-table-link:hover:not(:disabled) { color: #e58b1f; box-shadow: none; }
+
+.super-admin-shell .sa-feature-row > td { padding: 0 !important; background: #f5faff; }
+.sa-feature-manager { padding: clamp(14px, 2.5vw, 22px); background: linear-gradient(145deg, #f4f9ff, #fffaf1); }
+.sa-feature-manager__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #cfdeed; }
+.sa-feature-manager__header span { display: block; margin-bottom: 4px; color: #52708e; font: 800 0.7rem/1 "Trebuchet MS", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; }
+.sa-feature-manager__header h3 { margin: 0; font-size: clamp(1.05rem, 2.4vw, 1.35rem); }
+.super-admin-shell .sa-feature-manager__close { background: #fff; color: #0f4c81; border-color: #a9c6df; box-shadow: none; }
+
+.sa-school-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 420px; }
+.super-admin-shell .sa-school-list button,
+.super-admin-shell .sa-filter-button {
+  background: #fff;
+  color: #0f4c81;
+  border-color: #b9cce0;
+  box-shadow: none;
+}
+.super-admin-shell .sa-school-list button { width: 100%; text-align: left; }
+.super-admin-shell .sa-school-list button:hover:not(:disabled),
+.super-admin-shell .sa-filter-button:hover:not(:disabled) { background: #edf6ff; color: #092d55; box-shadow: none; }
+.sa-filter-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.super-admin-shell .sa-filter-button.is-selected { color: #092d55; background: #dcefff; border-color: #0f4c81; }

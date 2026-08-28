@@ -41,8 +41,16 @@ function FeatureModal({ school, onClose }) {
   };
 
   return (
-    <div style={{ border: "1px solid #333", padding: 20, marginTop: 20 }}>
-      <h3>Manage Features — {school.name}</h3>
+    <section className="sa-feature-manager" aria-label={`Manage features for ${school.name}`}>
+      <div className="sa-feature-manager__header">
+        <div>
+          <span>School feature access</span>
+          <h3>Manage Features - {school.name}</h3>
+        </div>
+        <button onClick={onClose} className="sa-feature-manager__close">
+          Close
+        </button>
+      </div>
 
       {loading && <p>Loading features...</p>}
 
@@ -53,11 +61,7 @@ function FeatureModal({ school, onClose }) {
           labelMap={labelMap}
         />
       )}
-
-      <button onClick={onClose} style={{ marginTop: 15 }}>
-        Close
-      </button>
-    </div>
+    </section>
   );
 }
 
