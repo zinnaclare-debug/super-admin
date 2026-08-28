@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import "./SchoolInformation.css";
 import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profileImage";
+import schoolInformationArt from "../../assets/dashboard/branding.svg";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DEFAULT_EXAM_RECORD = {
@@ -933,13 +934,17 @@ export default function SchoolInformation() {
 
   return (
     <div className="sa-page sai-page sa-page--information">
-      <div className="sai-top">
+      <section className="sa-page-hero sai-hero">
         <div>
-          <h2>School Information</h2>
+          <span className="sa-page-eyebrow">School configuration</span>
+          <h1>School Information</h1>
           <p>{school?.name ? `Manage ${school.name}` : "Manage school information"}</p>
         </div>
-        <button onClick={() => navigate(-1)}>Back</button>
-      </div>
+        <div className="sai-hero-actions">
+          <img className="sa-page-art" src={schoolInformationArt} alt="" aria-hidden="true" />
+          <button type="button" className="sai-back-button" onClick={() => navigate(-1)}>Back</button>
+        </div>
+      </section>
 
       <section className="sai-card">
         <h3>Branding</h3>
@@ -1651,9 +1656,3 @@ export default function SchoolInformation() {
     </div>
   );
 }
-
-
-
-
-
-

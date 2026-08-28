@@ -155,33 +155,31 @@ function SuperAdminSchools() {
                   <span className={`sa-status ${school.status === "active" ? "sa-status--active" : "sa-status--suspended"}`}>{school.status === "active" ? "Active" : "Suspended"}</span>
                 </td>
 
-                <td>
-                  <button
-                    onClick={() => {
-                      setSelectedSchool(school);
-                      setShowFeatureModal(true);
-                    }}
-                    className="btn btn-sm btn-outline-primary"
-                  >
-                    Manage Features
-                  </button>
-
-                  <button
-                    style={{ marginLeft: 10 }}
-                    onClick={() => toggleSchool(school)}
-                  >
-                    {school.status === "active" ? "Disable" : "Enable"}
-                  </button>
-
-                  {school.admin && (
+                <td className="sa-overview-actions-cell">
+                  <div className="sa-overview-actions">
                     <button
-                      style={{ marginLeft: 10 }}
-                      onClick={() => resetAdminPassword(school)}
-                      disabled={resettingAdminId === school.admin.id}
+                      onClick={() => {
+                        setSelectedSchool(school);
+                        setShowFeatureModal(true);
+                      }}
+                      className="btn btn-sm btn-outline-primary"
                     >
-                      {resettingAdminId === school.admin.id ? "Resetting..." : "Reset Admin Password"}
+                      Manage Features
                     </button>
-                  )}
+
+                    <button onClick={() => toggleSchool(school)}>
+                      {school.status === "active" ? "Disable" : "Enable"}
+                    </button>
+
+                    {school.admin && (
+                      <button
+                        onClick={() => resetAdminPassword(school)}
+                        disabled={resettingAdminId === school.admin.id}
+                      >
+                        {resettingAdminId === school.admin.id ? "Resetting..." : "Reset Admin Password"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
 

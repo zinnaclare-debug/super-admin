@@ -169,3 +169,78 @@
 .super-admin-shell .sa-filter-button:hover:not(:disabled) { background: #edf6ff; color: #092d55; box-shadow: none; }
 .sa-filter-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .super-admin-shell .sa-filter-button.is-selected { color: #092d55; background: #dcefff; border-color: #0f4c81; }
+
+/* Keep the overview stable when an individual school feature panel opens. */
+.sa-page--overview .sa-table { min-width: 940px; table-layout: fixed; }
+.sa-page--overview .sa-table th:nth-child(1) { width: 19%; }
+.sa-page--overview .sa-table th:nth-child(2) { width: 25%; }
+.sa-page--overview .sa-table th:nth-child(3) { width: 12%; }
+.sa-page--overview .sa-table th:nth-child(4) { width: 44%; }
+.sa-overview-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.super-admin-shell .sa-overview-actions button { margin: 0 !important; }
+.sa-feature-manager { min-width: 0; overflow: hidden; }
+.sa-feature-manager > div { min-width: 0; }
+
+.sa-page--information { align-items: start; }
+.sa-page--information .sai-card,
+.sa-page--information .sai-login-audit,
+.sa-page--information .sai-template-table,
+.sa-page--information .sai-level-exam-card,
+.sa-page--information .sai-result-template-mini { min-width: 0; box-sizing: border-box; }
+.sai-hero { min-width: 0; }
+.sai-hero-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.sai-hero-actions .sa-page-art { width: clamp(76px, 11vw, 132px); }
+.super-admin-shell .sai-back-button {
+  background: #fff;
+  color: #0f4c81;
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 16px rgba(3, 20, 42, 0.16);
+}
+.sa-page--information .sai-card { padding: clamp(15px, 2.4vw, 24px); }
+.sa-page--information .sai-card > h3 { font-size: clamp(1.1rem, 2.3vw, 1.45rem); }
+.sa-page--information .sai-grid,
+.sa-page--information .sai-result-template-grid,
+.sa-page--information .sai-subscription-summary,
+.sa-page--information .sai-subscription-quotes { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.sa-page--information .sai-field,
+.sa-page--information .sai-upload,
+.sa-page--information .sai-section-head,
+.sa-page--information .sai-history-guide,
+.sa-page--information .sai-login-limit-panel { min-width: 0; }
+.sa-page--information .sai-upload small,
+.sa-page--information .sai-note,
+.sa-page--information .sai-import-warnings,
+.sa-page--information .sai-check { overflow-wrap: anywhere; }
+.sa-page--information .sai-table-wrap,
+.sa-page--information .sai-grade-table-wrap { width: 100%; max-width: 100%; box-sizing: border-box; }
+
+@media (max-width: 700px) {
+  .sa-page--overview .sa-table { min-width: 900px; }
+  .sa-overview-actions { min-width: 320px; }
+  .sa-feature-manager { padding: 14px 12px; }
+  .sa-feature-manager__header { align-items: flex-start; }
+
+  .sai-hero { min-height: 154px; align-items: flex-start; }
+  .sai-hero-actions { align-self: stretch; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 6px; }
+  .sai-hero-actions .sa-page-art { width: 66px; max-height: 70px; }
+  .super-admin-shell .sai-back-button { min-height: 34px; padding: 7px 11px; }
+  .sa-page--information .sai-card { padding: 14px; }
+  .sa-page--information .sai-grid,
+  .sa-page--information .sai-exam-grid,
+  .sa-page--information .sai-result-template-grid,
+  .sa-page--information .sai-subscription-summary,
+  .sa-page--information .sai-subscription-quotes,
+  .sa-page--information .sai-import-grid { grid-template-columns: 1fr; }
+  .sa-page--information .sai-section-head,
+  .sa-page--information .sai-level-exam-head,
+  .sa-page--information .sai-login-limit-panel { align-items: stretch; }
+  .sa-page--information .sai-section-head > button,
+  .sa-page--information .sai-actions > button,
+  .sa-page--information .sai-login-limit-panel > button { width: 100%; }
+  .sa-page--information .sai-login-limit-panel .sai-field { width: 100%; }
+  .sa-page--information .sai-upload { align-items: flex-start; }
+  .sa-page--information .sai-upload button { width: 100%; }
+  .sa-page--information .sai-meta { gap: 7px; }
+  .sa-page--information .sai-result-template-preview { overflow-x: auto; }
+  .sa-page--information .sai-result-template-mini { min-width: 360px; }
+}
