@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 import SchoolSubscriptionSection from "./SchoolSubscriptionSection";
+import paymentsArt from "../../assets/payments/online-payments.svg";
 
 export default function SuperAdminPayments() {
   const [schools, setSchools] = useState([]);
@@ -34,11 +35,16 @@ export default function SuperAdminPayments() {
   };
 
   return (
-    <div>
-      <h2>School Billing Payments</h2>
-      <p style={{ marginTop: 6, opacity: 0.75 }}>
-        Review each school&apos;s online subscription payments and bank-transfer receipt uploads in one place.
-      </p>
+    <div className="sa-page sa-page--payments">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">Billing control</span>
+          <h1>School Billing Payments</h1>
+          <p>Review online subscriptions and bank-transfer receipt uploads across every school.</p>
+        </div>
+        <img className="sa-page-art" src={paymentsArt} alt="" aria-hidden="true" />
+      </section>
+
 
       {loadingSchools ? (
         <p>Loading schools...</p>

@@ -932,7 +932,7 @@ export default function SchoolInformation() {
   }
 
   return (
-    <div className="sai-page">
+    <div className="sa-page sai-page sa-page--information">
       <div className="sai-top">
         <div>
           <h2>School Information</h2>

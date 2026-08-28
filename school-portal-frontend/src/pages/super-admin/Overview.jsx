@@ -4,6 +4,7 @@ import api from "../../services/api";
 import FeatureModal from "../../components/FeatureModal";
 import { clearAuthState, getStoredToken, getStoredUser } from "../../utils/authStorage";
 import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
+import overviewArt from "../../assets/dashboard/branding.svg";
 
 function SuperAdminSchools() {
   const [schools, setSchools] = useState([]);
@@ -115,16 +116,17 @@ function SuperAdminSchools() {
   };
 
   return (
-    <div>
-      <h1>Schools Control Panel</h1>
+    <div className="sa-page sa-page--overview">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">Platform oversight</span>
+          <h1>Schools Control Panel</h1>
+          <p>Monitor school status, update access, manage enabled features, and maintain administrator accounts.</p>
+        </div>
+        <img className="sa-page-art" src={overviewArt} alt="" aria-hidden="true" />
+      </section>
 
-      <table
-        border="1"
-        cellPadding="10"
-        cellSpacing="0"
-        width="100%"
-        style={{ marginTop: 20 }}
-      >
+      <div className="sa-table-wrap"><table className="sa-table" border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ marginTop: 20 }}>
         <thead>
           <tr>
             <th>School Name</th>
@@ -157,9 +159,7 @@ function SuperAdminSchools() {
               <td>{school.email}</td>
 
               <td>
-                <strong>
-                  {school.status === "active" ? "Active" : "Suspended"}
-                </strong>
+                <span className={`sa-status ${school.status === "active" ? "sa-status--active" : "sa-status--suspended"}`}>{school.status === "active" ? "Active" : "Suspended"}</span>
               </td>
 
               <td>
@@ -193,7 +193,7 @@ function SuperAdminSchools() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
       {showFeatureModal && selectedSchool && (
         <FeatureModal

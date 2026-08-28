@@ -28,6 +28,9 @@ class SchoolHistoryImportService
     private array $pendingPasswordsByUserId = [];
     private array $latestPlacementByStudentId = [];
     private array $sessionOrder = [];
+    private array $levelAliases = [];
+    private array $levelLabels = [];
+    private array $caHeaderAliases = [];
 
     private array $summary = [
         'rows_read' => 0,
@@ -97,6 +100,7 @@ class SchoolHistoryImportService
     public function import(School $school, UploadedFile $file, int $actorUserId, bool $makeLatestSessionCurrent = false): array
     {
         $this->reset();
+        $this->prepareSchoolImportAliases($school);
 
         $rows = $this->readCsv($file);
         if (empty($rows)) {
@@ -150,6 +154,26 @@ class SchoolHistoryImportService
             $activeCaIndices = [0];
         }
 
+        $levelLabels = [];
+        $levelClasses = [];
+        foreach (ClassTemplateSchema::normalize($school?->class_templates) as $section) {
+            $key = AssessmentSchema::normalizeLevelKey((string) ($section['key'] ?? ''));
+            if ($key !== null) {
+                $levelLabels[$key] = trim((string) ($section['label'] ?? '')) ?: $key;
+                $levelClasses[$key] = ClassTemplateSchema::activeClassNames($section);
+            }
+        }
+
+        $caHeaders = [];
+        foreach ($activeCaIndices as $caIndex) {
+            $labels = collect($levelSchemas['by_level'])
+                ->map(fn (array $schema) => trim((string) ($schema['ca_labels'][$caIndex] ?? '')))
+                ->filter()
+                ->unique(fn (string $label) => strtolower($label))
+                ->values();
+            $caHeaders[] = $labels->count() === 1 ? $labels->first() : 'CA' . ($caIndex + 1);
+        }
+
         $headers = [
             'session',
             'term',
@@ -162,7 +186,7 @@ class SchoolHistoryImportService
             'gender',
             'status',
             'subject',
-            ...array_map(fn ($index) => 'ca' . ($index + 1), $activeCaIndices),
+            ...$caHeaders,
             'exam',
         ];
 
@@ -178,8 +202,8 @@ class SchoolHistoryImportService
             $rows[] = [
                 '2024/2025',
                 $index % 2 === 0 ? 'First Term' : 'Second Term',
-                $level,
-                self::exampleClassForLevel($level),
+                $levelLabels[$level] ?? $level,
+                $levelClasses[$level][0] ?? self::exampleClassForLevel($level),
                 $level === 'secondary' ? 'Science' : '',
                 $index === 0 ? 'Ada Example' : 'Tunde Example',
                 $index === 0 ? 'adaexample01' : 'tundeexample01',
@@ -220,6 +244,38 @@ class SchoolHistoryImportService
         $this->pendingPasswordsByUserId = [];
         $this->latestPlacementByStudentId = [];
         $this->sessionOrder = [];
+        $this->levelAliases = [];
+        $this->levelLabels = [];
+        $this->caHeaderAliases = [];
+    }
+
+    private function prepareSchoolImportAliases(School $school): void
+    {
+        $templates = ClassTemplateSchema::normalize($school->class_templates);
+        $levels = [];
+
+        foreach ($templates as $section) {
+            $levelKey = AssessmentSchema::normalizeLevelKey((string) ($section['key'] ?? ''));
+            if ($levelKey === null) {
+                continue;
+            }
+
+            $levels[] = $levelKey;
+            $label = trim((string) ($section['label'] ?? '')) ?: $levelKey;
+            $this->levelLabels[$levelKey] = $label;
+            $this->levelAliases[$this->normalizeLevelKey($levelKey)] = $levelKey;
+            $this->levelAliases[$this->normalizeLevelKey($label)] = $levelKey;
+        }
+
+        $schemas = AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $levels);
+        foreach ($schemas['by_level'] as $schema) {
+            foreach ((array) ($schema['ca_labels'] ?? []) as $index => $label) {
+                $key = $this->normalizeHeaderKey((string) $label);
+                if ($key !== '') {
+                    $this->caHeaderAliases[$key] = 'ca' . ((int) $index + 1);
+                }
+            }
+        }
     }
 
     private function readCsv(UploadedFile $file): array
@@ -234,7 +290,12 @@ class SchoolHistoryImportService
 
         while (($raw = fgetcsv($handle)) !== false) {
             if ($headers === null) {
-                $headers = $this->normalizeHeaders($raw);
+                $candidateHeaders = $this->historyHeadersFromRawHeaders($raw);
+                if (!$this->looksLikeHistoryHeader($candidateHeaders)) {
+                    continue;
+                }
+
+                $headers = $candidateHeaders;
                 continue;
             }
 
@@ -260,14 +321,67 @@ class SchoolHistoryImportService
         return $rows;
     }
 
+    private function historyHeadersFromRawHeaders(array $rawHeaders): array
+    {
+        $normalizedHeaders = $this->normalizeHeaders($rawHeaders);
+
+        for ($startIndex = 0; $startIndex < count($normalizedHeaders); $startIndex++) {
+            $candidate = array_values(array_slice($normalizedHeaders, $startIndex));
+            $candidate = array_map(fn (string $header) => $this->canonicalHistoryHeader($header), $candidate);
+
+            if (
+                in_array($candidate[0] ?? '', ['session', 'academic_session', 'session_name'], true)
+                && $this->looksLikeHistoryHeader($candidate)
+            ) {
+                return $candidate;
+            }
+        }
+
+        return array_map(fn (string $header) => $this->canonicalHistoryHeader($header), $normalizedHeaders);
+    }
+
+    private function canonicalHistoryHeader(string $header): string
+    {
+        if (isset($this->caHeaderAliases[$header])) {
+            return $this->caHeaderAliases[$header];
+        }
+
+        if (in_array($header, self::BASE_KEYS, true)) {
+            return $header;
+        }
+
+        foreach (self::BASE_KEYS as $knownHeader) {
+            if (str_ends_with($header, '_' . $knownHeader)) {
+                return $knownHeader;
+            }
+        }
+
+        return $header;
+    }
+
+    private function looksLikeHistoryHeader(array $headers): bool
+    {
+        $headers = array_filter($headers);
+
+        return (
+            count(array_intersect($headers, ['session', 'academic_session', 'session_name'])) > 0
+            && count(array_intersect($headers, ['term', 'term_name'])) > 0
+            && count(array_intersect($headers, ['class', 'class_name'])) > 0
+            && count(array_intersect($headers, ['student_name', 'full_name', 'name'])) > 0
+        );
+    }
+
     private function normalizeHeaders(array $headers): array
     {
-        return array_map(function ($header) {
-            $clean = strtolower(trim((string) $header));
-            $clean = preg_replace('/^\xEF\xBB\xBF/', '', $clean) ?? $clean;
-            $clean = preg_replace('/[^a-z0-9]+/', '_', $clean) ?? $clean;
-            return trim($clean, '_');
-        }, $headers);
+        return array_map(fn ($header) => $this->normalizeHeaderKey((string) $header), $headers);
+    }
+
+    private function normalizeHeaderKey(string $header): string
+    {
+        $clean = strtolower(trim($header));
+        $clean = preg_replace('/^\xEF\xBB\xBF/', '', $clean) ?? $clean;
+        $clean = preg_replace('/[^a-z0-9]+/', '_', $clean) ?? $clean;
+        return trim($clean, '_');
     }
 
     private function rowIsBlank(array $row): bool
@@ -293,7 +407,14 @@ class SchoolHistoryImportService
             return;
         }
 
-        $level = $this->normalizeLevel($this->value($row, ['level', 'education_level']), $className);
+        $submittedLevel = $this->value($row, ['level', 'education_level']);
+        $level = $this->normalizeLevel($submittedLevel, $className);
+        if ($level === '') {
+            $availableLevels = implode(', ', array_values($this->levelLabels));
+            $this->skip($lineNumber, "Level '{$submittedLevel}' is not configured for this school. Use one of: {$availableLevels}.");
+            return;
+        }
+
         $departmentName = $this->value($row, ['department', 'sub_class']);
         $declaredStatus = $this->normalizeStatus($this->value($row, ['status']));
 
@@ -377,30 +498,43 @@ class SchoolHistoryImportService
 
     private function normalizeLevel(string $level, string $className): string
     {
-        $level = strtolower(trim($level));
-        if ($level !== '') {
-            $level = str_replace(['-', ' '], '_', $level);
-            $level = preg_replace('/[^a-z0-9_]+/', '', $level) ?? '';
-            $level = preg_replace('/_+/', '_', $level) ?? '';
-            $level = trim($level, '_');
-
-            if (str_starts_with($level, 'creche')) {
-                return 'creche';
-            }
-            if (str_starts_with($level, 'pre_nursery') || str_starts_with($level, 'prenursery')) {
-                return 'pre_nursery';
-            }
-
-            return $level;
+        $submittedLevel = $this->normalizeLevelKey($level);
+        if ($submittedLevel !== '') {
+            return $this->levelAliases[$submittedLevel] ?? '';
         }
 
+        $classLevel = $this->inferLevelFromClassName($className);
+        if ($classLevel !== null) {
+            return $this->levelAliases[$classLevel] ?? $classLevel;
+        }
+
+        return isset($this->levelAliases['secondary']) ? 'secondary' : (string) array_key_first($this->levelLabels);
+    }
+
+    private function normalizeLevelKey(string $level): string
+    {
+        $level = strtolower(trim($level));
+        if ($level === '') {
+            return '';
+        }
+
+        $level = str_replace(['-', ' '], '_', $level);
+        $level = preg_replace('/[^a-z0-9_]+/', '', $level) ?? '';
+        $level = preg_replace('/_+/', '_', $level) ?? '';
+        return trim($level, '_');
+    }
+
+    private function inferLevelFromClassName(string $className): ?string
+    {
         $class = strtolower($className);
         return match (true) {
             str_contains($class, 'creche') => 'creche',
             str_contains($class, 'pre nursery'), str_contains($class, 'pre-nursery'), str_contains($class, 'prenursery') => 'pre_nursery',
             str_contains($class, 'nursery'), str_contains($class, 'kg') => 'nursery',
             str_contains($class, 'primary'), str_contains($class, 'pry'), str_contains($class, 'basic') => 'primary',
-            default => 'secondary',
+            str_contains($class, 'jss'), str_contains($class, 'sss'), str_contains($class, 'secondary') => 'secondary',
+            preg_match('/\b(js|ss)\s*\d+\b/i', $className) === 1 => 'secondary',
+            default => null,
         };
     }
 
@@ -514,13 +648,7 @@ class SchoolHistoryImportService
             ->where('school_id', (int) $school->id)
             ->where('role', 'student');
 
-        $user = null;
-        if ($identifier !== '') {
-            $user = (clone $userQuery)->whereRaw('LOWER(username) = ?', [strtolower($identifier)])->first();
-        }
-        if (!$user && $email !== '') {
-            $user = (clone $userQuery)->whereRaw('LOWER(email) = ?', [strtolower($email)])->first();
-        }
+        $user = $this->matchingStudentUser($school, $userQuery, $identifier, $email, $name);
 
         $isNewUser = false;
         $plainPassword = null;
@@ -569,6 +697,84 @@ class SchoolHistoryImportService
         $this->studentsByKey[$cacheKey] = $student;
 
         return $student;
+    }
+
+    private function matchingStudentUser(School $school, $userQuery, string $identifier, string $email, string $name): ?User
+    {
+        $matches = collect();
+        if ($identifier !== '') {
+            $match = (clone $userQuery)->whereRaw('LOWER(username) = ?', [strtolower($identifier)])->first();
+            if ($match) {
+                $matches->push($match);
+            }
+        }
+        if ($email !== '') {
+            $match = (clone $userQuery)->whereRaw('LOWER(email) = ?', [strtolower($email)])->first();
+            if ($match) {
+                $matches->push($match);
+            }
+        }
+
+        $matches = $matches->unique('id')->values();
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+        if ($matches->count() > 1) {
+            return null;
+        }
+
+        return $this->studentUserByName($school, $name);
+    }
+
+    private function studentUserByName(School $school, string $name): ?User
+    {
+        $needle = $this->nameMatchKey($name);
+        if ($needle === '') {
+            return null;
+        }
+
+        $users = User::query()
+            ->where('school_id', (int) $school->id)
+            ->where('role', 'student')
+            ->get(['id', 'name']);
+
+        $exactMatches = $users
+            ->filter(fn (User $user) => $this->nameMatchKey((string) $user->name) === $needle)
+            ->values();
+        if ($exactMatches->count() === 1) {
+            return User::query()->find((int) $exactMatches->first()->id);
+        }
+        if ($exactMatches->count() > 1) {
+            return null;
+        }
+
+        $tokenNeedle = $this->nameTokensKey($name);
+        if ($tokenNeedle === '') {
+            return null;
+        }
+        $tokenMatches = $users
+            ->filter(fn (User $user) => $this->nameTokensKey((string) $user->name) === $tokenNeedle)
+            ->values();
+
+        return $tokenMatches->count() === 1 ? User::query()->find((int) $tokenMatches->first()->id) : null;
+    }
+
+    private function nameMatchKey(string $name): string
+    {
+        $name = strtolower(trim($name));
+        $name = preg_replace('/[^a-z0-9]+/', '', $name) ?? '';
+        return $name;
+    }
+
+    private function nameTokensKey(string $name): string
+    {
+        $tokens = preg_split('/[^a-z0-9]+/', strtolower(trim($name)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($tokens) < 2) {
+            return '';
+        }
+
+        sort($tokens, SORT_STRING);
+        return implode(' ', $tokens);
     }
 
     private function uniqueUsername(string $seed): string

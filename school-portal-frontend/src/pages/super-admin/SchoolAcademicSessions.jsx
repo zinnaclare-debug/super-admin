@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
+import sessionsArt from "../../assets/academic-session/city-girl.svg";
 
 const formatSessionStatus = (status) => {
   const value = String(status || "").toLowerCase();
@@ -87,7 +88,15 @@ export default function SchoolAcademicSessions() {
   };
 
   return (
-    <div>
+    <div className="sa-page sa-page--sessions">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">Academic control</span>
+          <h1>Academic Sessions</h1>
+          <p>Review the school cycle, select its current session, and protect its historical records.</p>
+        </div>
+        <img className="sa-page-art" src={sessionsArt} alt="" aria-hidden="true" />
+      </section>
       <div
         style={{
           display: "flex",
@@ -113,7 +122,7 @@ export default function SchoolAcademicSessions() {
       {loading ? (
         <p>Loading...</p>
       ) : (
-        <table border="1" cellPadding="10" cellSpacing="0" width="100%">
+        <div className="sa-table-wrap"><table className="sa-table" border="1" cellPadding="10" cellSpacing="0" width="100%">
           <thead>
             <tr>
               <th>S/N</th>
@@ -130,7 +139,7 @@ export default function SchoolAcademicSessions() {
                 <td>{session.session_name || "-"}</td>
                 <td>{session.academic_year || "-"}</td>
                 <td>
-                  <strong>{formatSessionStatus(session.status)}</strong>
+                  <span className={`sa-status ${session.status === "current" ? "sa-status--current" : session.status === "completed" ? "sa-status--completed" : "sa-status--danger"}`}>{formatSessionStatus(session.status)}</span>
                 </td>
                 <td>
                   {session.status === "pending" && (
@@ -182,7 +191,7 @@ export default function SchoolAcademicSessions() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       )}
     </div>
   );

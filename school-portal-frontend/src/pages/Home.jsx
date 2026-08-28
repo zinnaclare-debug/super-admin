@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+
 import api from "../services/api";
 import SuspendedSchoolNotice from "../components/SuspendedSchoolNotice";
 import PublicSchoolPortal from "./public-school/PublicSchoolPortal";
@@ -122,9 +122,6 @@ function Home() {
             <p className="home-brand-name">Lytebridge Professional Service LTD</p>
           </div>
         </div>
-        <Link className="home-login-btn" to="/login">
-          Login
-        </Link>
       </header>
 
       <main className="home-main">

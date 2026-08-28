@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import "../pages/super-admin/SuperAdmin.css";
 import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
 import {
@@ -910,6 +911,7 @@ function DashboardLayout() {
       ) : null}
 
       <main
+        className={user?.role === "super_admin" ? "super-admin-shell" : undefined}
         style={{
           flex: 1,
           width: isCbtExamActive || isMobile ? "100%" : isCompactSidebar ? `calc(100vw - ${compactSidebarWidth}px)` : "auto",

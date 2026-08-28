@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import loginArt from "../../assets/profile/profile-card.svg";
 
 const parseFileName = (headers, fallback = "school_admin_login_details.csv") => {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -67,9 +68,17 @@ export default function SuperAdminLoginDetails() {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <h1 style={{ marginBottom: 6 }}>School Admin Login Details</h1>
+    <div className="sa-page sa-page--logins">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">Access records</span>
+          <h1>School Admin Login Details</h1>
+          <p>Search, review, and securely download school administrator login records.</p>
+        </div>
+        <img className="sa-page-art" src={loginArt} alt="" aria-hidden="true" />
+      </section>
+      <div className="sa-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <h2 style={{ marginBottom: 6 }}>Login records</h2>
         <button onClick={() => navigate("/super-admin/users")}>Back</button>
       </div>
 

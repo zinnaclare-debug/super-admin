@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
+import studentsArt from "../../assets/dashboard/students.svg";
 
 function SchoolUsersByLevel() {
   const { schoolId } = useParams();
@@ -37,9 +38,17 @@ function SchoolUsersByLevel() {
   }, [schoolId]);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ marginBottom: 6 }}>{school ? `${school.name} - Students` : "School Students"}</h1>
+    <div className="sa-page sa-page--students">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">School records</span>
+          <h1>Students by Level</h1>
+          <p>Filter each school&apos;s registered students by the education level configured for that school.</p>
+        </div>
+        <img className="sa-page-art" src={studentsArt} alt="" aria-hidden="true" />
+      </section>
+      <div className="sa-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ marginBottom: 6 }}>{school ? `${school.name} - Students` : "School Students"}</h2>
         <button onClick={() => navigate("/super-admin/users")}>Back to Schools</button>
       </div>
 

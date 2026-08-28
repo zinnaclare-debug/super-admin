@@ -1,0 +1,138 @@
+.super-admin-shell {
+  --sa-ink: #13213d;
+  --sa-muted: #62718b;
+  --sa-line: #dbe5f0;
+  --sa-surface: #ffffff;
+  --sa-primary: #0f4c81;
+  --sa-primary-deep: #092d55;
+  --sa-accent: #e58b1f;
+  color: var(--sa-ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.super-admin-shell > div,
+.super-admin-shell .sai-page {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+.super-admin-shell h1,
+.super-admin-shell h2,
+.super-admin-shell h3,
+.super-admin-shell h4 { color: var(--sa-ink); letter-spacing: -0.025em; }
+.super-admin-shell h1 { margin: 0; font-size: clamp(1.65rem, 4vw, 2.65rem); line-height: 1.08; }
+.super-admin-shell h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+.super-admin-shell p { color: var(--sa-muted); line-height: 1.58; }
+
+.super-admin-shell button,
+.super-admin-shell input,
+.super-admin-shell select,
+.super-admin-shell textarea { font: inherit; }
+
+.super-admin-shell button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 8px 13px;
+  background: linear-gradient(135deg, var(--sa-primary) 0%, #156a9e 100%);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(15, 76, 129, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.super-admin-shell button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 9px 18px rgba(15, 76, 129, 0.2); }
+.super-admin-shell button:disabled { opacity: 0.58; cursor: not-allowed; box-shadow: none; }
+
+.super-admin-shell input,
+.super-admin-shell select,
+.super-admin-shell textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #cbd8e6;
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: var(--sa-ink);
+  background: #fff;
+  outline: none;
+}
+
+.super-admin-shell input:focus,
+.super-admin-shell select:focus,
+.super-admin-shell textarea:focus { border-color: var(--sa-primary); box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.12); }
+
+.sa-page-hero {
+  position: relative;
+  min-height: 148px;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 22px;
+  color: #fff;
+  background: linear-gradient(125deg, var(--sa-primary-deep) 0%, var(--sa-primary) 58%, #2279a6 100%);
+  box-shadow: 0 18px 38px rgba(9, 45, 85, 0.2);
+}
+
+.sa-page-hero::before,
+.sa-page-hero::after { content: ""; position: absolute; border-radius: 999px; pointer-events: none; z-index: -1; }
+.sa-page-hero::before { width: 300px; height: 300px; right: 9%; bottom: -220px; border: 38px solid rgba(229, 139, 31, 0.85); }
+.sa-page-hero::after { width: 240px; height: 240px; left: -135px; top: -150px; border: 32px solid rgba(255, 255, 255, 0.12); }
+.sa-page-hero h1, .sa-page-hero h2, .sa-page-hero p { color: #fff; }
+.sa-page-hero p { margin: 6px 0 0; max-width: 680px; opacity: 0.86; }
+.sa-page-eyebrow { display: block; margin-bottom: 6px; color: #ffce8a; font: 800 0.72rem/1 "Trebuchet MS", sans-serif; letter-spacing: 0.14em; text-transform: uppercase; }
+.sa-page-art { width: clamp(92px, 15vw, 165px); max-height: 122px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 12px 18px rgba(3, 20, 42, 0.2)); }
+
+.sa-card,
+.super-admin-shell > div > form,
+.super-admin-shell .sai-card { border: 1px solid var(--sa-line); border-radius: 16px; background: var(--sa-surface); box-shadow: 0 10px 28px rgba(31, 56, 88, 0.07); }
+.sa-card { padding: clamp(14px, 2vw, 22px); }
+.sa-card > :first-child { margin-top: 0; }
+.sa-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; padding: clamp(14px, 2vw, 20px); }
+
+.sa-table-wrap,
+.super-admin-shell > div > div[style*="overflowX"] {
+  width: 100%; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--sa-line); border-radius: 15px; background: #fff; box-shadow: 0 10px 24px rgba(31, 56, 88, 0.06);
+}
+
+.super-admin-shell table { width: 100% !important; border: 0 !important; border-collapse: collapse; color: var(--sa-ink); background: #fff; }
+.super-admin-shell th,
+.super-admin-shell td { border: 0 !important; border-bottom: 1px solid #e7eef6 !important; padding: 12px 13px !important; text-align: left; vertical-align: middle; }
+.super-admin-shell th { color: #24415f; background: #edf5fb; font: 800 0.72rem/1.2 "Trebuchet MS", sans-serif; letter-spacing: 0.05em; text-transform: uppercase; }
+.super-admin-shell tbody tr:hover { background: #f8fbff; }
+.super-admin-shell td button + button { margin-left: 8px; }
+
+.sa-stack { display: grid; gap: 16px; }
+.sa-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sa-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sa-muted { color: var(--sa-muted); }
+.sa-status { display: inline-flex; align-items: center; width: max-content; padding: 4px 9px; border-radius: 999px; font: 800 0.7rem/1 "Trebuchet MS", sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+.sa-status--active, .sa-status--current { color: #087443; background: #def7e9; }
+.sa-status--suspended, .sa-status--danger { color: #a62318; background: #fff0ef; }
+.sa-status--completed { color: #8c5800; background: #fff2d8; }
+
+.super-admin-shell .sai-page { gap: 18px; }
+.super-admin-shell .sai-top { padding: 18px; border-radius: 16px; background: linear-gradient(135deg, #eff7ff, #fffaf1); border: 1px solid var(--sa-line); }
+.super-admin-shell .sai-card { border-color: var(--sa-line); border-radius: 16px; box-shadow: 0 10px 28px rgba(31, 56, 88, 0.07); }
+
+@media (max-width: 700px) {
+  .super-admin-shell > div, .super-admin-shell .sai-page { gap: 13px; }
+  .sa-page-hero { min-height: 130px; align-items: flex-start; padding: 18px; }
+  .sa-page-art { width: 78px; max-height: 88px; align-self: flex-end; }
+  .sa-page-hero::before { right: -64px; bottom: -160px; }
+  .super-admin-shell th, .super-admin-shell td { padding: 10px !important; }
+  .super-admin-shell td button + button { margin: 7px 0 0; }
+  .super-admin-shell .sai-top { align-items: stretch; }
+  .super-admin-shell .sai-top > button { width: 100%; }
+}

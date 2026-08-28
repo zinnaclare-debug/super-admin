@@ -3,6 +3,7 @@ import api from "../../services/api";
 import FeatureTable from "../../components/FeatureTable";
 import { FEATURE_DEFINITIONS } from "../../config/features";
 import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
+import schoolsArt from "../../assets/dashboard/modules.svg";
 
 const TENANCY_BASE_DOMAIN = "lyt.com.ng";
 
@@ -277,7 +278,7 @@ function Schools() {
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: "100%" }}>
+    <div className="sa-page sa-page--schools">
       {toast ? (
         <div
           style={{
@@ -302,10 +303,16 @@ function Schools() {
         </div>
       ) : null}
 
-      <h1 style={{ marginTop: 0, fontSize: "clamp(1.7rem, 3vw, 2.4rem)" }}>Schools</h1>
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">Platform operations</span>
+          <h1>Schools</h1>
+          <p>Create, manage, and protect every school account from one responsive workspace.</p>
+        </div>
+        <img className="sa-page-art" src={schoolsArt} alt="" aria-hidden="true" />
+      </section>
 
-      <form
-        onSubmit={createSchoolWithAdmin}
+      <form className="sa-form-grid" onSubmit={createSchoolWithAdmin}
         style={{
           marginBottom: 20,
           display: "grid",
@@ -373,8 +380,8 @@ function Schools() {
         </div>
       )}
 
-      <div style={{ width: "100%", overflowX: "auto" }}>
-        <table border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980 }}>
+      <div className="sa-table-wrap">
+        <table className="sa-table" border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980 }}>
           <thead>
             <tr>
               <th>School Name</th>
@@ -419,7 +426,7 @@ function Schools() {
                 </td>
 
                 <td>
-                  <strong>{s.status === "active" ? "Active" : "Suspended"}</strong>
+                  <span className={`sa-status ${s.status === "active" ? "sa-status--active" : "sa-status--suspended"}`}>{s.status === "active" ? "Active" : "Suspended"}</span>
                 </td>
 
                 <td>

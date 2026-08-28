@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import usersArt from "../../assets/users/people.svg";
 
 function Users() {
   const navigate = useNavigate();
@@ -25,9 +26,16 @@ function Users() {
   }, []);
 
   return (
-    <div>
-      <h1>Platform Users</h1>
-      <p>Select a school to view students by education level.</p>
+    <div className="sa-page sa-page--users">
+      <section className="sa-page-hero">
+        <div>
+          <span className="sa-page-eyebrow">People directory</span>
+          <h1>Platform Users</h1>
+          <p>Open a school to review its students by education level and manage administrator login records.</p>
+        </div>
+        <img className="sa-page-art" src={usersArt} alt="" aria-hidden="true" />
+      </section>
+
       <div style={{ marginTop: 8 }}>
         <button onClick={() => navigate("/super-admin/users/login-details")}>
           School Admin Login Details
