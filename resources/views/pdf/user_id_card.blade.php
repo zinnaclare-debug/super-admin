@@ -433,10 +433,17 @@
                             <span class="detail-label">Issue</span>
                             <span class="validity-value">{{ strtoupper($issueSessionDisplay) }}</span>
                         </div>
-                        <div class="validity-item">
-                            <span class="detail-label">Expiry</span>
-                            <span class="validity-value">{{ strtoupper($expirySessionDisplay) }}</span>
-                        </div>
+                        @if($isStudent)
+
+                            <div class="validity-item">
+
+                                <span class="detail-label">Expiry</span>
+
+                                <span class="validity-value">{{ strtoupper($expirySessionDisplay) }}</span>
+
+                            </div>
+
+                        @endif
                     </td>
                 </tr>
             </table>

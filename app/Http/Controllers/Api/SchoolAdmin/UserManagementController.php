@@ -216,6 +216,12 @@ class UserManagementController extends Controller
         }
     }
 
+    // GET /api/staff/id-card or /api/student/id-card
+    public function downloadOwnIdCard(Request $request)
+    {
+        return $this->downloadIdCard($request, $request->user());
+    }
+
     // GET /api/school-admin/users/{user}/id-card
     public function downloadIdCard(Request $request, User $user)
     {
@@ -1797,8 +1803,3 @@ class UserManagementController extends Controller
         }
     }
 }
-
-
-
-
-

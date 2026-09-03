@@ -946,7 +946,7 @@ export default function SchoolInformation() {
         </div>
       </section>
 
-      <section className="sai-card">
+      <section className="sai-card" style={{ display: "none" }}>
         <h3>Branding</h3>
         <div className="sai-grid">
           <div className="sai-field">

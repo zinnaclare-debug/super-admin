@@ -96,6 +96,7 @@ class StaffProfileController extends Controller
         }
 
         $payload = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
             'email' => [
                 'nullable',
                 'email',
@@ -108,6 +109,15 @@ class StaffProfileController extends Controller
             'position' => ['nullable', 'string', 'max:120'],
             'education_level' => ['nullable', 'string', 'max:120'],
         ]);
+
+        if (array_key_exists('name', $payload)) {
+            $name = trim((string) ($payload['name'] ?? ''));
+            if ($name === '') {
+                return response()->json(['message' => 'Name cannot be empty.'], 422);
+            }
+            $user->name = $name;
+            $user->save();
+        }
 
         if (array_key_exists('email', $payload)) {
             $email = strtolower(trim((string) ($payload['email'] ?? '')));

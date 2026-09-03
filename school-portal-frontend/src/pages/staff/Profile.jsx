@@ -6,6 +6,7 @@ import "../shared/ProfileShowcase.css";
 import { compressProfilePhoto, PROFILE_PHOTO_GUIDE } from "../../utils/profileImage";
 
 const staffFormFromData = (data) => ({
+  name: data?.user?.name || data?.name || "",
   email: data?.user?.email || data?.email || "",
   position: data?.staff_position || data?.position || data?.staff?.position || "",
   education_level: data?.education_level || data?.staff?.education_level || "",
@@ -25,6 +26,7 @@ export default function StaffProfile() {
   const [uploading, setUploading] = useState(false);
   const [processingPhoto, setProcessingPhoto] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(0);
+  const [downloadingIdCard, setDownloadingIdCard] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +76,25 @@ export default function StaffProfile() {
     load();
   }, []);
 
+  const downloadIdCard = async () => {
+    setDownloadingIdCard(true);
+    try {
+      const res = await api.get("/api/staff/id-card", { responseType: "blob" });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `staff_id_card_${me?.username || me?.user?.username || "profile"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download ID card.");
+    } finally {
+      setDownloadingIdCard(false);
+    }
+  };
   const toAbsoluteUrl = (url) => {
     if (!url) return null;
 
@@ -262,10 +283,10 @@ export default function StaffProfile() {
               </div>
             ) : (
               <div className="pf-kv">
-                <div className="pf-row">
+                <label className="pf-row">
                   <span className="pf-row-label">Name</span>
-                  <span className="pf-row-value">{me.name || me.user?.name || "-"}</span>
-                </div>
+                  <input className="pf-input" value={form.name} onChange={(e) => setField("name", e.target.value)} />
+                </label>
                 <div className="pf-row">
                   <span className="pf-row-label">Username</span>
                   <span className="pf-row-value">{me.username || me.user?.username || "-"}</span>
@@ -294,6 +315,9 @@ export default function StaffProfile() {
               ) : (
                 <>
                   <button className="pf-btn" onClick={() => setEditing(true)}>Edit Profile</button>
+                  <button className="pf-btn" onClick={downloadIdCard} disabled={downloadingIdCard}>
+                    {downloadingIdCard ? "Preparing ID..." : "Download ID Card"}
+                  </button>
                   <button className="pf-btn" onClick={load}>Refresh</button>
                 </>
               )}

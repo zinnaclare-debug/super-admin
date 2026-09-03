@@ -624,3 +624,28 @@
   color: #fff;
   background: linear-gradient(125deg, #1d4ed8 0%, #0f766e 100%);
 }
+
+.sd-file-control {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed #9ab4ce;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.sd-file-control img {
+  width: 74px;
+  height: 64px;
+  object-fit: contain;
+  border: 1px solid #d5e2ee;
+  border-radius: 8px;
+  background: #fff;
+}
+.sd-file-control span { color: #62718b; font-size: 0.85rem; }
+.sd-file-control button { margin-left: auto; }
+@media (max-width: 700px) {
+  .sd-file-control { flex-wrap: wrap; }
+  .sd-file-control button { width: 100%; margin-left: 0; }
+}

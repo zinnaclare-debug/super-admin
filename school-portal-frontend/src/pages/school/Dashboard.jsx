@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import { getStoredFeatures } from "../../utils/authStorage";
@@ -24,6 +24,9 @@ function SchoolDashboard() {
     contact_phone: "",
     show_result_position: true,
     paystack_subaccount_code: "",
+    school_logo_url: "",
+    head_of_school_name: "",
+    head_signature_url: "",
     students: 0,
     male_students: 0,
     female_students: 0,
@@ -32,13 +35,18 @@ function SchoolDashboard() {
     enabled_modules: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [headOfSchoolName, setHeadOfSchoolName] = useState("");
   const [schoolLocation, setSchoolLocation] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [schoolMotto, setSchoolMotto] = useState("");
   const [showResultPosition, setShowResultPosition] = useState(true);
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
+  const [logoFile, setLogoFile] = useState(null);
+  const [signatureFile, setSignatureFile] = useState(null);
   const [savingBranding, setSavingBranding] = useState(false);
+  const logoInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
   const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
 
   useEffect(() => {
@@ -57,6 +65,9 @@ function SchoolDashboard() {
           school_motto: res.data?.school_motto ?? "",
           show_result_position: Boolean(res.data?.show_result_position ?? true),
           paystack_subaccount_code: res.data?.paystack_subaccount_code ?? "",
+          school_logo_url: res.data?.school_logo_url ?? "",
+          head_of_school_name: res.data?.head_of_school_name ?? "",
+          head_signature_url: res.data?.head_signature_url ?? "",
           students: res.data?.students ?? 0,
           male_students: res.data?.male_students ?? 0,
           female_students: res.data?.female_students ?? 0,
@@ -64,6 +75,7 @@ function SchoolDashboard() {
           staff: res.data?.staff ?? 0,
           enabled_modules: res.data?.enabled_modules ?? 0,
         });
+        setHeadOfSchoolName(res.data?.head_of_school_name ?? "");
         setSchoolLocation(res.data?.school_location ?? "");
         setContactEmail(res.data?.contact_email ?? "");
         setContactPhone(res.data?.contact_phone ?? "");
@@ -81,6 +93,9 @@ function SchoolDashboard() {
           school_motto: "",
           show_result_position: true,
           paystack_subaccount_code: "",
+    school_logo_url: "",
+    head_of_school_name: "",
+    head_signature_url: "",
           students: 0,
           male_students: 0,
           female_students: 0,
@@ -88,6 +103,7 @@ function SchoolDashboard() {
           staff: 0,
           enabled_modules: 0,
         });
+        setHeadOfSchoolName("");
         setSchoolLocation("");
         setContactEmail("");
         setContactPhone("");
@@ -104,17 +120,22 @@ function SchoolDashboard() {
   }, []);
 
   const saveBranding = async () => {
+    const normalizedHeadName = (headOfSchoolName || "").trim();
     const normalizedLocation = (schoolLocation || "").trim();
     const normalizedContactEmail = (contactEmail || "").trim();
     const normalizedContactPhone = (contactPhone || "").trim();
     const normalizedSchoolMotto = (schoolMotto || "").trim();
     const normalizedSubaccountCode = (paystackSubaccountCode || "").trim();
+    const existingHeadName = (stats.head_of_school_name || "").trim();
     const existingLocation = (stats.school_location || "").trim();
     const existingContactEmail = (stats.contact_email || "").trim();
     const existingContactPhone = (stats.contact_phone || "").trim();
     const existingSchoolMotto = (stats.school_motto || "").trim();
     const existingShowResultPosition = Boolean(stats.show_result_position ?? true);
     const existingSubaccountCode = (stats.paystack_subaccount_code || "").trim();
+    const hasHeadNameChange = normalizedHeadName !== existingHeadName;
+    const hasLogoChange = Boolean(logoFile);
+    const hasSignatureChange = Boolean(signatureFile);
     const hasLocationChange = normalizedLocation !== existingLocation;
     const hasContactEmailChange = normalizedContactEmail !== existingContactEmail;
     const hasContactPhoneChange = normalizedContactPhone !== existingContactPhone;
@@ -122,19 +143,22 @@ function SchoolDashboard() {
     const hasShowResultPositionChange = Boolean(showResultPosition) !== existingShowResultPosition;
     const hasSubaccountCodeChange = normalizedSubaccountCode !== existingSubaccountCode;
 
-    if (!hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSchoolMottoChange && !hasShowResultPositionChange && !hasSubaccountCodeChange) {
+    if (!hasHeadNameChange && !hasLogoChange && !hasSignatureChange && !hasLocationChange && !hasContactEmailChange && !hasContactPhoneChange && !hasSchoolMottoChange && !hasShowResultPositionChange && !hasSubaccountCodeChange) {
       return alert("No school information changes to save.");
     }
 
     setSavingBranding(true);
     try {
       const fd = new FormData();
+      fd.append("head_of_school_name", normalizedHeadName);
       fd.append("school_location", normalizedLocation);
       fd.append("contact_email", normalizedContactEmail);
       fd.append("contact_phone", normalizedContactPhone);
       fd.append("school_motto", normalizedSchoolMotto);
       fd.append("show_result_position", showResultPosition ? "1" : "0");
       fd.append("paystack_subaccount_code", normalizedSubaccountCode);
+      if (logoFile) fd.append("logo", logoFile);
+      if (signatureFile) fd.append("head_signature", signatureFile);
 
       const res = await api.post("/api/school-admin/branding", fd, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -144,6 +168,9 @@ function SchoolDashboard() {
       setStats((prev) => ({
         ...prev,
         school_name: data.school_name ?? prev.school_name,
+        head_of_school_name: data.head_of_school_name ?? prev.head_of_school_name,
+        school_logo_url: data.school_logo_url ?? prev.school_logo_url,
+        head_signature_url: data.head_signature_url ?? prev.head_signature_url,
         school_location: data.school_location ?? prev.school_location,
         contact_email: Object.prototype.hasOwnProperty.call(data, "contact_email")
           ? (data.contact_email ?? "")
@@ -161,6 +188,9 @@ function SchoolDashboard() {
             ? (data.paystack_subaccount_code ?? "")
             : prev.paystack_subaccount_code,
       }));
+      setHeadOfSchoolName(data.head_of_school_name ?? normalizedHeadName);
+      setLogoFile(null);
+      setSignatureFile(null);
       setSchoolLocation(data.school_location ?? normalizedLocation);
       setContactEmail(
         Object.prototype.hasOwnProperty.call(data, "contact_email")
@@ -313,10 +343,32 @@ function SchoolDashboard() {
         <div className="sd-branding__form">
           <div className="sd-section-head">
             <h2>School Information</h2>
-            <p>Update contact details here. Logo, head details, exam record, class templates, and department setup are managed in School Information.</p>
+            <p>Update the school identity, head details, payment account, and contact information used across your school portal.</p>
           </div>
 
           <div className="sd-field-grid">
+            <div className="sd-field">
+              <label>School Logo</label>
+              <div className="sd-file-control">
+                {logoFile || stats.school_logo_url ? <img src={logoFile ? URL.createObjectURL(logoFile) : stats.school_logo_url} alt="School logo" /> : <span>No logo uploaded</span>}
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} hidden />
+                <button type="button" onClick={() => logoInputRef.current?.click()}>Choose Logo</button>
+              </div>
+            </div>
+
+            <div className="sd-field">
+              <label>Head of School Name</label>
+              <input type="text" value={headOfSchoolName} onChange={(e) => setHeadOfSchoolName(e.target.value)} placeholder="Enter head of school name" />
+            </div>
+
+            <div className="sd-field">
+              <label>Head Signature or Stamp</label>
+              <div className="sd-file-control">
+                {signatureFile || stats.head_signature_url ? <img src={signatureFile ? URL.createObjectURL(signatureFile) : stats.head_signature_url} alt="Head signature or stamp" /> : <span>No signature or stamp uploaded</span>}
+                <input ref={signatureInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setSignatureFile(e.target.files?.[0] || null)} hidden />
+                <button type="button" onClick={() => signatureInputRef.current?.click()}>Choose Signature or Stamp</button>
+              </div>
+            </div>
             <div className="sd-field">
               <label>School Location</label>
               <input
@@ -397,14 +449,3 @@ function SchoolDashboard() {
 }
 
 export default SchoolDashboard;
-
-
-
-
-
-
-
-
-
-
-

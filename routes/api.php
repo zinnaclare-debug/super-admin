@@ -163,7 +163,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'classTemplates']);
     Route::put('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'upsertClassTemplates']);
 
-    // âœ… School features (school admin only)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ School features (school admin only)
     Route::get('/schools/features', [SchoolFeatureController::class, 'index']);
 
     Route::get('/school-admin/payments/config', [SchoolAdminPaymentsController::class, 'config'])
@@ -253,7 +253,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::get('/school-admin/class-progress', [SchoolAdminClassProgressController::class, 'index'])
         ->middleware('feature:class progress');
 
-    // âœ… Registration
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
         ->middleware('feature:register');
 
@@ -274,7 +274,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
         ->middleware('feature:register');
 
-    // âœ… Users management
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
         ->middleware('feature:users');
 
@@ -308,7 +308,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::post('/school-admin/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])
         ->middleware('feature:users');
 
-    // âœ… Academic Sessions
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Academic Sessions
     Route::get('/school-admin/academic-sessions', [AcademicSessionController::class, 'index'])
         ->middleware('feature:academic_session');
 
@@ -319,9 +319,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:academic_session');
 
 
-    // âœ… Your controller uses setStatus() so keep this name
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Your controller uses setStatus() so keep this name
 
-    // âœ… Academic Structure (Details page + Departments per level)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Academic Structure (Details page + Departments per level)
     Route::get('/school-admin/academic-sessions/{session}/details', [AcademicStructureController::class, 'details'])
         ->middleware('feature:academic_session');
 
@@ -332,7 +332,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::delete('/school-admin/academic-sessions/{session}/level-departments/{department}', [AcademicStructureController::class, 'deleteLevelDepartment'])
         ->middleware('feature:academic_session');
 
-    // âœ… Class Terms page
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Class Terms page
     Route::get('/school-admin/classes/{class}/terms', [AcademicStructureController::class, 'classTerms'])
         ->middleware('feature:academic_session');
 
@@ -448,7 +448,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::patch('/school-admin/cbt/exams/{exam}/publish', [AcademicsController::class, 'publishCbtExam'])
         ->middleware('feature:academics');
 
-    // âœ… Alias for termCourses (courses = subjects)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Alias for termCourses (courses = subjects)
     Route::get('/school-admin/classes/{class}/terms/{term}/courses', [AcademicsController::class, 'termCourses'])
         ->middleware('feature:academics');
 
@@ -496,6 +496,7 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
         ->middleware('feature:attendant');
     Route::post('/staff/attendant/sign-out', [StaffAttendantController::class, 'signOut'])
         ->middleware('feature:attendant');
+    Route::get('/staff/id-card', [UserManagementController::class, 'downloadOwnIdCard']);
     Route::get('/staff/profile', [StaffProfileController::class, 'show']);
     Route::put('/staff/profile', [StaffProfileController::class, 'update']);
     Route::get('/staff/profile/photo', [StaffProfileController::class, 'photo']);
@@ -574,6 +575,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/announcements', [StudentAnnouncementController::class, 'index'])
         ->middleware('feature:announcements');
     Route::get('/student/features', [FeatureAccessController::class, 'studentFeatures']);
+    Route::get('/student/id-card', [UserManagementController::class, 'downloadOwnIdCard']);
     Route::get('/student/profile', [\App\Http\Controllers\Api\Student\ProfileController::class, 'me']);
     Route::put('/student/profile', [\App\Http\Controllers\Api\Student\ProfileController::class, 'update']);
     Route::get('/student/school-fees', [StudentSchoolFeesController::class, 'index'])
@@ -608,35 +610,3 @@ Route::middleware(['auth:sanctum', 'role:student'])->group(function () {
     Route::get('/student/class-activities/{activity}/download', [StudentClassActivitiesController::class, 'download'])->middleware('feature:class activities');
     Route::get('/student/e-library', [StudentELibraryController::class, 'index']);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

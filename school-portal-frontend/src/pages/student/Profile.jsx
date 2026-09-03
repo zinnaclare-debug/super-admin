@@ -5,6 +5,7 @@ import proudArt from "../../assets/profile/proud-self.svg";
 import "../shared/ProfileShowcase.css";
 
 const profileFormFromData = (data) => ({
+  name: data?.user?.name || "",
   email: data?.user?.email || "",
   sex: data?.student?.sex || "",
   religion: data?.student?.religion || "",
@@ -28,6 +29,7 @@ export default function StudentProfile() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(profileFormFromData(null));
   const [error, setError] = useState("");
+  const [downloadingIdCard, setDownloadingIdCard] = useState(false);
 
   const applyProfile = (data) => {
     setProfile(data);
@@ -78,6 +80,25 @@ export default function StudentProfile() {
     }
   };
 
+  const downloadIdCard = async () => {
+    setDownloadingIdCard(true);
+    try {
+      const res = await api.get("/api/student/id-card", { responseType: "blob" });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `student_id_card_${user.username || "profile"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to download ID card.");
+    } finally {
+      setDownloadingIdCard(false);
+    }
+  };
   const toAbsoluteUrl = (url) => {
     if (!url) return "";
 
@@ -189,10 +210,10 @@ export default function StudentProfile() {
                   </div>
                 ) : (
                   <div className="pf-kv">
-                    <div className="pf-row">
+                    <label className="pf-row">
                       <span className="pf-row-label">Name</span>
-                      <span className="pf-row-value">{user.name || "-"}</span>
-                    </div>
+                      <input className="pf-input" value={form.name} onChange={(e) => setField("name", e.target.value)} />
+                    </label>
                     <div className="pf-row">
                       <span className="pf-row-label">Username</span>
                       <span className="pf-row-value">{user.username || "-"}</span>
@@ -230,7 +251,12 @@ export default function StudentProfile() {
                       </button>
                     </>
                   ) : (
-                    <button className="pf-btn" onClick={() => setEditing(true)}>Edit Profile</button>
+                    <>
+                      <button className="pf-btn" onClick={() => setEditing(true)}>Edit Profile</button>
+                      <button className="pf-btn" onClick={downloadIdCard} disabled={downloadingIdCard}>
+                        {downloadingIdCard ? "Preparing ID..." : "Download ID Card"}
+                      </button>
+                    </>
                   )}
                 </div>
               </article>

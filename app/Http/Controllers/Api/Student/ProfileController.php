@@ -154,6 +154,7 @@ class ProfileController extends Controller
 
         $schoolId = (int) $user->school_id;
         $payload = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
             'email' => [
                 'nullable',
                 'email',
@@ -180,6 +181,15 @@ class ProfileController extends Controller
 
         if (!$student) {
             return response()->json(['message' => 'Student record not found'], 404);
+        }
+
+        if (array_key_exists('name', $payload)) {
+            $name = trim((string) ($payload['name'] ?? ''));
+            if ($name === '') {
+                return response()->json(['message' => 'Name cannot be empty.'], 422);
+            }
+            $user->name = $name;
+            $user->save();
         }
 
         if (array_key_exists('email', $payload)) {

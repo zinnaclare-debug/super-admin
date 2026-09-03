@@ -110,22 +110,16 @@ class DashboardController extends Controller
             return response()->json(['message' => 'School not found'], 404);
         }
 
-        if (
-            $request->has('head_of_school_name')
-            || $request->hasFile('logo')
-            || $request->hasFile('head_signature')
-        ) {
-            return response()->json([
-                'message' => 'Head of school name, logo, and signature are managed in School Information.',
-            ], 403);
-        }
 
         $payload = $request->validate([
+            'head_of_school_name' => 'nullable|string|max:255',
             'school_location' => 'nullable|string|max:255',
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:30',
             'school_motto' => 'nullable|string|max:255',
             'show_result_position' => 'nullable|boolean',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
+            'head_signature' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
             'paystack_subaccount_code' => [
                 'nullable',
                 'string',
@@ -134,6 +128,9 @@ class DashboardController extends Controller
             ],
         ]);
 
+        $hasHeadNameField = $request->has('head_of_school_name');
+        $hasLogoFile = $request->hasFile('logo');
+        $hasSignatureFile = $request->hasFile('head_signature');
         $hasLocationField = $request->has('school_location');
         $hasContactEmailField = $request->has('contact_email');
         $hasContactPhoneField = $request->has('contact_phone');
@@ -142,7 +139,10 @@ class DashboardController extends Controller
         $hasPaystackSubaccountField = $request->has('paystack_subaccount_code');
 
         if (
-            ! $hasLocationField
+            ! $hasHeadNameField
+            && !$hasLogoFile
+            && !$hasSignatureFile
+            && ! $hasLocationField
             && !$hasContactEmailField
             && !$hasContactPhoneField
             && !$hasSchoolMottoField
@@ -150,8 +150,23 @@ class DashboardController extends Controller
             && !$hasPaystackSubaccountField
         ) {
             return response()->json([
-                'message' => 'Provide school_location, contact_email, contact_phone, school_motto, show_result_position, or paystack_subaccount_code.',
+                'message' => 'Provide school branding or contact information to update.',
             ], 422);
+        }
+
+        if ($hasHeadNameField) {
+            $headName = trim((string) ($payload['head_of_school_name'] ?? ''));
+            $school->head_of_school_name = $headName !== '' ? $headName : null;
+        }
+        if ($hasLogoFile) {
+            $logo = $request->file('logo');
+            $logoExt = $logo->getClientOriginalExtension();
+            $school->logo_path = $logo->storeAs("schools/{$schoolId}/branding", "logo.{$logoExt}", 'public');
+        }
+        if ($hasSignatureFile) {
+            $signature = $request->file('head_signature');
+            $signatureExt = $signature->getClientOriginalExtension();
+            $school->head_signature_path = $signature->storeAs("schools/{$schoolId}/branding", "head-signature.{$signatureExt}", 'public');
         }
 
         if ($hasLocationField) {
@@ -189,7 +204,7 @@ class DashboardController extends Controller
         $school->save();
 
         return response()->json([
-            'message' => 'School contact information updated successfully',
+            'message' => 'School branding and contact information updated successfully',
             'data' => [
                 'school_name' => $school->name,
                 'school_location' => $school->location,
@@ -528,6 +543,3 @@ class DashboardController extends Controller
         ];
     }
 }
-
-
-

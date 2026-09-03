@@ -398,7 +398,3 @@ class SchoolSubscriptionBilling
         return round((float) ($value ?? 0), 2);
     }
 }
-
-
-
-
