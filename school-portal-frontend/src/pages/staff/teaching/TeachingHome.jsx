@@ -33,7 +33,8 @@ export default function StaffTeachingHome() {
   const [deletingId, setDeletingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [aiTopics, setAiTopics] = useState("");
-  const [aiQuestionCount, setAiQuestionCount] = useState(10);
+  const [aiQuestionCount, setAiQuestionCount] = useState(5);
+  const [aiDocumentType, setAiDocumentType] = useState("exam_questions");
   const [aiJob, setAiJob] = useState(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiActionKey, setAiActionKey] = useState("");
@@ -110,6 +111,7 @@ export default function StaffTeachingHome() {
         term_subject_id: termSubjectId,
         topics: aiTopics.trim(),
         question_count: Number(aiQuestionCount),
+        document_type: aiDocumentType,
       });
       setAiJob(res.data?.data || null);
     } catch (e) {
@@ -263,8 +265,8 @@ export default function StaffTeachingHome() {
               <div className="teach-ai-head">
                 <div>
                   <span className="teach-pill">AI Lesson Planner</span>
-                  <h3>Generate a reviewable teaching pack</h3>
-                  <p>Use your term topics to prepare hard exam questions, lesson notes, and lesson plans. Review or edit each PDF before saving it to Current Term Uploads.</p>
+                  <h3>Generate one reviewable teaching document at a time</h3>
+                  <p>Generate Exam Questions, Lesson Notes, or Lesson Plans separately. This keeps AI generation reliable on the school server. Review or edit each PDF before saving it to Current Term Uploads.</p>
                 </div>
               </div>
               <form className="teach-form" onSubmit={generateAiPack}>
@@ -282,11 +284,20 @@ export default function StaffTeachingHome() {
                   onChange={(e) => setAiTopics(e.target.value)}
                   placeholder="Enter the term topics, subtopics, learning goals, and any curriculum guidance for this subject..."
                 />
-                <select className="teach-field" value={aiQuestionCount} onChange={(e) => setAiQuestionCount(e.target.value)}>
-                  {[5].map((count) => <option key={count} value={count}>{count} hard exam questions</option>)}
+                <select className="teach-field" value={aiDocumentType} onChange={(e) => setAiDocumentType(e.target.value)}>
+                  <option value="exam_questions">Exam Questions</option>
+                  <option value="lesson_notes">Lesson Notes</option>
+                  <option value="lesson_plan">Lesson Plan</option>
                 </select>
+                {aiDocumentType === "exam_questions" ? (
+                  <select className="teach-field" value={aiQuestionCount} onChange={(e) => setAiQuestionCount(e.target.value)}>
+                    <option value={5}>5 hard exam questions</option>
+                  </select>
+                ) : null}
                 <button className="teach-btn" type="submit" disabled={aiGenerating || subjects.length === 0 || ["queued", "processing"].includes(aiJob?.status)}>
-                  {aiGenerating || ["queued", "processing"].includes(aiJob?.status) ? `Generating... ${aiJob?.progress || 0}%` : "Generate Teaching Pack"}
+                  {aiGenerating || ["queued", "processing"].includes(aiJob?.status)
+                    ? `Generating... ${aiJob?.progress || 0}%`
+                    : `Generate ${aiDocumentType === "exam_questions" ? "Exam Questions" : aiDocumentType === "lesson_notes" ? "Lesson Notes" : "Lesson Plan"}`}
                 </button>
               </form>
               {aiJob ? (

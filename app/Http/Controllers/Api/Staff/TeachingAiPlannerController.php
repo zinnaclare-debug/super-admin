@@ -59,7 +59,8 @@ class TeachingAiPlannerController extends Controller
         $data = $request->validate([
             'term_subject_id' => ['required', 'integer'],
             'topics' => ['required', 'string', 'min:20', 'max:12000'],
-            'question_count' => ['required', 'integer', 'min:5', 'max:40'],
+            'question_count' => ['nullable', 'integer', 'min:5', 'max:5'],
+            'document_type' => ['required', Rule::in(array_keys(self::DOCUMENTS))],
         ]);
 
         $termSubject = $this->assignedSubject((int) $user->school_id, (int) $user->id, (int) $session->id, (int) $term->id, (int) $data['term_subject_id']);
@@ -73,6 +74,7 @@ class TeachingAiPlannerController extends Controller
             ->where('academic_session_id', $session->id)
             ->where('term_id', $term->id)
             ->where('term_subject_id', $termSubject->id)
+            ->where('result_json->_document_type', (string) $data['document_type'])
             ->whereIn('status', [TeachingAiGenerationJob::STATUS_QUEUED, TeachingAiGenerationJob::STATUS_PROCESSING])
             ->exists();
         if ($alreadyRunning) {
@@ -87,7 +89,8 @@ class TeachingAiPlannerController extends Controller
             'term_subject_id' => $termSubject->id,
             'subject_id' => $termSubject->subject_id,
             'topics' => trim($data['topics']),
-            'question_count' => (int) $data['question_count'],
+            'question_count' => (int) ($data['question_count'] ?? 5),
+            'result_json' => ['_document_type' => (string) $data['document_type']],
             'status' => TeachingAiGenerationJob::STATUS_QUEUED,
             'progress' => 0,
         ]);
@@ -95,7 +98,7 @@ class TeachingAiPlannerController extends Controller
         GenerateTeachingAiPackJob::dispatch((int) $job->id);
 
         return response()->json([
-            'message' => 'AI teaching pack queued. You can remain on this page while it is generated.',
+            'message' => (self::DOCUMENTS[(string) $data['document_type']]['label'] ?? 'Teaching document') . ' generation queued.',
             'data' => $this->payload($job),
         ], 201);
     }
@@ -192,15 +195,16 @@ class TeachingAiPlannerController extends Controller
             throw new RuntimeException('The subject assignment is no longer available.');
         }
 
+        $document = $this->documentType($job);
         $job->forceFill(['progress' => 25])->save();
-        $content = $this->askAi($job, $subject);
-        $this->validateContent($content, $job->question_count);
+        $content = $this->askAi($job, $subject, $document);
+        $this->validateContent($content, $job->question_count, $document);
 
-        $job->forceFill(['progress' => 70, 'result_json' => $content])->save();
+        $job->forceFill(['progress' => 70, 'result_json' => array_merge(['_document_type' => $document], $content)])->save();
         $school = School::query()->findOrFail($job->school_id);
         $directory = "schools/{$job->school_id}/teaching-ai/{$job->academic_session_id}/{$job->term_id}/{$job->staff_user_id}/{$job->id}";
 
-        foreach (array_keys(self::DOCUMENTS) as $document) {
+        foreach ([$document] as $document) {
             $html = view('pdf.teaching_ai_pack', [
                 'school' => $school,
                 'job' => $job,
@@ -229,7 +233,7 @@ class TeachingAiPlannerController extends Controller
         ])->save();
     }
 
-    private function askAi(TeachingAiGenerationJob $job, object $subject): array
+    private function askAi(TeachingAiGenerationJob $job, object $subject, string $document): array
     {
         $baseUrl = rtrim((string) config('services.ai.base_url', 'https://api.openai.com/v1'), '/');
         $apiKey = trim((string) config('services.ai.api_key', ''));
@@ -238,78 +242,74 @@ class TeachingAiPlannerController extends Controller
             throw new RuntimeException('AI service is not configured.');
         }
 
-        $system = <<<'PROMPT'
-You are an expert Nigerian and international curriculum instructional designer. Return strict JSON only, with this exact shape:
-{
- "exam_questions":[{"question":"...","marks":5,"answer_guide":"..."}],
- "lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}],
- "lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]
-}
-Rules: generate exactly the requested number of hard, original, topic-specific exam questions. Use higher-order reasoning, application and analysis; avoid generic study-skills questions. No duplicate or near-duplicate questions. Each answer guide must be short. Create a compact teaching pack: no more than 2 lesson notes and 2 lesson plans. Keep every field concise but classroom-ready. Lesson content must be age-appropriate, align with Nigerian curriculum expectations where applicable, and use international best-practice pedagogy. Never claim official endorsement. Do not add markdown or text outside JSON.
-PROMPT;
-        $prompt = "Subject: {$subject->subject_name}\nClass: {$subject->class_name}\nLevel: {$subject->class_level}\nQuestion count: {$job->question_count}\nTerm topics and teacher guidance:\n{$job->topics}";
+        $shape = match ($document) {
+            'exam_questions' => '{"exam_questions":[{"question":"...","marks":5,"answer_guide":"..."}]}',
+            'lesson_notes' => '{"lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}]}',
+            default => '{"lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]}',
+        };
+        $instruction = match ($document) {
+            'exam_questions' => "Generate exactly {$job->question_count} hard, original, topic-specific questions. Use application and analysis, not generic study-skills questions. Keep answer guides short. Do not repeat or rephrase questions.",
+            'lesson_notes' => 'Generate no more than two concise, classroom-ready lesson notes. Use Nigerian curriculum expectations where applicable and international teaching practice. Keep every field short.',
+            default => 'Generate no more than two concise, classroom-ready lesson plans. Use Nigerian curriculum expectations where applicable and international teaching practice. Keep every field short.',
+        };
+        $system = "You are an expert Nigerian and international curriculum instructional designer. Return strict JSON only with this exact shape: {$shape}. {$instruction} Do not add markdown or text outside JSON.";
+        $prompt = "Subject: {$subject->subject_name}\nClass: {$subject->class_name}\nLevel: {$subject->class_level}\nTerm topics and teacher guidance:\n{$job->topics}";
+        $maxOutput = $document === 'exam_questions' ? 650 : 700;
 
         $http = Http::timeout(max(90, min((int) config('services.ai.timeout', 180), 220)))
             ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 30), 30)))
             ->acceptJson();
 
         if ($isLocalEndpoint) {
-            // Ollama's native endpoint is reliable on this CPU-only server; its OpenAI-compatible route can stall.
             $nativeBaseUrl = preg_replace('#/v1$#', '', $baseUrl) ?: $baseUrl;
             $response = $http->post($nativeBaseUrl . '/api/generate', [
                 'model' => config('services.ai.model', 'phi3.5:latest'),
                 'prompt' => $system . "\n\n" . $prompt,
                 'stream' => false,
                 'format' => 'json',
-                'options' => [
-                    'temperature' => 0.2,
-                    'num_ctx' => 2048,
-                    'num_predict' => 800,
-                ],
+                'options' => ['temperature' => 0.2, 'num_ctx' => 2048, 'num_predict' => $maxOutput],
             ]);
             $raw = trim((string) data_get($response->json(), 'response', ''));
         } else {
-            if ($apiKey !== '') {
-                $http = $http->withToken($apiKey);
-            }
+            if ($apiKey !== '') $http = $http->withToken($apiKey);
             $response = $http->post($baseUrl . '/chat/completions', [
                 'model' => config('services.ai.model', 'gpt-4.1-mini'),
                 'temperature' => 0.25,
-                'max_tokens' => max(800, min(2500, 800 + ((int) $job->question_count * 90))),
-                'messages' => [
-                    ['role' => 'system', 'content' => $system],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
+                'max_tokens' => $maxOutput,
+                'messages' => [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $prompt]],
             ]);
             $raw = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
         }
-        if ($response->failed()) {
-            throw new RuntimeException('AI provider did not complete the request.');
-        }
+        if ($response->failed()) throw new RuntimeException('AI provider did not complete the request.');
         $raw = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw) ?: '';
         $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            throw new RuntimeException('AI returned an invalid teaching-pack format.');
-        }
+        if (!is_array($decoded)) throw new RuntimeException('AI returned an invalid document format.');
         return $decoded;
     }
 
-    private function validateContent(array $content, int $questionCount): void
+    private function validateContent(array $content, int $questionCount, string $document): void
     {
-        $questions = array_values(array_filter($content['exam_questions'] ?? [], fn ($item) => is_array($item) && trim((string) ($item['question'] ?? '')) !== ''));
-        if (count($questions) !== $questionCount || empty($content['lesson_notes']) || empty($content['lesson_plan'])) {
-            throw new RuntimeException('AI returned an incomplete teaching pack.');
-        }
-        $seen = [];
-        foreach ($questions as $question) {
-            $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string) $question['question']) ?? '');
-            if ($key === '' || isset($seen[$key])) {
-                throw new RuntimeException('AI returned duplicate questions.');
+        if ($document === 'exam_questions') {
+            $questions = array_values(array_filter($content['exam_questions'] ?? [], fn ($item) => is_array($item) && trim((string) ($item['question'] ?? '')) !== ''));
+            if (count($questions) !== $questionCount) throw new RuntimeException('AI returned an incomplete exam-question document.');
+            $seen = [];
+            foreach ($questions as $question) {
+                $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string) $question['question']) ?? '');
+                if ($key === '' || isset($seen[$key])) throw new RuntimeException('AI returned duplicate questions.');
+                $seen[$key] = true;
             }
-            $seen[$key] = true;
+            return;
         }
+
+        $items = $content[$document] ?? [];
+        if (!is_array($items) || empty($items)) throw new RuntimeException('AI returned an incomplete teaching document.');
     }
 
+    private function documentType(TeachingAiGenerationJob $job): string
+    {
+        $type = (string) data_get($job->result_json, '_document_type', 'exam_questions');
+        return array_key_exists($type, self::DOCUMENTS) ? $type : 'exam_questions';
+    }
     private function currentCycle(int $schoolId): array
     {
         $session = AcademicSession::query()->where('school_id', $schoolId)->where('status', 'current')->first();
@@ -334,12 +334,11 @@ PROMPT;
 
     private function payload(TeachingAiGenerationJob $job): array
     {
-        $documents = [];
-        foreach (self::DOCUMENTS as $key => $definition) {
-            $ready = (bool) ($job->{$definition['path']} && Storage::disk('public')->exists($job->{$definition['path']}));
-            $documents[$key] = ['label' => $definition['label'], 'ready' => $ready];
-        }
-        return ['id' => $job->id, 'term_subject_id' => $job->term_subject_id, 'status' => $job->status, 'progress' => $job->progress, 'topics' => $job->topics, 'question_count' => $job->question_count, 'documents' => $documents, 'error_message' => $job->error_message, 'created_at' => optional($job->created_at)?->toDateTimeString()];
+        $document = $this->documentType($job);
+        $definition = self::DOCUMENTS[$document];
+        $ready = (bool) ($job->{$definition['path']} && Storage::disk('public')->exists($job->{$definition['path']}));
+        $documents = [$document => ['label' => $definition['label'], 'ready' => $ready]];
+        return ['id' => $job->id, 'term_subject_id' => $job->term_subject_id, 'document_type' => $document, 'status' => $job->status, 'progress' => $job->progress, 'topics' => $job->topics, 'question_count' => $job->question_count, 'documents' => $documents, 'error_message' => $job->error_message, 'created_at' => optional($job->created_at)?->toDateTimeString()];
     }
 
     private function fileName(TeachingAiGenerationJob $job, string $document): string
