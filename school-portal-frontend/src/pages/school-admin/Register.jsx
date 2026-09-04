@@ -417,9 +417,9 @@ export default function Register() {
       // IMPORTANT: confirm MUST be FormData (so photo gets uploaded)
       const fd = buildFormData({ username });
 
-      await api.post("/api/school-admin/register/confirm", fd);
+      const res = await api.post("/api/school-admin/register/confirm", fd);
 
-      alert("User Created");
+      alert(res.data?.warning ? `User Created.\n\n${res.data.warning}` : "User Created");
 
       // reset
       setStep(1);

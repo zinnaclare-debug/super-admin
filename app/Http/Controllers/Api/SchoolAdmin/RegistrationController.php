@@ -182,6 +182,11 @@ class RegistrationController extends Controller
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
+        $duplicateNameWarning = $this->duplicateFullNameWarning(
+            $schoolId,
+            (string) $request->input('name'),
+            (string) $request->input('role')
+        );
         $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
         $result = $this->createRegisteredUser($request, $schoolId, (string) $request->input('username'), $educationLevel);
 
@@ -189,6 +194,7 @@ class RegistrationController extends Controller
             'message' => 'User registered successfully',
             'username' => $result['username'],
             'photo_url' => $this->storageUrl($result['photo_path']),
+            'warning' => $duplicateNameWarning,
         ], 201);
     }
 
@@ -214,6 +220,11 @@ class RegistrationController extends Controller
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:150',
         ]);
 
+        $duplicateNameWarning = $this->duplicateFullNameWarning(
+            $schoolId,
+            (string) $request->input('name'),
+            (string) $request->input('role')
+        );
         $username = $this->generateUsername($school, (string) $request->name);
         $educationLevel = $this->normalizeEducationLevel($request->input('education_level'));
         $result = $this->createRegisteredUser($request, $schoolId, $username, $educationLevel);
@@ -222,6 +233,7 @@ class RegistrationController extends Controller
             'message' => 'Registration successful',
             'username' => $result['username'],
             'photo_url' => $this->storageUrl($result['photo_path']),
+            'warning' => $duplicateNameWarning,
         ], 201);
     }
 
@@ -1701,6 +1713,31 @@ class RegistrationController extends Controller
         }
 
         return $templateNames;
+    }
+
+    private function duplicateFullNameWarning(int $schoolId, string $fullName, string $role): ?string
+    {
+        $normalizedName = strtolower(trim(preg_replace('/\s+/', ' ', $fullName) ?? ''));
+        if ($normalizedName === '' || !in_array($role, ['student', 'staff'], true)) {
+            return null;
+        }
+
+        $existing = User::query()
+            ->where('school_id', $schoolId)
+            ->where('role', $role)
+            ->whereRaw("LOWER(TRIM(name)) = ?", [$normalizedName])
+            ->first(['name', 'username', 'email']);
+
+        if (!$existing) {
+            return null;
+        }
+
+        return sprintf(
+            'Warning: a %s with the same full name already exists (%s%s). This registration was saved because matching names can belong to different people.',
+            $role,
+            $existing->username ? 'username: ' . $existing->username : 'existing record',
+            $existing->email ? ', email: ' . $existing->email : ''
+        );
     }
 
     private function generateUsername(School $_school, string $fullName): string
