@@ -16,10 +16,21 @@ class GenerateTeachingAiPackJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 300;
+    public int $timeout = 210;
+    public bool $failOnTimeout = true;
 
     public function __construct(public int $generationJobId)
     {
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        TeachingAiGenerationJob::query()->whereKey($this->generationJobId)->update([
+            'status' => TeachingAiGenerationJob::STATUS_FAILED,
+            'progress' => 100,
+            'error_message' => 'Generation timed out or stopped. Reduce the number of questions or shorten the topics, then try again.',
+            'completed_at' => now(),
+        ]);
     }
 
     public function handle(TeachingAiPlannerController $planner): void
