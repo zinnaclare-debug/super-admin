@@ -42,6 +42,8 @@ class UserManagementController extends Controller
             'class' => ['nullable', 'string', 'max:120'],
             'department' => ['nullable', 'string', 'max:120'],
             'q' => ['nullable', 'string', 'max:120'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
+            'missing_field' => ['nullable', Rule::in(['gender'])],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
@@ -60,6 +62,20 @@ class UserManagementController extends Controller
 
         if ($role && in_array($role, ['student', 'staff'], true)) {
             $query->where('role', $role);
+        }
+
+        if (!empty($payload['user_id'])) {
+            $query->where('id', (int) $payload['user_id']);
+        }
+
+        if (($payload['missing_field'] ?? null) === 'gender') {
+            $query->where('role', 'student')
+                ->whereHas('studentProfile', function ($profileQuery) {
+                    $profileQuery->where(function ($genderQuery) {
+                        $genderQuery->whereNull('sex')
+                            ->orWhereRaw("TRIM(COALESCE(sex, '')) = ''");
+                    });
+                });
         }
 
         $users = $query->orderBy('name')->get(['id', 'name', 'email', 'username', 'role', 'is_active']);
@@ -111,6 +127,8 @@ class UserManagementController extends Controller
                     'class' => $payload['class'] ?? null,
                     'department' => $payload['department'] ?? null,
                     'q' => $payload['q'] ?? null,
+                    'user_id' => $payload['user_id'] ?? null,
+                    'missing_field' => $payload['missing_field'] ?? null,
                 ],
                 'current_page' => $paginated['current_page'],
                 'last_page' => $paginated['last_page'],
@@ -181,6 +199,8 @@ class UserManagementController extends Controller
                     'class' => $payload['class'] ?? null,
                     'department' => $payload['department'] ?? null,
                     'q' => $payload['q'] ?? null,
+                    'user_id' => $payload['user_id'] ?? null,
+                    'missing_field' => $payload['missing_field'] ?? null,
                 ],
                 'generatedAt' => now(),
             ])->render();

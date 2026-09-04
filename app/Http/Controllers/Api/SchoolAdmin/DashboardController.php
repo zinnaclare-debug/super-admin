@@ -40,6 +40,32 @@ class DashboardController extends Controller
         $femaleStudents = (int) ($genderStats->female_students ?? 0);
         $unspecifiedStudents = max(0, $students - ($maleStudents + $femaleStudents));
 
+        $missingGenderUserIds = User::query()
+            ->from('users')
+            ->join('students', 'students.user_id', '=', 'users.id')
+            ->where('users.school_id', $schoolId)
+            ->where('users.role', 'student')
+            ->where(function ($query) {
+                $query->whereNull('students.sex')
+                    ->orWhereRaw("TRIM(COALESCE(students.sex, '')) = ''");
+            })
+            ->orderBy('users.name')
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $profileCompletenessNotices = [];
+        if ($unspecifiedStudents > 0) {
+            $profileCompletenessNotices[] = [
+                'key' => 'missing_gender',
+                'field' => 'gender',
+                'role' => 'student',
+                'count' => $unspecifiedStudents,
+                'user_id' => count($missingGenderUserIds) === 1 ? $missingGenderUserIds[0] : null,
+            ];
+        }
+
         $staff = User::where('school_id', $schoolId)
             ->where('role', 'staff')
             ->count();
@@ -69,6 +95,7 @@ class DashboardController extends Controller
             'male_students' => $maleStudents,
             'female_students' => $femaleStudents,
             'unspecified_students' => $unspecifiedStudents,
+            'profile_completeness_notices' => $profileCompletenessNotices,
             'staff' => $staff,
             'enabled_modules' => $enabledModules,
         ]);

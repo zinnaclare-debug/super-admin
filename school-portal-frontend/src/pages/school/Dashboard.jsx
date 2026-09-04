@@ -31,6 +31,7 @@ function SchoolDashboard() {
     male_students: 0,
     female_students: 0,
     unspecified_students: 0,
+    profile_completeness_notices: [],
     staff: 0,
     enabled_modules: 0,
   });
@@ -72,6 +73,9 @@ function SchoolDashboard() {
           male_students: res.data?.male_students ?? 0,
           female_students: res.data?.female_students ?? 0,
           unspecified_students: res.data?.unspecified_students ?? 0,
+          profile_completeness_notices: Array.isArray(res.data?.profile_completeness_notices)
+            ? res.data.profile_completeness_notices
+            : [],
           staff: res.data?.staff ?? 0,
           enabled_modules: res.data?.enabled_modules ?? 0,
         });
@@ -321,11 +325,22 @@ function SchoolDashboard() {
           ))}
         </div>
 
-        {!loading && Number(stats.unspecified_students || 0) > 0 && (
-          <p className="sd-note">
-            {formatCount(stats.unspecified_students)} student record(s) do not have gender set yet.
-          </p>
-        )}
+        {!loading && (stats.profile_completeness_notices || []).map((notice) => {
+          const count = Number(notice?.count || 0);
+          if (count <= 0) return null;
+
+          const isSingleProfile = Number(notice?.user_id || 0) > 0;
+          const target = isSingleProfile
+            ? `/school/admin/users/${notice.role || "student"}/active?user_id=${notice.user_id}`
+            : `/school/admin/users/${notice.role || "student"}/active?missing_field=${encodeURIComponent(notice.field || "")}`;
+
+          return (
+            <p key={notice.key || notice.field} className="sd-note">
+              {formatCount(count)} {notice.role || "user"} record(s) do not have {notice.field || "required profile information"} set yet.{" "}
+              <Link to={target}>{isSingleProfile ? "Open profile" : "Review profiles"}</Link>
+            </p>
+          );
+        })}
       </section>      {websiteEnabled || entranceExamEnabled ? (
         <section className="sd-card">
           <div className="sd-section-head">

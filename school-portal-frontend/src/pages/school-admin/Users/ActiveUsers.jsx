@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import UserProfilePanel from "./UserProfilePanel";
 
@@ -39,6 +39,9 @@ const readStoredFilters = (role, status) => {
 export default function ActiveUsers({ status = "active" }) {
   const { role } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedUserId = Math.max(0, Number(searchParams.get("user_id")) || 0);
+  const missingField = String(searchParams.get("missing_field") || "");
   const isGraduated = status === "graduated";
   const storageKey = filterStorageKey(role, status);
   const storedFilters = readStoredFilters(role, status);
@@ -88,6 +91,8 @@ export default function ActiveUsers({ status = "active" }) {
     setLoading(true);
     try {
       const params = { role, status, page, per_page: PAGE_SIZE };
+      if (requestedUserId > 0) params.user_id = requestedUserId;
+      if (missingField) params.missing_field = missingField;
       if (q) params.q = q;
       if (levelFilter) params.level = levelFilter;
       if (classFilter) params.class = classFilter;
@@ -117,11 +122,17 @@ export default function ActiveUsers({ status = "active" }) {
     } finally {
       setLoading(false);
     }
-  }, [classFilter, departmentFilter, levelFilter, page, q, role, status]);
+  }, [classFilter, departmentFilter, levelFilter, missingField, page, q, requestedUserId, role, status]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (requestedUserId > 0 && rows.some((user) => Number(user.id) === requestedUserId)) {
+      setSelectedUserId(requestedUserId);
+    }
+  }, [requestedUserId, rows]);
 
   const levelOptions = useMemo(() => meta.levels || [], [meta.levels]);
   const classOptions = useMemo(() => meta.classes || [], [meta.classes]);
