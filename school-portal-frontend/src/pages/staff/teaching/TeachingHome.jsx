@@ -258,6 +258,7 @@ export default function StaffTeachingHome() {
         <section className="teach-panel">
           {loading ? <p className="teach-state">Loading teaching materials...</p> : null}
           {!loading ? (
+            <>
             <div className="teach-ai-card">
               <div className="teach-ai-head">
                 <div>
@@ -396,6 +397,7 @@ export default function StaffTeachingHome() {
                 {subjectGroups.length === 0 ? <p className="teach-small">No current term uploads yet.</p> : null}
               </article>
             </div>
+            </>
           ) : null}
         </section>
       </div>
