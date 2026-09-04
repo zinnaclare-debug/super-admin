@@ -1,0 +1,334 @@
+<?php
+
+namespace App\Http\Controllers\Api\Staff;
+
+use App\Http\Controllers\Controller;
+use App\Jobs\CompressTeachingMaterialJob;
+use App\Jobs\GenerateTeachingAiPackJob;
+use App\Models\AcademicSession;
+use App\Models\School;
+use App\Models\TeachingAiGenerationJob;
+use App\Models\TeachingMaterial;
+use App\Models\Term;
+use App\Models\TermSubject;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use RuntimeException;
+
+class TeachingAiPlannerController extends Controller
+{
+    private const DOCUMENTS = [
+        'exam_questions' => ['path' => 'exam_questions_path', 'category' => TeachingMaterial::CATEGORY_EXAM_QUESTION, 'label' => 'Exam Questions'],
+        'lesson_notes' => ['path' => 'lesson_notes_path', 'category' => TeachingMaterial::CATEGORY_LESSON_NOTE, 'label' => 'Lesson Notes'],
+        'lesson_plan' => ['path' => 'lesson_plan_path', 'category' => TeachingMaterial::CATEGORY_LESSON_PLAN, 'label' => 'Lesson Plan'],
+    ];
+
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        [$session, $term] = $this->currentCycle((int) $user->school_id);
+        if (!$session || !$term) {
+            return response()->json(['data' => []]);
+        }
+
+        $jobs = TeachingAiGenerationJob::query()
+            ->where('school_id', $user->school_id)
+            ->where('staff_user_id', $user->id)
+            ->where('academic_session_id', $session->id)
+            ->where('term_id', $term->id)
+            ->latest()
+            ->take(12)
+            ->get()
+            ->map(fn (TeachingAiGenerationJob $job) => $this->payload($job));
+
+        return response()->json(['data' => $jobs]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = $request->user();
+        [$session, $term] = $this->currentCycle((int) $user->school_id);
+        if (!$session || !$term) {
+            return response()->json(['message' => 'No current academic session/term configured.'], 422);
+        }
+
+        $data = $request->validate([
+            'term_subject_id' => ['required', 'integer'],
+            'topics' => ['required', 'string', 'min:20', 'max:12000'],
+            'question_count' => ['required', 'integer', 'min:5', 'max:40'],
+        ]);
+
+        $termSubject = $this->assignedSubject((int) $user->school_id, (int) $user->id, (int) $session->id, (int) $term->id, (int) $data['term_subject_id']);
+        if (!$termSubject) {
+            return response()->json(['message' => 'Select a subject assigned to you for the current term.'], 422);
+        }
+
+        $alreadyRunning = TeachingAiGenerationJob::query()
+            ->where('school_id', $user->school_id)
+            ->where('staff_user_id', $user->id)
+            ->where('academic_session_id', $session->id)
+            ->where('term_id', $term->id)
+            ->where('term_subject_id', $termSubject->id)
+            ->whereIn('status', [TeachingAiGenerationJob::STATUS_QUEUED, TeachingAiGenerationJob::STATUS_PROCESSING])
+            ->exists();
+        if ($alreadyRunning) {
+            return response()->json(['message' => 'A teaching pack is already being generated for this subject.'], 422);
+        }
+
+        $job = TeachingAiGenerationJob::create([
+            'school_id' => $user->school_id,
+            'staff_user_id' => $user->id,
+            'academic_session_id' => $session->id,
+            'term_id' => $term->id,
+            'term_subject_id' => $termSubject->id,
+            'subject_id' => $termSubject->subject_id,
+            'topics' => trim($data['topics']),
+            'question_count' => (int) $data['question_count'],
+            'status' => TeachingAiGenerationJob::STATUS_QUEUED,
+            'progress' => 0,
+        ]);
+
+        GenerateTeachingAiPackJob::dispatch((int) $job->id);
+
+        return response()->json([
+            'message' => 'AI teaching pack queued. You can remain on this page while it is generated.',
+            'data' => $this->payload($job),
+        ], 201);
+    }
+
+    public function show(Request $request, TeachingAiGenerationJob $generationJob)
+    {
+        $this->guardJob($request, $generationJob);
+        return response()->json(['data' => $this->payload($generationJob->fresh())]);
+    }
+
+    public function download(Request $request, TeachingAiGenerationJob $generationJob, string $document)
+    {
+        $this->guardJob($request, $generationJob);
+        $definition = self::DOCUMENTS[$document] ?? null;
+        abort_unless($definition, 404);
+        $path = $generationJob->{$definition['path']};
+        abort_unless($path && Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->download($path, $this->fileName($generationJob, $document));
+    }
+
+    public function clear(Request $request, TeachingAiGenerationJob $generationJob, string $document)
+    {
+        $this->guardJob($request, $generationJob);
+        $definition = self::DOCUMENTS[$document] ?? null;
+        abort_unless($definition, 404);
+
+        $path = $generationJob->{$definition['path']};
+        if ($path) {
+            Storage::disk('public')->delete($path);
+        }
+        $generationJob->forceFill([$definition['path'] => null])->save();
+
+        return response()->json(['message' => $definition['label'] . ' draft cleared.', 'data' => $this->payload($generationJob->fresh())]);
+    }
+
+    public function saveToTeaching(Request $request, TeachingAiGenerationJob $generationJob, string $document)
+    {
+        $user = $request->user();
+        $this->guardJob($request, $generationJob);
+        $definition = self::DOCUMENTS[$document] ?? null;
+        abort_unless($definition, 404);
+
+        $sourcePath = $generationJob->{$definition['path']};
+        if (!$sourcePath || !Storage::disk('public')->exists($sourcePath)) {
+            return response()->json(['message' => 'Generate this document again before saving it to current term uploads.'], 422);
+        }
+
+        if ($definition['category'] === TeachingMaterial::CATEGORY_EXAM_QUESTION) {
+            $old = TeachingMaterial::query()
+                ->where('school_id', $generationJob->school_id)
+                ->where('staff_user_id', $generationJob->staff_user_id)
+                ->where('academic_session_id', $generationJob->academic_session_id)
+                ->where('term_id', $generationJob->term_id)
+                ->where('term_subject_id', $generationJob->term_subject_id)
+                ->where('category', TeachingMaterial::CATEGORY_EXAM_QUESTION)
+                ->get();
+            foreach ($old as $material) {
+                Storage::disk('public')->delete($material->file_path);
+                $material->delete();
+            }
+        }
+
+        $directory = "schools/{$generationJob->school_id}/teaching/{$generationJob->academic_session_id}/{$generationJob->term_id}/{$user->id}/{$generationJob->term_subject_id}";
+        $target = $directory . '/' . $this->fileName($generationJob, $document);
+        Storage::disk('public')->copy($sourcePath, $target);
+        $size = Storage::disk('public')->size($target);
+
+        $material = TeachingMaterial::create([
+            'school_id' => $generationJob->school_id,
+            'staff_user_id' => $user->id,
+            'academic_session_id' => $generationJob->academic_session_id,
+            'term_id' => $generationJob->term_id,
+            'term_subject_id' => $generationJob->term_subject_id,
+            'subject_id' => $generationJob->subject_id,
+            'category' => $definition['category'],
+            'title' => 'AI Generated ' . $definition['label'],
+            'original_name' => $this->fileName($generationJob, $document),
+            'mime_type' => 'application/pdf',
+            'file_path' => $target,
+            'file_size' => $size,
+            'status' => TeachingMaterial::STATUS_PROCESSING,
+            'processing_note' => 'AI draft saved and queued for compression.',
+        ]);
+        CompressTeachingMaterialJob::dispatch((int) $material->id);
+
+        return response()->json(['message' => $definition['label'] . ' saved to Current Term Uploads and queued for compression.']);
+    }
+
+    public function generateForQueue(TeachingAiGenerationJob $job): void
+    {
+        $subject = $this->assignedSubject($job->school_id, $job->staff_user_id, $job->academic_session_id, $job->term_id, $job->term_subject_id);
+        if (!$subject) {
+            throw new RuntimeException('The subject assignment is no longer available.');
+        }
+
+        $job->forceFill(['progress' => 25])->save();
+        $content = $this->askAi($job, $subject);
+        $this->validateContent($content, $job->question_count);
+
+        $job->forceFill(['progress' => 70, 'result_json' => $content])->save();
+        $school = School::query()->findOrFail($job->school_id);
+        $directory = "schools/{$job->school_id}/teaching-ai/{$job->academic_session_id}/{$job->term_id}/{$job->staff_user_id}/{$job->id}";
+
+        foreach (array_keys(self::DOCUMENTS) as $document) {
+            $html = view('pdf.teaching_ai_pack', [
+                'school' => $school,
+                'job' => $job,
+                'subject' => $subject,
+                'document' => $document,
+                'content' => $content,
+            ])->render();
+            $options = new Options();
+            $options->set('isRemoteEnabled', true);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $pdf = new Dompdf($options);
+            $pdf->loadHtml($html);
+            $pdf->setPaper('A4', 'portrait');
+            $pdf->render();
+            $path = $directory . '/' . $this->fileName($job, $document);
+            Storage::disk('public')->put($path, $pdf->output());
+            $job->{self::DOCUMENTS[$document]['path']} = $path;
+            $job->progress = min(95, $job->progress + 8);
+            $job->save();
+        }
+
+        $job->forceFill([
+            'status' => TeachingAiGenerationJob::STATUS_COMPLETED,
+            'progress' => 100,
+            'completed_at' => now(),
+        ])->save();
+    }
+
+    private function askAi(TeachingAiGenerationJob $job, object $subject): array
+    {
+        $baseUrl = rtrim((string) config('services.ai.base_url', 'https://api.openai.com/v1'), '/');
+        $apiKey = trim((string) config('services.ai.api_key', ''));
+        $isLocalEndpoint = (bool) preg_match('/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i', $baseUrl);
+        if ($apiKey === '' && !$isLocalEndpoint) {
+            throw new RuntimeException('AI service is not configured.');
+        }
+
+        $system = <<<'PROMPT'
+You are an expert Nigerian and international curriculum instructional designer. Return strict JSON only, with this exact shape:
+{
+ "exam_questions":[{"question":"...","marks":5,"answer_guide":"..."}],
+ "lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}],
+ "lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]
+}
+Rules: generate exactly the requested number of hard, original, topic-specific exam questions. Use higher-order reasoning, application and analysis; avoid generic study-skills questions. No duplicate or near-duplicate questions. Questions must have practical marking guides. Lesson content must be classroom-ready, age-appropriate, align with Nigerian curriculum expectations where applicable, and use international best-practice pedagogy. Never claim official endorsement. Do not add markdown or text outside JSON.
+PROMPT;
+        $prompt = "Subject: {$subject->subject_name}\nClass: {$subject->class_name}\nLevel: {$subject->class_level}\nQuestion count: {$job->question_count}\nTerm topics and teacher guidance:\n{$job->topics}";
+
+        $http = Http::timeout(max(30, min((int) config('services.ai.timeout', 90), 180)))
+            ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 15), 30)))
+            ->acceptJson();
+        if ($apiKey !== '') {
+            $http = $http->withToken($apiKey);
+        }
+
+        $response = $http->post($baseUrl . '/chat/completions', [
+                'model' => config('services.ai.model', 'gpt-4.1-mini'),
+                'temperature' => 0.25,
+                'max_tokens' => 7000,
+                'messages' => [
+                    ['role' => 'system', 'content' => $system],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+            ]);
+
+        if ($response->failed()) {
+            throw new RuntimeException('AI provider did not complete the request.');
+        }
+        $raw = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
+        $raw = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw) ?: '';
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('AI returned an invalid teaching-pack format.');
+        }
+        return $decoded;
+    }
+
+    private function validateContent(array $content, int $questionCount): void
+    {
+        $questions = array_values(array_filter($content['exam_questions'] ?? [], fn ($item) => is_array($item) && trim((string) ($item['question'] ?? '')) !== ''));
+        if (count($questions) !== $questionCount || empty($content['lesson_notes']) || empty($content['lesson_plan'])) {
+            throw new RuntimeException('AI returned an incomplete teaching pack.');
+        }
+        $seen = [];
+        foreach ($questions as $question) {
+            $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string) $question['question']) ?? '');
+            if ($key === '' || isset($seen[$key])) {
+                throw new RuntimeException('AI returned duplicate questions.');
+            }
+            $seen[$key] = true;
+        }
+    }
+
+    private function currentCycle(int $schoolId): array
+    {
+        $session = AcademicSession::query()->where('school_id', $schoolId)->where('status', 'current')->first();
+        if (!$session) return [null, null];
+        $term = Term::query()->where('school_id', $schoolId)->where('academic_session_id', $session->id)->where('is_current', true)->first()
+            ?: Term::query()->where('school_id', $schoolId)->where('academic_session_id', $session->id)->orderBy('id')->first();
+        return [$session, $term];
+    }
+
+    private function assignedSubject(int $schoolId, int $staffId, int $sessionId, int $termId, int $termSubjectId): ?object
+    {
+        return TermSubject::query()->where('term_subjects.school_id', $schoolId)->where('term_subjects.teacher_user_id', $staffId)->where('term_subjects.id', $termSubjectId)->where('term_subjects.term_id', $termId)
+            ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')->join('classes', 'classes.id', '=', 'term_subjects.class_id')
+            ->where('classes.academic_session_id', $sessionId)
+            ->first(['term_subjects.id', 'term_subjects.subject_id', 'subjects.name as subject_name', 'classes.name as class_name', 'classes.level as class_level']);
+    }
+
+    private function guardJob(Request $request, TeachingAiGenerationJob $job): void
+    {
+        abort_unless((int) $job->school_id === (int) $request->user()->school_id && (int) $job->staff_user_id === (int) $request->user()->id, 404);
+    }
+
+    private function payload(TeachingAiGenerationJob $job): array
+    {
+        $documents = [];
+        foreach (self::DOCUMENTS as $key => $definition) {
+            $ready = (bool) ($job->{$definition['path']} && Storage::disk('public')->exists($job->{$definition['path']}));
+            $documents[$key] = ['label' => $definition['label'], 'ready' => $ready];
+        }
+        return ['id' => $job->id, 'term_subject_id' => $job->term_subject_id, 'status' => $job->status, 'progress' => $job->progress, 'topics' => $job->topics, 'question_count' => $job->question_count, 'documents' => $documents, 'error_message' => $job->error_message, 'created_at' => optional($job->created_at)?->toDateTimeString()];
+    }
+
+    private function fileName(TeachingAiGenerationJob $job, string $document): string
+    {
+        $label = strtolower(str_replace(' ', '_', self::DOCUMENTS[$document]['label']));
+        return "ai_{$label}_{$job->id}.pdf";
+    }
+}

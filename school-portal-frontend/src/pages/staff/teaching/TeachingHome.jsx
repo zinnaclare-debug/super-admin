@@ -32,6 +32,11 @@ export default function StaffTeachingHome() {
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [aiTopics, setAiTopics] = useState("");
+  const [aiQuestionCount, setAiQuestionCount] = useState(10);
+  const [aiJob, setAiJob] = useState(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiActionKey, setAiActionKey] = useState("");
 
   const categories = summary?.categories || {};
   const subjects = Array.isArray(summary?.subjects) ? summary.subjects : [];
@@ -75,6 +80,93 @@ export default function StaffTeachingHome() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!aiJob || !["queued", "processing"].includes(aiJob.status)) return undefined;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await api.get(`/api/staff/teaching/ai-planner/${aiJob.id}`);
+        const nextJob = res.data?.data || null;
+        setAiJob(nextJob);
+        if (nextJob?.status !== "queued" && nextJob?.status !== "processing") {
+          setAiGenerating(false);
+          if (nextJob?.status === "completed") await load();
+        }
+      } catch {
+        setAiGenerating(false);
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [aiJob]);
+
+  const generateAiPack = async (event) => {
+    event.preventDefault();
+    if (!termSubjectId) return alert("Select the subject you want to generate for.");
+    if (aiTopics.trim().length < 20) return alert("Enter clear term topics or teacher guidance of at least 20 characters.");
+
+    setAiGenerating(true);
+    try {
+      const res = await api.post("/api/staff/teaching/ai-planner", {
+        term_subject_id: termSubjectId,
+        topics: aiTopics.trim(),
+        question_count: Number(aiQuestionCount),
+      });
+      setAiJob(res.data?.data || null);
+    } catch (e) {
+      setAiGenerating(false);
+      alert(e?.response?.data?.message || "Could not queue the AI teaching pack.");
+    }
+  };
+
+  const downloadAiDocument = async (document, label) => {
+    if (!aiJob?.id) return;
+    const key = `download-${document}`;
+    setAiActionKey(key);
+    try {
+      const res = await api.get(`/api/staff/teaching/ai-planner/${aiJob.id}/${document}/download`, { responseType: "blob" });
+      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${label.replace(/\s+/g, "_").toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Download failed.");
+    } finally {
+      setAiActionKey("");
+    }
+  };
+
+  const clearAiDocument = async (document) => {
+    if (!aiJob?.id || !window.confirm("Clear this generated draft? This does not affect any file already saved to Current Term Uploads.")) return;
+    const key = `clear-${document}`;
+    setAiActionKey(key);
+    try {
+      const res = await api.delete(`/api/staff/teaching/ai-planner/${aiJob.id}/${document}`);
+      setAiJob(res.data?.data || null);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Could not clear the draft.");
+    } finally {
+      setAiActionKey("");
+    }
+  };
+
+  const saveAiDocument = async (document) => {
+    if (!aiJob?.id) return;
+    const key = `save-${document}`;
+    setAiActionKey(key);
+    try {
+      const res = await api.post(`/api/staff/teaching/ai-planner/${aiJob.id}/${document}/save`);
+      alert(res.data?.message || "Saved to Current Term Uploads.");
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.message || "Could not save this draft.");
+    } finally {
+      setAiActionKey("");
+    }
+  };
 
   const upload = async (event) => {
     event.preventDefault();
@@ -166,6 +258,59 @@ export default function StaffTeachingHome() {
         <section className="teach-panel">
           {loading ? <p className="teach-state">Loading teaching materials...</p> : null}
           {!loading ? (
+            <div className="teach-ai-card">
+              <div className="teach-ai-head">
+                <div>
+                  <span className="teach-pill">AI Lesson Planner</span>
+                  <h3>Generate a reviewable teaching pack</h3>
+                  <p>Use your term topics to prepare hard exam questions, lesson notes, and lesson plans. Review or edit each PDF before saving it to Current Term Uploads.</p>
+                </div>
+              </div>
+              <form className="teach-form" onSubmit={generateAiPack}>
+                <select className="teach-field" value={termSubjectId} onChange={(e) => setTermSubjectId(e.target.value)}>
+                  <option value="">Select Subject</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.term_subject_id} value={subject.term_subject_id}>
+                      {subject.label || `${subject.subject_name} - ${subject.class_name}`}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className="teach-field teach-ai-topics"
+                  value={aiTopics}
+                  onChange={(e) => setAiTopics(e.target.value)}
+                  placeholder="Enter the term topics, subtopics, learning goals, and any curriculum guidance for this subject..."
+                />
+                <select className="teach-field" value={aiQuestionCount} onChange={(e) => setAiQuestionCount(e.target.value)}>
+                  {[5, 10, 15, 20, 30, 40].map((count) => <option key={count} value={count}>{count} hard exam questions</option>)}
+                </select>
+                <button className="teach-btn" type="submit" disabled={aiGenerating || subjects.length === 0 || ["queued", "processing"].includes(aiJob?.status)}>
+                  {aiGenerating || ["queued", "processing"].includes(aiJob?.status) ? `Generating... ${aiJob?.progress || 0}%` : "Generate Teaching Pack"}
+                </button>
+              </form>
+              {aiJob ? (
+                <div className="teach-ai-result">
+                  <p className="teach-file-meta">Status: <strong>{aiJob.status}</strong>{aiJob.error_message ? ` | ${aiJob.error_message}` : ""}</p>
+                  {aiJob.status === "completed" ? (
+                    <div className="teach-ai-documents">
+                      {Object.entries(aiJob.documents || {}).map(([key, item]) => (
+                        <div className="teach-ai-document" key={key}>
+                          <strong>{item.label}</strong>
+                          {item.ready ? (
+                            <div className="teach-actions">
+                              <button type="button" className="teach-btn teach-btn--soft" onClick={() => downloadAiDocument(key, item.label)} disabled={aiActionKey === `download-${key}`}>{aiActionKey === `download-${key}` ? "Downloading..." : "Download"}</button>
+                              <button type="button" className="teach-btn" onClick={() => saveAiDocument(key)} disabled={aiActionKey === `save-${key}`}>{aiActionKey === `save-${key}` ? "Saving..." : "Save to Current Term"}</button>
+                              <button type="button" className="teach-btn teach-btn--danger" onClick={() => clearAiDocument(key)} disabled={aiActionKey === `clear-${key}`}>{aiActionKey === `clear-${key}` ? "Clearing..." : "X Clear"}</button>
+                            </div>
+                          ) : <span className="teach-small">Draft cleared</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             <div className="teach-grid">
               <article className="teach-card">
                 <h3>Upload Teaching File</h3>

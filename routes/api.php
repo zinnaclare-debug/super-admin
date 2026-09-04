@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\Staff\TeacherTopicsController;
 use App\Http\Controllers\Api\Staff\ELibraryController as StaffELibraryController;
 use App\Http\Controllers\Api\Staff\AnnouncementController as StaffAnnouncementController;
 use App\Http\Controllers\Api\Staff\TeachingController as StaffTeachingController;
+use App\Http\Controllers\Api\Staff\TeachingAiPlannerController;
 use App\Http\Controllers\Api\Staff\AttendantController as StaffAttendantController;
 use App\Http\Controllers\Api\Student\ELibraryController as StudentELibraryController;
 use App\Http\Controllers\Api\Staff\VirtualClassesController as StaffVirtualClassesController;
@@ -163,7 +164,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'classTemplates']);
     Route::put('/school-admin/class-templates', [SchoolAdminDashboardController::class, 'upsertClassTemplates']);
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ School features (school admin only)
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ School features (school admin only)
     Route::get('/schools/features', [SchoolFeatureController::class, 'index']);
 
     Route::get('/school-admin/payments/config', [SchoolAdminPaymentsController::class, 'config'])
@@ -253,7 +254,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::get('/school-admin/class-progress', [SchoolAdminClassProgressController::class, 'index'])
         ->middleware('feature:class progress');
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Registration
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Registration
     Route::get('/school-admin/register/enrollment-options', [RegistrationController::class, 'enrollmentOptions'])
         ->middleware('feature:register');
 
@@ -274,7 +275,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
         ->middleware('feature:register');
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Users management
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
         ->middleware('feature:users');
 
@@ -308,7 +309,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::post('/school-admin/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])
         ->middleware('feature:users');
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Academic Sessions
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Academic Sessions
     Route::get('/school-admin/academic-sessions', [AcademicSessionController::class, 'index'])
         ->middleware('feature:academic_session');
 
@@ -319,9 +320,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:academic_session');
 
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Your controller uses setStatus() so keep this name
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Your controller uses setStatus() so keep this name
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Academic Structure (Details page + Departments per level)
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Academic Structure (Details page + Departments per level)
     Route::get('/school-admin/academic-sessions/{session}/details', [AcademicStructureController::class, 'details'])
         ->middleware('feature:academic_session');
 
@@ -332,7 +333,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::delete('/school-admin/academic-sessions/{session}/level-departments/{department}', [AcademicStructureController::class, 'deleteLevelDepartment'])
         ->middleware('feature:academic_session');
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Class Terms page
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Class Terms page
     Route::get('/school-admin/classes/{class}/terms', [AcademicStructureController::class, 'classTerms'])
         ->middleware('feature:academic_session');
 
@@ -448,7 +449,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::patch('/school-admin/cbt/exams/{exam}/publish', [AcademicsController::class, 'publishCbtExam'])
         ->middleware('feature:academics');
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Alias for termCourses (courses = subjects)
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Alias for termCourses (courses = subjects)
     Route::get('/school-admin/classes/{class}/terms/{term}/courses', [AcademicsController::class, 'termCourses'])
         ->middleware('feature:academics');
 
@@ -489,6 +490,18 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::delete('/staff/teaching/materials/{material}', [StaffTeachingController::class, 'destroy'])
         ->middleware('feature:teaching');
     Route::get('/staff/teaching/materials/{material}/download', [StaffTeachingController::class, 'download'])
+        ->middleware('feature:teaching');
+    Route::get('/staff/teaching/ai-planner', [TeachingAiPlannerController::class, 'index'])
+        ->middleware('feature:teaching');
+    Route::post('/staff/teaching/ai-planner', [TeachingAiPlannerController::class, 'store'])
+        ->middleware('feature:teaching');
+    Route::get('/staff/teaching/ai-planner/{generationJob}', [TeachingAiPlannerController::class, 'show'])
+        ->middleware('feature:teaching');
+    Route::get('/staff/teaching/ai-planner/{generationJob}/{document}/download', [TeachingAiPlannerController::class, 'download'])
+        ->middleware('feature:teaching');
+    Route::delete('/staff/teaching/ai-planner/{generationJob}/{document}', [TeachingAiPlannerController::class, 'clear'])
+        ->middleware('feature:teaching');
+    Route::post('/staff/teaching/ai-planner/{generationJob}/{document}/save', [TeachingAiPlannerController::class, 'saveToTeaching'])
         ->middleware('feature:teaching');
     Route::get('/staff/attendant/today', [StaffAttendantController::class, 'today'])
         ->middleware('feature:attendant');
