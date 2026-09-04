@@ -245,32 +245,47 @@ You are an expert Nigerian and international curriculum instructional designer. 
  "lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}],
  "lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]
 }
-Rules: generate exactly the requested number of hard, original, topic-specific exam questions. Use higher-order reasoning, application and analysis; avoid generic study-skills questions. No duplicate or near-duplicate questions. Questions must have practical marking guides. Create a concise teaching pack: group related topics into no more than 3 lesson notes and 3 lesson plans, with compact classroom-ready content. Lesson content must be age-appropriate, align with Nigerian curriculum expectations where applicable, and use international best-practice pedagogy. Never claim official endorsement. Do not add markdown or text outside JSON.
+Rules: generate exactly the requested number of hard, original, topic-specific exam questions. Use higher-order reasoning, application and analysis; avoid generic study-skills questions. No duplicate or near-duplicate questions. Each answer guide must be short. Create a compact teaching pack: no more than 2 lesson notes and 2 lesson plans. Keep every field concise but classroom-ready. Lesson content must be age-appropriate, align with Nigerian curriculum expectations where applicable, and use international best-practice pedagogy. Never claim official endorsement. Do not add markdown or text outside JSON.
 PROMPT;
         $prompt = "Subject: {$subject->subject_name}\nClass: {$subject->class_name}\nLevel: {$subject->class_level}\nQuestion count: {$job->question_count}\nTerm topics and teacher guidance:\n{$job->topics}";
 
-        $http = Http::timeout(max(30, min((int) config('services.ai.timeout', 90), 180)))
-            ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 15), 30)))
+        $http = Http::timeout(max(90, min((int) config('services.ai.timeout', 180), 220)))
+            ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 30), 30)))
             ->acceptJson();
-        if ($apiKey !== '') {
-            $http = $http->withToken($apiKey);
-        }
 
-        $response = $http->post($baseUrl . '/chat/completions', [
+        if ($isLocalEndpoint) {
+            // Ollama's native endpoint is reliable on this CPU-only server; its OpenAI-compatible route can stall.
+            $nativeBaseUrl = preg_replace('#/v1$#', '', $baseUrl) ?: $baseUrl;
+            $response = $http->post($nativeBaseUrl . '/api/generate', [
+                'model' => config('services.ai.model', 'phi3.5:latest'),
+                'prompt' => $system . "\n\n" . $prompt,
+                'stream' => false,
+                'format' => 'json',
+                'options' => [
+                    'temperature' => 0.2,
+                    'num_ctx' => 2048,
+                    'num_predict' => 800,
+                ],
+            ]);
+            $raw = trim((string) data_get($response->json(), 'response', ''));
+        } else {
+            if ($apiKey !== '') {
+                $http = $http->withToken($apiKey);
+            }
+            $response = $http->post($baseUrl . '/chat/completions', [
                 'model' => config('services.ai.model', 'gpt-4.1-mini'),
                 'temperature' => 0.25,
-                // Keep local CPU-hosted models within the queue worker time limit.
-                'max_tokens' => max(1600, min(3600, 1500 + ((int) $job->question_count * 110))),
+                'max_tokens' => max(800, min(2500, 800 + ((int) $job->question_count * 90))),
                 'messages' => [
                     ['role' => 'system', 'content' => $system],
                     ['role' => 'user', 'content' => $prompt],
                 ],
             ]);
-
+            $raw = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
+        }
         if ($response->failed()) {
             throw new RuntimeException('AI provider did not complete the request.');
         }
-        $raw = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
         $raw = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw) ?: '';
         $decoded = json_decode($raw, true);
         if (!is_array($decoded)) {

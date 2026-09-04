@@ -283,7 +283,7 @@ export default function StaffTeachingHome() {
                   placeholder="Enter the term topics, subtopics, learning goals, and any curriculum guidance for this subject..."
                 />
                 <select className="teach-field" value={aiQuestionCount} onChange={(e) => setAiQuestionCount(e.target.value)}>
-                  {[5, 10, 15, 20, 30, 40].map((count) => <option key={count} value={count}>{count} hard exam questions</option>)}
+                  {[5].map((count) => <option key={count} value={count}>{count} hard exam questions</option>)}
                 </select>
                 <button className="teach-btn" type="submit" disabled={aiGenerating || subjects.length === 0 || ["queued", "processing"].includes(aiJob?.status)}>
                   {aiGenerating || ["queued", "processing"].includes(aiJob?.status) ? `Generating... ${aiJob?.progress || 0}%` : "Generate Teaching Pack"}
