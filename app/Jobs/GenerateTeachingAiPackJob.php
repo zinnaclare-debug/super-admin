@@ -16,7 +16,7 @@ class GenerateTeachingAiPackJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 210;
+    public int $timeout = 230;
     public bool $failOnTimeout = true;
 
     public function __construct(public int $generationJobId)

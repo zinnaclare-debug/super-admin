@@ -282,7 +282,8 @@ export default function StaffTeachingHome() {
                   className="teach-field teach-ai-topics"
                   value={aiTopics}
                   onChange={(e) => setAiTopics(e.target.value)}
-                  placeholder="Enter the term topics, subtopics, learning goals, and any curriculum guidance for this subject..."
+                  maxLength={1200}
+                  placeholder="Enter concise term topics, subtopics, learning goals, and curriculum guidance (maximum 1,200 characters)..."
                 />
                 <select className="teach-field" value={aiDocumentType} onChange={(e) => setAiDocumentType(e.target.value)}>
                   <option value="exam_questions">Exam Questions</option>

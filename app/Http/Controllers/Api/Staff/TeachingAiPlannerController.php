@@ -58,7 +58,7 @@ class TeachingAiPlannerController extends Controller
 
         $data = $request->validate([
             'term_subject_id' => ['required', 'integer'],
-            'topics' => ['required', 'string', 'min:20', 'max:12000'],
+            'topics' => ['required', 'string', 'min:20', 'max:1200'],
             'question_count' => ['nullable', 'integer', 'min:5', 'max:5'],
             'document_type' => ['required', Rule::in(array_keys(self::DOCUMENTS))],
         ]);
@@ -248,14 +248,18 @@ class TeachingAiPlannerController extends Controller
             default => '{"lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]}',
         };
         $instruction = match ($document) {
-            'exam_questions' => "Generate exactly {$job->question_count} hard, original, topic-specific questions. Use application and analysis, not generic study-skills questions. Keep answer guides short. Do not repeat or rephrase questions.",
-            'lesson_notes' => 'Generate no more than two concise, classroom-ready lesson notes. Use Nigerian curriculum expectations where applicable and international teaching practice. Keep every field short.',
-            default => 'Generate no more than two concise, classroom-ready lesson plans. Use Nigerian curriculum expectations where applicable and international teaching practice. Keep every field short.',
+            'exam_questions' => "Write exactly {$job->question_count} original hard questions. Use application or analysis. Keep each question and answer guide to one short sentence. No duplicates.",
+            'lesson_notes' => 'Write exactly one concise lesson note. Each text value must be one short sentence. Objectives maximum two.',
+            default => 'Write exactly one concise lesson plan. Each text value must be one short sentence. Objectives and resources maximum two.',
         };
-        $system = "You are an expert Nigerian and international curriculum instructional designer. Return strict JSON only with this exact shape: {$shape}. {$instruction} Do not add markdown or text outside JSON.";
-        $prompt = "Subject: {$subject->subject_name}\nClass: {$subject->class_name}\nLevel: {$subject->class_level}\nTerm topics and teacher guidance:\n{$job->topics}";
-        $maxOutput = $document === 'exam_questions' ? 650 : 700;
-
+        $system = "Return valid JSON only. Shape: {$shape}. {$instruction} Nigerian curriculum context where relevant. No markdown.";
+        $topicText = mb_substr(trim((string) $job->topics), 0, 1200);
+        $prompt = "Subject: {$subject->subject_name}; Class: {$subject->class_name}; Level: {$subject->class_level}; Topics: {$topicText}";
+        $maxOutput = match ($document) {
+            'exam_questions' => 400,
+            'lesson_notes' => 320,
+            default => 350,
+        };
         $http = Http::timeout(max(90, min((int) config('services.ai.timeout', 180), 220)))
             ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 30), 30)))
             ->acceptJson();
