@@ -15,8 +15,9 @@ class GenerateTeachingAiPackJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 2;
-    public int $timeout = 230;
+    // The local CPU-only Ollama service generates documents gradually.
+    public int $tries = 1;
+    public int $timeout = 900;
     public bool $failOnTimeout = true;
 
     public function __construct(public int $generationJobId)
@@ -28,7 +29,7 @@ class GenerateTeachingAiPackJob implements ShouldQueue
         TeachingAiGenerationJob::query()->whereKey($this->generationJobId)->update([
             'status' => TeachingAiGenerationJob::STATUS_FAILED,
             'progress' => 100,
-            'error_message' => 'Generation timed out or stopped. Reduce the number of questions or shorten the topics, then try again.',
+            'error_message' => 'Generation failed: ' . mb_strimwidth($exception->getMessage(), 0, 220, '...'),
             'completed_at' => now(),
         ]);
     }
@@ -52,7 +53,7 @@ class GenerateTeachingAiPackJob implements ShouldQueue
             $job->forceFill([
                 'status' => TeachingAiGenerationJob::STATUS_FAILED,
                 'progress' => 100,
-                'error_message' => 'Generation could not be completed. Please review the topics and try again.',
+                'error_message' => 'Generation failed: ' . mb_strimwidth($exception->getMessage(), 0, 220, '...'),
                 'completed_at' => now(),
             ])->save();
 

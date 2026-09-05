@@ -197,7 +197,9 @@ class TeachingAiPlannerController extends Controller
 
         $document = $this->documentType($job);
         $job->forceFill(['progress' => 25])->save();
-        $content = $this->askAi($job, $subject, $document);
+        $content = $document === 'exam_questions'
+            ? $this->generateExamQuestions($job, $subject)
+            : $this->askAi($job, $subject, $document);
         $this->validateContent($content, $job->question_count, $document);
 
         $job->forceFill(['progress' => 70, 'result_json' => array_merge(['_document_type' => $document], $content)])->save();
@@ -233,7 +235,33 @@ class TeachingAiPlannerController extends Controller
         ])->save();
     }
 
-    private function askAi(TeachingAiGenerationJob $job, object $subject, string $document): array
+    private function generateExamQuestions(TeachingAiGenerationJob $job, object $subject): array
+    {
+        $questions = [];
+        $seen = [];
+
+        for ($number = 1; $number <= $job->question_count; $number++) {
+            $job->forceFill(['progress' => 25 + ($number * 7)])->save();
+            $question = $this->askAi($job, $subject, 'exam_questions', $number, $questions);
+            $text = trim((string) ($question['question'] ?? ''));
+            $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', $text) ?? '');
+
+            if ($key === '' || isset($seen[$key])) {
+                throw new RuntimeException('AI returned a duplicate or empty exam question.');
+            }
+
+            $seen[$key] = true;
+            $questions[] = [
+                'question' => $text,
+                'marks' => max(1, min(100, (int) ($question['marks'] ?? 5))),
+                'answer_guide' => trim((string) ($question['answer_guide'] ?? '')),
+            ];
+        }
+
+        return ['exam_questions' => $questions];
+    }
+
+    private function askAi(TeachingAiGenerationJob $job, object $subject, string $document, ?int $questionNumber = null, array $previousQuestions = []): array
     {
         $baseUrl = rtrim((string) config('services.ai.base_url', 'https://api.openai.com/v1'), '/');
         $apiKey = trim((string) config('services.ai.api_key', ''));
@@ -242,25 +270,29 @@ class TeachingAiPlannerController extends Controller
             throw new RuntimeException('AI service is not configured.');
         }
 
-        $shape = match ($document) {
-            'exam_questions' => '{"exam_questions":[{"question":"...","marks":5,"answer_guide":"..."}]}',
-            'lesson_notes' => '{"lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}]}',
-            default => '{"lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]}',
-        };
-        $instruction = match ($document) {
-            'exam_questions' => "Write exactly {$job->question_count} original hard questions. Use application or analysis. Keep each question and answer guide to one short sentence. No duplicates.",
-            'lesson_notes' => 'Write exactly one concise lesson note. Each text value must be one short sentence. Objectives maximum two.',
-            default => 'Write exactly one concise lesson plan. Each text value must be one short sentence. Objectives and resources maximum two.',
-        };
+        $isSingleQuestion = $document === 'exam_questions' && $questionNumber !== null;
+        $shape = $isSingleQuestion
+            ? '{"question":"...","marks":5,"answer_guide":"..."}'
+            : match ($document) {
+                'lesson_notes' => '{"lesson_notes":[{"topic":"...","objectives":["..."],"content":"...","activities":"...","assessment":"...","homework":"...","references":"..."}]}',
+                default => '{"lesson_plan":[{"week":"Week 1","topic":"...","duration":"40 minutes","objectives":["..."],"resources":["..."],"introduction":"...","teacher_activities":"...","learner_activities":"...","assessment":"...","conclusion":"..."}]}',
+            };
+        $previous = collect($previousQuestions)->pluck('question')->implode(' | ');
+        $instruction = $isSingleQuestion
+            ? "Write one original hard application or analysis exam question number {$questionNumber}. Keep the question and answer guide to one short sentence. Do not repeat these earlier questions: {$previous}."
+            : match ($document) {
+                'lesson_notes' => 'Write exactly one concise lesson note. Each text value must be one short sentence. Objectives maximum two.',
+                default => 'Write exactly one concise lesson plan. Each text value must be one short sentence. Objectives and resources maximum two.',
+            };
         $system = "Return valid JSON only. Shape: {$shape}. {$instruction} Nigerian curriculum context where relevant. No markdown.";
         $topicText = mb_substr(trim((string) $job->topics), 0, 1200);
         $prompt = "Subject: {$subject->subject_name}; Class: {$subject->class_name}; Level: {$subject->class_level}; Topics: {$topicText}";
         $maxOutput = match ($document) {
-            'exam_questions' => 400,
-            'lesson_notes' => 320,
-            default => 350,
+            'exam_questions' => 110,
+            'lesson_notes' => 220,
+            default => 240,
         };
-        $http = Http::timeout(max(90, min((int) config('services.ai.timeout', 180), 220)))
+        $http = Http::timeout(max(45, min((int) config('services.ai.timeout', 150), 150)))
             ->connectTimeout(max(5, min((int) config('services.ai.connect_timeout', 30), 30)))
             ->acceptJson();
 
@@ -270,8 +302,8 @@ class TeachingAiPlannerController extends Controller
                 'model' => config('services.ai.model', 'phi3.5:latest'),
                 'prompt' => $system . "\n\n" . $prompt,
                 'stream' => false,
-                'format' => 'json',
-                'options' => ['temperature' => 0.2, 'num_ctx' => 2048, 'num_predict' => $maxOutput],
+                'keep_alive' => '10m',
+                'options' => ['temperature' => 0.2, 'num_ctx' => 1024, 'num_predict' => $maxOutput],
             ]);
             $raw = trim((string) data_get($response->json(), 'response', ''));
         } else {
@@ -286,6 +318,11 @@ class TeachingAiPlannerController extends Controller
         }
         if ($response->failed()) throw new RuntimeException('AI provider did not complete the request.');
         $raw = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw) ?: '';
+        $firstBrace = strpos($raw, '{');
+        $lastBrace = strrpos($raw, '}');
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace >= $firstBrace) {
+            $raw = substr($raw, $firstBrace, $lastBrace - $firstBrace + 1);
+        }
         $decoded = json_decode($raw, true);
         if (!is_array($decoded)) throw new RuntimeException('AI returned an invalid document format.');
         return $decoded;
