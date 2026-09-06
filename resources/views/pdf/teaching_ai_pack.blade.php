@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -20,6 +20,15 @@
 </style>
 </head>
 <body>
+@php
+  $asText = static function ($value): string {
+    if (is_array($value)) {
+      return collect($value)->flatten()->map(static fn ($item) => (string) $item)->filter()->implode('; ');
+    }
+
+    return (string) ($value ?? '');
+  };
+@endphp
 <div class="header">
   <p class="brand">{{ $school->name }}</p>
   <p class="sub">AI Teaching Planner Draft | Review and edit before classroom use</p>
@@ -35,10 +44,10 @@
   <h1>Examination Questions</h1>
   @foreach(($content['exam_questions'] ?? []) as $index => $question)
     <div class="question">
-      <span class="mark">{{ $question['marks'] ?? 5 }} marks</span>
-      <strong>{{ $index + 1 }}. {{ $question['question'] ?? '' }}</strong>
+      <span class="mark">{{ $asText($question['marks'] ?? 5) }} marks</span>
+      <strong>{{ $index + 1 }}. {{ $asText($question['question'] ?? '') }}</strong>
       <h3>Marking Guide</h3>
-      <p>{{ $question['answer_guide'] ?? '' }}</p>
+      <p>{{ $asText($question['answer_guide'] ?? '') }}</p>
     </div>
   @endforeach
 @endif
@@ -46,31 +55,31 @@
 @if($document === 'lesson_notes')
   <h1>Lesson Notes</h1>
   @foreach(($content['lesson_notes'] ?? []) as $note)
-    <h2>{{ $note['topic'] ?? 'Topic' }}</h2>
+    <h2>{{ $asText($note['topic'] ?? 'Topic') }}</h2>
     <p class="label">Learning Objectives</p>
-    <ul>@foreach(($note['objectives'] ?? []) as $objective)<li>{{ $objective }}</li>@endforeach</ul>
-    <p><span class="label">Lesson Content:</span> {{ $note['content'] ?? '' }}</p>
-    <p><span class="label">Class Activities:</span> {{ $note['activities'] ?? '' }}</p>
-    <p><span class="label">Assessment:</span> {{ $note['assessment'] ?? '' }}</p>
-    <p><span class="label">Homework:</span> {{ $note['homework'] ?? '' }}</p>
-    <p><span class="label">References:</span> {{ $note['references'] ?? '' }}</p>
+    <ul>@foreach(($note['objectives'] ?? []) as $objective)<li>{{ $asText($objective) }}</li>@endforeach</ul>
+    <p><span class="label">Lesson Content:</span> {{ $asText($note['content'] ?? '') }}</p>
+    <p><span class="label">Class Activities:</span> {{ $asText($note['activities'] ?? '') }}</p>
+    <p><span class="label">Assessment:</span> {{ $asText($note['assessment'] ?? '') }}</p>
+    <p><span class="label">Homework:</span> {{ $asText($note['homework'] ?? '') }}</p>
+    <p><span class="label">References:</span> {{ $asText($note['references'] ?? '') }}</p>
   @endforeach
 @endif
 
 @if($document === 'lesson_plan')
   <h1>Lesson Plan</h1>
   @foreach(($content['lesson_plan'] ?? []) as $plan)
-    <h2>{{ $plan['week'] ?? 'Week' }}: {{ $plan['topic'] ?? 'Topic' }}</h2>
-    <p><span class="label">Duration:</span> {{ $plan['duration'] ?? '' }}</p>
+    <h2>{{ $asText($plan['week'] ?? 'Week') }}: {{ $asText($plan['topic'] ?? 'Topic') }}</h2>
+    <p><span class="label">Duration:</span> {{ $asText($plan['duration'] ?? '') }}</p>
     <p class="label">Objectives</p>
-    <ul>@foreach(($plan['objectives'] ?? []) as $objective)<li>{{ $objective }}</li>@endforeach</ul>
+    <ul>@foreach(($plan['objectives'] ?? []) as $objective)<li>{{ $asText($objective) }}</li>@endforeach</ul>
     <p class="label">Resources</p>
-    <ul>@foreach(($plan['resources'] ?? []) as $resource)<li>{{ $resource }}</li>@endforeach</ul>
-    <p><span class="label">Introduction:</span> {{ $plan['introduction'] ?? '' }}</p>
-    <p><span class="label">Teacher Activities:</span> {{ $plan['teacher_activities'] ?? '' }}</p>
-    <p><span class="label">Learner Activities:</span> {{ $plan['learner_activities'] ?? '' }}</p>
-    <p><span class="label">Assessment:</span> {{ $plan['assessment'] ?? '' }}</p>
-    <p><span class="label">Conclusion:</span> {{ $plan['conclusion'] ?? '' }}</p>
+    <ul>@foreach(($plan['resources'] ?? []) as $resource)<li>{{ $asText($resource) }}</li>@endforeach</ul>
+    <p><span class="label">Introduction:</span> {{ $asText($plan['introduction'] ?? '') }}</p>
+    <p><span class="label">Teacher Activities:</span> {{ $asText($plan['teacher_activities'] ?? '') }}</p>
+    <p><span class="label">Learner Activities:</span> {{ $asText($plan['learner_activities'] ?? '') }}</p>
+    <p><span class="label">Assessment:</span> {{ $asText($plan['assessment'] ?? '') }}</p>
+    <p><span class="label">Conclusion:</span> {{ $asText($plan['conclusion'] ?? '') }}</p>
   @endforeach
 @endif
 
