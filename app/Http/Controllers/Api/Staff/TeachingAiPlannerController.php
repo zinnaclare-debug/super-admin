@@ -199,8 +199,7 @@ class TeachingAiPlannerController extends Controller
         $job->forceFill(['progress' => 25])->save();
         $content = $document === 'exam_questions'
             ? $this->generateExamQuestions($job, $subject)
-            : $this->askAi($job, $subject, $document);
-        $this->validateContent($content, $job->question_count, $document);
+            : $this->generateTeachingDocument($job, $subject, $document);
 
         $job->forceFill(['progress' => 70, 'result_json' => array_merge(['_document_type' => $document], $content)])->save();
         $school = School::query()->findOrFail($job->school_id);
@@ -235,6 +234,24 @@ class TeachingAiPlannerController extends Controller
         ])->save();
     }
 
+    private function generateTeachingDocument(TeachingAiGenerationJob $job, object $subject, string $document): array
+    {
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $content = $this->askAi($job, $subject, $document, null, [], $attempt);
+                $this->validateContent($content, $job->question_count, $document);
+
+                return $content;
+            } catch (RuntimeException $exception) {
+                $lastException = $exception;
+                sleep(1);
+            }
+        }
+
+        throw new RuntimeException('AI could not return a usable ' . str_replace('_', ' ', $document) . ' after three attempts.', 0, $lastException);
+    }
     private function generateExamQuestions(TeachingAiGenerationJob $job, object $subject): array
     {
         $questions = [];
@@ -242,26 +259,41 @@ class TeachingAiPlannerController extends Controller
 
         for ($number = 1; $number <= $job->question_count; $number++) {
             $job->forceFill(['progress' => 25 + ($number * 7)])->save();
-            $question = $this->askAi($job, $subject, 'exam_questions', $number, $questions);
-            $text = trim((string) ($question['question'] ?? ''));
-            $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', $text) ?? '');
+            $accepted = null;
 
-            if ($key === '' || isset($seen[$key])) {
-                throw new RuntimeException('AI returned a duplicate or empty exam question.');
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                try {
+                    $question = $this->askAi($job, $subject, 'exam_questions', $number, $questions, $attempt);
+                    $questionText = trim((string) ($question['question'] ?? ''));
+                    $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', $questionText) ?? '');
+
+                    if ($key !== '' && !isset($seen[$key])) {
+                        $accepted = [
+                            'question' => $questionText,
+                            'marks' => max(1, min(100, (int) ($question['marks'] ?? 5))),
+                            'answer_guide' => trim((string) ($question['answer_guide'] ?? '')),
+                        ];
+                        $seen[$key] = true;
+                        break;
+                    }
+                } catch (RuntimeException) {
+                    // Retry malformed local-model output with a different question angle.
+                }
+
+                sleep(1);
             }
 
-            $seen[$key] = true;
-            $questions[] = [
-                'question' => $text,
-                'marks' => max(1, min(100, (int) ($question['marks'] ?? 5))),
-                'answer_guide' => trim((string) ($question['answer_guide'] ?? '')),
-            ];
+            if (!$accepted) {
+                throw new RuntimeException('AI could not produce a unique exam question after three attempts.');
+            }
+
+            $questions[] = $accepted;
         }
 
         return ['exam_questions' => $questions];
     }
 
-    private function askAi(TeachingAiGenerationJob $job, object $subject, string $document, ?int $questionNumber = null, array $previousQuestions = []): array
+    private function askAi(TeachingAiGenerationJob $job, object $subject, string $document, ?int $questionNumber = null, array $previousQuestions = [], int $attempt = 1): array
     {
         $baseUrl = rtrim((string) config('services.ai.base_url', 'https://api.openai.com/v1'), '/');
         $apiKey = trim((string) config('services.ai.api_key', ''));
@@ -287,6 +319,7 @@ class TeachingAiPlannerController extends Controller
         $system = "Return valid JSON only. Shape: {$shape}. {$instruction} Nigerian curriculum context where relevant. No markdown.";
         $topicText = mb_substr(trim((string) $job->topics), 0, 1200);
         $prompt = "Subject: {$subject->subject_name}; Class: {$subject->class_name}; Level: {$subject->class_level}; Topics: {$topicText}";
+        $prompt .= ' Attempt ' . $attempt . ': return only the requested JSON object and make this response materially different from prior attempts.';
         $maxOutput = match ($document) {
             'exam_questions' => 110,
             'lesson_notes' => 220,
@@ -302,15 +335,16 @@ class TeachingAiPlannerController extends Controller
                 'model' => config('services.ai.model', 'phi3.5:latest'),
                 'prompt' => $system . "\n\n" . $prompt,
                 'stream' => false,
+                'format' => 'json',
                 'keep_alive' => '10m',
-                'options' => ['temperature' => 0.2, 'num_ctx' => 1024, 'num_predict' => $maxOutput],
+                'options' => ['temperature' => 0.45, 'num_ctx' => 1024, 'num_predict' => $maxOutput],
             ]);
             $raw = trim((string) data_get($response->json(), 'response', ''));
         } else {
             if ($apiKey !== '') $http = $http->withToken($apiKey);
             $response = $http->post($baseUrl . '/chat/completions', [
                 'model' => config('services.ai.model', 'gpt-4.1-mini'),
-                'temperature' => 0.25,
+                'temperature' => 0.455,
                 'max_tokens' => $maxOutput,
                 'messages' => [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $prompt]],
             ]);

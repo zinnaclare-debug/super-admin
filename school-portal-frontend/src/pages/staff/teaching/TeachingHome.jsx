@@ -120,20 +120,20 @@ export default function StaffTeachingHome() {
     }
   };
 
-  const downloadAiDocument = async (document, label) => {
+  const downloadAiDocument = async (documentType, label) => {
     if (!aiJob?.id) return;
-    const key = `download-${document}`;
+    const key = "download-" + documentType;
     setAiActionKey(key);
     try {
-      const res = await api.get(`/api/staff/teaching/ai-planner/${aiJob.id}/${document}/download`, { responseType: "blob" });
+      const res = await api.get("/api/staff/teaching/ai-planner/" + aiJob.id + "/" + documentType + "/download", { responseType: "blob" });
       const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      const link = document.createElement("a");
+      const link = window.document.createElement("a");
       link.href = blobUrl;
       link.download = `${label.replace(/\s+/g, "_").toLowerCase()}.pdf`;
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
     } catch (e) {
       alert(e?.response?.data?.message || "Download failed.");
     } finally {
@@ -220,13 +220,13 @@ export default function StaffTeachingHome() {
         responseType: "blob",
       });
       const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
+      const link = window.document.createElement("a");
       link.href = blobUrl;
       link.download = fileNameFromHeaders(res.headers, item.original_name);
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
     } catch (e) {
       alert(e?.response?.data?.message || "Download failed. File may still be processing.");
     } finally {
