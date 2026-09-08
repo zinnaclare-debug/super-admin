@@ -19,14 +19,13 @@ export default function AttendanceHome() {
   const [totalSchoolDays, setTotalSchoolDays] = useState(0);
   const [nextTermBeginDate, setNextTermBeginDate] = useState("");
 
-  const load = async (nextClassId = "", nextTermId = "") => {
+  const load = async (nextClassId = "") => {
     setLoading(true);
     setMessage("");
     try {
       const res = await api.get("/api/staff/attendance", {
         params: {
           ...(nextClassId ? { class_id: nextClassId } : {}),
-          ...(nextTermId ? { term_id: nextTermId } : {}),
         },
       });
       const data = res.data?.data;
@@ -78,7 +77,7 @@ export default function AttendanceHome() {
         })),
       });
       alert("Attendance saved");
-      await load(classId, termId);
+      await load(classId);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to save attendance");
     } finally {
@@ -94,7 +93,7 @@ export default function AttendanceHome() {
             <span className="sat-pill">Student Attendance</span>
             <h2>Track attendance clearly and save class records fast</h2>
             <p className="sat-subtitle">
-              Select class and term, update each student&apos;s attendance days, and keep term summary details in one organized page.
+              Select your assigned class, update attendance days, and keep the current-term summary details in one organized page.
             </p>
             <div className="sat-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
@@ -128,7 +127,7 @@ export default function AttendanceHome() {
                 onChange={async (e) => {
                   const v = e.target.value;
                   setClassId(v);
-                  await load(v, termId);
+                  await load(v);
                 }}
                 disabled={loading || !classes.length}
               >
@@ -142,25 +141,8 @@ export default function AttendanceHome() {
             </div>
 
             <div className="sat-filter">
-              <label htmlFor="sat-term">Term</label>
-              <select
-                id="sat-term"
-                className="sat-field"
-                value={termId}
-                onChange={async (e) => {
-                  const v = e.target.value;
-                  setTermId(v);
-                  await load(classId, v);
-                }}
-                disabled={loading || !terms.length}
-              >
-                <option value="">Select term</option>
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <label htmlFor="sat-term">Current Term</label>
+              <input id="sat-term" className="sat-field" value={terms[0]?.name || "No current term"} readOnly />
             </div>
           </div>
         </section>

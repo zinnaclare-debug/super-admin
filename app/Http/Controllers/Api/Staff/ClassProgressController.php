@@ -97,6 +97,7 @@ class ClassProgressController extends Controller
 
         $terms = Term::where('school_id', $schoolId)
             ->where('academic_session_id', $session->id)
+            ->where('is_current', true)
             ->orderBy('id')
             ->get(['id', 'name', 'academic_session_id']);
 

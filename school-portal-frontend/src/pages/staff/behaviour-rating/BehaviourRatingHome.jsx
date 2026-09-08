@@ -26,14 +26,13 @@ export default function BehaviourRatingHome() {
   const [termId, setTermId] = useState("");
   const [students, setStudents] = useState([]);
 
-  const load = async (nextClassId = "", nextTermId = "") => {
+  const load = async (nextClassId = "") => {
     setLoading(true);
     setMessage("");
     try {
       const res = await api.get("/api/staff/behaviour-rating", {
         params: {
           ...(nextClassId ? { class_id: nextClassId } : {}),
-          ...(nextTermId ? { term_id: nextTermId } : {}),
         },
       });
       const data = res.data?.data;
@@ -80,7 +79,7 @@ export default function BehaviourRatingHome() {
         })),
       });
       alert("Behaviour ratings saved");
-      await load(classId, termId);
+      await load(classId);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to save behaviour ratings");
     } finally {
@@ -96,7 +95,7 @@ export default function BehaviourRatingHome() {
             <span className="bvr-pill">Staff Behaviour Rating</span>
             <h2>Rate classroom behaviour with structure and speed</h2>
             <p className="bvr-subtitle">
-              Select class and term, score behaviour criteria on a 0-5 scale, and save ratings for each student in one page.
+              Select your assigned class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student.
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
@@ -130,7 +129,7 @@ export default function BehaviourRatingHome() {
                 onChange={async (e) => {
                   const v = e.target.value;
                   setClassId(v);
-                  await load(v, termId);
+                  await load(v);
                 }}
                 disabled={loading || !classes.length}
               >
@@ -144,25 +143,8 @@ export default function BehaviourRatingHome() {
             </div>
 
             <div className="bvr-filter">
-              <label htmlFor="bvr-term">Term</label>
-              <select
-                id="bvr-term"
-                className="bvr-field"
-                value={termId}
-                onChange={async (e) => {
-                  const v = e.target.value;
-                  setTermId(v);
-                  await load(classId, v);
-                }}
-                disabled={loading || !terms.length}
-              >
-                <option value="">Select term</option>
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <label htmlFor="bvr-term">Current Term</label>
+              <input id="bvr-term" className="bvr-field" value={terms[0]?.name || "No current term"} readOnly />
             </div>
           </div>
         </section>

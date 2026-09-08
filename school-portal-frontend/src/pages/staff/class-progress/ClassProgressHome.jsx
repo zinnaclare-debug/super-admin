@@ -34,14 +34,13 @@ export default function ClassProgressHome() {
   const [selectedDepartmentNames, setSelectedDepartmentNames] = useState([]);
   const [selectedScopeLabel, setSelectedScopeLabel] = useState("");
 
-  const load = async (nextClassId = "", nextTermId = "") => {
+  const load = async (nextClassId = "") => {
     setLoading(true);
     setMessage("");
     try {
       const res = await api.get("/api/staff/class-progress", {
         params: {
           ...(nextClassId ? { class_id: nextClassId } : {}),
-          ...(nextTermId ? { term_id: nextTermId } : {}),
         },
       });
 
@@ -149,7 +148,7 @@ export default function ClassProgressHome() {
                 onChange={async (e) => {
                   const value = e.target.value;
                   setClassId(value);
-                  await load(value, termId);
+                  await load(value);
                 }}
                 disabled={loading || !classes.length}
               >
@@ -163,25 +162,8 @@ export default function ClassProgressHome() {
             </div>
 
             <div className="ctp-filter">
-              <label htmlFor="ctp-term">Term</label>
-              <select
-                id="ctp-term"
-                className="ctp-field"
-                value={termId}
-                onChange={async (e) => {
-                  const value = e.target.value;
-                  setTermId(value);
-                  await load(classId, value);
-                }}
-                disabled={loading || !terms.length}
-              >
-                <option value="">Select term</option>
-                {terms.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+              <label htmlFor="ctp-term">Current Term</label>
+              <input id="ctp-term" className="ctp-field" value={selectedTermName || "No current term"} readOnly />
             </div>
           </div>
         </section>
