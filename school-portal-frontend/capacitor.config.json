@@ -1,0 +1,9 @@
+{
+  "appId": "ng.com.lyt.schoolportal",
+  "appName": "LYT School Portal",
+  "webDir": "dist-mobile",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["projectschool.lyt.com.ng", "*.lyt.com.ng"]
+  }
+}

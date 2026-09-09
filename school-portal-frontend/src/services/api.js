@@ -3,7 +3,7 @@ import { getStoredToken } from "../utils/authStorage";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  window.location.origin;
+  (import.meta.env.MODE === 'mobile' ? 'https://projectschool.lyt.com.ng' : window.location.origin);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

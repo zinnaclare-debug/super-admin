@@ -1,7 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isMobileBuild = mode === "mobile";
+
+  return {
   plugins: [react()],
   test: {
     environment: "jsdom",
@@ -9,7 +12,8 @@ export default defineConfig({
 
   // Build into Laravel public/build
   build: {
-    outDir: "../public/build",
+    // Keep Laravel's web build separate from the self-contained Android bundle.
+    outDir: isMobileBuild ? "dist-mobile" : "../public/build",
     emptyOutDir: true,
     cssCodeSplit: true,
     reportCompressedSize: false,
@@ -38,5 +42,6 @@ export default defineConfig({
   },
 
   // IMPORTANT: assets will be served from /build/...
-  base: "/build/",
+  base: isMobileBuild ? "./" : "/build/",
+  };
 });

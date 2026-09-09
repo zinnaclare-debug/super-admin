@@ -31,3 +31,6 @@ Thumbs.db
 .railway
 
 tests/my-first-app22/
+
+# Android mobile build output
+school-portal-frontend/dist-mobile/
