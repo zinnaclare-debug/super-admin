@@ -27,6 +27,7 @@ class School extends Model
         'entrance_exam_config',
         'slug',
         'subdomain',
+        'school_code',
         'status',
         'school_admin_login_limit',
         'paystack_subaccount_code',

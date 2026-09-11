@@ -26,6 +26,10 @@ function hasWindow() {
   return typeof window !== "undefined";
 }
 
+function isMobileBuild() {
+  return import.meta.env.MODE === "mobile";
+}
+
 function readPreferred(key) {
   if (!hasWindow()) return null;
 
@@ -63,22 +67,26 @@ export function getStoredFeatures() {
 export function setAuthState({ token, user }) {
   if (!hasWindow()) return;
 
-  safeStorageRemove(window.localStorage, "token");
-  safeStorageRemove(window.localStorage, "user");
+  const storage = isMobileBuild() ? window.localStorage : window.sessionStorage;
+  const otherStorage = isMobileBuild() ? window.sessionStorage : window.localStorage;
+  safeStorageRemove(otherStorage, "token");
+  safeStorageRemove(otherStorage, "user");
 
   if (token) {
-    safeStorageSet(window.sessionStorage, "token", token);
+    safeStorageSet(storage, "token", token);
   }
   if (user) {
-    safeStorageSet(window.sessionStorage, "user", JSON.stringify(user));
+    safeStorageSet(storage, "user", JSON.stringify(user));
   }
 }
 
 export function setStoredFeatures(features) {
   if (!hasWindow()) return;
 
-  safeStorageRemove(window.localStorage, "features");
-  safeStorageSet(window.sessionStorage, "features", JSON.stringify(features || []));
+  const storage = isMobileBuild() ? window.localStorage : window.sessionStorage;
+  const otherStorage = isMobileBuild() ? window.sessionStorage : window.localStorage;
+  safeStorageRemove(otherStorage, "features");
+  safeStorageSet(storage, "features", JSON.stringify(features || []));
 }
 
 export function clearAuthState() {

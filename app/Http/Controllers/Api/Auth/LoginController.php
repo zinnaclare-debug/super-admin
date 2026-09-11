@@ -21,6 +21,7 @@ class LoginController extends Controller
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'school_code' => ['nullable', 'string', 'size:8', 'regex:/^[A-Za-z0-9]{3}-[A-Za-z0-9]{4}$/'],
         ]);
 
         $user = User::where('email', $credentials['email'])->first();
@@ -29,6 +30,26 @@ class LoginController extends Controller
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
+        }
+
+        $schoolFromCode = null;
+        if (!empty($credentials['school_code'])) {
+            $schoolFromCode = School::query()
+                ->where('school_code', strtoupper($credentials['school_code']))
+                ->where('status', 'active')
+                ->first();
+
+            if (! $schoolFromCode) {
+                return response()->json([
+                    'message' => 'School code was not found or this school is not active.',
+                ], 403);
+            }
+
+            if ($user->role === 'super_admin' || empty($user->school_id) || (int) $user->school_id !== (int) $schoolFromCode->id) {
+                return response()->json([
+                    'message' => 'This email account does not belong to the selected school.',
+                ], 403);
+            }
         }
 
         if ($user->role === 'student' && Schema::hasColumn('students', 'status')) {
@@ -64,6 +85,12 @@ class LoginController extends Controller
         $requestKey = (string) config('tenancy.request_key', 'tenant_school');
         $tenantSchool = $request->attributes->get($requestKey) ?? $this->resolveTenantSchool($request);
 
+        if ($tenantSchool && $schoolFromCode && (int) $tenantSchool->id !== (int) $schoolFromCode->id) {
+            return response()->json([
+                'message' => 'School code does not match this school address.',
+            ], 403);
+        }
+
         if ($tenantSchool) {
             if ($user->role === 'super_admin' || empty($user->school_id)) {
                 return response()->json([
@@ -79,6 +106,7 @@ class LoginController extends Controller
         } elseif (
             (bool) config('tenancy.require_subdomain_for_school_users', false)
             && !empty($user->school_id)
+            && !$schoolFromCode
         ) {
             return response()->json([
                 'message' => 'Use your school subdomain to sign in.',

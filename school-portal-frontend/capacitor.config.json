@@ -4,6 +4,6 @@
   "webDir": "dist-mobile",
   "server": {
     "androidScheme": "https",
-    "allowNavigation": ["projectschool.lyt.com.ng", "*.lyt.com.ng"]
+    "allowNavigation": ["lyt.com.ng", "www.lyt.com.ng", "*.lyt.com.ng"]
   }
 }

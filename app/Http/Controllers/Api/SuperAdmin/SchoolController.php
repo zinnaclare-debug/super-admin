@@ -82,8 +82,9 @@ class SchoolController extends Controller
         ]);
 
         $school = School::create($validated + [
-            'slug'      => Str::slug($validated['name']),
-            'status'    => $validated['status'] ?? 'active',
+            'slug'        => Str::slug($validated['name']),
+            'school_code' => $this->generateSchoolCode(),
+            'status'      => $validated['status'] ?? 'active',
         ]);
 
         return response()->json([
@@ -132,6 +133,7 @@ class SchoolController extends Controller
                 'username_prefix'  => Str::slug($validated['school_name']),
                 'slug'             => Str::slug($validated['school_name']),
                 'subdomain'        => $validated['subdomain'],
+                'school_code'      => $this->generateSchoolCode(),
                 'status'           => 'active',
             ]);
 
@@ -1036,6 +1038,14 @@ class SchoolController extends Controller
         }
     }
 
+    private function generateSchoolCode(): string
+    {
+        do {
+            $code = Str::upper(Str::random(3)) . '-' . Str::upper(Str::random(4));
+        } while (School::query()->where('school_code', $code)->exists());
+
+        return $code;
+    }
     private function normalizeSubdomain(?string $subdomain): string
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower(trim((string) $subdomain))) ?? '';

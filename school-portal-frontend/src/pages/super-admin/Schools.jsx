@@ -16,6 +16,7 @@ function Schools() {
   const [newAdminName, setNewAdminName] = useState("");
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState(null);
+  const [generatedSchoolCode, setGeneratedSchoolCode] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -92,6 +93,7 @@ function Schools() {
       });
 
       setGeneratedPassword(res.data.password);
+      setGeneratedSchoolCode(res.data.school?.school_code || null);
       await loadSchools();
 
       setSchoolName("");
@@ -373,10 +375,11 @@ function Schools() {
         </button>
       </form>
 
-      {generatedPassword && (
+      {(generatedPassword || generatedSchoolCode) && (
         <div style={{ background: "#fef3c7", padding: 15, marginBottom: 20, wordBreak: "break-word" }}>
-          <strong>School Admin Password (show once):</strong>
-          <p>{generatedPassword}</p>
+          <strong>New school login details:</strong>
+          {generatedSchoolCode ? <p>School code: <strong>{generatedSchoolCode}</strong></p> : null}
+          {generatedPassword ? <p>School Admin Password (show once): {generatedPassword}</p> : null}
         </div>
       )}
 
@@ -386,6 +389,7 @@ function Schools() {
             <tr>
               <th>School Name</th>
               <th>Subdomain</th>
+              <th>School Code</th>
               <th>School Web Address</th>
               <th>Email</th>
               <th>Status</th>
@@ -406,6 +410,8 @@ function Schools() {
                 </td>
 
                 <td>{s.subdomain || "-"}</td>
+
+                <td><strong>{s.school_code || "-"}</strong></td>
 
                 <td style={{ wordBreak: "break-word" }}>
                   {s.subdomain ? (

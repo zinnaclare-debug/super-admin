@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\TenantContextController;
+use App\Http\Controllers\Api\MobileSchoolController;
 use App\Http\Controllers\Api\Payments\PaystackWebhookController;
 use App\Http\Controllers\Api\PublicSchoolWebsiteController;
 use App\Http\Controllers\Api\PublicPlatformContentController;
@@ -76,6 +77,7 @@ use App\Http\Controllers\Api\Student\AnnouncementController as StudentAnnounceme
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/tenant/context', [TenantContextController::class, 'show']);
+Route::post('/mobile/schools/resolve', [MobileSchoolController::class, 'resolve']);
 Route::get('/public/school-site', [PublicSchoolWebsiteController::class, 'show']);
 Route::get('/public/platform-content', [PublicPlatformContentController::class, 'show']);
 Route::get('/public/school-contents', [PublicSchoolWebsiteController::class, 'contents']);

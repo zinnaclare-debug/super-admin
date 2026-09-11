@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api";
+import api, { clearMobileSchool, isMobileBuild, selectMobileSchool } from "../services/api";
 import SuspendedSchoolNotice from "../components/SuspendedSchoolNotice";
 import heroArt from "../assets/dashboard/hero.svg";
 import graduationArt from "../assets/login/Graduation-cuate.svg";
 import brandBanner from "../assets/home/lytebridge-brand.jpg";
 import brandLogo from "../assets/home/lytebridge-logo.png";
 import { setAuthState, setStoredFeatures } from "../utils/authStorage";
+import { getMobileSchool } from "../utils/mobileSchool";
 import "./Login.css";
 import PasswordVisibilityToggle from "../components/PasswordVisibilityToggle";
 
@@ -16,7 +17,12 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [tenantSchool, setTenantSchool] = useState(null);
+  const isMobileApp = isMobileBuild;
+  const [mobileSchool, setMobileSchool] = useState(() => (isMobileBuild ? getMobileSchool() : null));
+  const [schoolCode, setSchoolCode] = useState("");
+  const [schoolCodeMessage, setSchoolCodeMessage] = useState("");
+  const [pendingMobileSchool, setPendingMobileSchool] = useState(null);
+  const [tenantSchool, setTenantSchool] = useState(() => (isMobileBuild ? getMobileSchool() : null));
   const [logoLoadError, setLogoLoadError] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState("");
   const [suspendedMessage, setSuspendedMessage] = useState("");
@@ -67,6 +73,10 @@ const loginThemeStyle = useMemo(
   }, []);
 
   useEffect(() => {
+    if (isMobileApp && !mobileSchool) {
+      return undefined;
+    }
+
     let active = true;
 
     api
@@ -87,7 +97,7 @@ const loginThemeStyle = useMemo(
     return () => {
       active = false;
     };
-  }, []);
+  }, [isMobileApp, mobileSchool]);
 
   useEffect(() => {
     setLogoLoadError(false);
@@ -95,6 +105,52 @@ const loginThemeStyle = useMemo(
 
   const goBackToSchoolWebsite = () => {
     navigate("/");
+  };
+  const handleSchoolCodeSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSchoolCodeMessage("");
+
+    try {
+      const school = await api.post("/api/mobile/schools/resolve", {
+        school_code: schoolCode.trim().toUpperCase(),
+      });
+      setPendingMobileSchool(school.data.data);
+      setTenantSchool(school.data.data);
+    } catch (err) {
+      setSchoolCodeMessage(
+        err.response?.data?.errors?.school_code?.[0] ||
+          err.response?.data?.message ||
+          "We could not find an active school with that code."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmMobileSchool = () => {
+    const selectedSchool = selectMobileSchool(pendingMobileSchool);
+    setMobileSchool(selectedSchool);
+    setTenantSchool(selectedSchool);
+    setPendingMobileSchool(null);
+  };
+
+  const useAnotherSchoolCode = () => {
+    setPendingMobileSchool(null);
+    setTenantSchool(null);
+    setSchoolCode("");
+    setSchoolCodeMessage("");
+  };
+
+  const changeMobileSchool = () => {
+    clearMobileSchool();
+    setMobileSchool(null);
+    setPendingMobileSchool(null);
+    setTenantSchool(null);
+    setSchoolCode("");
+    setEmail("");
+    setPassword("");
+    setSchoolCodeMessage("");
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -106,6 +162,7 @@ const loginThemeStyle = useMemo(
       const res = await api.post("/api/login", {
         email,
         password,
+        school_code: isMobileApp ? mobileSchool?.school_code : undefined,
       });
 
       const { token, user } = res.data;
@@ -209,7 +266,7 @@ const loginThemeStyle = useMemo(
             </div>
           </div>
 
-          {tenantSchool && !isLytCentralDomain ? (
+          {tenantSchool && !isLytCentralDomain && !isMobileApp ? (
            <button
   type="button"
   className="login-back-link"
@@ -225,39 +282,90 @@ const loginThemeStyle = useMemo(
 
           ) : null}
 
-          <form onSubmit={handleSubmit} className="login-form">
-            <label htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              type="email"
-              placeholder="you@school.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
+          {isMobileApp && !mobileSchool ? (
+            pendingMobileSchool ? (
+              <div className="login-school-match">
+                <span>School found</span>
+                <strong>{pendingMobileSchool.name}</strong>
+                <small>School code: {pendingMobileSchool.school_code}</small>
+                <p>Confirm this is your school before entering your email and password.</p>
+                <button type="button" className="login-btn" onClick={confirmMobileSchool}>
+                  Continue to login
+                </button>
+                <button type="button" className="login-school-change-button" onClick={useAnotherSchoolCode}>
+                  Use another school code
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSchoolCodeSubmit} className="login-form">
+                <label htmlFor="school-code">School code</label>
+                <input
+                  id="school-code"
+                  type="text"
+                  placeholder="Example: A7K-9P2Q"
+                  value={schoolCode}
+                  onChange={(e) => {
+                    setSchoolCode(e.target.value.toUpperCase());
+                    setSchoolCodeMessage("");
+                  }}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  maxLength={8}
+                  required
+                />
+                <p className="login-school-code-help">
+                  Enter the eight-character code given by your school administrator.
+                </p>
+                {schoolCodeMessage ? <p className="login-school-code-error">{schoolCodeMessage}</p> : null}
+                <button className="login-btn" disabled={loading}>
+                  {loading ? "Finding school..." : "Find my school"}
+                </button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSubmit} className="login-form">
+              {isMobileApp ? (
+                <div className="login-selected-school">
+                  <span>Selected school</span>
+                  <strong>{mobileSchool?.name}</strong>
+                  <small>Code: {mobileSchool?.school_code}</small>
+                  <button type="button" onClick={changeMobileSchool}>Change school</button>
+                </div>
+              ) : null}
 
-            <label htmlFor="login-password">Password</label>
-            <div className="password-visibility-field">
+              <label htmlFor="login-email">Email</label>
               <input
-                id="login-password"
-                placeholder="Enter password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
+                id="login-email"
+                type="email"
+                placeholder="you@school.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 required
               />
-              <PasswordVisibilityToggle
-                visible={showPassword}
-                onToggle={() => setShowPassword((value) => !value)}
-              />
-            </div>
 
-            <button className="login-btn" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </button>
-          </form>
+              <label htmlFor="login-password">Password</label>
+              <div className="password-visibility-field">
+                <input
+                  id="login-password"
+                  placeholder="Enter password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+                <PasswordVisibilityToggle
+                  visible={showPassword}
+                  onToggle={() => setShowPassword((value) => !value)}
+                />
+              </div>
+
+              <button className="login-btn" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
+              </button>
+            </form>
+          )}
 
           {graduationMessage ? (
             <div className="login-graduation-card" role="status">
