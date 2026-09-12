@@ -1,6 +1,8 @@
 // App.jsx
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { getStoredToken, getStoredUser } from "./utils/authStorage";
+import { isMobileBuild } from "./services/api";
 
 // Public
 import Login from "./pages/Login";
@@ -115,11 +117,29 @@ function LiveClassRouteFallback() {
   return <div style={{ padding: 24 }}>Loading live classroom...</div>;
 }
 
+function MobileStartRoute() {
+  const token = getStoredToken();
+  const user = getStoredUser();
+
+  if (!token || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const destinationByRole = {
+    super_admin: "/super-admin",
+    school_admin: "/school/dashboard",
+    staff: "/staff/dashboard",
+    student: "/student/dashboard",
+  };
+
+  return <Navigate to={destinationByRole[user.role] || "/login"} replace />;
+}
+
 function App() {
   return (
     <Routes>
       {/* PUBLIC */}
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={isMobileBuild ? <MobileStartRoute /> : <Home />} />
       <Route path="/apply-now" element={<PublicSchoolPortal page="apply" />} />
       <Route path="/entrance-exam" element={<PublicSchoolPortal page="exam" />} />
       <Route path="/verify-score" element={<PublicSchoolPortal page="verify" />} />
