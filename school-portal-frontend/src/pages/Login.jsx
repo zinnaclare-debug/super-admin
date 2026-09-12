@@ -213,7 +213,19 @@ const loginThemeStyle = useMemo(
         <section className="login-hero">
           <div className="hero-meta">
             <span className="hero-pill">Smart School Portal</span>
-            <span className="hero-domain">{window.location.hostname}</span>
+            {isMobileApp && mobileSchool ? (
+              <button
+                type="button"
+                className="login-mobile-school-back"
+                onClick={changeMobileSchool}
+                aria-label="Change school"
+                title="Change school"
+              >
+                &larr;
+              </button>
+            ) : !isMobileApp ? (
+              <span className="hero-domain">{window.location.hostname}</span>
+            ) : null}
           </div>
 
           <h1>
@@ -298,11 +310,11 @@ const loginThemeStyle = useMemo(
               </div>
             ) : (
               <form onSubmit={handleSchoolCodeSubmit} className="login-form">
-                <label htmlFor="school-code">School code</label>
+                <label htmlFor="school-code">ENTER SCHOOL CODE</label>
                 <input
                   id="school-code"
                   type="text"
-                  placeholder="Example: A7K-9P2Q"
+                  placeholder="School code"
                   value={schoolCode}
                   onChange={(e) => {
                     setSchoolCode(e.target.value.toUpperCase());
@@ -313,9 +325,6 @@ const loginThemeStyle = useMemo(
                   maxLength={8}
                   required
                 />
-                <p className="login-school-code-help">
-                  Enter the eight-character code given by your school administrator.
-                </p>
                 {schoolCodeMessage ? <p className="login-school-code-error">{schoolCodeMessage}</p> : null}
                 <button className="login-btn" disabled={loading}>
                   {loading ? "Finding school..." : "Find my school"}
@@ -324,16 +333,7 @@ const loginThemeStyle = useMemo(
             )
           ) : (
             <form onSubmit={handleSubmit} className="login-form">
-              {isMobileApp ? (
-                <div className="login-selected-school">
-                  <span>Selected school</span>
-                  <strong>{mobileSchool?.name}</strong>
-                  <small>Code: {mobileSchool?.school_code}</small>
-                  <button type="button" onClick={changeMobileSchool}>Change school</button>
-                </div>
-              ) : null}
-
-              <label htmlFor="login-email">Email</label>
+<label htmlFor="login-email">Email</label>
               <input
                 id="login-email"
                 type="email"
