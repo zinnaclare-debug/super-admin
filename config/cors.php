@@ -19,8 +19,13 @@ return [
             }
 
             $delimiters = ['/', '#', '~', '%', '!'];
-            if (in_array($pattern[0], $delimiters, true)) {
-                return $pattern;
+            $firstCharacter = $pattern[0];
+            if (in_array($firstCharacter, $delimiters, true)) {
+                // Only retain a supplied delimiter when its matching closing delimiter exists.
+                if (str_ends_with($pattern, $firstCharacter)) {
+                    return $pattern;
+                }
+                $pattern = substr($pattern, 1);
             }
 
             return '#' . $pattern . '#';

@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import UserProfilePanel from "./UserProfilePanel";
+import { saveDownload } from "../../../utils/downloadFile";
 
 const PAGE_SIZE = 100;
 
@@ -227,14 +228,8 @@ export default function ActiveUsers({ status = "active" }) {
       });
 
       const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers, `users_${role || "all"}_${status}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(blob, parseFileName(res.headers, `users_${role || "all"}_${status}.pdf`));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to download users PDF.");
     } finally {
@@ -252,17 +247,11 @@ export default function ActiveUsers({ status = "active" }) {
       });
 
       const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(
-        res.headers,
-        `${user.role || "user"}_id_card_${user.username || user.id}.pdf`
+      const saved = await saveDownload(
+        blob,
+        parseFileName(res.headers, `${user.role || "user"}_id_card_${user.username || user.id}.pdf`)
       );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to download ID card.");
     } finally {

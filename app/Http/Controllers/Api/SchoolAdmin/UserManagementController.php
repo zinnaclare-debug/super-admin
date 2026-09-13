@@ -414,21 +414,26 @@ class UserManagementController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $studentStatus = null;
-        if ($user->role === 'student' && Schema::hasColumn('students', 'status')) {
-            $studentStatus = Student::query()
+        $student = null;
+        if ($user->role === 'student') {
+            $student = Student::query()
                 ->where('school_id', (int) $user->school_id)
                 ->where('user_id', (int) $user->id)
-                ->value('status');
+                ->first();
         }
 
         return response()->json([
             'data' => array_merge(
                 $user->only(['id', 'name', 'email', 'role', 'is_active', 'school_id']),
                 [
-                    'status' => $studentStatus === 'graduated'
+                    'status' => ($student?->status ?? null) === 'graduated'
                         ? 'graduated'
                         : ($user->is_active ? 'active' : 'inactive'),
+                    'exit_reason' => Schema::hasColumn('students', 'exit_reason')
+                        ? ($student?->exit_reason ?? null)
+                        : null,
+                    'reactivation_requested' => Schema::hasColumn('students', 'reactivation_requested_at')
+                        && !empty($student?->reactivation_requested_at),
                 ]
             ),
         ]);
@@ -779,6 +784,12 @@ class UserManagementController extends Controller
     // POST /api/school-admin/users/students/access
     public function updateStudentAccess(Request $request)
     {
+        if (!Schema::hasColumn('students', 'exit_reason')) {
+            return response()->json([
+                'message' => 'Student access tracking is not ready yet. Run the latest database migration and try again.',
+            ], 503);
+        }
+
         $schoolId = (int) $request->user()->school_id;
         $payload = $request->validate([
             'ids' => ['required', 'array', 'min:1', 'max:500'],
@@ -794,8 +805,10 @@ class UserManagementController extends Controller
         $students = Student::query()
             ->where('school_id', $schoolId)
             ->whereIn('user_id', $payload['ids'])
-            ->where('status', '!=', 'graduated')
             ->get();
+        if (Schema::hasColumn('students', 'status')) {
+            $students = $students->reject(fn (Student $student) => $student->status === 'graduated')->values();
+        }
         if ($students->isEmpty()) {
             return response()->json(['message' => 'No eligible students were found.'], 422);
         }
@@ -1166,7 +1179,14 @@ class UserManagementController extends Controller
 
     private function applyUserStatusFilter($query, string $status, bool $isActive): void
     {
+        $hasStudentStatus = Schema::hasColumn('students', 'status');
+        $hasExitReason = Schema::hasColumn('students', 'exit_reason');
+
         if ($status === 'graduated') {
+            if (!$hasStudentStatus) {
+                $query->whereRaw('1 = 0');
+                return;
+            }
             $query->where('role', 'student')->whereExists(function ($subQuery) {
                 $subQuery->select(DB::raw(1))->from('students')
                     ->whereColumn('students.user_id', 'users.id')->where('students.status', 'graduated');
@@ -1175,6 +1195,10 @@ class UserManagementController extends Controller
         }
 
         if ($status === 'pending_fees') {
+            if (!$hasExitReason) {
+                $query->whereRaw('1 = 0');
+                return;
+            }
             $query->where('role', 'student')->where('is_active', false)->whereExists(function ($subQuery) {
                 $subQuery->select(DB::raw(1))->from('students')
                     ->whereColumn('students.user_id', 'users.id')->where('students.exit_reason', 'fees_unpaid');
@@ -1183,12 +1207,16 @@ class UserManagementController extends Controller
         }
 
         $query->where('is_active', $isActive);
-        $query->where(function ($statusQuery) use ($status) {
-            $statusQuery->where('role', '!=', 'student')->orWhereNotExists(function ($subQuery) use ($status) {
+        $query->where(function ($statusQuery) use ($status, $hasStudentStatus, $hasExitReason) {
+            $statusQuery->where('role', '!=', 'student')->orWhereNotExists(function ($subQuery) use ($status, $hasStudentStatus, $hasExitReason) {
                 $subQuery->select(DB::raw(1))->from('students')->whereColumn('students.user_id', 'users.id')
-                    ->where(function ($studentQuery) use ($status) {
-                        $studentQuery->where('students.status', 'graduated');
-                        if ($status === 'inactive') {
+                    ->where(function ($studentQuery) use ($status, $hasStudentStatus, $hasExitReason) {
+                        if ($hasStudentStatus) {
+                            $studentQuery->where('students.status', 'graduated');
+                        } else {
+                            $studentQuery->whereRaw('1 = 0');
+                        }
+                        if ($status === 'inactive' && $hasExitReason) {
                             $studentQuery->orWhere('students.exit_reason', 'fees_unpaid');
                         }
                     });

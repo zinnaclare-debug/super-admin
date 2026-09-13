@@ -220,6 +220,10 @@ class UserController extends Controller
     // GET /api/super-admin/schools/{school}/reactivation-requests
     public function reactivationRequests(School $school)
     {
+        if (!Schema::hasColumn('students', 'exit_reason') || !Schema::hasColumn('students', 'reactivation_requested_at')) {
+            return response()->json(['data' => ['students' => []]]);
+        }
+
         $rows = Student::query()
             ->join('users', 'users.id', '=', 'students.user_id')
             ->where('students.school_id', (int) $school->id)
@@ -245,6 +249,10 @@ class UserController extends Controller
     // POST /api/super-admin/students/{student}/approve-reactivation
     public function approveReactivation(Request $request, Student $student)
     {
+        if (!Schema::hasColumn('students', 'exit_reason') || !Schema::hasColumn('students', 'reactivation_requested_at')) {
+            return response()->json(['message' => 'Student access tracking is not ready yet. Run the latest database migration and try again.'], 503);
+        }
+
         $schoolId = (int) $student->school_id;
         if ($student->exit_reason !== 'left_school' || !$student->reactivation_requested_at || $student->reactivation_approved_at) {
             return response()->json(['message' => 'This student does not have a pending left-school reactivation request.'], 422);
