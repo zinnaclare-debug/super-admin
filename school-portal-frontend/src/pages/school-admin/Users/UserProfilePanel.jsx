@@ -138,7 +138,7 @@ export default function UserProfilePanel({ userId, onClose, onChanged }) {
                       checked={disableReason === "left_school"}
                       onChange={(event) => setDisableReason(event.target.value)}
                     />{" "}
-                    Left School - re-enabling will require Super Admin approval.
+                    Left School - re-enabling will require approval.
                   </label>
                   <label style={{ display: "block", marginTop: 8 }}>
                     <input

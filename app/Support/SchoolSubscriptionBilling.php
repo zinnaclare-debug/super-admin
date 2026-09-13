@@ -118,6 +118,7 @@ class SchoolSubscriptionBilling
 
     public static function buildQuote(SchoolSubscriptionSetting $settings, int $studentCount, string $cycle): ?array
     {
+        $studentCounts = self::billableStudentCounts((int) $settings->school_id);
         $cycle = strtolower(trim($cycle));
         if (!in_array($cycle, [self::CYCLE_TERMLY, self::CYCLE_YEARLY], true)) {
             return null;
@@ -161,7 +162,8 @@ class SchoolSubscriptionBilling
     {
         $settings = self::getSettings($school);
         [$session, $term] = self::resolveCurrentSessionAndTerm((int) $school->id);
-        $studentCount = self::countBillableStudents((int) $school->id);
+        $studentCounts = self::billableStudentCounts((int) $school->id);
+        $studentCount = (int) $studentCounts['total'];
         $quote = self::buildQuote($settings, $studentCount, $cycle);
 
         return [
