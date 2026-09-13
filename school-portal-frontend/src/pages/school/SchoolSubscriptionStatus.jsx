@@ -175,6 +175,7 @@ export default function SchoolSubscriptionStatus() {
   };
 
   const quoteCards = [summary?.quotes?.termly, summary?.quotes?.yearly].filter(Boolean);
+  const isActiveSubscription = summary.status === "active";
   const buttonLabel = loading ? "LOADING..." : (summary.status_label || "FREE VERSION");
   const latestPendingBankInvoice = summary.latest_pending_invoice?.payment_channel === "bank"
     ? summary.latest_pending_invoice
@@ -281,14 +282,14 @@ export default function SchoolSubscriptionStatus() {
                     </div>
 
                     <div className="sd-subscription-actions">
-                      <button type="button" onClick={() => triggerPaystack(cycle)} disabled={busyCycle === cycle || summary.status === "free"}>
+                      <button type="button" onClick={() => triggerPaystack(cycle)} disabled={busyCycle === cycle || summary.status === "free" || isActiveSubscription}>
                         {busyCycle === cycle ? "Working..." : "Pay Online"}
                       </button>
                       <button
                         type="button"
                         className="sd-subscription-alt"
                         onClick={() => setBankCycle((prev) => (prev === cycle ? "" : cycle))}
-                        disabled={summary.status === "free"}
+                        disabled={summary.status === "free" || isActiveSubscription}
                       >
                         Pay With Bank
                       </button>

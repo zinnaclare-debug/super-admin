@@ -66,10 +66,12 @@ class SchoolSubscriptionBilling
     {
         $settings = self::getSettings($school);
         [$session, $term] = self::resolveCurrentSessionAndTerm((int) $school->id);
-        $studentCount = self::countBillableStudents((int) $school->id);
+        $studentCounts = self::billableStudentCounts((int) $school->id);
+        $activeInvoice = self::findActiveCoverageInvoice((int) $school->id, $session?->id, $term?->id);
+        // Coverage must show the invoice snapshot, not students added after the payment.
+        $studentCount = $activeInvoice ? (int) $activeInvoice->student_count_snapshot : (int) $studentCounts['total'];
         $termlyQuote = self::buildQuote($settings, $studentCount, self::CYCLE_TERMLY);
         $yearlyQuote = self::buildQuote($settings, $studentCount, self::CYCLE_YEARLY);
-        $activeInvoice = self::findActiveCoverageInvoice((int) $school->id, $session?->id, $term?->id);
         $pendingInvoice = self::findLatestPendingInvoice((int) $school->id, $session?->id, $term?->id);
 
         $status = self::deriveStatus($settings, $activeInvoice);
@@ -89,6 +91,8 @@ class SchoolSubscriptionBilling
                 'name' => $term->name,
             ] : null,
             'student_count' => $studentCount,
+            'active_student_count' => (int) $studentCounts['active'],
+            'fees_unpaid_student_count' => (int) $studentCounts['fees_unpaid'],
             'settings' => [
                 'amount_per_student_per_term' => self::money($settings->amount_per_student_per_term),
                 'currency' => $settings->currency ?: 'NGN',
@@ -142,6 +146,8 @@ class SchoolSubscriptionBilling
             'label' => $cycle === self::CYCLE_YEARLY ? 'Pay Yearly' : 'Pay Termly',
             'terms_covered' => $multiplier,
             'student_count' => $studentCount,
+            'active_student_count' => (int) $studentCounts['active'],
+            'fees_unpaid_student_count' => (int) $studentCounts['fees_unpaid'],
             'amount_per_student_per_term' => $rate,
             'subtotal' => $subtotal,
             'tax_percent' => $taxPercent,
@@ -163,6 +169,8 @@ class SchoolSubscriptionBilling
             'session' => $session,
             'term' => $term,
             'student_count' => $studentCount,
+            'active_student_count' => (int) $studentCounts['active'],
+            'fees_unpaid_student_count' => (int) $studentCounts['fees_unpaid'],
             'quote' => $quote,
         ];
     }
@@ -221,15 +229,24 @@ class SchoolSubscriptionBilling
 
     public static function countBillableStudents(int $schoolId): int
     {
-        $query = User::query()
-            ->where('school_id', $schoolId)
-            ->where('role', 'student');
+        return (int) self::billableStudentCounts($schoolId)['total'];
+    }
 
-        if (Schema::hasColumn('users', 'is_active')) {
-            $query->where('is_active', true);
+    public static function billableStudentCounts(int $schoolId): array
+    {
+        $active = (int) User::query()->where('school_id', $schoolId)->where('role', 'student')->where('is_active', true)->count();
+        $feesUnpaid = 0;
+        if (Schema::hasColumn('students', 'exit_reason')) {
+            $feesUnpaid = (int) User::query()
+                ->join('students', 'students.user_id', '=', 'users.id')
+                ->where('users.school_id', $schoolId)
+                ->where('users.role', 'student')
+                ->where('users.is_active', false)
+                ->where('students.exit_reason', 'fees_unpaid')
+                ->count();
         }
 
-        return (int) $query->count();
+        return ['active' => $active, 'fees_unpaid' => $feesUnpaid, 'total' => $active + $feesUnpaid];
     }
 
     public static function findActiveCoverageInvoice(int $schoolId, ?int $sessionId, ?int $termId): ?SchoolSubscriptionInvoice

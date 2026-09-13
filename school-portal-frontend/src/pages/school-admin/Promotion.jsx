@@ -28,6 +28,7 @@ export default function Promotion() {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [promotingStudentId, setPromotingStudentId] = useState(null);
   const [bulkPromoting, setBulkPromoting] = useState(false);
+  const [bulkDemoting, setBulkDemoting] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, name: "" });
 
@@ -160,6 +161,32 @@ export default function Promotion() {
     }
   };
 
+  const bulkDemoteStudents = async () => {
+    if (!selectedClass?.id || selectedPromotableIds.length === 0) return;
+    const destination = students[0]?.next_session?.session_name || students[0]?.next_session?.academic_year || "the pending session";
+    const warning = `Demote ${selectedPromotableIds.length} selected student(s)? They will repeat ${selectedClass.name} in ${destination}. Their previous-session scores stay as history, and their new-session subjects start fresh.`;
+    if (!window.confirm(warning)) return;
+
+    setBulkDemoting(true);
+    let completed = 0;
+    const failed = [];
+    try {
+      for (const studentId of selectedPromotableIds) {
+        const student = students.find((item) => item.student_id === studentId);
+        try {
+          await api.post(`/api/school-admin/promotion/classes/${selectedClass.id}/students/${studentId}/demote`);
+          completed += 1;
+        } catch {
+          failed.push(student?.name || `Student ${studentId}`);
+        }
+      }
+      await loadClassStudents(selectedClass);
+      alert(failed.length ? `Demoted ${completed} student(s). Failed: ${failed.join(", ")}` : `Demoted ${completed} student(s).`);
+    } finally {
+      setBulkDemoting(false);
+      setSelectedStudentIds([]);
+    }
+  };
   useEffect(() => {
     loadClasses();
   }, []);
@@ -245,16 +272,14 @@ export default function Promotion() {
                 </p>
               </div>
               {promotableStudents.length > 0 ? (
-                <button
-                  className="payx-btn"
-                  type="button"
-                  onClick={bulkPromoteStudents}
-                  disabled={bulkPromoting || selectedPromotableIds.length === 0}
-                >
-                  {bulkPromoting && bulkProgress.total > 0
-                    ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...`
-                    : "Bulk Promote"}
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className="payx-btn" type="button" onClick={bulkPromoteStudents} disabled={bulkPromoting || bulkDemoting || selectedPromotableIds.length === 0}>
+                    {bulkPromoting && bulkProgress.total > 0 ? `Promoting ${bulkProgress.current}/${bulkProgress.total}...` : "Bulk Promote"}
+                  </button>
+                  <button className="payx-btn" type="button" onClick={bulkDemoteStudents} disabled={bulkPromoting || bulkDemoting || selectedPromotableIds.length === 0} style={{ background: "#b91c1c", borderColor: "#991b1b" }}>
+                    {bulkDemoting ? "Demoting..." : "Demote"}
+                  </button>
+                </div>
               ) : null}
             </div>
 

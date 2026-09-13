@@ -4,6 +4,7 @@ import api, { clearMobileSchool, isMobileBuild, selectMobileSchool } from "../se
 import SuspendedSchoolNotice from "../components/SuspendedSchoolNotice";
 import heroArt from "../assets/dashboard/hero.svg";
 import graduationArt from "../assets/login/Graduation-cuate.svg";
+import schoolCodeBridgeArt from "../assets/login/school-code-bridge.jpeg";
 import brandBanner from "../assets/home/lytebridge-brand.jpg";
 import brandLogo from "../assets/home/lytebridge-logo.png";
 import { setAuthState, setStoredFeatures } from "../utils/authStorage";
@@ -171,6 +172,10 @@ const loginThemeStyle = useMemo(
       setAuthState({ token, user });
       setStoredFeatures([]);
 
+      if (!isMobileApp) {
+        window.dispatchEvent(new Event("request-pwa-install"));
+      }
+
       // 3️⃣ ROUTE BASED ON ROLE
       if (user.role === "super_admin") {
         navigate("/super-admin", { replace: true });
@@ -221,7 +226,7 @@ const loginThemeStyle = useMemo(
                 aria-label="Change school"
                 title="Change school"
               >
-                &larr;
+                Back
               </button>
             ) : !isMobileApp ? (
               <span className="hero-domain">{window.location.hostname}</span>
@@ -241,7 +246,7 @@ const loginThemeStyle = useMemo(
           </p>
 
           <div className="hero-visual">
-            <img className="hero-visual-main" src={heroArt} alt="School management illustration" />
+            <img className="hero-visual-main" src={isMobileApp && !mobileSchool ? schoolCodeBridgeArt : heroArt} alt={isMobileApp && !mobileSchool ? "School Portal bridge logo" : "School management illustration"} />
             <img className="hero-visual-accent" src={graduationArt} alt="Graduation illustration" />
             <svg
               className="hero-orbit"

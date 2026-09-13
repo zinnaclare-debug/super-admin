@@ -148,7 +148,13 @@ class LoginController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token) {
+            SchoolAdminLoginAudit::query()
+                ->where('personal_access_token_id', (int) $token->id)
+                ->delete();
+            $token->delete();
+        }
 
         return response()->json([
             'message' => 'Logged out successfully'
@@ -256,6 +262,9 @@ class LoginController extends Controller
             return;
         }
 
+        SchoolAdminLoginAudit::query()
+            ->whereIn('personal_access_token_id', $tokenIds)
+            ->delete();
         $user->tokens()->whereIn('id', $tokenIds)->delete();
     }
 

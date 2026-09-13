@@ -28,9 +28,14 @@ export default function UsersRoleHome() {
           Inactive
         </NavLink>
         {role === "student" ? (
-          <NavLink to="graduated" style={btnStyle}>
-            Graduated
-          </NavLink>
+          <>
+            <NavLink to="pending-fees" style={btnStyle}>
+              Pending Fees
+            </NavLink>
+            <NavLink to="graduated" style={btnStyle}>
+              Graduated
+            </NavLink>
+          </>
         ) : null}
       </div>
 

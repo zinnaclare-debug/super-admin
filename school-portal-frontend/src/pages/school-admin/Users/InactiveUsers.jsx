@@ -171,6 +171,21 @@ export default function InactiveUsers() {
     }
   };
 
+  const requestBulkReactivation = async () => {
+    if (role !== "student" || selectedIds.size === 0) return;
+    if (!window.confirm(`Send ${selectedIds.size} selected student(s) to Super Admin for reactivation approval? Only Left School students will be requested.`)) return;
+    try {
+      const res = await api.post("/api/school-admin/users/students/access", {
+        ids: Array.from(selectedIds),
+        action: "request_reactivation",
+      });
+      setSelectedIds(new Set());
+      await load();
+      alert(res.data?.message || "Reactivation request sent.");
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to send reactivation request.");
+    }
+  };
   const downloadUsersPdf = async () => {
     setDownloadingPdf(true);
     try {
@@ -280,7 +295,11 @@ export default function InactiveUsers() {
         </div>
       </div>
 
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>        {role === "student" ? (
+          <button onClick={requestBulkReactivation} disabled={selectedIds.size === 0}>
+            Request Bulk Enable ({selectedIds.size})
+          </button>
+        ) : null}
         <button
           onClick={bulkDeleteUsers}
           disabled={selectedIds.size === 0 || bulkDeleting}

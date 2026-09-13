@@ -43,6 +43,7 @@ export default function ActiveUsers({ status = "active" }) {
   const requestedUserId = Math.max(0, Number(searchParams.get("user_id")) || 0);
   const missingField = String(searchParams.get("missing_field") || "");
   const isGraduated = status === "graduated";
+  const isPendingFees = status === "pending_fees";
   const storageKey = filterStorageKey(role, status);
   const storedFilters = readStoredFilters(role, status);
   const [rows, setRows] = useState([]);
@@ -183,6 +184,34 @@ export default function ActiveUsers({ status = "active" }) {
     }
   };
 
+  const updateStudentAccess = async (action, reason = null) => {
+    if (role !== "student" || selectedIds.size === 0) return;
+    try {
+      const res = await api.post("/api/school-admin/users/students/access", {
+        ids: Array.from(selectedIds),
+        action,
+        reason,
+      });
+      setSelectedIds(new Set());
+      await load();
+      alert(res.data?.message || "Student access updated.");
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to update student access.");
+    }
+  };
+
+  const bulkDisableStudents = async () => {
+    if (selectedIds.size === 0) return;
+    const choice = window.prompt("Reason for disabling selected students: type LEFT for Left School or FEES for Fees Unpaid.");
+    const reason = String(choice || "").trim().toUpperCase() === "LEFT"
+      ? "left_school"
+      : String(choice || "").trim().toUpperCase() === "FEES"
+        ? "fees_unpaid"
+        : null;
+    if (!reason) return alert("No change made. Type LEFT or FEES to choose a reason.");
+    if (!window.confirm(`Disable ${selectedIds.size} selected student(s) for ${reason === "left_school" ? "Left School" : "Fees Unpaid"}?`)) return;
+    await updateStudentAccess("disable", reason);
+  };
   const downloadUsersPdf = async () => {
     setDownloadingPdf(true);
     try {
@@ -274,7 +303,7 @@ export default function ActiveUsers({ status = "active" }) {
     <div style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h4 style={{ margin: 0 }}>
-          {isGraduated ? "Graduated Students" : `Active ${role === "staff" ? "Staff" : "Students"}`}
+          {isGraduated ? "Graduated Students" : isPendingFees ? "Students With Pending Fees" : `Active ${role === "staff" ? "Staff" : "Students"}`}
         </h4>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 560px", width: "100%" }}>
@@ -294,7 +323,16 @@ export default function ActiveUsers({ status = "active" }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>        {role === "student" && !isGraduated && !isPendingFees ? (
+          <button onClick={bulkDisableStudents} disabled={selectedIds.size === 0} style={{ background: "#dc2626", border: "1px solid #b91c1c", color: "#fff" }}>
+            Disable Selected ({selectedIds.size})
+          </button>
+        ) : null}
+        {role === "student" && isPendingFees ? (
+          <button onClick={() => updateStudentAccess("enable")} disabled={selectedIds.size === 0}>
+            Enable Fees-Unpaid Students ({selectedIds.size})
+          </button>
+        ) : null}
         <button
           onClick={bulkDeleteUsers}
           disabled={selectedIds.size === 0 || bulkDeleting}

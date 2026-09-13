@@ -36,7 +36,7 @@ class UserManagementController extends Controller
     {
         $schoolId = (int) $request->user()->school_id;
         $payload = $request->validate([
-            'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated'])],
+            'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'pending_fees'])],
             'role' => ['nullable', Rule::in(['student', 'staff'])],
             'level' => ['nullable', 'string', 'max:60'],
             'class' => ['nullable', 'string', 'max:120'],
@@ -143,7 +143,7 @@ class UserManagementController extends Controller
     {
         $schoolId = (int) $request->user()->school_id;
         $payload = $request->validate([
-            'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated'])],
+            'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'pending_fees'])],
             'role' => ['nullable', Rule::in(['student', 'staff'])],
             'level' => ['nullable', 'string', 'max:60'],
             'class' => ['nullable', 'string', 'max:120'],
@@ -745,14 +745,24 @@ class UserManagementController extends Controller
         }
 
         if ($user->role === 'student' && Schema::hasColumn('students', 'status')) {
-            $studentStatus = Student::query()
+            $student = Student::query()
                 ->where('school_id', (int) $user->school_id)
                 ->where('user_id', (int) $user->id)
-                ->value('status');
+                ->first();
 
-            if ($studentStatus === 'graduated') {
+            if (($student?->status ?? null) === 'graduated') {
                 return response()->json([
                     'message' => 'Graduated students cannot be reactivated from the active/inactive controls.',
+                ], 422);
+            }
+            if ($user->is_active) {
+                return response()->json([
+                    'message' => 'Disable students using the selected-students action so Left School or Fees Unpaid is recorded.',
+                ], 422);
+            }
+            if (($student?->exit_reason ?? null) === 'left_school') {
+                return response()->json([
+                    'message' => 'A Left School student needs Super Admin approval before access can be enabled.',
                 ], 422);
             }
         }
@@ -766,6 +776,74 @@ class UserManagementController extends Controller
         ]);
     }
 
+    // POST /api/school-admin/users/students/access
+    public function updateStudentAccess(Request $request)
+    {
+        $schoolId = (int) $request->user()->school_id;
+        $payload = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+            'action' => ['required', Rule::in(['disable', 'enable', 'request_reactivation'])],
+            'reason' => ['nullable', Rule::in(['left_school', 'fees_unpaid'])],
+        ]);
+        $action = (string) $payload['action'];
+        if ($action === 'disable' && empty($payload['reason'])) {
+            return response()->json(['message' => 'Choose either Left School or Fees Unpaid before disabling students.'], 422);
+        }
+
+        $students = Student::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('user_id', $payload['ids'])
+            ->where('status', '!=', 'graduated')
+            ->get();
+        if ($students->isEmpty()) {
+            return response()->json(['message' => 'No eligible students were found.'], 422);
+        }
+
+        $updated = 0;
+        DB::transaction(function () use ($students, $action, $payload, $request, &$updated) {
+            foreach ($students as $student) {
+                $user = User::query()->find($student->user_id);
+                if (!$user) {
+                    continue;
+                }
+                if ($action === 'disable') {
+                    $user->is_active = false;
+                    $student->exit_reason = $payload['reason'];
+                    $student->reactivation_requested_at = null;
+                    $student->reactivation_requested_by_user_id = null;
+                    $student->reactivation_approved_at = null;
+                    $student->reactivation_approved_by_user_id = null;
+                } elseif ($action === 'enable') {
+                    if ($student->exit_reason !== 'fees_unpaid') {
+                        continue;
+                    }
+                    $user->is_active = true;
+                    $student->exit_reason = null;
+                    $student->reactivation_requested_at = null;
+                    $student->reactivation_requested_by_user_id = null;
+                } else {
+                    if ($student->exit_reason !== 'left_school' || $user->is_active) {
+                        continue;
+                    }
+                    $student->reactivation_requested_at = now();
+                    $student->reactivation_requested_by_user_id = (int) $request->user()->id;
+                    $student->reactivation_approved_at = null;
+                    $student->reactivation_approved_by_user_id = null;
+                }
+                $user->save();
+                $student->save();
+                $updated++;
+            }
+        });
+
+        $message = match ($action) {
+            'disable' => 'Selected students were disabled.',
+            'enable' => 'Eligible fees-unpaid students were enabled.',
+            default => 'Reactivation request sent to Super Admin for approval.',
+        };
+        return response()->json(['message' => $message, 'data' => ['updated' => $updated]]);
+    }
     // DELETE /api/school-admin/users/{user}
     public function destroy(Request $request, User $user)
     {
@@ -881,6 +959,11 @@ class UserManagementController extends Controller
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
 
         $studentColumns = ['id', 'user_id', 'education_level'];
+        foreach (['exit_reason', 'reactivation_requested_at'] as $column) {
+            if (Schema::hasColumn('students', $column)) {
+                $studentColumns[] = $column;
+            }
+        }
         if (Schema::hasColumn('students', 'status')) {
             $studentColumns[] = 'status';
         }
@@ -911,6 +994,8 @@ class UserManagementController extends Controller
                 'role' => (string) $user->role,
                 'is_active' => (bool) $user->is_active,
                 'status' => $user->is_active ? 'active' : 'inactive',
+                'exit_reason' => null,
+                'reactivation_requested' => false,
                 'education_level' => null,
                 'class_name' => null,
                 'department_name' => null,
@@ -924,7 +1009,11 @@ class UserManagementController extends Controller
                 if ($student) {
                     if (($student->status ?? null) === 'graduated') {
                         $row['status'] = 'graduated';
+                    } elseif (($student->exit_reason ?? null) === 'fees_unpaid') {
+                        $row['status'] = 'pending_fees';
                     }
+                    $row['exit_reason'] = $student->exit_reason ?? null;
+                    $row['reactivation_requested'] = !empty($student->reactivation_requested_at);
 
                     $educationLevel = $this->normalizeEducationLevel($student->education_level ?? null);
                     $placement = $this->resolveStudentCurrentPlacement($schoolId, (int) $student->id);
@@ -1078,41 +1167,34 @@ class UserManagementController extends Controller
     private function applyUserStatusFilter($query, string $status, bool $isActive): void
     {
         if ($status === 'graduated') {
-            $query->where('role', 'student');
-
-            if (!Schema::hasColumn('students', 'status')) {
-                $query->whereRaw('1 = 0');
-                return;
-            }
-
-            $query->whereExists(function ($subQuery) {
-                $subQuery->select(DB::raw(1))
-                    ->from('students')
-                    ->whereColumn('students.user_id', 'users.id')
-                    ->where('students.status', 'graduated');
+            $query->where('role', 'student')->whereExists(function ($subQuery) {
+                $subQuery->select(DB::raw(1))->from('students')
+                    ->whereColumn('students.user_id', 'users.id')->where('students.status', 'graduated');
             });
+            return;
+        }
 
+        if ($status === 'pending_fees') {
+            $query->where('role', 'student')->where('is_active', false)->whereExists(function ($subQuery) {
+                $subQuery->select(DB::raw(1))->from('students')
+                    ->whereColumn('students.user_id', 'users.id')->where('students.exit_reason', 'fees_unpaid');
+            });
             return;
         }
 
         $query->where('is_active', $isActive);
-
-        if (!Schema::hasColumn('students', 'status')) {
-            return;
-        }
-
-        $query->where(function ($statusQuery) {
-            $statusQuery
-                ->where('role', '!=', 'student')
-                ->orWhereNotExists(function ($subQuery) {
-                    $subQuery->select(DB::raw(1))
-                        ->from('students')
-                        ->whereColumn('students.user_id', 'users.id')
-                        ->where('students.status', 'graduated');
-                });
+        $query->where(function ($statusQuery) use ($status) {
+            $statusQuery->where('role', '!=', 'student')->orWhereNotExists(function ($subQuery) use ($status) {
+                $subQuery->select(DB::raw(1))->from('students')->whereColumn('students.user_id', 'users.id')
+                    ->where(function ($studentQuery) use ($status) {
+                        $studentQuery->where('students.status', 'graduated');
+                        if ($status === 'inactive') {
+                            $studentQuery->orWhere('students.exit_reason', 'fees_unpaid');
+                        }
+                    });
+            });
         });
     }
-
     private function resolveStaffAssignmentsForUsers(int $schoolId, array $staffUserIds): array
     {
         $userIds = collect($staffUserIds)

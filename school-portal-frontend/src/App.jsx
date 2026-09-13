@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { getStoredToken, getStoredUser } from "./utils/authStorage";
 import { isMobileBuild } from "./services/api";
+import PwaInstallPrompt from "./components/PwaInstallPrompt";
 
 // Public
 import Login from "./pages/Login";
@@ -137,7 +138,9 @@ function MobileStartRoute() {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <PwaInstallPrompt />
+      <Routes>
       {/* PUBLIC */}
       <Route path="/" element={isMobileBuild ? <MobileStartRoute /> : <Home />} />
       <Route path="/apply-now" element={<PublicSchoolPortal page="apply" />} />
@@ -188,6 +191,7 @@ function App() {
           <Route path=":role" element={<UsersRoleHome />}>
             <Route path="active" element={<ActiveUsers />} />
             <Route path="inactive" element={<InactiveUsers />} />
+            <Route path="pending-fees" element={<ActiveUsers status="pending_fees" />} />
             <Route path="graduated" element={<ActiveUsers status="graduated" />} />
           </Route>
         </Route>
@@ -329,7 +333,8 @@ function App() {
 
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

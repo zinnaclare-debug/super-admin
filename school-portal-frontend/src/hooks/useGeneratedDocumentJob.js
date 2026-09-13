@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import { saveDownload } from "../utils/downloadFile";
 
 export function fileNameFromHeaders(headers, fallback) {
   const contentDisposition = headers?.["content-disposition"] || "";
@@ -80,14 +81,10 @@ export function useGeneratedDocumentJob() {
       }
 
       const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, job.file_name || fallbackName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      const saved = await saveDownload(pdfBlob, fileNameFromHeaders(res.headers, job.file_name || fallbackName));
+      if (saved.native) {
+        window.alert(saved.message);
+      }
     } finally {
       setDownloading(false);
     }

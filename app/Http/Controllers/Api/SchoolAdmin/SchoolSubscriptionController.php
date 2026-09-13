@@ -326,6 +326,10 @@ class SchoolSubscriptionController extends Controller
             return response()->json(['message' => 'Subscription billing has not been configured for this payment option yet.'], 422);
         }
 
+        if ($settings->manual_status_override === SchoolSubscriptionBilling::STATUS_ACTIVE || SchoolSubscriptionBilling::findActiveCoverageInvoice((int) $school->id, (int) $session->id, (int) $term->id)) {
+            return response()->json(['message' => 'Subscription is already active for the current period.'], 422);
+        }
+
         /** @var UploadedFile $receipt */
         $receipt = $payload['receipt'];
         $receiptPath = $receipt->store('school-subscription-receipts/' . (int) $school->id, 'public');

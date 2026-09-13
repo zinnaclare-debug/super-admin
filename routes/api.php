@@ -108,6 +108,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/users/login-details', [SuperAdminLoginDetailsController::class, 'index']);
     Route::get('/super-admin/users/login-details/download', [SuperAdminLoginDetailsController::class, 'download']);
     Route::get('/super-admin/schools/{school}/students-by-level', [UserController::class, 'studentsByLevel']);
+    Route::get('/super-admin/schools/{school}/reactivation-requests', [UserController::class, 'reactivationRequests']);
+    Route::post('/super-admin/students/{student}/approve-reactivation', [UserController::class, 'approveReactivation']);
 
     Route::get('/super-admin/schools', [SchoolController::class, 'index']);
     Route::post('/super-admin/schools', [SchoolController::class, 'store']);
@@ -292,6 +294,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::get('/school-admin/users/{user}/id-card', [UserManagementController::class, 'downloadIdCard'])
         ->middleware('feature:users');
 
+    Route::post('/school-admin/users/students/access', [UserManagementController::class, 'updateStudentAccess'])
+        ->middleware('feature:users');
+
     Route::delete('/school-admin/users/bulk-delete', [UserManagementController::class, 'bulkDestroy'])
         ->middleware('feature:users');
 
@@ -352,6 +357,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:academic_session');
     Route::get('/school-admin/promotion/classes/{class}/students', [PromotionController::class, 'classStudents'])
         ->middleware('feature:academic_session');
+    Route::post('/school-admin/promotion/classes/{class}/students/{student}/demote', [PromotionController::class, 'demote'])
+        ->middleware('feature:academic_session');
+
     Route::post('/school-admin/promotion/classes/{class}/students/{student}/promote', [PromotionController::class, 'promote'])
         ->middleware('feature:academic_session');
 

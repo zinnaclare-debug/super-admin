@@ -643,7 +643,7 @@
 }
 .login-mobile-school-back {
   display: inline-grid;
-  width: 38px;
+  min-width: 58px;
   height: 38px;
   place-items: center;
   border: 2px solid rgba(255, 255, 255, 0.72);

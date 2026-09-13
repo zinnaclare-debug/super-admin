@@ -217,6 +217,55 @@ class UserController extends Controller
         ]);
     }
 
+    // GET /api/super-admin/schools/{school}/reactivation-requests
+    public function reactivationRequests(School $school)
+    {
+        $rows = Student::query()
+            ->join('users', 'users.id', '=', 'students.user_id')
+            ->where('students.school_id', (int) $school->id)
+            ->where('students.exit_reason', 'left_school')
+            ->whereNotNull('students.reactivation_requested_at')
+            ->whereNull('students.reactivation_approved_at')
+            ->select(['students.id as student_id', 'users.name', 'students.education_level', 'students.reactivation_requested_at'])
+            ->orderBy('students.reactivation_requested_at')
+            ->get()
+            ->map(function ($row, int $index) {
+                return [
+                    'sn' => $index + 1,
+                    'student_id' => (int) $row->student_id,
+                    'name' => (string) $row->name,
+                    'level' => $this->normalizeLevelValue((string) $row->education_level) ?: 'unassigned',
+                    'requested_at' => $row->reactivation_requested_at,
+                ];
+            })->values();
+
+        return response()->json(['data' => ['students' => $rows]]);
+    }
+
+    // POST /api/super-admin/students/{student}/approve-reactivation
+    public function approveReactivation(Request $request, Student $student)
+    {
+        $schoolId = (int) $student->school_id;
+        if ($student->exit_reason !== 'left_school' || !$student->reactivation_requested_at || $student->reactivation_approved_at) {
+            return response()->json(['message' => 'This student does not have a pending left-school reactivation request.'], 422);
+        }
+
+        $user = User::query()->where('id', $student->user_id)->where('school_id', $schoolId)->first();
+        if (!$user) {
+            return response()->json(['message' => 'Student user account was not found.'], 404);
+        }
+
+        $user->is_active = true;
+        $user->save();
+        $student->exit_reason = null;
+        $student->reactivation_approved_at = now();
+        $student->reactivation_approved_by_user_id = (int) $request->user()->id;
+        $student->reactivation_requested_at = null;
+        $student->reactivation_requested_by_user_id = null;
+        $student->save();
+
+        return response()->json(['message' => 'Student reactivation approved and access enabled.']);
+    }
     private function validateDeleteCode(Request $request): void
     {
         $payload = $request->validate([

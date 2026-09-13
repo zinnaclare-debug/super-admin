@@ -343,6 +343,106 @@ class PromotionController extends Controller
         ]);
     }
 
+    // POST /api/school-admin/promotion/classes/{class}/students/{student}/demote
+    public function demote(Request $request, SchoolClass $class, Student $student)
+    {
+        $schoolId = (int) $request->user()->school_id;
+        abort_unless((int) $class->school_id === $schoolId, 403);
+        abort_unless((int) $student->school_id === $schoolId, 403);
+
+        [$session, $term] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$term || (int) $class->academic_session_id !== (int) $session->id) {
+            return response()->json(['message' => 'Demotion is only available for a class in the current academic session.'], 422);
+        }
+
+        $targetSession = AcademicSession::query()
+            ->where('school_id', $schoolId)
+            ->where('status', 'pending')
+            ->where('id', '!=', $session->id)
+            ->latest('id')
+            ->first();
+        if (!$targetSession) {
+            return response()->json(['message' => 'Create the next academic session first. Demotion repeats the student in that pending session.'], 422);
+        }
+
+        $sameClass = SchoolClass::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $targetSession->id)
+            ->where('name', $class->name)
+            ->where('level', $class->level)
+            ->first();
+        if (!$sameClass) {
+            return response()->json(['message' => 'The same class is not available in the pending academic session.'], 422);
+        }
+
+        $sourceEnrollment = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('class_id', $class->id)
+            ->where('student_id', $student->id)
+            ->first();
+        if (!$sourceEnrollment) {
+            return response()->json(['message' => 'Student is not enrolled in the selected class.'], 404);
+        }
+
+        DB::transaction(function () use ($schoolId, $session, $targetSession, $class, $sameClass, $student, $sourceEnrollment) {
+            $exists = DB::table('class_students')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $targetSession->id)
+                ->where('class_id', $sameClass->id)
+                ->where('student_id', $student->id)
+                ->exists();
+            if (!$exists) {
+                DB::table('class_students')->insert([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $targetSession->id,
+                    'class_id' => $sameClass->id,
+                    'student_id' => $student->id,
+                    'roll_number' => $sourceEnrollment->roll_number ?? null,
+                    'enrolled_at' => now()->toDateString(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $termIds = Term::query()
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', $targetSession->id)
+                ->pluck('id');
+            foreach ($termIds as $termId) {
+                $enrollment = DB::table('enrollments')
+                    ->where('student_id', $student->id)
+                    ->where('class_id', $sameClass->id)
+                    ->where('term_id', $termId);
+                if (Schema::hasColumn('enrollments', 'school_id')) {
+                    $enrollment->where('school_id', $schoolId);
+                }
+                if (!$enrollment->exists()) {
+                    $data = [
+                        'student_id' => $student->id,
+                        'class_id' => $sameClass->id,
+                        'term_id' => $termId,
+                        'department_id' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $data['school_id'] = $schoolId;
+                    }
+                    DB::table('enrollments')->insert($data);
+                }
+            }
+        });
+
+        return response()->json([
+            'message' => 'Student will repeat this class in the pending academic session. Previous scores remain in their original session history.',
+            'data' => [
+                'student_id' => (int) $student->id,
+                'class' => ['id' => (int) $sameClass->id, 'name' => $sameClass->name, 'level' => $sameClass->level],
+                'session' => ['id' => (int) $targetSession->id, 'session_name' => $targetSession->session_name, 'academic_year' => $targetSession->academic_year, 'status' => $targetSession->status],
+            ],
+        ]);
+    }
     private function resolvePromotionDestination(int $schoolId, AcademicSession $sourceSession, SchoolClass $sourceClass): array
     {
         $targetSession = $this->resolveTargetPromotionSession($schoolId, (int) $sourceSession->id);

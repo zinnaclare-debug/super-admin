@@ -16,12 +16,19 @@ class Student extends Model
         'address',
         'photo_path',
         'status',
+        'exit_reason',
+        'reactivation_requested_at',
+        'reactivation_requested_by_user_id',
+        'reactivation_approved_at',
+        'reactivation_approved_by_user_id',
         'graduated_at',
         'graduation_session_id',
     ];
 
     protected $casts = [
         'graduated_at' => 'datetime',
+        'reactivation_requested_at' => 'datetime',
+        'reactivation_approved_at' => 'datetime',
     ];
 
     public function user()

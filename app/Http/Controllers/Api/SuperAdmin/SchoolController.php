@@ -323,6 +323,12 @@ class SchoolController extends Controller
             }
         }
 
+        if (Schema::hasTable('school_admin_login_audits') && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')) {
+            SchoolAdminLoginAudit::query()
+                ->whereIn('personal_access_token_id', $tokenIdsToDelete)
+                ->delete();
+        }
+
         DB::table('personal_access_tokens')->whereIn('id', $tokenIdsToDelete)->delete();
 
         return response()->json([

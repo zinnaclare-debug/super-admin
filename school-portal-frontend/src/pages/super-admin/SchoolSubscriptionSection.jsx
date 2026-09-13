@@ -10,6 +10,8 @@ const emptySummary = {
   current_session: null,
   current_term: null,
   student_count: 0,
+  active_student_count: 0,
+  fees_unpaid_student_count: 0,
   settings: {
     amount_per_student_per_term: 0,
     currency: "NGN",
