@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import { getStoredFeatures } from "../../utils/authStorage";
+import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profileImage";
 import "./Dashboard.css";
 
 import heroArt from "../../assets/dashboard/features.svg";
@@ -45,6 +46,7 @@ function SchoolDashboard() {
   const [paystackSubaccountCode, setPaystackSubaccountCode] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [signatureFile, setSignatureFile] = useState(null);
+  const [processingBrandingImage, setProcessingBrandingImage] = useState(false);
   const [savingBranding, setSavingBranding] = useState(false);
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
@@ -123,6 +125,32 @@ function SchoolDashboard() {
     load();
   }, []);
 
+  const pickBrandingFile = async (event, kind) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      alert("Image must be JPG, PNG, or WEBP.");
+      return;
+    }
+
+    setProcessingBrandingImage(true);
+    try {
+      const compressed = await compressBrandingImage(
+        file,
+        kind === "signature"
+          ? { maxWidth: 1200, maxHeight: 400, maxBytes: 150 * 1024 }
+          : { maxWidth: 1200, maxHeight: 1200, maxBytes: BRANDING_IMAGE_GUIDE.maxBytes }
+      );
+      if (kind === "logo") setLogoFile(compressed);
+      else setSignatureFile(compressed);
+    } catch (error) {
+      alert(error?.message || "Failed to process image.");
+    } finally {
+      setProcessingBrandingImage(false);
+    }
+  };
   const saveBranding = async () => {
     const normalizedHeadName = (headOfSchoolName || "").trim();
     const normalizedLocation = (schoolLocation || "").trim();
@@ -366,8 +394,8 @@ function SchoolDashboard() {
               <label>School Logo</label>
               <div className="sd-file-control">
                 {logoFile || stats.school_logo_url ? <img src={logoFile ? URL.createObjectURL(logoFile) : stats.school_logo_url} alt="School logo" /> : <span>No logo uploaded</span>}
-                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} hidden />
-                <button type="button" onClick={() => logoInputRef.current?.click()}>Choose Logo</button>
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => pickBrandingFile(event, "logo")} hidden />
+                <button type="button" disabled={processingBrandingImage} onClick={() => logoInputRef.current?.click()}>{processingBrandingImage ? "Processing..." : "Choose Logo"}</button>
               </div>
             </div>
 
@@ -380,8 +408,8 @@ function SchoolDashboard() {
               <label>Head Signature or Stamp</label>
               <div className="sd-file-control">
                 {signatureFile || stats.head_signature_url ? <img src={signatureFile ? URL.createObjectURL(signatureFile) : stats.head_signature_url} alt="Head signature or stamp" /> : <span>No signature or stamp uploaded</span>}
-                <input ref={signatureInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setSignatureFile(e.target.files?.[0] || null)} hidden />
-                <button type="button" onClick={() => signatureInputRef.current?.click()}>Choose Signature or Stamp</button>
+                <input ref={signatureInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => pickBrandingFile(event, "signature")} hidden />
+                <button type="button" disabled={processingBrandingImage} onClick={() => signatureInputRef.current?.click()}>{processingBrandingImage ? "Processing..." : "Choose Signature or Stamp"}</button>
               </div>
             </div>
             <div className="sd-field">
@@ -449,7 +477,7 @@ function SchoolDashboard() {
           </div>
 
           <div className="sd-actions">
-            <button onClick={saveBranding} disabled={savingBranding}>
+            <button onClick={saveBranding} disabled={savingBranding || processingBrandingImage}>
               {savingBranding ? "Saving..." : "Save Information"}
             </button>
           </div>
