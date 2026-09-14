@@ -7,6 +7,7 @@ use App\Models\Announcement;
 use App\Models\School;
 use App\Models\SchoolClass;
 use App\Support\ClassTemplateSchema;
+use App\Support\PortalNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -89,6 +90,7 @@ class AnnouncementController extends Controller
         ]);
 
         $announcement->load('author:id,name');
+        PortalNotifications::announcement($announcement);
 
         return response()->json([
             'message' => 'Announcement created.',

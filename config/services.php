@@ -61,5 +61,10 @@ return [
         'student_role' => env('HMS_STUDENT_ROLE', 'student'),
     ],
 
-];
+    'web_push' => [
+        'public_key' => env('WEB_PUSH_VAPID_PUBLIC_KEY'),
+        'private_key' => env('WEB_PUSH_VAPID_PRIVATE_KEY'),
+        'subject' => env('WEB_PUSH_VAPID_SUBJECT', 'mailto:support@lyt.com.ng'),
+    ],
 
+];

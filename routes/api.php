@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\TenantContextController;
 use App\Http\Controllers\Api\MobileSchoolController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Payments\PaystackWebhookController;
 use App\Http\Controllers\Api\PublicSchoolWebsiteController;
 use App\Http\Controllers\Api\PublicPlatformContentController;
@@ -89,6 +90,19 @@ Route::get('/public/entrance-exam/receipt', [PublicSchoolWebsiteController::clas
 Route::post('/public/verify-score', [PublicSchoolWebsiteController::class, 'verifyScore']);
 
 Route::post('/payments/paystack/webhook', [PaystackWebhookController::class, 'handle']);
+
+/*
+|--------------------------------------------------------------------------
+| SIGNED-IN NOTIFICATION ROUTES
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read', [NotificationController::class, 'markRead']);
+    Route::get('/notifications/vapid-public-key', [NotificationController::class, 'publicKey']);
+    Route::post('/notifications/subscriptions', [NotificationController::class, 'subscribe']);
+    Route::delete('/notifications/subscriptions', [NotificationController::class, 'unsubscribe']);
+});
 
 /*
 |--------------------------------------------------------------------------

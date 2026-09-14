@@ -23,6 +23,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\GradingSchema;
+use App\Support\PortalNotifications;
 use App\Support\ResultPdfTemplate;
 use App\Support\SchoolHistoryImportService;
 use App\Support\SchoolSubscriptionBilling;
@@ -198,6 +199,10 @@ class SchoolController extends Controller
 
         $school->results_published = !$school->results_published;
         $school->save();
+
+        if ($school->results_published) {
+            PortalNotifications::resultsPublished($school);
+        }
 
         return response()->json([
             'message' => 'School results publication updated',

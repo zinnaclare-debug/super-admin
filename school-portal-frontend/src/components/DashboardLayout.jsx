@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import "../pages/super-admin/SuperAdmin.css";
 import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import NotificationBell from "./NotificationBell";
 import {
   clearAuthState,
   getStoredToken,
@@ -585,6 +586,7 @@ function DashboardLayout() {
         overflowX: "hidden",
       }}
     >
+      {(user?.role === "staff" || user?.role === "student") && !isCbtExamActive ? <NotificationBell mobile={isMobile} /> : null}
       {isMobile && !isCbtExamActive ? (
         <>
           <div
