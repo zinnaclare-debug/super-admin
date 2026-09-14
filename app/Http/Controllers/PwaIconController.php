@@ -16,12 +16,12 @@ class PwaIconController extends Controller
             : public_path('lyt-logo.png');
 
         if (!is_file($source) || !function_exists('imagecreatetruecolor')) {
-            return response()->file(public_path("pwa-{$size}.png"), ['Content-Type' => 'image/png']);
+            return $this->fallbackIcon($size);
         }
 
         $image = $this->loadImage($source);
         if (!$image) {
-            return response()->file(public_path("pwa-{$size}.png"), ['Content-Type' => 'image/png']);
+            return $this->fallbackIcon($size);
         }
 
         $canvas = imagecreatetruecolor($size, $size);
@@ -44,6 +44,14 @@ class PwaIconController extends Controller
         imagedestroy($canvas);
 
         return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'no-store, max-age=0']);
+    }
+
+    private function fallbackIcon(int $size)
+    {
+        return response()->file(public_path("pwa-{$size}.png"), [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'no-store, max-age=0',
+        ]);
     }
 
     private function loadImage(string $path): mixed
