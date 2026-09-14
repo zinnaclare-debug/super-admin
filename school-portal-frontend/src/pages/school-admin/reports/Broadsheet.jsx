@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import { Capacitor } from "@capacitor/core";
+import { saveDownload } from "../../../utils/downloadFile";
 import photocopyArt from "../../../assets/broadsheet/photocopy.svg";
 import dataAtWorkArt from "../../../assets/broadsheet/data-at-work.svg";
 import spreadsheetsArt from "../../../assets/broadsheet/spreadsheets.svg";
@@ -219,11 +221,16 @@ export default function Broadsheet() {
       }
 
       const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      window.open(blobUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => {
-        window.URL.revokeObjectURL(blobUrl);
-      }, 15000);
+      if (Capacitor.isNativePlatform()) {
+        const saved = await saveDownload(pdfBlob, "broadsheet.pdf");
+        alert(saved.message);
+      } else {
+        const blobUrl = window.URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, "_blank", "noopener,noreferrer");
+        setTimeout(() => {
+          window.URL.revokeObjectURL(blobUrl);
+        }, 15000);
+      }
     } catch (e) {
       if (e?.response?.data instanceof Blob) {
         const msg = await messageFromBlobError(e.response.data, "Failed to preview broadsheet PDF.");

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Navigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import SuspendedSchoolNotice from "../../components/SuspendedSchoolNotice";
 import { createCbtSecurityFramework } from "../../utils/cbtSecurityFramework";
 import "./PublicSchoolPortal.css";
@@ -483,15 +484,8 @@ export default function PublicSchoolPortal({ page = "home", initialSiteData = nu
         params: { application_number: applicationNumber },
         responseType: "blob",
       });
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `entrance_exam_receipt_${applicationNumber}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), `entrance_exam_receipt_${applicationNumber}.pdf`);
+      if (saved.native) alert(saved.message);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to download receipt.");
     }

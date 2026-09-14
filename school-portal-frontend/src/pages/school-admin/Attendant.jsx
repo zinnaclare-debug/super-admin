@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import professorArt from "../../assets/attendant/professor.svg";
 import gradingArt from "../../assets/attendant/grading-papers.svg";
 import educatorArt from "../../assets/attendant/educator.svg";
@@ -277,15 +278,8 @@ export default function SchoolAdminAttendant() {
       const res = await api.get(`/api/school-admin/attendant/history/${term.id}/download/pdf`, {
         responseType: "blob",
       });
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers, `${term.name || "term"}_staff_attendance.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), parseFileName(res.headers, `${term.name || "term"}_staff_attendance.pdf`));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       setMessage(e?.response?.data?.message || "Failed to download attendance PDF.");
     } finally {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import { saveDownload } from "../../../utils/downloadFile";
 
 const PAGE_SIZE = 100;
 
@@ -102,15 +103,8 @@ export default function LoginDetails() {
         responseType: "blob",
       });
 
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "text/csv" }), parseFileName(res.headers));
+      if (saved.native) alert(saved.message);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to download login details.");
     } finally {
@@ -133,15 +127,8 @@ export default function LoginDetails() {
         responseType: "blob",
       });
 
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers, "user_login_details.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), parseFileName(res.headers, "user_login_details.pdf"));
+      if (saved.native) alert(saved.message);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to download login details PDF.");
     } finally {

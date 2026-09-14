@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import { saveDownload } from "../../../utils/downloadFile";
 import examPrepArt from "../../../assets/results/exam-prep.svg";
 import onlineSurveyArt from "../../../assets/results/online-survey.svg";
 import certificateArt from "../../../assets/results/certificate.svg";
@@ -278,17 +279,14 @@ export default function StudentResultsHome() {
       const pdfBlob =
         res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
 
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(
-        res.headers,
-        pdfJob.file_name || `${(selected.class_name || "class").replace(/\s+/g, "_")}_${(selected.term_name || "term").replace(/\s+/g, "_")}_result.pdf`
+      const saved = await saveDownload(
+        pdfBlob,
+        fileNameFromHeaders(
+          res.headers,
+          pdfJob.file_name || `${(selected.class_name || "class").replace(/\s+/g, "_")}_${(selected.term_name || "term").replace(/\s+/g, "_")}_result.pdf`
+        )
       );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      if (saved.native) alert(saved.message);
     } catch (e) {
       if (e?.response?.data instanceof Blob) {
         const message = await messageFromBlobError(e.response.data, "Failed to download result PDF");

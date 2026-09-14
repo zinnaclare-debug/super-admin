@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 
 const emptySummary = {
   status: "free",
@@ -148,15 +149,8 @@ export default function SchoolSubscriptionStatus() {
       const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
       const filename = filenameMatch?.[1] || `school_subscription_invoice_${cycle}.pdf`;
 
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(new Blob([res.data], { type: "application/pdf" }), filename);
+      if (saved.native) alert(saved.message);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to download subscription invoice.");
     } finally {

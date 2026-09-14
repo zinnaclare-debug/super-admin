@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import newsfeedArt from "../../assets/teaching/newsfeed.svg";
 import mobileArt from "../../assets/teaching/mobile-devices.svg";
 import readingArt from "../../assets/teaching/reading-book.svg";
@@ -141,14 +142,8 @@ export default function SchoolAdminTeaching() {
       const res = await api.get(`/api/school-admin/teaching/materials/${item.id}/download`, {
         responseType: "blob",
       });
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, item.original_name);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+            const saved = await saveDownload(new Blob([res.data]), fileNameFromHeaders(res.headers, item.original_name));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Download failed. File may still be processing.");
     } finally {

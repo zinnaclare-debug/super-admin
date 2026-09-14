@@ -10,16 +10,33 @@ const blobToBase64 = (blob) => new Promise((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
+async function ensureDocumentsPermission() {
+  const current = await Filesystem.checkPermissions();
+  if (current.publicStorage === "granted") return;
+
+  const requested = await Filesystem.requestPermissions();
+  if (requested.publicStorage !== "granted") {
+    throw new Error("Storage permission is required to save this file.");
+  }
+}
+
 export async function saveDownload(blob, filename = "document.pdf") {
   const fileName = safeName(filename);
+
   if (Capacitor.isNativePlatform()) {
-    await Filesystem.writeFile({
+    await ensureDocumentsPermission();
+    const result = await Filesystem.writeFile({
       path: `School Portal/${fileName}`,
       data: await blobToBase64(blob),
       directory: Directory.Documents,
       recursive: true,
     });
-    return { native: true, message: `Saved to Documents/School Portal/${fileName}` };
+
+    return {
+      native: true,
+      uri: result.uri,
+      message: `Saved ${fileName} to Documents/School Portal.`,
+    };
   }
 
   const url = window.URL.createObjectURL(blob);
@@ -30,5 +47,6 @@ export async function saveDownload(blob, filename = "document.pdf") {
   link.click();
   link.remove();
   window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+
   return { native: false, message: "Download started." };
 }

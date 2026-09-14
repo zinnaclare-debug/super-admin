@@ -82,9 +82,7 @@ export function useGeneratedDocumentJob() {
 
       const pdfBlob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
       const saved = await saveDownload(pdfBlob, fileNameFromHeaders(res.headers, job.file_name || fallbackName));
-      if (saved.native) {
-        window.alert(saved.message);
-      }
+      if (saved.native) window.alert(saved.message);
     } finally {
       setDownloading(false);
     }

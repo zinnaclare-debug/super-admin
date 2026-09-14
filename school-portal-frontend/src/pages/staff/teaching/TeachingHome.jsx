@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import { saveDownload } from "../../../utils/downloadFile";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import newsfeedArt from "../../../assets/teaching/newsfeed.svg";
 import mobileArt from "../../../assets/teaching/mobile-devices.svg";
@@ -126,14 +127,8 @@ export default function StaffTeachingHome() {
     setAiActionKey(key);
     try {
       const res = await api.get("/api/staff/teaching/ai-planner/" + aiJob.id + "/" + documentType + "/download", { responseType: "blob" });
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      const link = window.document.createElement("a");
-      link.href = blobUrl;
-      link.download = `${label.replace(/\s+/g, "_").toLowerCase()}.pdf`;
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+            const saved = await saveDownload(new Blob([res.data], { type: "application/pdf" }), `${label.replace(/\s+/g, "_").toLowerCase()}.pdf`);
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Download failed.");
     } finally {
@@ -219,14 +214,8 @@ export default function StaffTeachingHome() {
       const res = await api.get(`/api/staff/teaching/materials/${item.id}/download`, {
         responseType: "blob",
       });
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
-      const link = window.document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, item.original_name);
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+            const saved = await saveDownload(new Blob([res.data]), fileNameFromHeaders(res.headers, item.original_name));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Download failed. File may still be processing.");
     } finally {

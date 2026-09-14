@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
+import { saveDownload } from "../../../utils/downloadFile";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
 import workingTogetherArt from "../../../assets/class-activities/working-together.svg";
 import gradingPapersArt from "../../../assets/class-activities/grading-papers.svg";
@@ -136,14 +137,8 @@ export default function ClassActivitiesHome() {
       const res = await api.get(`/api/staff/class-activities/${a.id}/download`, {
         responseType: "blob",
       });
-      const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileNameFromHeaders(res.headers, a.original_name || a.title || "activity");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+            const saved = await saveDownload(new Blob([res.data]), fileNameFromHeaders(res.headers, a.original_name || a.title || "activity"));
+      if (saved.native) alert(saved.message);
     } catch {
       if (a.file_url) {
         window.open(a.file_url, "_blank", "noopener,noreferrer");

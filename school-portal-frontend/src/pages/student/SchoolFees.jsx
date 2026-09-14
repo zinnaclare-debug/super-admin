@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import payCardArt from "../../assets/payments/pay-with-credit-card.svg";
 import creditCardArt from "../../assets/payments/credit-card-payments.svg";
 import onlinePayArt from "../../assets/payments/online-payments.svg";
@@ -163,15 +164,8 @@ export default function StudentSchoolFees() {
       const res = await api.get(`/api/student/school-fees/payments/${paymentId}/receipt`, {
         responseType: "blob",
       });
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers, `fee_receipt_${reference || paymentId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), parseFileName(res.headers, `fee_receipt_${reference || paymentId}.pdf`));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to download receipt.");
     }
@@ -187,15 +181,8 @@ export default function StudentSchoolFees() {
       const res = await api.get(fee?.invoice_download_url || "/api/student/school-fees/invoice", {
         responseType: "blob",
       });
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFileName(res.headers, "school_fee_invoice.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), parseFileName(res.headers, "school_fee_invoice.pdf"));
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to download invoice.");
     } finally {

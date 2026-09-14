@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import profileArt from "../../assets/profile/profile-card.svg";
 import proudArt from "../../assets/profile/proud-self.svg";
 import "../shared/ProfileShowcase.css";
@@ -80,15 +81,8 @@ export default function StaffProfile() {
     setDownloadingIdCard(true);
     try {
       const res = await api.get("/api/staff/id-card", { responseType: "blob" });
-      const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `staff_id_card_${me?.username || me?.user?.username || "profile"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const saved = await saveDownload(res.data instanceof Blob ? res.data : new Blob([res.data], { type: "application/pdf" }), `staff_id_card_${me?.username || me?.user?.username || "profile"}.pdf`);
+      if (saved.native) alert(saved.message);
     } catch (e) {
       alert(e?.response?.data?.message || "Failed to download ID card.");
     } finally {
