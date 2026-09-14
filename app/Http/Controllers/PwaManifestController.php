@@ -15,6 +15,17 @@ class PwaManifestController extends Controller
         $websiteContent = is_array($school?->website_content) ? $school->website_content : [];
         $themeColor = (string) ($websiteContent['primary_color'] ?? '#082f49');
         $iconVersion = $this->iconVersion($school);
+        $logoPath = trim((string) ($school?->logo_path ?? ''));
+
+        $icons = $logoPath !== '' ? [[
+            'src' => '/storage/' . ltrim($logoPath, '/') . '?v=' . $iconVersion,
+            'sizes' => 'any',
+            'type' => $this->iconMimeType($logoPath),
+            'purpose' => 'any maskable',
+        ]] : [
+            ['src' => '/pwa-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ['src' => '/pwa-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+        ];
 
         return response()->json([
             'name' => $name,
@@ -24,10 +35,7 @@ class PwaManifestController extends Controller
             'display' => 'standalone',
             'background_color' => '#ffffff',
             'theme_color' => $themeColor,
-            'icons' => [
-                ['src' => '/tenant-pwa-icon/192.png?v=' . $iconVersion, 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
-                ['src' => '/tenant-pwa-icon/512.png?v=' . $iconVersion, 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
-            ],
+            'icons' => $icons,
         ], 200, [
             'Content-Type' => 'application/manifest+json',
             'Cache-Control' => 'no-store, max-age=0',
@@ -42,6 +50,15 @@ class PwaManifestController extends Controller
 
         $path = storage_path('app/public/' . ltrim($school->logo_path, '/'));
         return is_file($path) ? (int) filemtime($path) : ($school->updated_at?->getTimestamp() ?? 1);
+    }
+
+    private function iconMimeType(string $path): string
+    {
+        return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            default => 'image/png',
+        };
     }
 
     public static function resolveTenantSchool(Request $request): ?School
