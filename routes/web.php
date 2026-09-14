@@ -3,8 +3,10 @@
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PwaManifestController;
+use App\Http\Controllers\PwaIconController;
 
 Route::get('/tenant-manifest.webmanifest', [PwaManifestController::class, 'show']);
+Route::get('/tenant-pwa-icon/{size}.png', [PwaIconController::class, 'show'])->whereNumber('size');
 
 // Fallback file-serving route for public storage assets.
 // This ensures /storage/... works even when app routing would otherwise catch it.

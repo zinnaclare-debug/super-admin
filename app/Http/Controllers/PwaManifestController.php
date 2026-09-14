@@ -9,11 +9,9 @@ class PwaManifestController extends Controller
 {
     public function show(Request $request)
     {
-        $school = $this->resolveTenantSchool($request);
+        $school = self::resolveTenantSchool($request);
         $schoolName = trim((string) ($school?->name ?? ''));
         $name = $schoolName !== '' ? $schoolName : 'LYT School Portal';
-        $logoPath = trim((string) ($school?->logo_path ?? ''));
-        $iconUrl = $logoPath !== '' ? '/storage/' . ltrim($logoPath, '/') : '/lyt-logo.png';
         $websiteContent = is_array($school?->website_content) ? $school->website_content : [];
         $themeColor = (string) ($websiteContent['primary_color'] ?? '#082f49');
 
@@ -26,7 +24,8 @@ class PwaManifestController extends Controller
             'background_color' => '#ffffff',
             'theme_color' => $themeColor,
             'icons' => [
-                ['src' => $iconUrl, 'type' => $this->iconMimeType($logoPath)],
+                ['src' => '/tenant-pwa-icon/192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+                ['src' => '/tenant-pwa-icon/512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
             ],
         ], 200, [
             'Content-Type' => 'application/manifest+json',
@@ -34,7 +33,7 @@ class PwaManifestController extends Controller
         ]);
     }
 
-    private function resolveTenantSchool(Request $request): ?School
+    public static function resolveTenantSchool(Request $request): ?School
     {
         $host = strtolower(rtrim(trim($request->getHost()), '.'));
         if (str_contains($host, ':')) {
@@ -64,15 +63,5 @@ class PwaManifestController extends Controller
             ->where('subdomain', $subdomain)
             ->where('status', 'active')
             ->first();
-    }
-
-    private function iconMimeType(string $path): string
-    {
-        return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-            'jpg', 'jpeg' => 'image/jpeg',
-            'webp' => 'image/webp',
-            'svg' => 'image/svg+xml',
-            default => 'image/png',
-        };
     }
 }
