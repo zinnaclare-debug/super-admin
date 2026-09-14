@@ -8,7 +8,7 @@ function setIcon(rel, href) {
     link.rel = rel;
     document.head.appendChild(link);
   }
-  link.type = "image/png";
+  link.removeAttribute("type");
   link.href = href;
 }
 
@@ -23,7 +23,9 @@ export default function TenantDocumentBranding() {
         if (!school?.name) return;
 
         document.title = school.name;
-        const icon = `/tenant-pwa-icon/192.png?v=${Date.now()}`;
+        const source = school.logo_url || "/tenant-pwa-icon/192.png";
+        const separator = source.includes("?") ? "&" : "?";
+        const icon = `${source}${separator}favicon=${Date.now()}`;
         setIcon("icon", icon);
         setIcon("apple-touch-icon", icon);
       })
