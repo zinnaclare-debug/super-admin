@@ -15,7 +15,7 @@ class GenerateWebPushVapidKeys extends Command
         $keys = VAPID::createVapidKeys();
         $this->line('WEB_PUSH_VAPID_PUBLIC_KEY=' . $keys['publicKey']);
         $this->line('WEB_PUSH_VAPID_PRIVATE_KEY=' . $keys['privateKey']);
-        $this->line('WEB_PUSH_VAPID_SUBJECT=mailto:your-support-email@example.com');
+        $this->line('WEB_PUSH_VAPID_SUBJECT=mailto:support@lyt.com.ng');
         return self::SUCCESS;
     }
 }
