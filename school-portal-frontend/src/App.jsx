@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { getStoredToken, getStoredUser } from "./utils/authStorage";
 import { isMobileBuild } from "./services/api";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
+import TenantDocumentBranding from "./components/TenantDocumentBranding";
 
 // Public
 import Login from "./pages/Login";
@@ -139,6 +140,7 @@ function MobileStartRoute() {
 function App() {
   return (
     <>
+      <TenantDocumentBranding />
       <PwaInstallPrompt />
       <Routes>
       {/* PUBLIC */}
