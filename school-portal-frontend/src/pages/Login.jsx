@@ -47,7 +47,10 @@ function Login() {
     return "";
   }, [tenantSchool]);
 
-  const cardLogoUrl = tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo;
+  const isSchoolCodeScreen = isMobileApp && !mobileSchool;
+  const cardLogoUrl = isSchoolCodeScreen
+    ? schoolCodeBridgeArt
+    : (tenantLogoUrl && !logoLoadError ? tenantLogoUrl : brandLogo);
   const tenantAddress = (tenantSchool?.school_location || tenantSchool?.location || "").trim();
   const tenantContactEmail = (tenantSchool?.contact_email || "").trim();
   const tenantContactPhone = (tenantSchool?.contact_phone || "").trim();
@@ -246,7 +249,7 @@ const loginThemeStyle = useMemo(
           </p>
 
           <div className="hero-visual">
-            <img className="hero-visual-main" src={isMobileApp && !mobileSchool ? schoolCodeBridgeArt : heroArt} alt={isMobileApp && !mobileSchool ? "School Portal bridge logo" : "School management illustration"} />
+            <img className="hero-visual-main" src={heroArt} alt="School management illustration" />
             <img className="hero-visual-accent" src={graduationArt} alt="Graduation illustration" />
             <svg
               className="hero-orbit"
@@ -275,7 +278,7 @@ const loginThemeStyle = useMemo(
             <div className="login-mark">
               <img
                 src={cardLogoUrl}
-                alt={`${tenantSchool?.name || "Lytebridge"} logo`}
+                alt={isSchoolCodeScreen ? "School Portal bridge logo" : `${tenantSchool?.name || "Lytebridge"} logo`}
                 onError={() => {
                   if (tenantLogoUrl) setLogoLoadError(true);
                 }}

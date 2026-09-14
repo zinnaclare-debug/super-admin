@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PwaManifestController;
+
+Route::get('/tenant-manifest.webmanifest', [PwaManifestController::class, 'show']);
 
 // Fallback file-serving route for public storage assets.
 // This ensures /storage/... works even when app routing would otherwise catch it.

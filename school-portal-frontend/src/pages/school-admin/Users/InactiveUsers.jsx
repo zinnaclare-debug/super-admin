@@ -174,7 +174,7 @@ export default function InactiveUsers() {
 
   const requestBulkReactivation = async () => {
     if (role !== "student" || selectedIds.size === 0) return;
-    if (!window.confirm(`Send ${selectedIds.size} selected student(s) to Super Admin for reactivation approval? Only Left School students will be requested.`)) return;
+    if (!window.confirm(`Send ${selectedIds.size} selected student(s) for reactivation approval? Only Left School students will be requested.`)) return;
     try {
       const res = await api.post("/api/school-admin/users/students/access", {
         ids: Array.from(selectedIds),

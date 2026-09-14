@@ -767,7 +767,7 @@ class UserManagementController extends Controller
             }
             if (($student?->exit_reason ?? null) === 'left_school') {
                 return response()->json([
-                    'message' => 'A Left School student needs Super Admin approval before access can be enabled.',
+                    'message' => 'A Left School student needs approval before access can be enabled.',
                 ], 422);
             }
         }
@@ -853,7 +853,7 @@ class UserManagementController extends Controller
         $message = match ($action) {
             'disable' => 'Selected students were disabled.',
             'enable' => 'Eligible fees-unpaid students were enabled.',
-            default => 'Reactivation request sent to Super Admin for approval.',
+            default => 'Reactivation request sent for approval.',
         };
         return response()->json(['message' => $message, 'data' => ['updated' => $updated]]);
     }
