@@ -447,13 +447,6 @@ class ReportsController extends Controller
             return response()->json(['message' => 'Provide student email or name'], 422);
         }
 
-        if ($this->currentTermResultIsLocked(
-            $request,
-            (int) $payload['academic_session_id'],
-            (int) $payload['term_id']
-        )) {
-            return response()->json(['message' => $this->currentTermResultLockedMessage()], 403);
-        }
 
         $resultType = strtolower(trim((string) ($payload['result_type'] ?? 'term'))) === 'cumulative'
             ? 'cumulative'
@@ -2264,35 +2257,7 @@ class ReportsController extends Controller
         }
     }
 
-    private function currentTermResultIsLocked(Request $request, int $sessionId, int $termId): bool
-    {
-        $school = $request->user()?->school;
-        if (!$school || (bool) $school->results_published) {
-            return false;
-        }
 
-        $term = Term::query()
-            ->where('school_id', (int) $request->user()->school_id)
-            ->where('academic_session_id', $sessionId)
-            ->where('id', $termId)
-            ->first(['id', 'is_current']);
-
-        if (!$term || !(bool) ($term->is_current ?? false)) {
-            return false;
-        }
-
-        $sessionStatus = AcademicSession::query()
-            ->where('school_id', (int) $request->user()->school_id)
-            ->where('id', $sessionId)
-            ->value('status');
-
-        return (string) $sessionStatus === 'current';
-    }
-
-    private function currentTermResultLockedMessage(): string
-    {
-        return 'Current term result has not been published yet. Please check back later.';
-    }
 }
 
 

@@ -173,6 +173,7 @@ Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/generated-documents/{generatedDocument}/file', [SchoolAdminGeneratedDocumentController::class, 'download']);
     Route::post('/school-admin/logo', [SchoolAdminDashboardController::class, 'uploadLogo']);
     Route::post('/school-admin/branding', [SchoolAdminDashboardController::class, 'upsertBranding']);
+    Route::put('/school-admin/results-publication', [SchoolAdminDashboardController::class, 'updateResultsPublication']);
     Route::get('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'examRecord']);
     Route::put('/school-admin/exam-record', [SchoolAdminDashboardController::class, 'upsertExamRecord']);
     Route::get('/school-admin/department-templates', [SchoolAdminDashboardController::class, 'departmentTemplates']);

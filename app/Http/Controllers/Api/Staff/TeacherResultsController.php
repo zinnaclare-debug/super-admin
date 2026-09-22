@@ -222,7 +222,7 @@ class TeacherResultsController extends Controller
         'term_name' => (string) ($subjectSummary->term_name ?? ''),
         'assessment_schema' => $assessmentSchema,
         'grading_schema' => GradingSchema::normalize($school?->grading_schema),
-        'results_published' => (bool) ($school?->results_published),
+        'results_published' => $school?->resultsArePublished() ?? false,
         'departments' => $rows
           ->map(fn ($row) => [
             'id' => (int) ($row['department_id'] ?? 0),
@@ -261,7 +261,7 @@ class TeacherResultsController extends Controller
       : null;
     abort_unless($currentTerm && (int)$termSubject->term_id === (int)$currentTerm->id, 403);
 
-    if ($school?->results_published) {
+    if ($school?->resultsArePublished()) {
       return response()->json([
         'message' => 'Results have been published. Staff can edit again after results are unpublished.',
       ], 423);

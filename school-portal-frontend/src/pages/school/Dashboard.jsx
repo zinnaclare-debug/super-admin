@@ -25,6 +25,9 @@ function SchoolDashboard() {
     contact_phone: "",
     show_result_position: true,
     paystack_subaccount_code: "",
+    results_published: false,
+    school_results_published: false,
+    results_effectively_published: false,
     school_logo_url: "",
     head_of_school_name: "",
     head_signature_url: "",
@@ -48,6 +51,10 @@ function SchoolDashboard() {
   const [signatureFile, setSignatureFile] = useState(null);
   const [processingBrandingImage, setProcessingBrandingImage] = useState(false);
   const [savingBranding, setSavingBranding] = useState(false);
+  const [resultPublication, setResultPublication] = useState("unpublish");
+  const [savingResultPublication, setSavingResultPublication] = useState(false);
+  const [showResultPublicationConfirmation, setShowResultPublicationConfirmation] = useState(false);
+  const [resultPublicationCode, setResultPublicationCode] = useState("");
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
   const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
@@ -68,6 +75,9 @@ function SchoolDashboard() {
           school_motto: res.data?.school_motto ?? "",
           show_result_position: Boolean(res.data?.show_result_position ?? true),
           paystack_subaccount_code: res.data?.paystack_subaccount_code ?? "",
+          results_published: Boolean(res.data?.results_published),
+          school_results_published: Boolean(res.data?.school_results_published),
+          results_effectively_published: Boolean(res.data?.results_effectively_published),
           school_logo_url: res.data?.school_logo_url ?? "",
           head_of_school_name: res.data?.head_of_school_name ?? "",
           head_signature_url: res.data?.head_signature_url ?? "",
@@ -88,6 +98,7 @@ function SchoolDashboard() {
         setSchoolMotto(res.data?.school_motto ?? "");
         setShowResultPosition(Boolean(res.data?.show_result_position ?? true));
         setPaystackSubaccountCode(res.data?.paystack_subaccount_code ?? "");
+        setResultPublication(res.data?.school_results_published ? "publish" : "unpublish");
 
         setEnabledFeatures(Array.isArray(featuresRes?.data?.data) ? featuresRes.data.data : []);
       } catch {
@@ -99,9 +110,12 @@ function SchoolDashboard() {
           school_motto: "",
           show_result_position: true,
           paystack_subaccount_code: "",
-    school_logo_url: "",
-    head_of_school_name: "",
-    head_signature_url: "",
+          results_published: false,
+          school_results_published: false,
+          results_effectively_published: false,
+          school_logo_url: "",
+          head_of_school_name: "",
+          head_signature_url: "",
           students: 0,
           male_students: 0,
           female_students: 0,
@@ -116,6 +130,7 @@ function SchoolDashboard() {
         setSchoolMotto("");
         setShowResultPosition(true);
         setPaystackSubaccountCode("");
+        setResultPublication("unpublish");
         setEnabledFeatures([]);
       } finally {
         setLoading(false);
@@ -261,6 +276,53 @@ function SchoolDashboard() {
     }
   };
 
+  const cancelResultPublication = () => {
+    setResultPublication(stats.school_results_published ? "publish" : "unpublish");
+    setResultPublicationCode("");
+    setShowResultPublicationConfirmation(false);
+  };
+
+  const requestResultPublicationSave = () => {
+    const nextPublished = resultPublication === "publish";
+    if (nextPublished === Boolean(stats.school_results_published)) {
+      return alert("No result publication changes to save.");
+    }
+
+    setResultPublicationCode("");
+    setShowResultPublicationConfirmation(true);
+  };
+
+  const saveResultPublication = async () => {
+    if (!/^2026$/.test(resultPublicationCode)) {
+      return alert("Enter the publication confirmation code.");
+    }
+
+    setSavingResultPublication(true);
+    try {
+      const res = await api.put("/api/school-admin/results-publication", {
+        published: resultPublication === "publish",
+        confirmation_code: resultPublicationCode,
+      });
+      const data = res.data?.data || {};
+      setStats((prev) => ({
+        ...prev,
+        results_published: Boolean(data.results_published),
+        school_results_published: Boolean(data.school_results_published),
+        results_effectively_published: Boolean(data.results_effectively_published),
+      }));
+      setResultPublication(data.school_results_published ? "publish" : "unpublish");
+      setResultPublicationCode("");
+      setShowResultPublicationConfirmation(false);
+      alert(res.data?.message || "Result publication updated.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to update result publication.");
+    } finally {
+      setSavingResultPublication(false);
+    }
+  };
   const featureCards = [
     {
       key: "cbt",
@@ -487,6 +549,73 @@ function SchoolDashboard() {
           <img src={brandingArt} alt="School information artwork" />
         </div>
       </section>
+
+      <section className="sd-card sd-result-publication">
+        <div className="sd-section-head">
+          <h2>RESULT</h2>
+          <p>Choose when the current term result should be available to students.</p>
+        </div>
+
+        <div className="sd-result-publication__controls">
+          <label className="sd-field" htmlFor="result-publication">
+            <span>RESULT</span>
+            <select
+              id="result-publication"
+              value={resultPublication}
+              onChange={(event) => setResultPublication(event.target.value)}
+              disabled={savingResultPublication}
+            >
+              <option value="publish">PUBLISH</option>
+              <option value="unpublish">UNPUBLISH</option>
+            </select>
+          </label>
+          <p className={`sd-result-publication__status${stats.results_effectively_published ? " sd-result-publication__status--open" : ""}`}>
+            {stats.results_effectively_published ? "Results are available to students." : "Results are not available to students."}
+          </p>
+        </div>
+
+        <div className="sd-actions">
+          <button type="button" onClick={requestResultPublicationSave} disabled={savingResultPublication}>
+            {savingResultPublication ? "Saving..." : "Save"}
+          </button>
+          <button type="button" className="sd-actions__alt" onClick={cancelResultPublication} disabled={savingResultPublication}>
+            Cancel
+          </button>
+        </div>
+      </section>
+
+      {showResultPublicationConfirmation ? (
+        <div className="sd-modal-backdrop" role="presentation">
+          <div className="sd-modal-card" role="dialog" aria-modal="true" aria-labelledby="result-publication-title">
+            <div className="sd-modal-head">
+              <h3 id="result-publication-title">Confirm Result Publication</h3>
+              <button type="button" className="sd-modal-close" onClick={cancelResultPublication} disabled={savingResultPublication}>Close</button>
+            </div>
+            <p className="sd-modal-help">
+              Enter the school administration confirmation code to {resultPublication === "publish" ? "publish" : "unpublish"} the current term result.
+            </p>
+            <label className="sd-field">
+              <span>Confirmation Code</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={4}
+                value={resultPublicationCode}
+                onChange={(event) => setResultPublicationCode(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Enter code"
+                disabled={savingResultPublication}
+              />
+            </label>
+            <div className="sd-actions">
+              <button type="button" onClick={saveResultPublication} disabled={savingResultPublication}>
+                {savingResultPublication ? "Saving..." : "Confirm Save"}
+              </button>
+              <button type="button" className="sd-actions__alt" onClick={cancelResultPublication} disabled={savingResultPublication}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -13,6 +13,7 @@ use App\Support\AssessmentSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\SchoolPublicWebsiteData;
+use App\Support\PortalNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -91,6 +92,8 @@ class DashboardController extends Controller
             'department_templates' => $this->resolveDepartmentTemplates($school),
             'class_templates' => ClassTemplateSchema::normalize($school?->class_templates),
             'results_published' => (bool) ($school?->results_published),
+            'school_results_published' => (bool) ($school?->school_results_published),
+            'results_effectively_published' => $school?->resultsArePublished() ?? false,
             'students' => $students,
             'male_students' => $maleStudents,
             'female_students' => $femaleStudents,
@@ -101,6 +104,44 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function updateResultsPublication(Request $request)
+    {
+        $school = School::query()->find((int) $request->user()->school_id);
+        if (! $school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $payload = $request->validate([
+            'published' => ['required', 'boolean'],
+            'confirmation_code' => ['required', 'digits:4'],
+        ]);
+
+        if (! hash_equals('2026', (string) $payload['confirmation_code'])) {
+            return response()->json([
+                'message' => 'Invalid publication confirmation code.',
+                'errors' => ['confirmation_code' => ['Invalid publication confirmation code.']],
+            ], 422);
+        }
+
+        $wasEffectivelyPublished = $school->resultsArePublished();
+        $school->school_results_published = (bool) $payload['published'];
+        $school->save();
+
+        if (! $wasEffectivelyPublished && $school->resultsArePublished()) {
+            PortalNotifications::resultsPublished($school);
+        }
+
+        return response()->json([
+            'message' => $school->school_results_published
+                ? 'Result publishing is enabled for your school.'
+                : 'Result publishing is disabled for your school.',
+            'data' => [
+                'results_published' => (bool) $school->results_published,
+                'school_results_published' => (bool) $school->school_results_published,
+                'results_effectively_published' => $school->resultsArePublished(),
+            ],
+        ]);
+    }
     public function uploadLogo(Request $request)
     {
         $schoolId = $request->user()->school_id;

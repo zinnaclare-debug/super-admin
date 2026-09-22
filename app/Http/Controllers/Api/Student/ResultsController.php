@@ -149,7 +149,7 @@ class ResultsController extends Controller
             return true;
         }
 
-        return (bool) ($school?->results_published);
+        return $school?->resultsArePublished() ?? false;
     }
 
     private function resultLockedMessage(AcademicSession $session, Term $term): string
@@ -712,10 +712,6 @@ class ResultsController extends Controller
         if (!$term) {
             return response()->json(['message' => 'Term not found for selected session'], 404);
         }
-        $school = $actor->school ?: $actor->school()->first();
-        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
-            return response()->json(['message' => $this->resultLockedMessage($session, $term)], 403);
-        }
 
         try {
             $this->assertCumulativeTerm($resultType, $term);
@@ -798,9 +794,6 @@ class ResultsController extends Controller
         if (!$term) {
             throw new \RuntimeException('Term not found for selected session.');
         }
-        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
-            throw new \RuntimeException($this->resultLockedMessage($session, $term));
-        }
 
         $resultType = $this->normalizeResultType($resultType);
         $this->assertCumulativeTerm($resultType, $term);
@@ -875,10 +868,6 @@ class ResultsController extends Controller
             ->first();
         if (!$term) {
             return response()->json(['message' => 'Term not found for selected session'], 404);
-        }
-        $school = $actor->school ?: $actor->school()->first();
-        if (!$this->resultPeriodIsOpen($school, $session, $term)) {
-            return response()->json(['message' => $this->resultLockedMessage($session, $term)], 403);
         }
 
         try {

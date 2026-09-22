@@ -32,10 +32,12 @@ class School extends Model
         'school_admin_login_limit',
         'paystack_subaccount_code',
         'results_published',
+        'school_results_published',
     ];
 
     protected $casts = [
         'results_published' => 'boolean',
+        'school_results_published' => 'boolean',
         'school_admin_login_limit' => 'integer',
         'assessment_schema' => 'array',
         'grading_schema' => 'array',
@@ -45,6 +47,11 @@ class School extends Model
         'website_content' => 'array',
         'entrance_exam_config' => 'array',
     ];
+
+    public function resultsArePublished(): bool
+    {
+        return (bool) $this->results_published && (bool) $this->school_results_published;
+    }
 
     public function features(): HasMany
     {

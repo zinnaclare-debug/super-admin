@@ -200,13 +200,15 @@ class SchoolController extends Controller
         $school->results_published = !$school->results_published;
         $school->save();
 
-        if ($school->results_published) {
+        if ($school->resultsArePublished()) {
             PortalNotifications::resultsPublished($school);
         }
 
         return response()->json([
             'message' => 'School results publication updated',
             'results_published' => (bool) $school->results_published,
+            'school_results_published' => (bool) $school->school_results_published,
+            'results_effectively_published' => $school->resultsArePublished(),
         ]);
     }
 
@@ -987,7 +989,7 @@ class SchoolController extends Controller
                     }
                 }
 
-                $school->results_published = false;
+                $school->school_results_published = false;
             } else {
                 Term::query()
                     ->where('school_id', $school->id)
@@ -1004,6 +1006,8 @@ class SchoolController extends Controller
             return response()->json([
                 'data' => $session,
                 'results_published' => (bool) $school->results_published,
+                'school_results_published' => (bool) $school->school_results_published,
+                'results_effectively_published' => $school->resultsArePublished(),
             ]);
         });
     }

@@ -427,7 +427,9 @@ class AcademicStructureController extends Controller
             return response()->json([
                 'message' => 'Current term updated successfully. Results were unpublished for the new cycle.',
                 'data' => $term->fresh(),
-                'results_published' => false,
+                'results_published' => (bool) $school?->results_published,
+                'school_results_published' => false,
+                'results_effectively_published' => false,
             ]);
         });
     }
@@ -450,8 +452,8 @@ class AcademicStructureController extends Controller
 
     private function resetLifecycleState(School $school): void
     {
-        if ($school->results_published) {
-            $school->results_published = false;
+        if ($school->school_results_published) {
+            $school->school_results_published = false;
             $school->save();
         }
 
