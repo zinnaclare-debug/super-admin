@@ -14,6 +14,7 @@ use App\Models\TermSubject;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
+use App\Support\SchoolSubscriptionBilling;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -138,9 +139,79 @@ class AcademicSessionController extends Controller
 
     public function setStatus(Request $request, AcademicSession $session)
     {
-        return response()->json([
-            'message' => 'Only platform administrators can change academic session status.',
-        ], 403);
+        $schoolId = (int) $request->user()->school_id;
+        abort_unless((int) $session->school_id === $schoolId, 403);
+
+        $payload = $request->validate([
+            'status' => ['required', 'in:current,completed'],
+            'current_selection_code' => ['nullable', 'digits:4'],
+        ]);
+
+        if ($payload['status'] === 'current' && ! hash_equals('4722', (string) ($payload['current_selection_code'] ?? ''))) {
+            return response()->json([
+                'message' => 'Invalid current selection confirmation code.',
+                'errors' => [
+                    'current_selection_code' => ['Invalid current selection confirmation code.'],
+                ],
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($schoolId, $session, $payload) {
+            $school = School::query()->findOrFail($schoolId);
+
+            if ($payload['status'] === 'current') {
+                AcademicSession::query()
+                    ->where('school_id', $schoolId)
+                    ->where('status', 'current')
+                    ->where('id', '!=', $session->id)
+                    ->update(['status' => 'completed']);
+
+                $hasCurrentTerm = Term::query()
+                    ->where('school_id', $schoolId)
+                    ->where('academic_session_id', $session->id)
+                    ->where('is_current', true)
+                    ->exists();
+
+                if (! $hasCurrentTerm) {
+                    Term::query()
+                        ->where('school_id', $schoolId)
+                        ->where('academic_session_id', $session->id)
+                        ->update(['is_current' => false]);
+
+                    $firstTerm = Term::query()
+                        ->where('school_id', $schoolId)
+                        ->where('academic_session_id', $session->id)
+                        ->orderBy('id')
+                        ->first();
+
+                    if ($firstTerm) {
+                        $firstTerm->update(['is_current' => true]);
+                    }
+                }
+
+                $school->school_results_published = false;
+                $school->save();
+
+                $settings = SchoolSubscriptionBilling::getSettings($school);
+                SchoolSubscriptionBilling::clearPendingOverride($settings);
+            } else {
+                Term::query()
+                    ->where('school_id', $schoolId)
+                    ->where('academic_session_id', $session->id)
+                    ->update(['is_current' => false]);
+            }
+
+            $session->update(['status' => $payload['status']]);
+
+            return response()->json([
+                'message' => 'Academic session status updated successfully.',
+                'data' => $session->fresh(),
+                'sessions' => AcademicSession::query()->where('school_id', $schoolId)->orderByDesc('created_at')->get(),
+                'results_published' => (bool) $school->results_published,
+                'school_results_published' => (bool) $school->school_results_published,
+                'results_effectively_published' => $school->resultsArePublished(),
+            ]);
+        });
     }
 
     public function details(Request $request, AcademicSession $session)

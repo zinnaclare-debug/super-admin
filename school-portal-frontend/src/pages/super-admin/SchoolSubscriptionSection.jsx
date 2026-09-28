@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
+import { saveDownload } from "../../utils/downloadFile";
 import { requestSuperAdminDeleteCode } from "./requestSuperAdminDeleteCode";
 
 const emptySummary = {
@@ -65,6 +66,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actingInvoiceId, setActingInvoiceId] = useState(null);
+  const [invoiceCycle, setInvoiceCycle] = useState("");
   const [summary, setSummary] = useState(emptySummary);
   const [form, setForm] = useState(buildForm(emptySummary));
 
@@ -170,6 +172,23 @@ export default function SchoolSubscriptionSection({ schoolId }) {
     }
   };
 
+  const downloadInvoice = async (cycle) => {
+    setInvoiceCycle(cycle);
+    try {
+      const res = await api.get(`/api/super-admin/schools/${schoolId}/information/billing/invoice`, {
+        params: { billing_cycle: cycle },
+        responseType: "blob",
+      });
+      const disposition = String(res.headers?.["content-disposition"] || "");
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] || `school_subscription_invoice_${cycle}.pdf`;
+      await saveDownload(new Blob([res.data], { type: "application/pdf" }), filename);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download subscription invoice.");
+    } finally {
+      setInvoiceCycle("");
+    }
+  };
   return (
     <section className="sai-card sai-subscription-card">
       <div className="sai-subscription-head">
@@ -198,6 +217,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             <div className="sai-subscription-tile">
               <span>Billable Students</span>
               <strong>{Number(summary.student_count || 0).toLocaleString()}</strong>
+              <small>{Number(summary.active_student_count || 0).toLocaleString()} active + {Number(summary.fees_unpaid_student_count || 0).toLocaleString()} fees unpaid</small>
             </div>
             <div className="sai-subscription-tile">
               <span>Status Reason</span>
@@ -340,6 +360,17 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             <button type="button" onClick={saveSettings} disabled={saving}>
               {saving ? "Saving..." : "Save Subscription Billing"}
             </button>
+            {[summary.quotes?.termly, summary.quotes?.yearly].filter(Boolean).map((quote) => (
+              <button
+                key={quote.billing_cycle}
+                type="button"
+                className="sai-action-secondary"
+                onClick={() => downloadInvoice(quote.billing_cycle)}
+                disabled={invoiceCycle === quote.billing_cycle || summary.status === "free"}
+              >
+                {invoiceCycle === quote.billing_cycle ? "Preparing Invoice..." : `Download ${quote.billing_cycle_label || quote.label} Invoice`}
+              </button>
+            ))}
           </div>
 
           <div className="sai-invoice-block">

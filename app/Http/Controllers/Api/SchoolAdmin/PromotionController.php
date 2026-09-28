@@ -317,6 +317,7 @@ class PromotionController extends Controller
                 }
                 DB::table('enrollments')->insert($insertData);
             }
+            $student->update(['education_level' => $nextClass->level]);
         });
 
         return response()->json([
@@ -432,6 +433,7 @@ class PromotionController extends Controller
                     DB::table('enrollments')->insert($data);
                 }
             }
+            $student->update(['education_level' => $sameClass->level]);
         });
 
         return response()->json([

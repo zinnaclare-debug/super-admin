@@ -17,6 +17,13 @@ const formatCount = (value) => {
   return Number.isFinite(n) ? n.toLocaleString() : "0";
 };
 
+const formatSessionStatus = (status) => {
+  const value = String(status || "").toLowerCase();
+  if (value === "current") return "Current";
+  if (value === "completed") return "Completed";
+  return "Pending";
+};
+
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
@@ -58,14 +65,17 @@ function SchoolDashboard() {
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
   const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
+  const [sessions, setSessions] = useState([]);
+  const [updatingSessionId, setUpdatingSessionId] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [res, featuresRes] = await Promise.all([
+        const [res, featuresRes, sessionsRes] = await Promise.all([
           api.get("/api/school-admin/stats"),
           api.get("/api/schools/features").catch(() => null),
+          api.get("/api/school-admin/academic-sessions").catch(() => null),
         ]);
         setStats({
           school_name: res.data?.school_name ?? "",
@@ -101,6 +111,7 @@ function SchoolDashboard() {
         setResultPublication(res.data?.school_results_published ? "publish" : "unpublish");
 
         setEnabledFeatures(Array.isArray(featuresRes?.data?.data) ? featuresRes.data.data : []);
+        setSessions(Array.isArray(sessionsRes?.data?.data) ? sessionsRes.data.data : []);
       } catch {
         setStats({
           school_name: "",
@@ -132,6 +143,7 @@ function SchoolDashboard() {
         setPaystackSubaccountCode("");
         setResultPublication("unpublish");
         setEnabledFeatures([]);
+        setSessions([]);
       } finally {
         setLoading(false);
       }
@@ -323,6 +335,38 @@ function SchoolDashboard() {
       setSavingResultPublication(false);
     }
   };
+  const updateSessionStatus = async (session, status) => {
+    let payload = { status };
+
+    if (status === "current") {
+      const currentSelectionCode = window.prompt("Enter current selection code (4722):");
+      if (currentSelectionCode === null) return;
+      payload = { status, current_selection_code: currentSelectionCode.trim() };
+    }
+
+    setUpdatingSessionId(session.id);
+    try {
+      const res = await api.patch(`/api/school-admin/academic-sessions/${session.id}/status`, payload);
+      const data = res.data || {};
+      setSessions(Array.isArray(data.sessions) ? data.sessions : []);
+      setStats((previous) => ({
+        ...previous,
+        results_published: Boolean(data.results_published),
+        school_results_published: Boolean(data.school_results_published),
+        results_effectively_published: Boolean(data.results_effectively_published),
+      }));
+      setResultPublication(data.school_results_published ? "publish" : "unpublish");
+      alert(data.message || "Academic session status updated successfully.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to update academic session status.");
+    } finally {
+      setUpdatingSessionId(null);
+    }
+  };
+
   const featureCards = [
     {
       key: "cbt",
@@ -343,6 +387,13 @@ function SchoolDashboard() {
       art: classArt,
     },
   ];
+
+  const resultsAvailableToStudents = Boolean(stats.results_effectively_published);
+  const resultPublicationStatus = resultsAvailableToStudents
+    ? "Results are now available to students."
+    : stats.school_results_published
+      ? "Results are awaiting approval before they are available to students."
+      : "Results are not available to students.";
 
   const populationStats = [
     { key: "male", label: "Total Male Students", value: stats.male_students },
@@ -569,8 +620,8 @@ function SchoolDashboard() {
               <option value="unpublish">UNPUBLISH</option>
             </select>
           </label>
-          <p className={`sd-result-publication__status${stats.results_effectively_published ? " sd-result-publication__status--open" : ""}`}>
-            {stats.results_effectively_published ? "Results are available to students." : "Results are not available to students."}
+          <p className={`sd-result-publication__status${resultsAvailableToStudents ? " sd-result-publication__status--open" : ""}`}>
+            {resultPublicationStatus}
           </p>
         </div>
 
@@ -581,6 +632,56 @@ function SchoolDashboard() {
           <button type="button" className="sd-actions__alt" onClick={cancelResultPublication} disabled={savingResultPublication}>
             Cancel
           </button>
+        </div>
+      </section>
+
+      <section className="sd-card sd-session-control">
+        <div className="sd-section-head">
+          <h2>ACADEMIC SESSIONS</h2>
+          <p>After creating a session, confirm its status here. Setting a session current requires code 4722.</p>
+        </div>
+        <div className="sd-session-table-wrap">
+          <table className="sd-session-table">
+            <thead>
+              <tr>
+                <th>S/N</th>
+                <th>Session</th>
+                <th>Academic Year</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((session, index) => (
+                <tr key={session.id}>
+                  <td>{index + 1}</td>
+                  <td>{session.session_name || "-"}</td>
+                  <td>{session.academic_year || "-"}</td>
+                  <td><span className={`sd-session-status sd-session-status--${session.status || "pending"}`}>{formatSessionStatus(session.status)}</span></td>
+                  <td>
+                    {session.status === "pending" && (
+                      <button type="button" onClick={() => updateSessionStatus(session, "current")} disabled={updatingSessionId === session.id}>
+                        {updatingSessionId === session.id ? "Updating..." : "Set Current"}
+                      </button>
+                    )}
+                    {session.status === "current" && (
+                      <button type="button" className="sd-actions__alt" onClick={() => updateSessionStatus(session, "completed")} disabled={updatingSessionId === session.id}>
+                        {updatingSessionId === session.id ? "Updating..." : "Set Completed"}
+                      </button>
+                    )}
+                    {session.status === "completed" && (
+                      <button type="button" onClick={() => updateSessionStatus(session, "current")} disabled={updatingSessionId === session.id}>
+                        {updatingSessionId === session.id ? "Updating..." : "Set Current"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {sessions.length === 0 && (
+                <tr><td colSpan="5">No academic sessions yet. Create one from Academic Session first.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 

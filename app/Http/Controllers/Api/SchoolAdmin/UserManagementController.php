@@ -1028,8 +1028,10 @@ class UserManagementController extends Controller
                     $row['exit_reason'] = $student->exit_reason ?? null;
                     $row['reactivation_requested'] = !empty($student->reactivation_requested_at);
 
-                    $educationLevel = $this->normalizeEducationLevel($student->education_level ?? null);
                     $placement = $this->resolveStudentCurrentPlacement($schoolId, (int) $student->id);
+                    $educationLevel = $this->normalizeEducationLevel(
+                        $placement['class_level'] ?? $student->education_level ?? null
+                    );
 
                     $className = trim((string) ($placement['class_name'] ?? ''));
                     $departmentName = trim((string) ($placement['department_name'] ?? ''));
@@ -1318,6 +1320,7 @@ class UserManagementController extends Controller
             'class_id' => null,
             'department_id' => null,
             'class_name' => null,
+            'class_level' => null,
             'department_name' => null,
         ];
 
@@ -1374,7 +1377,7 @@ class UserManagementController extends Controller
         $class = SchoolClass::query()
             ->where('school_id', $schoolId)
             ->where('id', $classId)
-            ->first(['id', 'name']);
+            ->first(['id', 'name', 'level']);
 
         if (!$class) {
             return $placement;
@@ -1382,6 +1385,7 @@ class UserManagementController extends Controller
 
         $placement['class_id'] = (int) $class->id;
         $placement['class_name'] = (string) $class->name;
+        $placement['class_level'] = (string) $class->level;
         $placement['department_id'] = $departmentId;
 
         if ($departmentId) {

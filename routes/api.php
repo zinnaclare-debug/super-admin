@@ -132,8 +132,6 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::patch('/super-admin/schools/{school}/toggle', [SchoolController::class, 'toggle']);
     Route::patch('/super-admin/schools/{school}/toggle-results', [SchoolController::class, 'toggleResultsPublish']);
     Route::get('/super-admin/schools/{school}/academic-sessions', [SchoolController::class, 'academicSessions']);
-    Route::patch('/super-admin/schools/{school}/academic-sessions/{session}/status', [SchoolController::class, 'updateAcademicSessionStatus']);
-    Route::delete('/super-admin/schools/{school}/academic-sessions/{session}', [SchoolController::class, 'destroyAcademicSession']);
     Route::get('/super-admin/schools/{school}/information', [SchoolController::class, 'information']);
     Route::post('/super-admin/schools/{school}/information/branding', [SchoolController::class, 'upsertInformationBranding']);
     Route::put('/super-admin/schools/{school}/information/exam-record', [SchoolController::class, 'updateInformationExamRecord']);
@@ -149,6 +147,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/information/website/applications', [SuperAdminSchoolWebsiteController::class, 'applications']);
     Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
+    Route::get('/super-admin/schools/{school}/information/billing/invoice', [SuperAdminSchoolSubscriptionController::class, 'invoice']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
     Route::delete('/super-admin/schools/{school}/subscription/invoices/{invoice}', [SuperAdminSchoolSubscriptionController::class, 'destroyInvoice']);
 
@@ -339,6 +338,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:academic_session');
 
     Route::put('/school-admin/academic-sessions/{session}', [AcademicSessionController::class, 'update'])
+        ->middleware('feature:academic_session');
+    Route::patch('/school-admin/academic-sessions/{session}/status', [AcademicSessionController::class, 'setStatus'])
         ->middleware('feature:academic_session');
 
 

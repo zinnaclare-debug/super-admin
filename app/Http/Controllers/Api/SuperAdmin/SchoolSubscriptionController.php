@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Models\SchoolSubscriptionInvoice;
 use App\Models\SchoolSubscriptionSetting;
 use App\Support\SchoolSubscriptionBilling;
+use App\Support\SchoolSubscriptionInvoicePdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -70,6 +71,14 @@ class SchoolSubscriptionController extends Controller
         ]);
     }
 
+    public function invoice(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'billing_cycle' => 'required|in:termly,yearly',
+        ]);
+
+        return SchoolSubscriptionInvoicePdf::download($school, (string) $payload['billing_cycle']);
+    }
     public function updateInvoiceStatus(Request $request, School $school, SchoolSubscriptionInvoice $invoice)
     {
         if ((int) $invoice->school_id !== (int) $school->id) {
