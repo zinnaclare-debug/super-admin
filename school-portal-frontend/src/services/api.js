@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getStoredToken } from "../utils/authStorage";
+import { getPortalDeviceId } from "../utils/portalDevice";
 import { clearMobileSchool as clearStoredMobileSchool, getMobileSchool, setMobileSchool } from "../utils/mobileSchool";
 
 export const isMobileBuild = import.meta.env.MODE === "mobile";
@@ -35,8 +36,13 @@ export function clearMobileSchool() {
 
 api.interceptors.request.use((config) => {
   const token = getStoredToken();
+  const deviceId = getPortalDeviceId();
+  config.headers = config.headers || {};
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (deviceId) {
+    config.headers["X-Portal-Device-Key"] = deviceId;
   }
   return config;
 });

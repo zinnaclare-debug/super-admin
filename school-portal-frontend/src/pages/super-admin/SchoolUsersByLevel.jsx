@@ -3,30 +3,37 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import studentsArt from "../../assets/dashboard/students.svg";
 
+const emptySummary = { active_count: 0, fees_unpaid_count: 0, billable_count: 0, inactive_count: 0, request_count: 0 };
+
 function SchoolUsersByLevel() {
   const { schoolId } = useParams();
   const navigate = useNavigate();
   const [school, setSchool] = useState(null);
   const [levels, setLevels] = useState([]);
+  const [summary, setSummary] = useState(emptySummary);
   const [selectedLevel, setSelectedLevel] = useState("");
+  const [listMode, setListMode] = useState("active");
   const [students, setStudents] = useState([]);
-  const [requestMode, setRequestMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [approvingId, setApprovingId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async (level = "") => {
+  const load = async ({ level = "", status = "active", mode = "active" } = {}) => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/super-admin/schools/${schoolId}/students-by-level`, { params: level ? { level } : {} });
+      const params = { status };
+      if (level) params.level = level;
+      const res = await api.get(`/api/super-admin/schools/${schoolId}/students-by-level`, { params });
       const data = res.data?.data || {};
       setSchool(data.school || null);
       setLevels(data.levels || []);
+      setSummary(data.summary || emptySummary);
       setStudents(data.students || []);
-      setRequestMode(false);
+      setSelectedLevel(level);
+      setListMode(mode);
       setSelectedIds(new Set());
-    } catch {
-      alert("Failed to load school students");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to load school students.");
       setStudents([]);
     } finally {
       setLoading(false);
@@ -38,17 +45,17 @@ function SchoolUsersByLevel() {
     try {
       const res = await api.get(`/api/super-admin/schools/${schoolId}/reactivation-requests`);
       setStudents(res.data?.data?.students || []);
-      setRequestMode(true);
+      setListMode("requests");
       setSelectedLevel("");
       setSelectedIds(new Set());
-    } catch (e) {
-      alert(e?.response?.data?.message || "Failed to load reactivation requests.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to load reactivation requests.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(""); }, [schoolId]);
+  useEffect(() => { load(); }, [schoolId]);
 
   const approve = async (studentId) => {
     setApprovingId(studentId);
@@ -56,35 +63,35 @@ function SchoolUsersByLevel() {
       const res = await api.post(`/api/super-admin/students/${studentId}/approve-reactivation`);
       setStudents((current) => current.filter((student) => Number(student.student_id) !== Number(studentId)));
       setSelectedIds((current) => { const next = new Set(current); next.delete(studentId); return next; });
+      setSummary((current) => ({ ...current, request_count: Math.max(0, Number(current.request_count || 0) - 1) }));
       alert(res.data?.message || "Student access enabled.");
-    } catch (e) {
-      alert(e?.response?.data?.message || "Failed to approve reactivation.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to approve reactivation.");
     } finally {
       setApprovingId(null);
     }
   };
 
   const approveSelected = async () => {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`Enable ${selectedIds.size} selected student(s)?`)) return;
+    if (selectedIds.size === 0 || !window.confirm(`Enable ${selectedIds.size} selected student(s)?`)) return;
     let completed = 0;
     for (const studentId of selectedIds) {
-      try { await api.post(`/api/super-admin/students/${studentId}/approve-reactivation`); completed += 1; } catch { /* Continue so one bad record does not block the batch. */ }
+      try { await api.post(`/api/super-admin/students/${studentId}/approve-reactivation`); completed += 1; } catch { /* Continue so one failed record does not block the batch. */ }
     }
     await loadRequests();
+    await load({ mode: "active" });
     alert(`${completed} student(s) enabled.`);
   };
 
+  const requestMode = listMode === "requests";
   const allSelected = students.length > 0 && students.every((student) => selectedIds.has(student.student_id));
-  const toggle = (studentId) => setSelectedIds((current) => {
-    const next = new Set(current); if (next.has(studentId)) next.delete(studentId); else next.add(studentId); return next;
-  });
+  const toggle = (studentId) => setSelectedIds((current) => { const next = new Set(current); next.has(studentId) ? next.delete(studentId) : next.add(studentId); return next; });
   const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(students.map((student) => student.student_id)));
 
   return (
     <div className="sa-page sa-page--students">
       <section className="sa-page-hero">
-        <div><span className="sa-page-eyebrow">School records</span><h1>Students by Level</h1><p>Review registered students and approve requests to restore left-school student access.</p></div>
+        <div><span className="sa-page-eyebrow">School records</span><h1>Students by Level</h1><p>Education-level totals include active students and students marked Fees Unpaid. Inactive students and reactivation requests are shown separately.</p></div>
         <img className="sa-page-art" src={studentsArt} alt="" aria-hidden="true" />
       </section>
       <div className="sa-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -92,9 +99,10 @@ function SchoolUsersByLevel() {
         <button onClick={() => navigate("/super-admin/users")}>Back to Schools</button>
       </div>
       <div className="sa-filter-list">
-        <button onClick={() => { setSelectedLevel(""); load(""); }} className={`sa-filter-button ${!requestMode && selectedLevel === "" ? "is-selected" : ""}`}>All</button>
-        {levels.map((level) => <button key={level.key} onClick={() => { setSelectedLevel(level.key); load(level.key); }} className={`sa-filter-button ${!requestMode && selectedLevel === level.key ? "is-selected" : ""}`}>{level.label} ({level.count})</button>)}
-        <button onClick={loadRequests} className={`sa-filter-button ${requestMode ? "is-selected" : ""}`}>Requests</button>
+        <button onClick={() => load({ mode: "active" })} className={`sa-filter-button ${listMode === "active" ? "is-selected" : ""}`}>All Active ({Number(summary.active_count || 0)})</button>
+        {levels.map((level) => <button key={level.key} onClick={() => load({ level: level.key, status: "billable", mode: "level" })} className={`sa-filter-button ${listMode === "level" && selectedLevel === level.key ? "is-selected" : ""}`}>{level.label} ({level.count})</button>)}
+        <button onClick={loadRequests} className={`sa-filter-button ${requestMode ? "is-selected" : ""}`}>Requests ({Number(summary.request_count || 0)})</button>
+        <button onClick={() => load({ status: "inactive", mode: "inactive" })} className={`sa-filter-button ${listMode === "inactive" ? "is-selected" : ""}`}>Inactive ({Number(summary.inactive_count || 0)})</button>
       </div>
       {requestMode ? <div style={{ marginTop: 14 }}><button onClick={approveSelected} disabled={selectedIds.size === 0 || approvingId !== null}>Confirm Selected ({selectedIds.size})</button></div> : null}
       <div style={{ marginTop: 16 }}>

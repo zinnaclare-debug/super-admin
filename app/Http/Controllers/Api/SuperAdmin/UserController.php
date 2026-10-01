@@ -124,99 +124,81 @@ class UserController extends Controller
     {
         $payload = $request->validate([
             'level' => 'nullable|string|max:60',
+            'status' => 'nullable|in:active,billable,inactive',
         ]);
 
         $schoolId = (int) $school->id;
         $currentTermId = $this->resolveCurrentTermId($schoolId);
+        $hasStudentEducationLevel = Schema::hasColumn('students', 'education_level');
+        $hasExitReason = Schema::hasColumn('students', 'exit_reason');
+        $hasReactivationRequest = Schema::hasColumn('students', 'reactivation_requested_at');
+        $hasReactivationApproval = Schema::hasColumn('students', 'reactivation_approved_at');
 
         $baseQuery = Student::query()
             ->join('users', 'users.id', '=', 'students.user_id')
             ->leftJoin('enrollments', function ($join) use ($schoolId, $currentTermId) {
                 $join->on('enrollments.student_id', '=', 'students.id');
-                if (Schema::hasColumn('enrollments', 'school_id')) {
-                    $join->where('enrollments.school_id', '=', $schoolId);
-                }
-                if ($currentTermId) {
-                    $join->where('enrollments.term_id', '=', $currentTermId);
-                }
+                if (Schema::hasColumn('enrollments', 'school_id')) $join->where('enrollments.school_id', '=', $schoolId);
+                if ($currentTermId) $join->where('enrollments.term_id', '=', $currentTermId);
             })
             ->leftJoin('classes', 'classes.id', '=', 'enrollments.class_id')
             ->where('students.school_id', $schoolId)
             ->where('users.role', 'student');
 
-        $selectColumns = [
-            'students.id as student_id',
-            'users.name as student_name',
-            'classes.level as class_level',
-        ];
-        $hasStudentEducationLevel = Schema::hasColumn('students', 'education_level');
-        if ($hasStudentEducationLevel) {
-            $selectColumns[] = 'students.education_level as student_level';
-        }
+        $selectColumns = ['students.id as student_id', 'users.name as student_name', 'users.is_active as user_is_active', 'classes.level as class_level'];
+        if ($hasStudentEducationLevel) $selectColumns[] = 'students.education_level as student_level';
+        if ($hasExitReason) $selectColumns[] = 'students.exit_reason as exit_reason';
+        if ($hasReactivationRequest) $selectColumns[] = 'students.reactivation_requested_at as reactivation_requested_at';
+        if ($hasReactivationApproval) $selectColumns[] = 'students.reactivation_approved_at as reactivation_approved_at';
 
-        $allRows = (clone $baseQuery)
-            ->select($selectColumns)
-            ->orderBy('users.name')
-            ->get();
+        $allRows = (clone $baseQuery)->select($selectColumns)->orderBy('users.name')->get();
+        $isFeesUnpaid = fn ($row) => !$row->user_is_active && ($row->exit_reason ?? null) === 'fees_unpaid';
+        $billableRows = $allRows->filter(fn ($row) => (bool) $row->user_is_active || $isFeesUnpaid($row))->values();
+        $activeRows = $allRows->filter(fn ($row) => (bool) $row->user_is_active)->values();
+        $inactiveRows = $allRows->filter(fn ($row) => !(bool) $row->user_is_active && !$isFeesUnpaid($row))->values();
+        $requestCount = $allRows->filter(fn ($row) => ($row->exit_reason ?? null) === 'left_school' && !empty($row->reactivation_requested_at) && empty($row->reactivation_approved_at))->count();
 
         $counts = [];
-        foreach ($allRows as $row) {
-            $lvl = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
-            if ($lvl !== '') {
-                $counts[$lvl] = (int) ($counts[$lvl] ?? 0) + 1;
-            }
+        foreach ($billableRows as $row) {
+            $level = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
+            if ($level !== '') $counts[$level] = (int) ($counts[$level] ?? 0) + 1;
         }
 
-        $filteredRows = $allRows;
+        $selectedStatus = (string) ($payload['status'] ?? 'active');
         if (!empty($payload['level'])) {
             $levelFilter = $this->normalizeLevelValue((string) $payload['level']);
-            $filteredRows = $allRows->filter(function ($row) use ($payload) {
-                $levelFilter = $this->normalizeLevelValue((string) $payload['level']);
-                $effectiveLevel = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
-                return $effectiveLevel === $levelFilter;
-            })->values();
+            $filteredRows = $billableRows->filter(fn ($row) => $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? ''))) === $levelFilter)->values();
+        } elseif ($selectedStatus === 'inactive') {
+            $filteredRows = $inactiveRows;
+        } elseif ($selectedStatus === 'billable') {
+            $filteredRows = $billableRows;
+        } else {
+            $filteredRows = $activeRows;
         }
 
         $students = $filteredRows->map(function ($row) {
-            $effectiveLevelRaw = trim((string) ($row->class_level ?? ($row->student_level ?? '')));
-            $effectiveLevel = $this->normalizeLevelValue($effectiveLevelRaw);
-            return [
-                'student_id' => (int) $row->student_id,
-                'name' => $row->student_name,
-                'level' => $effectiveLevel !== '' ? $effectiveLevel : 'unassigned',
-            ];
+            $level = $this->normalizeLevelValue((string) ($row->class_level ?? ($row->student_level ?? '')));
+            return ['student_id' => (int) $row->student_id, 'name' => $row->student_name, 'level' => $level !== '' ? $level : 'unassigned'];
         })->values();
 
-        $templateLevelMap = collect(
-            ClassTemplateSchema::activeLevelKeys(
-                ClassTemplateSchema::normalize($school->class_templates)
-            )
-        )
-            ->mapWithKeys(fn ($key) => [$key => 0])
-            ->all();
-        $mergedCounts = array_merge($templateLevelMap, $counts);
+        $templateLevelMap = collect(ClassTemplateSchema::activeLevelKeys(ClassTemplateSchema::normalize($school->class_templates)))->mapWithKeys(fn ($key) => [$key => 0])->all();
+        $levels = collect(array_merge($templateLevelMap, $counts))->map(function ($count, $key) {
+            return ['key' => (string) $key, 'label' => ucwords(str_replace('_', ' ', (string) $key)), 'count' => (int) $count];
+        })->sortBy('label')->values()->all();
 
-        $levels = collect($mergedCounts)
-            ->map(function ($count, $key) {
-                $label = ucwords(str_replace('_', ' ', (string) $key));
-                return ['key' => (string) $key, 'label' => $label, 'count' => (int) $count];
-            })
-            ->sortBy('label')
-            ->values()
-            ->all();
-
-        return response()->json([
-            'data' => [
-                'school' => [
-                    'id' => $school->id,
-                    'name' => $school->name,
-                ],
-                'levels' => $levels,
-                'students' => $students,
+        return response()->json(['data' => [
+            'school' => ['id' => $school->id, 'name' => $school->name],
+            'levels' => $levels,
+            'students' => $students,
+            'summary' => [
+                'active_count' => $activeRows->count(),
+                'fees_unpaid_count' => $billableRows->count() - $activeRows->count(),
+                'billable_count' => $billableRows->count(),
+                'inactive_count' => $inactiveRows->count(),
+                'request_count' => $requestCount,
             ],
-        ]);
+        ]]);
     }
-
     // GET /api/super-admin/schools/{school}/reactivation-requests
     public function reactivationRequests(School $school)
     {

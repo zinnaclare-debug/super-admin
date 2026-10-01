@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\DeviceInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -114,7 +115,8 @@ class LoginController extends Controller
         }
 
         $deviceKey = $this->schoolAdminDeviceKey($request, $user);
-        $this->replaceExistingSchoolAdminDeviceToken($user, $deviceKey);
+        $legacyDeviceKey = $this->schoolAdminLegacyDeviceKey($request, $user);
+        $this->replaceExistingSchoolAdminDeviceToken($user, $deviceKey, $legacyDeviceKey);
 
         $loginLimitResponse = $this->ensureSchoolAdminCanLogin($user);
         if ($loginLimitResponse) {
@@ -227,15 +229,25 @@ class LoginController extends Controller
             return null;
         }
 
-        $userAgent = strtolower(trim((string) $request->userAgent()));
-        if ($userAgent === '') {
+        $deviceId = trim((string) $request->header('X-Portal-Device-Key', ''));
+        if (preg_match('/^[A-Za-z0-9_-]{16,200}$/', $deviceId)) {
+            return hash('sha256', 'portal-device:' . (int) $user->id . ':' . $deviceId);
+        }
+
+        return $this->schoolAdminLegacyDeviceKey($request, $user);
+    }
+
+    private function schoolAdminLegacyDeviceKey(Request $request, User $user): ?string
+    {
+        if ($user->role !== User::ROLE_SCHOOL_ADMIN) {
             return null;
         }
 
-        return hash('sha256', $userAgent);
+        $userAgent = strtolower(trim((string) $request->userAgent()));
+        return $userAgent === '' ? null : hash('sha256', $userAgent);
     }
 
-    private function replaceExistingSchoolAdminDeviceToken(User $user, ?string $deviceKey): void
+    private function replaceExistingSchoolAdminDeviceToken(User $user, ?string $deviceKey, ?string $legacyDeviceKey = null): void
     {
         if (
             $user->role !== User::ROLE_SCHOOL_ADMIN
@@ -247,9 +259,10 @@ class LoginController extends Controller
             return;
         }
 
+        $deviceKeys = array_values(array_unique(array_filter([$deviceKey, $legacyDeviceKey])));
         $tokenIds = SchoolAdminLoginAudit::query()
             ->where('user_id', (int) $user->id)
-            ->where('device_key', $deviceKey)
+            ->whereIn('device_key', $deviceKeys)
             ->whereNotNull('personal_access_token_id')
             ->pluck('personal_access_token_id')
             ->map(static fn ($id) => (int) $id)
@@ -262,9 +275,7 @@ class LoginController extends Controller
             return;
         }
 
-        SchoolAdminLoginAudit::query()
-            ->whereIn('personal_access_token_id', $tokenIds)
-            ->delete();
+        SchoolAdminLoginAudit::query()->whereIn('personal_access_token_id', $tokenIds)->delete();
         $user->tokens()->whereIn('id', $tokenIds)->delete();
     }
 
@@ -276,7 +287,7 @@ class LoginController extends Controller
 
         $school = School::query()->find((int) $user->school_id);
         $maximumDevices = $this->schoolAdminLoginLimit($school);
-        $activeDevices = $this->activeSchoolAdminDeviceCount($user);
+        $activeDevices = $school ? $this->activeSchoolAdminDeviceCount($school) : 0;
 
         if ($activeDevices >= $maximumDevices) {
             return response()->json([
@@ -290,23 +301,24 @@ class LoginController extends Controller
         return null;
     }
 
-    private function activeSchoolAdminDeviceCount(User $user): int
+    private function activeSchoolAdminDeviceCount(School $school): int
     {
-        $tokens = $user->tokens()
-            ->orderByDesc('last_used_at')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->get(['id', 'name']);
+        $tokens = DB::table('personal_access_tokens as tokens')
+            ->join('users', function ($join) {
+                $join->on('users.id', '=', 'tokens.tokenable_id')
+                    ->where('tokens.tokenable_type', User::class);
+            })
+            ->where('users.school_id', (int) $school->id)
+            ->where('users.role', User::ROLE_SCHOOL_ADMIN)
+            ->select(['tokens.id', 'tokens.name', 'users.id as user_id'])
+            ->get();
 
         if ($tokens->isEmpty()) {
             return 0;
         }
 
         $auditsByToken = collect();
-        if (
-            Schema::hasTable('school_admin_login_audits')
-            && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')
-        ) {
+        if (Schema::hasTable('school_admin_login_audits') && Schema::hasColumn('school_admin_login_audits', 'personal_access_token_id')) {
             $auditsByToken = SchoolAdminLoginAudit::query()
                 ->whereIn('personal_access_token_id', $tokens->pluck('id')->all())
                 ->orderByDesc('logged_in_at')
@@ -317,24 +329,19 @@ class LoginController extends Controller
         }
 
         return $tokens
-            ->map(fn ($token) => $this->activeSchoolAdminDeviceGroupKey($token, $auditsByToken->get((int) $token->id)))
+            ->map(fn ($token) => 'user:' . (int) $token->user_id . ':' . $this->activeSchoolAdminDeviceGroupKey($token, $auditsByToken->get((int) $token->id)))
             ->unique()
             ->count();
     }
 
     private function activeSchoolAdminDeviceGroupKey(object $token, ?SchoolAdminLoginAudit $audit): string
     {
-        if (
-            $audit
-            && Schema::hasColumn('school_admin_login_audits', 'device_key')
-            && !empty($audit->device_key)
-        ) {
+        if ($audit && Schema::hasColumn('school_admin_login_audits', 'device_key') && !empty($audit->device_key)) {
             return 'device:' . $audit->device_key;
         }
 
         return 'token-name:' . sha1((string) $token->name);
     }
-
     private function schoolAdminLoginLimit(?School $school): int
     {
         if (!$school || !Schema::hasColumn('schools', 'school_admin_login_limit')) {
