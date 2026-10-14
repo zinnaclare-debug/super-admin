@@ -678,7 +678,6 @@ class RegistrationController extends Controller
     ): array
     {
         $firstLevel = $templateLevels[0] ?? ($activeLevels[0] ?? 'primary');
-        $acceptedLevels = implode(' | ', $activeLevels ?: $templateLevels ?: [$firstLevel]);
         $templateLevelForFile = $mixedLevelTemplate
             ? 'all_levels'
             : (preg_replace('/[^a-z0-9_]+/i', '_', $firstLevel) ?: 'level');
@@ -693,13 +692,10 @@ class RegistrationController extends Controller
                     'email',
                     'password',
                     'username',
-                    'education_level',
-                    'staff_position',
+                    'level',
                     'sex',
                     'dob',
                     'address',
-                    'accepted_education_levels',
-                    'template_note',
                 ],
                 'examples' => collect($templateLevels)->map(fn (string $level, int $index) => [
                     $index === 0 ? 'Samuel Adeyemi' : 'Teacher ' . ucwords(str_replace('_', ' ', $level)),
@@ -707,12 +703,9 @@ class RegistrationController extends Controller
                     'Pass1234',
                     '',
                     $level,
-                    $level === 'secondary' ? 'Mathematics Teacher' : 'Class Teacher',
                     'M',
                     '1990-08-12',
                     '12 School Road',
-                    $acceptedLevels,
-                    $templateNote,
                 ])->values()->all(),
                 'filename' => "staff_bulk_template_{$templateLevelForFile}.csv",
             ];
@@ -724,22 +717,19 @@ class RegistrationController extends Controller
                 'email',
                 'password',
                 'username',
-                'education_level',
-                'class_name',
-                'department_name',
+                'level',
+                'class',
+                'department',
                 'sex',
                 'religion',
                 'dob',
                 'address',
                 'guardian_name',
-                'guardian_email',
                 'guardian_mobile',
                 'guardian_location',
                 'guardian_state_of_origin',
                 'guardian_occupation',
                 'guardian_relationship',
-                'accepted_education_levels',
-                'template_note',
             ],
             'examples' => collect($templateLevels)->map(fn (string $level, int $index) => [
                 $index === 0 ? 'Amina Yusuf' : 'Student ' . ucwords(str_replace('_', ' ', $level)),
@@ -750,18 +740,15 @@ class RegistrationController extends Controller
                 $exampleClassNames[$level] ?? $this->exampleClassNameForLevel(null, $level),
                 $level === 'secondary' ? 'Science' : '',
                 'F',
-                'Islam',
+                'Religion',
                 '2012-01-15',
                 '12 School Road',
                 'Hafsat Yusuf',
-                'hafsat@example.com',
                 '08030000000',
                 'Lagos',
                 'Kano',
                 'Trader',
                 'mother',
-                $acceptedLevels,
-                $templateNote,
             ])->values()->all(),
             'filename' => "student_bulk_template_{$templateLevelForFile}.csv",
         ];
@@ -1122,7 +1109,7 @@ class RegistrationController extends Controller
             }
         }
 
-        $dob = $this->csvValue($row, ['dob', 'date_of_birth']);
+        $dob = $this->csvValue($row, ['dob', 'date_of_birth', 'dob_yyyy_mm_dd']);
         if ($dob !== null) {
             $timestamp = strtotime($dob);
             if ($timestamp === false) {
@@ -1252,7 +1239,7 @@ class RegistrationController extends Controller
             }
         }
 
-        $dob = $this->csvValue($row, ['dob', 'date_of_birth']);
+        $dob = $this->csvValue($row, ['dob', 'date_of_birth', 'dob_yyyy_mm_dd']);
         if ($dob === null) {
             $errors[] = 'Date of birth is required for staff.';
         } else {

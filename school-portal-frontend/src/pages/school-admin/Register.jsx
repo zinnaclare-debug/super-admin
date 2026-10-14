@@ -859,8 +859,8 @@ export default function Register() {
           <h3>Bulk {bulkTypeLabel} CSV Upload</h3>
           <p style={{ marginTop: 4, opacity: 0.8 }}>
             {isBulkStudent
-              ? "Use the student template. Include password, class placement, and optional guardian details per row."
-              : "Use the staff template. Include email, password, and staff details per row. Guardian fields are not used for staff uploads."}
+              ? "Use the student template. Include password, class placement, and optional guardian details per row. Enter dates as YYYY-MM-DD, for example 2012-01-15."
+              : "Use the staff template. Include email, password, and staff details per row. Enter dates as YYYY-MM-DD, for example 1990-08-12."}
           </p>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end", marginTop: 10 }}>
