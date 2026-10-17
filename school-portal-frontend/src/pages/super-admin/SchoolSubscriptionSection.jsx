@@ -68,6 +68,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   const [actingInvoiceId, setActingInvoiceId] = useState(null);
   const [invoiceCycle, setInvoiceCycle] = useState("");
   const [receiptInvoiceId, setReceiptInvoiceId] = useState("");
+  const [receiptCycle, setReceiptCycle] = useState("");
   const [receiptSubtotal, setReceiptSubtotal] = useState("");
   const [receiptSaving, setReceiptSaving] = useState(false);
   const [receiptDownloadingId, setReceiptDownloadingId] = useState(null);
@@ -94,8 +95,16 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   }, [schoolId]);
 
   const invoiceRows = useMemo(() => (Array.isArray(summary.recent_invoices) ? summary.recent_invoices : []), [summary]);
+  const receiptQuoteOptions = [summary.quotes?.termly, summary.quotes?.yearly].filter(Boolean);
   const selectedReceiptInvoice = invoiceRows.find((invoice) => String(invoice.id) === String(receiptInvoiceId)) || invoiceRows[0] || null;
-  const selectedReceiptSummary = selectedReceiptInvoice?.receipt_summary || null;
+  const selectedReceiptCycle = selectedReceiptInvoice?.billing_cycle || receiptCycle || receiptQuoteOptions[0]?.billing_cycle || "";
+  const selectedReceiptQuote = receiptQuoteOptions.find((quote) => quote.billing_cycle === selectedReceiptCycle) || null;
+  const selectedReceiptSummary = selectedReceiptInvoice?.receipt_summary || (selectedReceiptQuote ? {
+    remaining_subtotal: selectedReceiptQuote.subtotal,
+    remaining_total: selectedReceiptQuote.subtotal,
+    latest_receipt: null,
+  } : null);
+  const receiptCurrency = selectedReceiptInvoice?.currency || selectedReceiptQuote?.currency || form.currency || "NGN";
 
   const saveSettings = async () => {
     setSaving(true);
@@ -198,11 +207,11 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   };
 
   const openReceiptModal = () => {
-    if (!selectedReceiptInvoice) {
-      alert("Select an invoice before creating a receipt.");
+    if (!selectedReceiptSummary) {
+      alert("Save subscription billing before creating a receipt.");
       return;
     }
-    if (Number(selectedReceiptSummary?.remaining_subtotal || 0) <= 0.01) {
+    if (Number(selectedReceiptSummary.remaining_subtotal || 0) <= 0.01) {
       alert("This invoice has already been fully receipted.");
       return;
     }
@@ -212,21 +221,26 @@ export default function SchoolSubscriptionSection({ schoolId }) {
 
   const createReceipt = async () => {
     const subtotalPaid = Number(receiptSubtotal || 0);
-    if (!selectedReceiptInvoice || !Number.isFinite(subtotalPaid) || subtotalPaid <= 0) {
+    if (!selectedReceiptSummary || !Number.isFinite(subtotalPaid) || subtotalPaid <= 0) {
       alert("Enter the subscription amount that was paid.");
       return;
     }
 
     setReceiptSaving(true);
     try {
-      const res = await api.post(
-        `/api/super-admin/schools/${schoolId}/subscription/invoices/${selectedReceiptInvoice.id}/receipts`,
-        { subtotal_paid: subtotalPaid }
-      );
+      const res = selectedReceiptInvoice
+        ? await api.post(
+          `/api/super-admin/schools/${schoolId}/subscription/invoices/${selectedReceiptInvoice.id}/receipts`,
+          { subtotal_paid: subtotalPaid }
+        )
+        : await api.post(`/api/super-admin/schools/${schoolId}/subscription/receipts`, {
+          billing_cycle: selectedReceiptCycle,
+          subtotal_paid: subtotalPaid,
+        });
       const nextSummary = res.data?.data?.summary || emptySummary;
       setSummary(nextSummary);
       setForm(buildForm(nextSummary));
-      setReceiptInvoiceId(String(selectedReceiptInvoice.id));
+      setReceiptInvoiceId("");
       setShowReceiptModal(false);
       alert(res.data?.message || "Payment receipt created.");
     } catch (err) {
@@ -236,7 +250,6 @@ export default function SchoolSubscriptionSection({ schoolId }) {
       setReceiptSaving(false);
     }
   };
-
   const downloadReceipt = async (invoice, receipt) => {
     if (!invoice || !receipt) return;
     setReceiptDownloadingId(receipt.id);
@@ -448,36 +461,48 @@ export default function SchoolSubscriptionSection({ schoolId }) {
               </div>
             </div>
 
-            {invoiceRows.length === 0 ? (
-              <p className="sai-note">An invoice must exist before a payment receipt can be created.</p>
+            {receiptQuoteOptions.length === 0 ? (
+              <p className="sai-note">Save subscription billing and enable a payment cycle before creating a receipt.</p>
             ) : (
               <div className="sai-receipt-summary">
                 <div className="sai-field">
-                  <label>Invoice</label>
-                  <select value={receiptInvoiceId || String(selectedReceiptInvoice?.id || "")} onChange={(e) => setReceiptInvoiceId(e.target.value)}>
-                    {invoiceRows.map((invoice) => (
-                      <option key={invoice.id} value={invoice.id}>{invoice.reference} - {invoice.billing_cycle_label}</option>
-                    ))}
-                  </select>
+                  {invoiceRows.length > 0 ? (
+                    <>
+                      <label>Invoice</label>
+                      <select value={receiptInvoiceId || String(selectedReceiptInvoice?.id || "")} onChange={(e) => setReceiptInvoiceId(e.target.value)}>
+                        {invoiceRows.map((invoice) => (
+                          <option key={invoice.id} value={invoice.id}>{invoice.reference} - {invoice.billing_cycle_label}</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label>Receipt Payment Cycle</label>
+                      <select value={receiptCycle || receiptQuoteOptions[0]?.billing_cycle || ""} onChange={(e) => setReceiptCycle(e.target.value)}>
+                        {receiptQuoteOptions.map((quote) => (
+                          <option key={quote.billing_cycle} value={quote.billing_cycle}>{quote.label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                 </div>
                 <div className="sai-subscription-tile">
                   <span>Amount Payable (Subtotal)</span>
-                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, selectedReceiptInvoice?.currency)}</strong>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, receiptCurrency)}</strong>
                 </div>
-
                 <div className="sai-subscription-tile">
-                  <span>Total Balance Remaining</span>
-                  <strong>{formatMoney(selectedReceiptSummary?.remaining_total, selectedReceiptInvoice?.currency)}</strong>
+                  <span>Subscription Balance Remaining</span>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_total, receiptCurrency)}</strong>
                 </div>
                 <div className="sai-inline-actions sai-receipt-actions">
-                  <button type="button" onClick={openReceiptModal} disabled={Number(selectedReceiptSummary?.remaining_subtotal || 0) <= 0.01}>
+                  <button type="button" onClick={openReceiptModal} disabled={!selectedReceiptSummary || Number(selectedReceiptSummary.remaining_subtotal || 0) <= 0.01}>
                     Create Receipt
                   </button>
                   <button
                     type="button"
                     className="sai-action-secondary"
                     onClick={() => downloadReceipt(selectedReceiptInvoice, selectedReceiptSummary?.latest_receipt)}
-                    disabled={!selectedReceiptSummary?.latest_receipt || receiptDownloadingId === selectedReceiptSummary?.latest_receipt?.id}
+                    disabled={!selectedReceiptInvoice || !selectedReceiptSummary?.latest_receipt || receiptDownloadingId === selectedReceiptSummary?.latest_receipt?.id}
                   >
                     {receiptDownloadingId === selectedReceiptSummary?.latest_receipt?.id ? "Preparing Receipt..." : "Download Receipt"}
                   </button>
@@ -486,14 +511,14 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             )}
           </div>
 
-          {showReceiptModal && selectedReceiptInvoice ? (
+          {showReceiptModal && selectedReceiptSummary ? (
             <div className="sai-receipt-modal-backdrop" onClick={() => !receiptSaving && setShowReceiptModal(false)}>
               <div className="sai-receipt-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
                 <h4 id="receipt-modal-title">Create Payment Receipt</h4>
-                <p className="sai-note">{selectedReceiptInvoice.reference}</p>
+                <p className="sai-note">{selectedReceiptInvoice?.reference || `${selectedReceiptQuote?.label || "Subscription"} receipt`}</p>
                 <div className="sai-receipt-modal-totals">
                   <span>Amount payable (subtotal)</span>
-                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, selectedReceiptInvoice.currency)}</strong>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, receiptCurrency)}</strong>
 
                 </div>
                 <label className="sai-field">

@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Api\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\SchoolSubscriptionInvoice;
+use App\Models\SchoolSubscriptionReceipt;
 use App\Models\SchoolSubscriptionSetting;
 use App\Support\SchoolSubscriptionBilling;
 use App\Support\SchoolSubscriptionInvoicePdf;
+use App\Support\SchoolSubscriptionReceiptPdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SchoolSubscriptionController extends Controller
@@ -136,6 +140,69 @@ class SchoolSubscriptionController extends Controller
         ]);
     }
 
+    public function createReceiptForCycle(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'billing_cycle' => 'required|in:termly,yearly',
+            'subtotal_paid' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $cycle = (string) $payload['billing_cycle'];
+        $context = SchoolSubscriptionBilling::quoteForCycle($school, $cycle);
+        $settings = $context['settings'];
+        $quote = $context['quote'];
+        $session = $context['session'];
+        $term = $context['term'];
+
+        if ($settings->is_free_version) {
+            return response()->json(['message' => 'Save this school as a paid subscription before creating a receipt.'], 422);
+        }
+        if (!$session || !$term) {
+            return response()->json(['message' => 'Set the current academic session and term before creating a receipt.'], 422);
+        }
+        if (!$quote) {
+            return response()->json(['message' => 'Save subscription billing for the selected payment cycle before creating a receipt.'], 422);
+        }
+
+        $termId = $cycle === SchoolSubscriptionBilling::CYCLE_TERMLY ? (int) $term->id : null;
+        $invoice = SchoolSubscriptionInvoice::query()
+            ->where('school_id', (int) $school->id)
+            ->where('academic_session_id', (int) $session->id)
+            ->where('billing_cycle', $cycle)
+            ->when($cycle === SchoolSubscriptionBilling::CYCLE_TERMLY, fn ($query) => $query->where('term_id', $termId), fn ($query) => $query->whereNull('term_id'))
+            ->latest('id')
+            ->first();
+
+        if (!$invoice) {
+            $invoice = SchoolSubscriptionInvoice::query()->create([
+                'school_id' => (int) $school->id,
+                'academic_session_id' => (int) $session->id,
+                'term_id' => $termId,
+                'billing_cycle' => $cycle,
+                'reference' => SchoolSubscriptionBilling::createReference(SchoolSubscriptionBilling::CHANNEL_MANUAL, (int) $school->id),
+                'status' => 'pending',
+                'payment_channel' => SchoolSubscriptionBilling::CHANNEL_MANUAL,
+                'student_count_snapshot' => (int) $quote['student_count'],
+                'amount_per_student_snapshot' => (float) $quote['amount_per_student_per_term'],
+                'subtotal' => (float) $quote['subtotal'],
+                'tax_percent_snapshot' => (float) $quote['tax_percent'],
+                'tax_amount' => (float) $quote['tax_amount'],
+                'total_amount' => (float) $quote['total_amount'],
+                'currency' => (string) $quote['currency'],
+                'submitted_by_user_id' => (int) $request->user()->id,
+                'meta' => [
+                    'type' => 'school_subscription',
+                    'session_name' => $session->session_name,
+                    'term_name' => $term->name,
+                    'school_name' => $school->name,
+                ],
+            ]);
+        }
+
+        $request->merge(['subtotal_paid' => $payload['subtotal_paid']]);
+        return $this->createReceipt($request, $school, $invoice);
+    }
+
     public function createReceipt(Request $request, School $school, SchoolSubscriptionInvoice $invoice)
     {
         if ((int) $invoice->school_id !== (int) $school->id) {
@@ -156,14 +223,10 @@ class SchoolSubscriptionController extends Controller
 
             if ($subtotalPaid > ((float) $summary['remaining_subtotal'] + 0.01)) {
                 throw ValidationException::withMessages([
-                    'subtotal_paid' => ['The amount paid cannot exceed the remaining subtotal of '
+                    'subtotal_paid' => ['The amount paid cannot exceed the remaining subscription balance of '
                         . number_format((float) $summary['remaining_subtotal'], 2) . '.'],
                 ]);
             }
-
-            // Official payment receipts contain only the paid subscription subtotal.
-            $processingFeePaid = 0.0;
-            $totalPaid = $subtotalPaid;
 
             do {
                 $receiptNumber = 'SSR-' . (int) $school->id . '-' . Str::upper(Str::random(10));
@@ -176,8 +239,8 @@ class SchoolSubscriptionController extends Controller
                 'school_subscription_invoice_id' => (int) $lockedInvoice->id,
                 'receipt_number' => $receiptNumber,
                 'subtotal_paid' => $subtotalPaid,
-                'processing_fee_paid' => $processingFeePaid,
-                'total_paid' => $totalPaid,
+                'processing_fee_paid' => 0,
+                'total_paid' => $subtotalPaid,
                 'currency' => $lockedInvoice->currency ?: 'NGN',
                 'recorded_by_user_id' => (int) $request->user()->id,
                 'meta' => [
@@ -196,7 +259,6 @@ class SchoolSubscriptionController extends Controller
             ],
         ], 201);
     }
-
     public function downloadReceipt(School $school, SchoolSubscriptionInvoice $invoice, SchoolSubscriptionReceipt $receipt)
     {
         if ((int) $invoice->school_id !== (int) $school->id

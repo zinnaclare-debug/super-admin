@@ -149,6 +149,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
     Route::get('/super-admin/schools/{school}/information/billing/invoice', [SuperAdminSchoolSubscriptionController::class, 'invoice']);
+    Route::post('/super-admin/schools/{school}/subscription/receipts', [SuperAdminSchoolSubscriptionController::class, 'createReceiptForCycle']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/receipts', [SuperAdminSchoolSubscriptionController::class, 'createReceipt']);
     Route::get('/super-admin/schools/{school}/subscription/invoices/{invoice}/receipts/{receipt}', [SuperAdminSchoolSubscriptionController::class, 'downloadReceipt']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
