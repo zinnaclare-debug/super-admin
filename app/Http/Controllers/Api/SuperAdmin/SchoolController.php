@@ -102,6 +102,12 @@ class SchoolController extends Controller
             ]);
         }
 
+        if ($request->has('admin_email')) {
+            $request->merge([
+                'admin_email' => strtolower(trim((string) $request->input('admin_email'))),
+            ]);
+        }
+
         $adminFieldsSubmitted = $request->has('admin_name') || $request->has('admin_email');
         $admin = $adminFieldsSubmitted ? $school->admin : null;
 
@@ -132,6 +138,7 @@ class SchoolController extends Controller
                 $admin->name = $payload['admin_name'];
                 $admin->email = $payload['admin_email'];
                 $admin->save();
+                UserCredentialStore::sync($admin);
             }
         });
 

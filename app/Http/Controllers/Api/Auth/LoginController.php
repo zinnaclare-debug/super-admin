@@ -19,6 +19,9 @@ class LoginController extends Controller
 {
     public function login(Request $request)
     {
+        $request->merge([
+            'email' => strtolower(trim((string) $request->input('email'))),
+        ]);
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
