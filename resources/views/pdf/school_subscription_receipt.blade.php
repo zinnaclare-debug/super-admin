@@ -62,14 +62,9 @@
     <div class="panel">
         <table class="party-table">
             <tr>
-                <td style="width: 53%; vertical-align: top;">
-                    <div class="party-title">Received By</div>
-                    <div class="party-name">{{ $issuerName }}</div>
-                    <div class="muted">{{ $issuerEmail }}</div>
-                </td>
-                <td style="width: 47%; vertical-align: top; text-align: right;">
+                <td style="vertical-align: top;">
                     @if($logoDataUri)<img class="logo" src="{{ $logoDataUri }}" alt="School logo">@endif
-                    <div class="party-title">Received From</div>
+                    <div class="party-title">Payment Received From</div>
                     <div class="party-name">{{ $school->name }}</div>
                     @if($school->contact_email || $school->email)<div class="muted">{{ $school->contact_email ?: $school->email }}</div>@endif
                 </td>
