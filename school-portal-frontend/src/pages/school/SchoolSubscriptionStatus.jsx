@@ -247,7 +247,7 @@ export default function SchoolSubscriptionStatus() {
               </div>
             ) : null}
 
-            {summary.latest_pending_invoice ? (
+            {summary.status !== "active" && summary.latest_pending_invoice ? (
               <div className="sd-subscription-highlight sd-subscription-highlight--pending">
                 <h4>Latest Pending Invoice</h4>
                 <p>
@@ -274,8 +274,10 @@ export default function SchoolSubscriptionStatus() {
                 const cycle = quote.billing_cycle;
                 const receiptName = bankForms[cycle]?.receipt?.name || "";
                 const showBankDetails = bankCycle === cycle;
-                const officialReceipt = summary.active_invoice?.billing_cycle === cycle
-                  ? summary.active_invoice?.receipt_summary?.latest_receipt
+                const receiptInvoice = [summary.active_invoice, summary.latest_pending_invoice]
+                  .find((invoice) => invoice?.billing_cycle === cycle && invoice?.receipt_summary?.latest_receipt);
+                const officialReceipt = summary.status === "active"
+                  ? receiptInvoice?.receipt_summary?.latest_receipt
                   : null;
 
                 return (

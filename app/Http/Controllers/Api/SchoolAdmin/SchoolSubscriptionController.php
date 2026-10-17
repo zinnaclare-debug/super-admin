@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Models\SchoolSubscriptionInvoice;
 use App\Support\SchoolPublicWebsiteData;
 use App\Support\SchoolSubscriptionBilling;
+use App\Support\SchoolSubscriptionReceiptPdf;
 use Carbon\Carbon;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -172,8 +173,11 @@ class SchoolSubscriptionController extends Controller
             $cycle
         );
         $receipt = $invoice?->receipts()->latest('id')->first();
+        $settings = SchoolSubscriptionBilling::getSettings($school);
+        $subscriptionIsActive = $invoice?->status === 'paid'
+            || $settings->manual_status_override === SchoolSubscriptionBilling::STATUS_ACTIVE;
 
-        if (!$invoice || $invoice->status !== 'paid' || !$receipt) {
+        if (!$invoice || !$receipt || !$subscriptionIsActive) {
             return response()->json(['message' => 'A saved receipt is not available for the active subscription yet.'], 422);
         }
 
