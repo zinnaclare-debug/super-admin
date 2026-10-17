@@ -96,13 +96,16 @@ class SchoolController extends Controller
 
     public function update(Request $request, School $school)
     {
-        $request->merge([
-            'subdomain' => $this->normalizeSubdomain($request->input('subdomain')),
-        ]);
+        if ($request->has('subdomain')) {
+            $request->merge([
+                'subdomain' => $this->normalizeSubdomain($request->input('subdomain')),
+            ]);
+        }
 
-        $admin = $school->admin;
+        $adminFieldsSubmitted = $request->has('admin_name') || $request->has('admin_email');
+        $admin = $adminFieldsSubmitted ? $school->admin : null;
 
-        if (!$admin) {
+        if ($adminFieldsSubmitted && !$admin) {
             throw ValidationException::withMessages([
                 'admin_email' => ['This school does not have an assigned school administrator.'],
             ]);
@@ -111,21 +114,25 @@ class SchoolController extends Controller
         $payload = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:schools,email,' . $school->id,
-            'subdomain' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]+$/', 'unique:schools,subdomain,' . $school->id],
-            'admin_name' => 'required|string|max:255',
-            'admin_email' => 'required|email|unique:users,email,' . $admin->id,
+            'subdomain' => ['sometimes', 'required', 'string', 'max:63', 'regex:/^[a-z0-9]+$/', 'unique:schools,subdomain,' . $school->id],
+            'admin_name' => ['sometimes', 'required', 'string', 'max:255', 'required_with:admin_email'],
+            'admin_email' => ['sometimes', 'required', 'email', 'required_with:admin_name', 'unique:users,email,' . optional($admin)->id],
         ]);
 
-        DB::transaction(function () use ($school, $admin, $payload) {
+        DB::transaction(function () use ($school, $admin, $adminFieldsSubmitted, $payload) {
             $school->name = $payload['name'];
             $school->email = $payload['email'];
-            $school->subdomain = $payload['subdomain'];
+            if (array_key_exists('subdomain', $payload)) {
+                $school->subdomain = $payload['subdomain'];
+            }
             $school->slug = Str::slug($payload['name']);
             $school->save();
 
-            $admin->name = $payload['admin_name'];
-            $admin->email = $payload['admin_email'];
-            $admin->save();
+            if ($adminFieldsSubmitted) {
+                $admin->name = $payload['admin_name'];
+                $admin->email = $payload['admin_email'];
+                $admin->save();
+            }
         });
 
         return response()->json([
