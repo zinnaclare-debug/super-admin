@@ -196,6 +196,66 @@ export default function SchoolSubscriptionSection({ schoolId }) {
       setInvoiceCycle("");
     }
   };
+
+  const openReceiptModal = () => {
+    if (!selectedReceiptInvoice) {
+      alert("Select an invoice before creating a receipt.");
+      return;
+    }
+    if (Number(selectedReceiptSummary?.remaining_subtotal || 0) <= 0.01) {
+      alert("This invoice has already been fully receipted.");
+      return;
+    }
+    setReceiptSubtotal("");
+    setShowReceiptModal(true);
+  };
+
+  const createReceipt = async () => {
+    const subtotalPaid = Number(receiptSubtotal || 0);
+    if (!selectedReceiptInvoice || !Number.isFinite(subtotalPaid) || subtotalPaid <= 0) {
+      alert("Enter the subscription amount that was paid.");
+      return;
+    }
+
+    setReceiptSaving(true);
+    try {
+      const res = await api.post(
+        `/api/super-admin/schools/${schoolId}/subscription/invoices/${selectedReceiptInvoice.id}/receipts`,
+        { subtotal_paid: subtotalPaid }
+      );
+      const nextSummary = res.data?.data?.summary || emptySummary;
+      setSummary(nextSummary);
+      setForm(buildForm(nextSummary));
+      setReceiptInvoiceId(String(selectedReceiptInvoice.id));
+      setShowReceiptModal(false);
+      alert(res.data?.message || "Payment receipt created.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {}).flat().find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to create payment receipt.");
+    } finally {
+      setReceiptSaving(false);
+    }
+  };
+
+  const downloadReceipt = async (invoice, receipt) => {
+    if (!invoice || !receipt) return;
+    setReceiptDownloadingId(receipt.id);
+    try {
+      const res = await api.get(
+        `/api/super-admin/schools/${schoolId}/subscription/invoices/${invoice.id}/receipts/${receipt.id}`,
+        { responseType: "blob" }
+      );
+      const disposition = String(res.headers?.["content-disposition"] || "");
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] || `school_subscription_receipt_${receipt.receipt_number}.pdf`;
+      await saveDownload(new Blob([res.data], { type: "application/pdf" }), filename);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download payment receipt.");
+    } finally {
+      setReceiptDownloadingId(null);
+    }
+  };
+
   return (
     <section className="sai-card sai-subscription-card">
       <div className="sai-subscription-head">
