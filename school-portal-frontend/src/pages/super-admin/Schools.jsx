@@ -22,6 +22,10 @@ function Schools() {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editSubdomain, setEditSubdomain] = useState("");
+  const [editAdminName, setEditAdminName] = useState("");
+  const [editAdminEmail, setEditAdminEmail] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [featureSchool, setFeatureSchool] = useState(null);
   const [schoolFeatures, setSchoolFeatures] = useState([]);
@@ -136,21 +140,37 @@ function Schools() {
 
   const startEdit = (school) => {
     setEditingId(school.id);
-    setEditName(school.name);
-    setEditEmail(school.email);
+    setEditName(school.name || "");
+    setEditSubdomain(school.subdomain || "");
+    setEditEmail(school.email || "");
+    setEditAdminName(school.admin?.name || "");
+    setEditAdminEmail(school.admin?.email || "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
   };
 
-  const updateSchool = async (id) => {
-    await api.put(`/api/super-admin/schools/${id}`, {
-      name: editName,
-      email: editEmail,
-    });
-    cancelEdit();
-    loadSchools();
+  const updateSchool = async (event) => {
+    event.preventDefault();
+    setSavingEdit(true);
+
+    try {
+      const res = await api.put(`/api/super-admin/schools/${editingId}`, {
+        name: editName,
+        subdomain: editSubdomain,
+        email: editEmail,
+        admin_name: editAdminName,
+        admin_email: editAdminEmail,
+      });
+      cancelEdit();
+      await loadSchools();
+      showToast(res?.data?.message || "School details updated successfully.");
+    } catch (err) {
+      showToast(formatApiError(err) || "Failed to update school details.", "error");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const deleteSchool = async (id, schoolNameValue) => {
@@ -473,6 +493,65 @@ function Schools() {
         </table>
       </div>
 
+      {editingId ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-school-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+            background: "rgba(15, 23, 42, 0.58)",
+          }}
+        >
+          <form
+            onSubmit={updateSchool}
+            style={{
+              width: "min(100%, 520px)",
+              maxHeight: "calc(100vh - 32px)",
+              overflowY: "auto",
+              padding: 24,
+              borderRadius: 16,
+              background: "#fff",
+              boxShadow: "0 20px 60px rgba(15, 23, 42, 0.3)",
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <h2 id="edit-school-title" style={{ margin: 0 }}>Edit School Details</h2>
+
+            <label style={{ display: "grid", gap: 5 }}>
+              School Name
+              <input required style={formInputStyle} value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </label>
+            <label style={{ display: "grid", gap: 5 }}>
+              Subdomain
+              <input required style={formInputStyle} value={editSubdomain} onChange={(e) => setEditSubdomain(slugifySubdomain(e.target.value))} />
+            </label>
+            <label style={{ display: "grid", gap: 5 }}>
+              School Email
+              <input required type="email" style={formInputStyle} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+            </label>
+            <label style={{ display: "grid", gap: 5 }}>
+              School Admin Name
+              <input required style={formInputStyle} value={editAdminName} onChange={(e) => setEditAdminName(e.target.value)} />
+            </label>
+            <label style={{ display: "grid", gap: 5 }}>
+              School Admin Email
+              <input required type="email" style={formInputStyle} value={editAdminEmail} onChange={(e) => setEditAdminEmail(e.target.value)} />
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button type="button" onClick={cancelEdit} disabled={savingEdit}>Cancel</button>
+              <button type="submit" disabled={savingEdit}>{savingEdit ? "Saving..." : "Save Changes"}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       {showFeatureModal && (
         <div style={{ border: "1px solid #000", padding: 20 }}>
           <h3>Manage Features - {featureSchool.name}</h3>
