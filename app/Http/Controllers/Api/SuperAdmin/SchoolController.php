@@ -96,19 +96,41 @@ class SchoolController extends Controller
 
     public function update(Request $request, School $school)
     {
+        $request->merge([
+            'subdomain' => $this->normalizeSubdomain($request->input('subdomain')),
+        ]);
+
+        $admin = $school->admin;
+
+        if (!$admin) {
+            throw ValidationException::withMessages([
+                'admin_email' => ['This school does not have an assigned school administrator.'],
+            ]);
+        }
+
         $payload = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:schools,email,' . $school->id,
+            'subdomain' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]+$/', 'unique:schools,subdomain,' . $school->id],
+            'admin_name' => 'required|string|max:255',
+            'admin_email' => 'required|email|unique:users,email,' . $admin->id,
         ]);
 
-        $school->name = $payload['name'];
-        $school->email = $payload['email'];
-        $school->slug = Str::slug($payload['name']);
-        $school->save();
+        DB::transaction(function () use ($school, $admin, $payload) {
+            $school->name = $payload['name'];
+            $school->email = $payload['email'];
+            $school->subdomain = $payload['subdomain'];
+            $school->slug = Str::slug($payload['name']);
+            $school->save();
+
+            $admin->name = $payload['admin_name'];
+            $admin->email = $payload['admin_email'];
+            $admin->save();
+        });
 
         return response()->json([
             'message' => 'School updated successfully',
-            'data' => $school,
+            'data' => $school->fresh(['admin:id,name,email,school_id']),
         ]);
     }
     public function createWithAdmin(Request $request)
