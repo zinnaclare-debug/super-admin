@@ -6,6 +6,7 @@ use App\Models\AcademicSession;
 use App\Models\School;
 use App\Models\SchoolSubscriptionInvoice;
 use App\Models\SchoolSubscriptionSetting;
+use App\Models\SchoolSubscriptionReceipt;
 use App\Models\Term;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
@@ -316,6 +317,45 @@ class SchoolSubscriptionBilling
         };
     }
 
+    public static function receiptSummary(SchoolSubscriptionInvoice $invoice): array
+    {
+        $receipts = $invoice->receipts()->oldest('id')->get();
+        $paidSubtotal = self::money($receipts->sum('subtotal_paid'));
+        // Official payment receipts record subscription subtotal only; processing fees stay on invoices.
+        $paidFee = 0.0;
+        $paidTotal = $paidSubtotal;
+        $invoiceSubtotal = self::money($invoice->subtotal);
+        $invoiceFee = 0.0;
+        $invoiceTotal = $invoiceSubtotal;
+        $latestReceipt = $receipts->last();
+
+        return [
+            'invoice_subtotal' => $invoiceSubtotal,
+            'invoice_processing_fee' => $invoiceFee,
+            'invoice_total' => $invoiceTotal,
+            'paid_subtotal' => $paidSubtotal,
+            'paid_processing_fee' => $paidFee,
+            'paid_total' => $paidTotal,
+            'remaining_subtotal' => max(0, self::money($invoiceSubtotal - $paidSubtotal)),
+            'remaining_processing_fee' => max(0, self::money($invoiceFee - $paidFee)),
+            'remaining_total' => max(0, self::money($invoiceTotal - $paidTotal)),
+            'receipt_count' => $receipts->count(),
+            'latest_receipt' => $latestReceipt ? self::receiptPayload($latestReceipt) : null,
+        ];
+    }
+
+    public static function receiptPayload(SchoolSubscriptionReceipt $receipt): array
+    {
+        return [
+            'id' => (int) $receipt->id,
+            'receipt_number' => $receipt->receipt_number,
+            'subtotal_paid' => self::money($receipt->subtotal_paid),
+            'processing_fee_paid' => self::money($receipt->processing_fee_paid),
+            'total_paid' => self::money($receipt->total_paid),
+            'currency' => $receipt->currency ?: 'NGN',
+            'created_at' => $receipt->created_at?->toDateTimeString(),
+        ];
+    }
     public static function invoicePayload(SchoolSubscriptionInvoice $invoice): array
     {
         $meta = is_array($invoice->meta) ? $invoice->meta : [];
@@ -355,6 +395,7 @@ class SchoolSubscriptionBilling
             'bank_receipt_mime_type' => $invoice->bank_receipt_mime_type,
             'bank_receipt_uploaded_at' => $invoice->bank_receipt_uploaded_at?->toDateTimeString(),
             'bank_receipt_url' => $invoice->bank_receipt_path ? Storage::disk('public')->url($invoice->bank_receipt_path) : null,
+            'receipt_summary' => self::receiptSummary($invoice),
             'meta' => $meta,
         ];
     }

@@ -992,3 +992,14 @@
   min-width: 920px;
 }
 
+
+.sai-receipt-block { border-top: 1px solid #dbe3ef; padding-top: 18px; }
+.sai-receipt-summary { margin-top: 12px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; }
+.sai-receipt-actions { align-self: stretch; align-items: end; }
+.sai-receipt-link { border: 0; background: transparent; cursor: pointer; padding: 0; }
+.sai-receipt-link:disabled { cursor: wait; opacity: .65; }
+.sai-receipt-modal-backdrop { position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .58); }
+.sai-receipt-modal { width: min(480px, 100%); border: 1px solid #dbe3ef; border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .25); padding: 22px; }
+.sai-receipt-modal h4 { margin: 0; color: #0f172a; }
+.sai-receipt-modal-totals { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin: 16px 0; padding: 13px; border-radius: 10px; background: #f0f7ff; color: #475569; }
+.sai-receipt-modal-totals strong { color: #0f172a; text-align: right; }

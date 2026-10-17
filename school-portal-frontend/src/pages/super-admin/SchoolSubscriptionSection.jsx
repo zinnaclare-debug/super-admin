@@ -67,6 +67,11 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   const [saving, setSaving] = useState(false);
   const [actingInvoiceId, setActingInvoiceId] = useState(null);
   const [invoiceCycle, setInvoiceCycle] = useState("");
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState("");
+  const [receiptSubtotal, setReceiptSubtotal] = useState("");
+  const [receiptSaving, setReceiptSaving] = useState(false);
+  const [receiptDownloadingId, setReceiptDownloadingId] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [summary, setSummary] = useState(emptySummary);
   const [form, setForm] = useState(buildForm(emptySummary));
 
@@ -89,6 +94,8 @@ export default function SchoolSubscriptionSection({ schoolId }) {
   }, [schoolId]);
 
   const invoiceRows = useMemo(() => (Array.isArray(summary.recent_invoices) ? summary.recent_invoices : []), [summary]);
+  const selectedReceiptInvoice = invoiceRows.find((invoice) => String(invoice.id) === String(receiptInvoiceId)) || invoiceRows[0] || null;
+  const selectedReceiptSummary = selectedReceiptInvoice?.receipt_summary || null;
 
   const saveSettings = async () => {
     setSaving(true);
@@ -373,6 +380,74 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             ))}
           </div>
 
+          <div className="sai-invoice-block sai-receipt-block">
+            <div className="sai-subscription-head">
+              <div>
+                <h4>Payment Receipts</h4>
+                <p className="sai-note">Create an official receipt after recording the subscription amount paid. Processing fees are not included on receipts.</p>
+              </div>
+            </div>
+
+            {invoiceRows.length === 0 ? (
+              <p className="sai-note">An invoice must exist before a payment receipt can be created.</p>
+            ) : (
+              <div className="sai-receipt-summary">
+                <div className="sai-field">
+                  <label>Invoice</label>
+                  <select value={receiptInvoiceId || String(selectedReceiptInvoice?.id || "")} onChange={(e) => setReceiptInvoiceId(e.target.value)}>
+                    {invoiceRows.map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>{invoice.reference} - {invoice.billing_cycle_label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sai-subscription-tile">
+                  <span>Amount Payable (Subtotal)</span>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, selectedReceiptInvoice?.currency)}</strong>
+                </div>
+
+                <div className="sai-subscription-tile">
+                  <span>Total Balance Remaining</span>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_total, selectedReceiptInvoice?.currency)}</strong>
+                </div>
+                <div className="sai-inline-actions sai-receipt-actions">
+                  <button type="button" onClick={openReceiptModal} disabled={Number(selectedReceiptSummary?.remaining_subtotal || 0) <= 0.01}>
+                    Create Receipt
+                  </button>
+                  <button
+                    type="button"
+                    className="sai-action-secondary"
+                    onClick={() => downloadReceipt(selectedReceiptInvoice, selectedReceiptSummary?.latest_receipt)}
+                    disabled={!selectedReceiptSummary?.latest_receipt || receiptDownloadingId === selectedReceiptSummary?.latest_receipt?.id}
+                  >
+                    {receiptDownloadingId === selectedReceiptSummary?.latest_receipt?.id ? "Preparing Receipt..." : "Download Receipt"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {showReceiptModal && selectedReceiptInvoice ? (
+            <div className="sai-receipt-modal-backdrop" onClick={() => !receiptSaving && setShowReceiptModal(false)}>
+              <div className="sai-receipt-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
+                <h4 id="receipt-modal-title">Create Payment Receipt</h4>
+                <p className="sai-note">{selectedReceiptInvoice.reference}</p>
+                <div className="sai-receipt-modal-totals">
+                  <span>Amount payable (subtotal)</span>
+                  <strong>{formatMoney(selectedReceiptSummary?.remaining_subtotal, selectedReceiptInvoice.currency)}</strong>
+
+                </div>
+                <label className="sai-field">
+                  <span>Subtotal amount paid</span>
+                  <input type="number" min="0.01" max={selectedReceiptSummary?.remaining_subtotal || undefined} step="0.01" value={receiptSubtotal} onChange={(e) => setReceiptSubtotal(e.target.value)} placeholder="Enter subscription amount paid" autoFocus />
+                </label>
+                <p className="sai-note">The receipt records this subscription amount only. No processing fee will be added.</p>
+                <div className="sai-actions">
+                  <button type="button" onClick={createReceipt} disabled={receiptSaving}>{receiptSaving ? "Saving..." : "Save Receipt"}</button>
+                  <button type="button" className="sai-action-secondary" onClick={() => setShowReceiptModal(false)} disabled={receiptSaving}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="sai-invoice-block">
             <div className="sai-subscription-head">
               <div>
@@ -416,9 +491,18 @@ export default function SchoolSubscriptionSection({ schoolId }) {
                       <td>{invoice.term_name || (invoice.billing_cycle === "yearly" ? "All Terms" : "-")}</td>
                       <td>{formatMoney(invoice.total_amount, invoice.currency)}</td>
                       <td>
-                        {invoice.bank_receipt_url ? (
+                        {invoice.receipt_summary?.latest_receipt ? (
+                          <button
+                            type="button"
+                            className="sai-action-link sai-receipt-link"
+                            onClick={() => downloadReceipt(invoice, invoice.receipt_summary.latest_receipt)}
+                            disabled={receiptDownloadingId === invoice.receipt_summary.latest_receipt.id}
+                          >
+                            {receiptDownloadingId === invoice.receipt_summary.latest_receipt.id ? "Preparing..." : "Download Receipt"}
+                          </button>
+                        ) : invoice.bank_receipt_url ? (
                           <a href={invoice.bank_receipt_url} target="_blank" rel="noreferrer" className="sai-action-link">
-                            {invoice.bank_receipt_name || "View Receipt"}
+                            {invoice.bank_receipt_name || "View Bank Receipt"}
                           </a>
                         ) : "-"}
                       </td>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SchoolSubscriptionInvoice extends Model
 {
@@ -48,6 +49,10 @@ class SchoolSubscriptionInvoice extends Model
         'meta' => 'array',
     ];
 
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(SchoolSubscriptionReceipt::class, 'school_subscription_invoice_id');
+    }
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);

@@ -41,6 +41,7 @@ export default function SchoolSubscriptionStatus() {
   const [open, setOpen] = useState(false);
   const [busyCycle, setBusyCycle] = useState("");
   const [invoiceCycle, setInvoiceCycle] = useState("");
+  const [receiptCycle, setReceiptCycle] = useState("");
   const [bankCycle, setBankCycle] = useState("");
   const [bankForms, setBankForms] = useState({});
 
@@ -158,6 +159,25 @@ export default function SchoolSubscriptionStatus() {
     }
   };
 
+
+  const downloadReceipt = async (cycle) => {
+    setReceiptCycle(cycle);
+    try {
+      const res = await api.get("/api/school-admin/subscription/receipt", {
+        params: { billing_cycle: cycle },
+        responseType: "blob",
+      });
+      const disposition = String(res.headers?.["content-disposition"] || "");
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] || `school_subscription_receipt_${cycle}.pdf`;
+      const saved = await saveDownload(new Blob([res.data], { type: "application/pdf" }), filename);
+      if (saved.native) alert(saved.message);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to download payment receipt.");
+    } finally {
+      setReceiptCycle("");
+    }
+  };
   const updateBankReceipt = (cycle, file) => {
     setBankForms((prev) => ({
       ...prev,
@@ -254,6 +274,9 @@ export default function SchoolSubscriptionStatus() {
                 const cycle = quote.billing_cycle;
                 const receiptName = bankForms[cycle]?.receipt?.name || "";
                 const showBankDetails = bankCycle === cycle;
+                const officialReceipt = summary.active_invoice?.billing_cycle === cycle
+                  ? summary.active_invoice?.receipt_summary?.latest_receipt
+                  : null;
 
                 return (
                   <article key={cycle} className="sd-subscription-card-item">
@@ -290,10 +313,12 @@ export default function SchoolSubscriptionStatus() {
                       <button
                         type="button"
                         className="sd-subscription-alt"
-                        onClick={() => downloadInvoice(cycle)}
-                        disabled={invoiceCycle === cycle || summary.status === "free"}
+                        onClick={() => officialReceipt ? downloadReceipt(cycle) : downloadInvoice(cycle)}
+                        disabled={summary.status === "free" || (officialReceipt ? receiptCycle === cycle : invoiceCycle === cycle)}
                       >
-                        {invoiceCycle === cycle ? "Preparing..." : "Download Invoice"}
+                        {officialReceipt
+                          ? (receiptCycle === cycle ? "Preparing..." : "Download Receipt")
+                          : (invoiceCycle === cycle ? "Preparing..." : "Download Invoice")}
                       </button>
                     </div>
 

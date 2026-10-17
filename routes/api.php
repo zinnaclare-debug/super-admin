@@ -149,6 +149,8 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     Route::get('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'show']);
     Route::put('/super-admin/schools/{school}/information/billing', [SuperAdminSchoolSubscriptionController::class, 'upsertSettings']);
     Route::get('/super-admin/schools/{school}/information/billing/invoice', [SuperAdminSchoolSubscriptionController::class, 'invoice']);
+    Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/receipts', [SuperAdminSchoolSubscriptionController::class, 'createReceipt']);
+    Route::get('/super-admin/schools/{school}/subscription/invoices/{invoice}/receipts/{receipt}', [SuperAdminSchoolSubscriptionController::class, 'downloadReceipt']);
     Route::post('/super-admin/schools/{school}/subscription/invoices/{invoice}/status', [SuperAdminSchoolSubscriptionController::class, 'updateInvoiceStatus']);
     Route::delete('/super-admin/schools/{school}/subscription/invoices/{invoice}', [SuperAdminSchoolSubscriptionController::class, 'destroyInvoice']);
 
@@ -228,6 +230,7 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:entrance_exam');
     Route::get('/school-admin/subscription', [SchoolAdminSubscriptionController::class, 'show']);
     Route::get('/school-admin/subscription/invoice', [SchoolAdminSubscriptionController::class, 'invoice']);
+    Route::get('/school-admin/subscription/receipt', [SchoolAdminSubscriptionController::class, 'receipt']);
     Route::post('/school-admin/subscription/initialize', [SchoolAdminSubscriptionController::class, 'initializePaystack']);
     Route::post('/school-admin/subscription/bank-transfer', [SchoolAdminSubscriptionController::class, 'submitBankTransfer']);
     Route::get('/school-admin/subscription/verify', [SchoolAdminSubscriptionController::class, 'verify']);

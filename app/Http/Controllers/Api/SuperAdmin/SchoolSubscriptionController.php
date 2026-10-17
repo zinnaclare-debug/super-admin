@@ -89,6 +89,15 @@ class SchoolSubscriptionController extends Controller
             'status_target' => 'required|in:active,pending',
         ]);
 
+        $receiptSummary = SchoolSubscriptionBilling::receiptSummary($invoice);
+        if ($payload['status_target'] === 'active'
+            && (int) $receiptSummary['receipt_count'] > 0
+            && (float) $receiptSummary['remaining_total'] > 0.01) {
+            return response()->json([
+                'message' => 'This invoice still has an outstanding receipt balance of '
+                    . number_format((float) $receiptSummary['remaining_total'], 2) . '.',
+            ], 422);
+        }
         $meta = is_array($invoice->meta) ? $invoice->meta : [];
         $meta['super_admin_action'] = [
             'status_target' => $payload['status_target'],
@@ -127,6 +136,77 @@ class SchoolSubscriptionController extends Controller
         ]);
     }
 
+    public function createReceipt(Request $request, School $school, SchoolSubscriptionInvoice $invoice)
+    {
+        if ((int) $invoice->school_id !== (int) $school->id) {
+            return response()->json(['message' => 'Invoice not found for this school.'], 404);
+        }
+
+        $payload = $request->validate([
+            'subtotal_paid' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $receipt = DB::transaction(function () use ($request, $school, $invoice, $payload) {
+            $lockedInvoice = SchoolSubscriptionInvoice::query()
+                ->whereKey($invoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $summary = SchoolSubscriptionBilling::receiptSummary($lockedInvoice);
+            $subtotalPaid = round((float) $payload['subtotal_paid'], 2);
+
+            if ($subtotalPaid > ((float) $summary['remaining_subtotal'] + 0.01)) {
+                throw ValidationException::withMessages([
+                    'subtotal_paid' => ['The amount paid cannot exceed the remaining subtotal of '
+                        . number_format((float) $summary['remaining_subtotal'], 2) . '.'],
+                ]);
+            }
+
+            // Official payment receipts contain only the paid subscription subtotal.
+            $processingFeePaid = 0.0;
+            $totalPaid = $subtotalPaid;
+
+            do {
+                $receiptNumber = 'SSR-' . (int) $school->id . '-' . Str::upper(Str::random(10));
+            } while (SchoolSubscriptionReceipt::query()->where('receipt_number', $receiptNumber)->exists());
+
+            $meta = is_array($lockedInvoice->meta) ? $lockedInvoice->meta : [];
+
+            return SchoolSubscriptionReceipt::query()->create([
+                'school_id' => (int) $school->id,
+                'school_subscription_invoice_id' => (int) $lockedInvoice->id,
+                'receipt_number' => $receiptNumber,
+                'subtotal_paid' => $subtotalPaid,
+                'processing_fee_paid' => $processingFeePaid,
+                'total_paid' => $totalPaid,
+                'currency' => $lockedInvoice->currency ?: 'NGN',
+                'recorded_by_user_id' => (int) $request->user()->id,
+                'meta' => [
+                    'school_name' => data_get($meta, 'school_name', $school->name),
+                    'session_name' => data_get($meta, 'session_name'),
+                    'term_name' => data_get($meta, 'term_name'),
+                ],
+            ]);
+        });
+
+        return response()->json([
+            'message' => 'Payment receipt created successfully.',
+            'data' => [
+                'receipt' => SchoolSubscriptionBilling::receiptPayload($receipt),
+                'summary' => SchoolSubscriptionBilling::buildSummary($school),
+            ],
+        ], 201);
+    }
+
+    public function downloadReceipt(School $school, SchoolSubscriptionInvoice $invoice, SchoolSubscriptionReceipt $receipt)
+    {
+        if ((int) $invoice->school_id !== (int) $school->id
+            || (int) $receipt->school_id !== (int) $school->id
+            || (int) $receipt->school_subscription_invoice_id !== (int) $invoice->id) {
+            return response()->json(['message' => 'Receipt not found for this school invoice.'], 404);
+        }
+
+        return SchoolSubscriptionReceiptPdf::download($school, $invoice, $receipt);
+    }
     public function destroyInvoice(Request $request, School $school, SchoolSubscriptionInvoice $invoice)
     {
         if ((int) $invoice->school_id !== (int) $school->id) {

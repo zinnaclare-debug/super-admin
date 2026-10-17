@@ -148,6 +148,37 @@ class SchoolSubscriptionController extends Controller
         }
     }
 
+    public function receipt(Request $request)
+    {
+        $payload = $request->validate([
+            'billing_cycle' => 'required|in:termly,yearly',
+        ]);
+
+        $school = School::query()->find((int) $request->user()->school_id);
+        if (!$school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $cycle = (string) $payload['billing_cycle'];
+        [$session, $term] = SchoolSubscriptionBilling::resolveCurrentSessionAndTerm((int) $school->id);
+        if (!$session || !$term) {
+            return response()->json(['message' => 'A current academic session and term are required to download this receipt.'], 422);
+        }
+
+        $invoice = $this->findMatchingInvoice(
+            (int) $school->id,
+            (int) $session->id,
+            $cycle === SchoolSubscriptionBilling::CYCLE_TERMLY ? (int) $term->id : null,
+            $cycle
+        );
+        $receipt = $invoice?->receipts()->latest('id')->first();
+
+        if (!$invoice || $invoice->status !== 'paid' || !$receipt) {
+            return response()->json(['message' => 'A saved receipt is not available for the active subscription yet.'], 422);
+        }
+
+        return SchoolSubscriptionReceiptPdf::download($school, $invoice, $receipt);
+    }
     public function initializePaystack(Request $request)
     {
         $payload = $request->validate([
