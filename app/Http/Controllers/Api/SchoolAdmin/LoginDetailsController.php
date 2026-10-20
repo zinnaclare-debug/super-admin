@@ -331,15 +331,16 @@ class LoginDetailsController extends Controller
 
             foreach ($classStudentQuery->get() as $row) {
                 $studentId = (int) ($row->student_id ?? 0);
-                if ($studentId < 1 || isset($studentProfileByStudentId[$studentId])) {
+                if ($studentId < 1) {
                     continue;
                 }
 
+                $existingProfile = $studentProfileByStudentId[$studentId] ?? [];
                 $studentProfileByStudentId[$studentId] = [
                     'class_id' => !empty($row->class_id) ? (int) $row->class_id : null,
                     'class_name' => trim((string) ($row->class_name ?? '')),
                     'level' => strtolower(trim((string) ($row->class_level ?? ''))),
-                    'department' => '',
+                    'department' => trim((string) ($existingProfile['department'] ?? '')),
                 ];
             }
         }

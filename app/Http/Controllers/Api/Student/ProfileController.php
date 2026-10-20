@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use App\Models\Student;
 use App\Models\Guardian;
 use App\Models\School;
@@ -49,8 +50,10 @@ class ProfileController extends Controller
 
         $currentClass = null;
         $currentDepartment = null;
-        if ($student && $currentTerm) {
-            $classRow = Enrollment::query()
+        if ($student && $currentSession) {
+            $classRow = null;
+            if ($currentTerm) {
+                $classRow = Enrollment::query()
                 ->where('enrollments.student_id', $student->id)
                 ->where('enrollments.term_id', $currentTerm->id)
                 ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
@@ -70,6 +73,22 @@ class ProfileController extends Controller
                     'class_departments.id as department_id',
                     'class_departments.name as department_name',
                 ]);
+            }
+
+            if (!$classRow && Schema::hasTable('class_students')) {
+                $classRow = DB::table('class_students')
+                    ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                    ->where('class_students.school_id', $schoolId)
+                    ->where('class_students.academic_session_id', (int) $currentSession->id)
+                    ->where('class_students.student_id', (int) $student->id)
+                    ->where('classes.school_id', $schoolId)
+                    ->orderByDesc('class_students.id')
+                    ->first([
+                        'classes.id as class_id',
+                        'classes.name as class_name',
+                        'classes.level as class_level',
+                    ]);
+            }
 
             if ($classRow) {
                 $currentClass = [
