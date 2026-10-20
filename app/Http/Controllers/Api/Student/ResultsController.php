@@ -117,11 +117,7 @@ class ResultsController extends Controller
             ->values()
             ->all();
 
-        if (!empty($classIds)) {
-            return array_values(array_unique($classIds));
-        }
-
-        // Backward-compatible fallback for schools still using term enrollments.
+        // Keep historical enrolments and saved results visible if class assignment data is incomplete.
         $enrollmentsQuery = Enrollment::query()
             ->where('enrollments.student_id', $studentId)
             ->join('terms', 'terms.id', '=', 'enrollments.term_id')
@@ -131,10 +127,33 @@ class ResultsController extends Controller
             $enrollmentsQuery->where('enrollments.school_id', $schoolId);
         }
 
-        return $enrollmentsQuery
+        $enrollmentClassIds = $enrollmentsQuery
             ->distinct()
             ->pluck('enrollments.class_id')
             ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $resultClassIds = DB::table('results')
+            ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+            ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+            ->where('results.school_id', $schoolId)
+            ->where('results.student_id', $studentId)
+            ->where('terms.school_id', $schoolId)
+            ->where('terms.academic_session_id', $sessionId)
+            ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
+                $query->where('term_subjects.school_id', $schoolId);
+            })
+            ->distinct()
+            ->pluck('term_subjects.class_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return collect([$classIds, $enrollmentClassIds, $resultClassIds])
+            ->flatten()
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
             ->values()
             ->all();
     }
@@ -849,6 +868,11 @@ class ResultsController extends Controller
         }
 
         $schoolId = (int) $actor->school_id;
+        $school = $actor->school ?: $actor->school()->first();
+        if (!$school) {
+            return response()->json(['message' => 'School not found for this account'], 404);
+        }
+
         $resolved = $this->resolveStudentByIdentifier($schoolId, $identifier);
         if (!$resolved) {
             return response()->json(['message' => 'Student not found for the supplied search value'], 404);
