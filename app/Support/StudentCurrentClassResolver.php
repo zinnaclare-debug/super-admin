@@ -31,32 +31,43 @@ class StudentCurrentClassResolver
 
         if (Schema::hasTable('class_students')) {
             $classStudentQuery = DB::table('class_students')
-                ->where('student_id', $studentId)
-                ->orderByDesc('id');
+                ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                ->where('class_students.student_id', $studentId)
+                ->where('classes.school_id', $schoolId)
+                ->where('classes.academic_session_id', $sessionId)
+                ->orderByDesc('class_students.id');
 
             if (Schema::hasColumn('class_students', 'school_id')) {
-                $classStudentQuery->where('school_id', $schoolId);
+                $classStudentQuery->where('class_students.school_id', $schoolId);
             }
             if (Schema::hasColumn('class_students', 'academic_session_id')) {
-                $classStudentQuery->where('academic_session_id', $sessionId);
+                $classStudentQuery->where('class_students.academic_session_id', $sessionId);
             }
 
             $candidateClassIds = array_merge($candidateClassIds, $classStudentQuery
-                ->pluck('class_id')
+                ->pluck('class_students.class_id')
                 ->map(fn ($id) => (int) $id)
                 ->all());
         }
 
-        $legacyQuery = Enrollment::query()
-            ->where('student_id', $studentId)
-            ->where('term_id', $termId)
-            ->orderByDesc('id');
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $legacyQuery->where('school_id', $schoolId);
-        }
-        $legacyClassId = $legacyQuery->value('class_id');
-        if ($legacyClassId) {
-            $candidateClassIds[] = (int) $legacyClassId;
+        // A student may be promoted into a pending session before staff briefly
+        // reactivate the previous session to correct published scores. Saved
+        // result rows provide a scoped recovery link for that exact term.
+        if (Schema::hasTable('results')) {
+            $resultClassIds = DB::table('results')
+                ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+                ->where('results.school_id', $schoolId)
+                ->where('results.student_id', $studentId)
+                ->where('term_subjects.term_id', $termId)
+                ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
+                    $query->where('term_subjects.school_id', $schoolId);
+                })
+                ->orderByDesc('results.id')
+                ->pluck('term_subjects.class_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $candidateClassIds = array_merge($candidateClassIds, $resultClassIds);
         }
 
         $candidateClassIds = array_values(array_unique(array_filter($candidateClassIds, fn ($id) => $id > 0)));

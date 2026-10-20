@@ -34,3 +34,6 @@ tests/my-first-app22/
 
 # Android mobile build output
 school-portal-frontend/dist-mobile/
+
+# Test cache
+.phpunit.result.cache
