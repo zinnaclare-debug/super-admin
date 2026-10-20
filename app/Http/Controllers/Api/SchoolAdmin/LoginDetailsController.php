@@ -180,7 +180,8 @@ class LoginDetailsController extends Controller
         ?string $role = null,
         ?string $level = null,
         ?string $department = null,
-        ?int $classId = null
+        ?int $classId = null,
+        ?string $q = null
     ): array
     {
         $hasCredentialTable = Schema::hasTable('user_login_credentials');
@@ -308,6 +309,40 @@ class LoginDetailsController extends Controller
                 ->all();
         }
 
+        if (
+            $studentIds->isNotEmpty()
+            && $currentSessionId
+            && Schema::hasTable('class_students')
+            && Schema::hasTable('classes')
+        ) {
+            $classStudentQuery = DB::table('class_students')
+                ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                ->where('class_students.school_id', $schoolId)
+                ->where('class_students.academic_session_id', (int) $currentSessionId)
+                ->where('classes.school_id', $schoolId)
+                ->whereIn('class_students.student_id', $studentIds->all())
+                ->orderByDesc('class_students.id')
+                ->select([
+                    'class_students.student_id',
+                    'classes.id as class_id',
+                    'classes.name as class_name',
+                    'classes.level as class_level',
+                ]);
+
+            foreach ($classStudentQuery->get() as $row) {
+                $studentId = (int) ($row->student_id ?? 0);
+                if ($studentId < 1 || isset($studentProfileByStudentId[$studentId])) {
+                    continue;
+                }
+
+                $studentProfileByStudentId[$studentId] = [
+                    'class_id' => !empty($row->class_id) ? (int) $row->class_id : null,
+                    'class_name' => trim((string) ($row->class_name ?? '')),
+                    'level' => strtolower(trim((string) ($row->class_level ?? ''))),
+                    'department' => '',
+                ];
+            }
+        }
         $rawRows = $users->values()->map(function (User $user) use (
             $hasCredentialTable,
             $studentIdByUserId,
@@ -358,6 +393,7 @@ class LoginDetailsController extends Controller
         $levelFilter = $this->normalizeLevelValue((string) $level);
         $departmentFilter = strtolower(trim((string) $department));
         $classFilter = (int) ($classId ?? 0);
+        $searchQuery = strtolower(trim((string) $q));
 
         $classOptionsQuery = DB::table('classes')
             ->where('school_id', $schoolId)
@@ -402,8 +438,20 @@ class LoginDetailsController extends Controller
                 $departmentFilter,
                 $validClassId,
                 $role,
-                $studentScopedFiltersActive
+                $studentScopedFiltersActive,
+                $searchQuery
             ) {
+                if ($searchQuery !== '') {
+                    $searchable = strtolower(implode(' ', [
+                        (string) ($row['name'] ?? ''),
+                        (string) ($row['email'] ?? ''),
+                        (string) ($row['username'] ?? ''),
+                    ]));
+                    if (!str_contains($searchable, $searchQuery)) {
+                        return false;
+                    }
+                }
+
                 if ($levelFilter !== '' && $this->normalizeLevelValue((string) ($row['level'] ?? '')) !== $levelFilter) {
                     return false;
                 }
