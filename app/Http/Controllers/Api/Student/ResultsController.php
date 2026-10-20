@@ -392,8 +392,33 @@ class ResultsController extends Controller
                 ->orderBy('id')
                 ->get(['id', 'name', 'is_current']);
 
+            $resultClassIdsByTerm = [];
+            if ($terms->isNotEmpty()) {
+                $resultClassIdsByTerm = DB::table('results')
+                    ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+                    ->where('results.school_id', $schoolId)
+                    ->where('results.student_id', (int) $student->id)
+                    ->whereIn('term_subjects.term_id', $terms->pluck('id')->all())
+                    ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
+                        $query->where('term_subjects.school_id', $schoolId);
+                    })
+                    ->get(['term_subjects.term_id', 'term_subjects.class_id'])
+                    ->groupBy('term_id')
+                    ->map(fn ($rows) => $rows->pluck('class_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn ($id) => $id > 0)
+                        ->unique()
+                        ->values()
+                        ->all())
+                    ->all();
+            }
             foreach ($classes as $class) {
             foreach ($terms as $term) {
+                $resultClassIds = $resultClassIdsByTerm[(int) $term->id] ?? [];
+                if (!empty($resultClassIds) && !in_array((int) $class->id, $resultClassIds, true)) {
+                    continue;
+                }
+
                 $isOpen = $this->resultPeriodIsOpen($school, $session, $term);
                 $items[] = [
                     'academic_session_id' => (int) $session->id,
