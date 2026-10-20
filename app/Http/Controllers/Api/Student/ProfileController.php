@@ -50,7 +50,7 @@ class ProfileController extends Controller
 
         $currentClass = null;
         $currentDepartment = null;
-        if ($student && $currentSession) {
+        if ($student) {
             $classRow = null;
             if ($currentTerm) {
                 $classRow = Enrollment::query()
@@ -75,11 +75,47 @@ class ProfileController extends Controller
                 ]);
             }
 
-            if (!$classRow && Schema::hasTable('class_students')) {
+            if (!$classRow && $currentSession && Schema::hasTable('class_students')) {
                 $classRow = DB::table('class_students')
                     ->join('classes', 'classes.id', '=', 'class_students.class_id')
                     ->where('class_students.school_id', $schoolId)
                     ->where('class_students.academic_session_id', (int) $currentSession->id)
+                    ->where('class_students.student_id', (int) $student->id)
+                    ->where('classes.school_id', $schoolId)
+                    ->orderByDesc('class_students.id')
+                    ->first([
+                        'classes.id as class_id',
+                        'classes.name as class_name',
+                        'classes.level as class_level',
+                    ]);
+            }
+
+            if (!$classRow) {
+                $classRow = Enrollment::query()
+                    ->where('enrollments.student_id', $student->id)
+                    ->when(Schema::hasColumn('enrollments', 'school_id'), function ($q) use ($schoolId) {
+                        $q->where('enrollments.school_id', $schoolId);
+                    })
+                    ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+                    ->leftJoin('class_departments', function ($join) use ($schoolId) {
+                        $join->on('class_departments.id', '=', 'enrollments.department_id')
+                            ->where('class_departments.school_id', '=', $schoolId);
+                    })
+                    ->where('classes.school_id', $schoolId)
+                    ->orderByDesc('enrollments.id')
+                    ->first([
+                        'classes.id as class_id',
+                        'classes.name as class_name',
+                        'classes.level as class_level',
+                        'class_departments.id as department_id',
+                        'class_departments.name as department_name',
+                    ]);
+            }
+
+            if (!$classRow && Schema::hasTable('class_students')) {
+                $classRow = DB::table('class_students')
+                    ->join('classes', 'classes.id', '=', 'class_students.class_id')
+                    ->where('class_students.school_id', $schoolId)
                     ->where('class_students.student_id', (int) $student->id)
                     ->where('classes.school_id', $schoolId)
                     ->orderByDesc('class_students.id')

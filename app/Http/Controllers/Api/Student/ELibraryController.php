@@ -9,6 +9,7 @@ use App\Models\ELibraryBook;
 use App\Models\Student;
 use App\Models\Term;
 use App\Models\TermSubject;
+use App\Support\StudentCurrentClassResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -36,60 +37,8 @@ class ELibraryController extends Controller
 
     private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId, int $currentTermId): array
     {
-        $enrollQuery = Enrollment::query()
-            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
-            ->where('classes.school_id', $schoolId)
-            ->where('classes.academic_session_id', $sessionId)
-            ->where('enrollments.student_id', $studentId)
-            ->where('enrollments.term_id', $currentTermId)
-            ->orderByDesc('enrollments.id');
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $enrollQuery->where('enrollments.school_id', $schoolId);
-        }
-
-        $activeClassId = $enrollQuery->value('enrollments.class_id');
-        if ($activeClassId) {
-            return [(int) $activeClassId];
-        }
-
-        $classIds = [];
-        if (Schema::hasTable('class_students')) {
-            $classStudentQuery = DB::table('class_students');
-            if (Schema::hasColumn('class_students', 'school_id')) {
-                $classStudentQuery->where('school_id', $schoolId);
-            }
-            if (Schema::hasColumn('class_students', 'academic_session_id')) {
-                $classStudentQuery->where('academic_session_id', $sessionId);
-            }
-            if (Schema::hasColumn('class_students', 'student_id')) {
-                $classStudentQuery->where('student_id', $studentId);
-            }
-
-            $classIds = $classStudentQuery
-                ->pluck('class_id')
-                ->map(fn ($id) => (int) $id)
-                ->filter(fn ($id) => $id > 0)
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        if (!empty($classIds)) {
-            return [(int) $classIds[0]];
-        }
-
-        $legacyQuery = Enrollment::query()
-            ->where('student_id', $studentId)
-            ->where('term_id', $currentTermId)
-            ->orderByDesc('id');
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $legacyQuery->where('school_id', $schoolId);
-        }
-
-        $legacyClassId = $legacyQuery->value('class_id');
-        return $legacyClassId ? [(int) $legacyClassId] : [];
+        return StudentCurrentClassResolver::forCurrentTerm($schoolId, $sessionId, $currentTermId, $studentId);
     }
-
     // GET /api/student/e-library/subjects
     // show subjects this student is assigned to (based on enrollments in CURRENT session)
     public function mySubjects(Request $request)

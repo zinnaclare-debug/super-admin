@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\Term;
 use App\Models\TermSubject;
+use App\Support\StudentCurrentClassResolver;
 use App\Models\VirtualClass;
 use App\Services\Hms\HmsRoomService;
 use Illuminate\Http\Request;
@@ -36,49 +37,8 @@ class VirtualClassesController extends Controller
 
     private function currentSessionClassIds(int $schoolId, int $sessionId, int $studentId, int $currentTermId): array
     {
-        $enrollQuery = Enrollment::query()
-            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
-            ->where('classes.school_id', $schoolId)
-            ->where('classes.academic_session_id', $sessionId)
-            ->where('student_id', $studentId)
-            ->where('term_id', $currentTermId)
-            ->orderByDesc('enrollments.id');
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $enrollQuery->where('enrollments.school_id', $schoolId);
-        }
-
-        $activeClassId = $enrollQuery->value('enrollments.class_id');
-        if ($activeClassId) {
-            return [(int) $activeClassId];
-        }
-
-        $classIds = DB::table('class_students')
-            ->where('school_id', $schoolId)
-            ->where('academic_session_id', $sessionId)
-            ->where('student_id', $studentId)
-            ->pluck('class_id')
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->unique()
-            ->values()
-            ->all();
-
-        if (!empty($classIds)) {
-            return [(int) $classIds[0]];
-        }
-
-        $legacyQuery = Enrollment::query()
-            ->where('student_id', $studentId)
-            ->where('term_id', $currentTermId)
-            ->orderByDesc('id');
-        if (Schema::hasColumn('enrollments', 'school_id')) {
-            $legacyQuery->where('school_id', $schoolId);
-        }
-
-        $legacyClassId = $legacyQuery->value('class_id');
-        return $legacyClassId ? [(int) $legacyClassId] : [];
+        return StudentCurrentClassResolver::forCurrentTerm($schoolId, $sessionId, $currentTermId, $studentId);
     }
-
     private function allowedTermSubjectIds(Request $request): array
     {
         $subjectsRes = $this->mySubjects($request)->getData(true);

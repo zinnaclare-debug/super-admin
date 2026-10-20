@@ -311,6 +311,43 @@ class LoginDetailsController extends Controller
 
         if (
             $studentIds->isNotEmpty()
+            && Schema::hasTable('enrollments')
+            && Schema::hasTable('classes')
+        ) {
+            $fallbackEnrollmentQuery = DB::table('enrollments')
+                ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+                ->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id')
+                ->where('classes.school_id', $schoolId)
+                ->whereIn('enrollments.student_id', $studentIds->all())
+                ->orderByDesc('enrollments.id')
+                ->select([
+                    'enrollments.student_id',
+                    'classes.id as class_id',
+                    'classes.name as class_name',
+                    'classes.level as class_level',
+                    'class_departments.name as department_name',
+                ]);
+
+            if (Schema::hasColumn('enrollments', 'school_id')) {
+                $fallbackEnrollmentQuery->where('enrollments.school_id', $schoolId);
+            }
+
+            foreach ($fallbackEnrollmentQuery->get() as $row) {
+                $studentId = (int) ($row->student_id ?? 0);
+                if ($studentId < 1 || isset($studentProfileByStudentId[$studentId])) {
+                    continue;
+                }
+
+                $studentProfileByStudentId[$studentId] = [
+                    'class_id' => !empty($row->class_id) ? (int) $row->class_id : null,
+                    'class_name' => trim((string) ($row->class_name ?? '')),
+                    'level' => strtolower(trim((string) ($row->class_level ?? ''))),
+                    'department' => trim((string) ($row->department_name ?? '')),
+                ];
+            }
+        }
+        if (
+            $studentIds->isNotEmpty()
             && $currentSessionId
             && Schema::hasTable('class_students')
             && Schema::hasTable('classes')
