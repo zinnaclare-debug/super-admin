@@ -392,9 +392,10 @@ class ResultsController extends Controller
                 ->orderBy('id')
                 ->get(['id', 'name', 'is_current']);
 
-            $resultClassIdsByTerm = [];
+            $preferredResultClassIdByTerm = [];
+            $sessionScoredClassId = null;
             if ($terms->isNotEmpty()) {
-                $resultClassIdsByTerm = DB::table('results')
+                $preferredResultClassIdByTerm = DB::table('results')
                     ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
                     ->where('results.school_id', $schoolId)
                     ->where('results.student_id', (int) $student->id)
@@ -402,23 +403,59 @@ class ResultsController extends Controller
                     ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($query) use ($schoolId) {
                         $query->where('term_subjects.school_id', $schoolId);
                     })
-                    ->get(['term_subjects.term_id', 'term_subjects.class_id'])
+                    ->get([
+                        'term_subjects.term_id',
+                        'term_subjects.class_id',
+                        'results.id as result_id',
+                        'results.ca',
+                        'results.exam',
+                        'results.created_at as result_created_at',
+                        'results.updated_at as result_updated_at',
+                    ])
                     ->groupBy('term_id')
-                    ->map(fn ($rows) => $rows->pluck('class_id')
-                        ->map(fn ($id) => (int) $id)
-                        ->filter(fn ($id) => $id > 0)
-                        ->unique()
-                        ->values()
-                        ->all())
+                    ->map(function ($termRows) {
+                        return $termRows
+                            ->filter(fn ($row) => $this->isResultRecordGraded(
+                                $row->result_id ?? null,
+                                $row->ca ?? null,
+                                $row->exam ?? null,
+                                $row->result_created_at ?? null,
+                                $row->result_updated_at ?? null
+                            ))
+                            ->groupBy('class_id')
+                            ->sortByDesc(fn ($classRows) => $classRows->count())
+                            ->keys()
+                            ->map(fn ($id) => (int) $id)
+                            ->first();
+                    })
+                    ->filter(fn ($classId) => (int) $classId > 0)
                     ->all();
+
+                $sessionScoredClassId = collect($preferredResultClassIdByTerm)
+                    ->countBy()
+                    ->sortDesc()
+                    ->keys()
+                    ->map(fn ($id) => (int) $id)
+                    ->first();
             }
+
+            $latestAssignedClassId = DB::table('class_students')
+                ->where('school_id', $schoolId)
+                ->where('academic_session_id', (int) $session->id)
+                ->where('student_id', (int) $student->id)
+                ->orderByDesc('id')
+                ->value('class_id');
+            $latestAssignedClassId = $latestAssignedClassId ? (int) $latestAssignedClassId : null;
+
             foreach ($classes as $class) {
             foreach ($terms as $term) {
-                $resultClassIds = $resultClassIdsByTerm[(int) $term->id] ?? [];
-                if (!empty($resultClassIds) && !in_array((int) $class->id, $resultClassIds, true)) {
+                $preferredClassId = (int) ($preferredResultClassIdByTerm[(int) $term->id]
+                    ?? $sessionScoredClassId
+                    ?? $latestAssignedClassId
+                    ?? 0);
+                if ($preferredClassId > 0 && (int) $class->id !== $preferredClassId) {
                     continue;
                 }
-
                 $isOpen = $this->resultPeriodIsOpen($school, $session, $term);
                 $items[] = [
                     'academic_session_id' => (int) $session->id,
@@ -1149,6 +1186,7 @@ class ResultsController extends Controller
             ->when(Schema::hasColumn('term_subjects', 'school_id'), function ($q) use ($schoolId) {
                 $q->where('term_subjects.school_id', $schoolId);
             })
+            ->orderByRaw('CASE WHEN results.ca > 0 OR results.exam > 0 OR results.updated_at > results.created_at THEN 0 ELSE 1 END')
             ->orderByDesc('results.id')
             ->value('term_subjects.class_id');
 
