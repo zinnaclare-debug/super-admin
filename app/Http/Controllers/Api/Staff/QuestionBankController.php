@@ -604,7 +604,8 @@ class QuestionBankController extends Controller
   }
 
   // GET /api/staff/question-bank/subjects?session_id=&term_id=
-  // For filter UX only. Question bank itself is not session-bound.
+  // Questions belong to a subject, not to a class or term. Return each taught
+  // subject once so multiple class assignments do not duplicate the same bank.
   public function subjects(Request $request)
   {
     $user = $request->user();
@@ -635,9 +636,17 @@ class QuestionBankController extends Controller
 
     if (!$session) return response()->json(['data' => []]);
 
+    $currentTerm = Term::where('school_id', $schoolId)
+      ->where('academic_session_id', $session->id)
+      ->where('is_current', true)
+      ->first();
+
+    if (!$currentTerm) return response()->json(['data' => []]);
+
     $query = TermSubject::query()
       ->where('term_subjects.school_id', $schoolId)
       ->where('term_subjects.teacher_user_id', $user->id)
+      ->where('term_subjects.term_id', $currentTerm->id)
       ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
       ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
       ->join('classes', 'classes.id', '=', 'term_subjects.class_id')
@@ -649,17 +658,14 @@ class QuestionBankController extends Controller
     }
 
     $rows = $query
-      ->orderBy('classes.level')
-      ->orderBy('classes.name')
-      ->orderBy('terms.id')
+      ->groupBy('term_subjects.subject_id', 'subjects.name', 'subjects.code', 'terms.id', 'terms.name')
       ->orderBy('subjects.name')
       ->get([
-        'term_subjects.id as term_subject_id',
+        DB::raw('MIN(term_subjects.id) as term_subject_id'),
         'term_subjects.subject_id as subject_id',
         'subjects.name as subject_name',
         'subjects.code as subject_code',
-        'classes.name as class_name',
-        'classes.level as class_level',
+        DB::raw("GROUP_CONCAT(DISTINCT classes.name ORDER BY classes.name SEPARATOR ', ') as class_name"),
         'terms.id as term_id',
         'terms.name as term_name',
       ]);

@@ -358,7 +358,7 @@ export default function QuestionBankHome() {
                 }}
                 disabled={loading}
               >
-                <option value="">All terms</option>
+                <option value="">Current term</option>
                 {terms.map((t) => (
                   <option key={t.term_id} value={t.term_id}>
                     {t.term_name}
