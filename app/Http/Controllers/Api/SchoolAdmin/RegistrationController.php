@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessBulkRegistrationImport;
 use App\Models\AcademicSession;
+use App\Models\BulkRegistrationImport;
 use App\Models\ClassDepartment;
 use App\Models\Enrollment;
 use App\Models\Guardian;
@@ -19,6 +21,7 @@ use App\Support\UserCredentialStore;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -430,9 +433,7 @@ class RegistrationController extends Controller
         $parsed = $this->parseBulkCsv($request->file('csv'), $importType);
         $rows = $parsed['rows'];
         if (empty($rows)) {
-            return response()->json([
-                'message' => 'CSV file is empty.',
-            ], 422);
+            return response()->json(['message' => 'CSV file is empty.'], 422);
         }
 
         $usedUsernames = [];
@@ -454,12 +455,8 @@ class RegistrationController extends Controller
             );
 
             $previewRows[] = $this->buildBulkPreviewRow($validated, $index + 2, $importType);
-
             if ($validated['ok']) {
-                $validPayloads[] = [
-                    'row_number' => $index + 2,
-                    'data' => $validated['data'],
-                ];
+                $validPayloads[] = ['row_number' => $index + 2, 'data' => $validated['data']];
             } else {
                 $invalidRows++;
             }
@@ -480,135 +477,203 @@ class RegistrationController extends Controller
             ], 422);
         }
 
-        $actorUserId = (int) $request->user()->id;
-        $createdRows = [];
-
-        $currentImportRow = null;
-        try {
-            DB::transaction(function () use ($schoolId, $actorUserId, $validPayloads, $importType, &$createdRows, &$currentImportRow) {
-                foreach ($validPayloads as $item) {
-                    $currentImportRow = $item;
-                    $data = $item['data'];
-
-                    $user = User::create([
-                        'school_id' => $schoolId,
-                        'name' => $data['name'],
-                        'username' => $data['username'],
-                        'email' => $data['email'],
-                        'password' => Hash::make($data['password']),
-                        'role' => $importType,
-                    ]);
-
-                    UserCredentialStore::sync($user, $data['password'], $actorUserId);
-
-                    if ($importType === 'student') {
-                        $studentPayload = [
-                            'user_id' => $user->id,
-                            'school_id' => $schoolId,
-                            'sex' => $data['sex'],
-                            'religion' => $data['religion'],
-                            'dob' => $data['dob'],
-                            'address' => $data['address'],
-                        ];
-                        if (Schema::hasColumn('students', 'education_level')) {
-                            $studentPayload['education_level'] = $data['education_level'];
-                        }
-
-                        $student = Student::create($studentPayload);
-                        $class = SchoolClass::query()
-                            ->where('school_id', $schoolId)
-                            ->where('id', (int) $data['class_id'])
-                            ->firstOrFail();
-                        $this->enrollStudentInClassSession(
-                            $schoolId,
-                            $student,
-                            $class,
-                            $data['session_term_ids'],
-                            $data['department_id']
-                        );
-
-                        if (!empty($data['guardian_name'])) {
-                            Guardian::create([
-                                'school_id' => $schoolId,
-                                'user_id' => $user->id,
-                                'name' => $data['guardian_name'],
-                                'email' => $data['guardian_email'],
-                                'mobile' => $data['guardian_mobile'],
-                                'location' => $data['guardian_location'],
-                                'state_of_origin' => $data['guardian_state_of_origin'],
-                                'occupation' => $data['guardian_occupation'],
-                                'relationship' => $data['guardian_relationship'],
-                            ]);
-                        }
-                    } else {
-                        Staff::create([
-                            'user_id' => $user->id,
-                            'school_id' => $schoolId,
-                            'sex' => $data['sex'],
-                            'dob' => $data['dob'],
-                            'address' => $data['address'],
-                            'position' => $data['staff_position'],
-                            'education_level' => $data['education_level'],
-                        ]);
-                    }
-
-                    $createdRows[] = [
-                        'row_number' => $item['row_number'],
-                        'name' => $data['name'],
-                        'username' => $data['username'],
-                        'password' => $data['password'],
-                        'class_name' => $data['class_name'] ?? null,
-                        'department_name' => $data['department_name'] ?? null,
-                        'staff_position' => $data['staff_position'] ?? null,
-                    ];
-                }
-            });
-        } catch (Throwable $exception) {
-            $rowNumber = (int) ($currentImportRow['row_number'] ?? 0);
-            $rowName = trim((string) data_get($currentImportRow, 'data.name', ''));
-            $label = $rowNumber > 0
-                ? 'Row ' . $rowNumber . ($rowName !== '' ? " ({$rowName})" : '')
-                : 'Bulk import';
-
+        $activeImportExists = BulkRegistrationImport::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('status', [BulkRegistrationImport::STATUS_QUEUED, BulkRegistrationImport::STATUS_PROCESSING])
+            ->exists();
+        if ($activeImportExists) {
             return response()->json([
-                'message' => $label . ': ' . $this->friendlyBulkExceptionMessage($exception),
-                'data' => [
-                    'import_type' => $importType,
-                    'failed_row' => $rowNumber ?: null,
-                    'rows' => $rowNumber > 0 ? [[
-                        'row_number' => $rowNumber,
-                        'status' => 'invalid',
-                        'errors' => [$this->friendlyBulkExceptionMessage($exception)],
-                        'data' => [
-                            'name' => data_get($currentImportRow, 'data.name'),
-                            'email' => data_get($currentImportRow, 'data.email'),
-                            'username' => data_get($currentImportRow, 'data.username'),
-                            'education_level' => data_get($currentImportRow, 'data.education_level'),
-                            'class_name' => data_get($currentImportRow, 'data.class_name'),
-                            'department_name' => data_get($currentImportRow, 'data.department_name'),
-                            'staff_position' => data_get($currentImportRow, 'data.staff_position'),
-                        ],
-                    ]] : [],
-                ],
-            ], 422);
+                'message' => 'A bulk import is already running for this school. Wait for it to finish before starting another one.',
+            ], 409);
         }
 
-        $message = $importType === 'student'
-            ? 'Bulk student registration completed successfully.'
-            : 'Bulk staff registration completed successfully.';
+        $import = BulkRegistrationImport::create([
+            'school_id' => $schoolId,
+            'requested_by_user_id' => (int) $request->user()->id,
+            'import_type' => $importType,
+            'status' => BulkRegistrationImport::STATUS_QUEUED,
+            'total_rows' => count($validPayloads),
+            'payload_encrypted' => Crypt::encryptString(json_encode($validPayloads, JSON_THROW_ON_ERROR)),
+        ]);
+
+        ProcessBulkRegistrationImport::dispatch((int) $import->id);
 
         return response()->json([
-            'message' => $message,
-            'data' => [
-                'import_type' => $importType,
-                'summary' => [
-                    'imported_rows' => count($createdRows),
-                ],
-                'credentials' => $createdRows,
-            ],
-        ], 201);
+            'message' => 'Bulk import queued. You can stay on this page while accounts are created.',
+            'data' => $this->bulkImportPayload($import),
+        ], 202);
     }
 
+    public function bulkImportStatus(Request $request, BulkRegistrationImport $bulkRegistrationImport)
+    {
+        abort_unless(
+            (int) $bulkRegistrationImport->school_id === (int) $request->user()->school_id
+                && (int) $bulkRegistrationImport->requested_by_user_id === (int) $request->user()->id,
+            403
+        );
+
+        return response()->json(['data' => $this->bulkImportPayload($bulkRegistrationImport->fresh())]);
+    }
+
+    public function processBulkImportChunk(int $bulkRegistrationImportId): void
+    {
+        $import = BulkRegistrationImport::query()->find($bulkRegistrationImportId);
+        if (!$import || in_array($import->status, [BulkRegistrationImport::STATUS_COMPLETED, BulkRegistrationImport::STATUS_FAILED], true)) {
+            return;
+        }
+
+        $payloads = json_decode(Crypt::decryptString($import->payload_encrypted), true, 512, JSON_THROW_ON_ERROR);
+        $credentials = $import->credentials_encrypted
+            ? json_decode(Crypt::decryptString($import->credentials_encrypted), true, 512, JSON_THROW_ON_ERROR)
+            : [];
+        $offset = (int) $import->processed_rows;
+        $chunk = array_slice($payloads, $offset, 3);
+
+        if (empty($chunk)) {
+            $import->forceFill([
+                'status' => BulkRegistrationImport::STATUS_COMPLETED,
+                'completed_at' => now(),
+            ])->save();
+            return;
+        }
+
+        $import->forceFill([
+            'status' => BulkRegistrationImport::STATUS_PROCESSING,
+            'started_at' => $import->started_at ?: now(),
+            'error_message' => null,
+        ])->save();
+
+        try {
+            foreach ($chunk as $item) {
+                $credentials[] = DB::transaction(fn () => $this->createBulkRegistrationRow(
+                    (int) $import->school_id,
+                    (int) $import->requested_by_user_id,
+                    (string) $import->import_type,
+                    $item
+                ));
+            }
+        } catch (Throwable $exception) {
+            $import->forceFill([
+                'status' => BulkRegistrationImport::STATUS_FAILED,
+                'error_message' => $this->friendlyBulkExceptionMessage($exception),
+                'completed_at' => now(),
+            ])->save();
+            return;
+        }
+
+        $processedRows = $offset + count($chunk);
+        $isComplete = $processedRows >= count($payloads);
+        $import->forceFill([
+            'processed_rows' => $processedRows,
+            'imported_rows' => count($credentials),
+            'credentials_encrypted' => Crypt::encryptString(json_encode($credentials, JSON_THROW_ON_ERROR)),
+            'status' => $isComplete ? BulkRegistrationImport::STATUS_COMPLETED : BulkRegistrationImport::STATUS_QUEUED,
+            'completed_at' => $isComplete ? now() : null,
+        ])->save();
+
+        if (!$isComplete) {
+            ProcessBulkRegistrationImport::dispatch((int) $import->id);
+        }
+    }
+
+    private function createBulkRegistrationRow(int $schoolId, int $actorUserId, string $importType, array $item): array
+    {
+        $data = $item['data'];
+        $user = User::create([
+            'school_id' => $schoolId,
+            'name' => $data['name'],
+            'username' => $data['username'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role' => $importType,
+        ]);
+
+        UserCredentialStore::sync($user, $data['password'], $actorUserId);
+
+        if ($importType === 'student') {
+            $studentPayload = [
+                'user_id' => $user->id,
+                'school_id' => $schoolId,
+                'sex' => $data['sex'],
+                'religion' => $data['religion'],
+                'dob' => $data['dob'],
+                'address' => $data['address'],
+            ];
+            if (Schema::hasColumn('students', 'education_level')) {
+                $studentPayload['education_level'] = $data['education_level'];
+            }
+
+            $student = Student::create($studentPayload);
+            $class = SchoolClass::query()
+                ->where('school_id', $schoolId)
+                ->where('id', (int) $data['class_id'])
+                ->firstOrFail();
+            $this->enrollStudentInClassSession(
+                $schoolId,
+                $student,
+                $class,
+                $data['session_term_ids'],
+                $data['department_id']
+            );
+
+            if (!empty($data['guardian_name'])) {
+                Guardian::create([
+                    'school_id' => $schoolId,
+                    'user_id' => $user->id,
+                    'name' => $data['guardian_name'],
+                    'email' => $data['guardian_email'],
+                    'mobile' => $data['guardian_mobile'],
+                    'location' => $data['guardian_location'],
+                    'state_of_origin' => $data['guardian_state_of_origin'],
+                    'occupation' => $data['guardian_occupation'],
+                    'relationship' => $data['guardian_relationship'],
+                ]);
+            }
+        } else {
+            Staff::create([
+                'user_id' => $user->id,
+                'school_id' => $schoolId,
+                'sex' => $data['sex'],
+                'dob' => $data['dob'],
+                'address' => $data['address'],
+                'position' => $data['staff_position'],
+                'education_level' => $data['education_level'],
+            ]);
+        }
+
+        return [
+            'row_number' => $item['row_number'],
+            'name' => $data['name'],
+            'username' => $data['username'],
+            'password' => $data['password'],
+            'class_name' => $data['class_name'] ?? null,
+            'department_name' => $data['department_name'] ?? null,
+            'staff_position' => $data['staff_position'] ?? null,
+        ];
+    }
+
+    private function bulkImportPayload(BulkRegistrationImport $import): array
+    {
+        $credentials = [];
+        if ($import->status === BulkRegistrationImport::STATUS_COMPLETED && $import->credentials_encrypted) {
+            try {
+                $credentials = json_decode(Crypt::decryptString($import->credentials_encrypted), true, 512, JSON_THROW_ON_ERROR);
+            } catch (Throwable) {
+                $credentials = [];
+            }
+        }
+
+        return [
+            'id' => (int) $import->id,
+            'import_type' => $import->import_type,
+            'status' => $import->status,
+            'total_rows' => (int) $import->total_rows,
+            'processed_rows' => (int) $import->processed_rows,
+            'imported_rows' => (int) $import->imported_rows,
+            'error_message' => $import->error_message,
+            'credentials' => $credentials,
+        ];
+    }
     private function storeBulkPreviewCache(Request $request, string $importType, array $summary, array $previewRows): string
     {
         $userId = (int) $request->user()->id;

@@ -77,6 +77,7 @@ export default function Register() {
   const [bulkPreviewPageLoading, setBulkPreviewPageLoading] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+  const [bulkImportJob, setBulkImportJob] = useState(null);
   const [bulkImportType, setBulkImportType] = useState("student");
   const [bulkTemplateLevel, setBulkTemplateLevel] = useState("");
 
@@ -113,6 +114,7 @@ export default function Register() {
   const bulkPlacementLabel = isBulkStudent ? "Class" : "Position";
   const bulkPreviewRows = Array.isArray(bulkPreviewData?.rows) ? bulkPreviewData.rows : [];
   const bulkPreviewPagination = bulkPreviewData?.pagination || null;
+  const bulkImportRunning = ["queued", "processing"].includes(bulkImportJob?.status);
   const studentClasses = enrollmentContext?.classes || [];
   const selectedClass = studentClasses.find((c) => String(c.id) === String(form.class_id));
   const selectedDepartments = selectedClass?.departments || [];
@@ -122,8 +124,42 @@ export default function Register() {
     setBulkPreviewData(null);
     setBulkPreviewPageLoading(false);
     setBulkResult(null);
+    setBulkImportJob(null);
   }, [bulkImportType]);
 
+  useEffect(() => {
+    if (!bulkImportJob?.id || !bulkImportRunning) return undefined;
+
+    let active = true;
+    const checkImport = async () => {
+      try {
+        const res = await api.get(`/api/school-admin/register/bulk/imports/${bulkImportJob.id}`);
+        const nextJob = res.data?.data || null;
+        if (!active || !nextJob) return;
+
+        setBulkImportJob(nextJob);
+        if (nextJob.status === "completed") {
+          setBulkResult({
+            import_type: nextJob.import_type,
+            summary: { imported_rows: nextJob.imported_rows },
+            credentials: nextJob.credentials || [],
+          });
+          alert(`Bulk ${nextJob.import_type} registration completed successfully.`);
+        } else if (nextJob.status === "failed") {
+          alert(nextJob.error_message || "Bulk import could not be completed.");
+        }
+      } catch (err) {
+        console.warn("Bulk import status failed:", err?.response?.data || err?.message);
+      }
+    };
+
+    checkImport();
+    const timer = window.setInterval(checkImport, 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [bulkImportJob?.id, bulkImportRunning]);
   useEffect(() => {
     if (!educationLevels.length) {
       setBulkTemplateLevel("all");
@@ -540,10 +576,11 @@ export default function Register() {
     setBulkImporting(true);
     try {
       const res = await api.post("/api/school-admin/register/bulk/confirm", fd);
-      setBulkResult(res.data?.data || null);
+      setBulkImportJob(res.data?.data || null);
+      setBulkResult(null);
       setBulkPreviewData(null);
       setBulkCsv(null);
-      alert(res.data?.message || `Bulk ${bulkTypeLabel.toLowerCase()} registration completed`);
+      alert(res.data?.message || `Bulk ${bulkTypeLabel.toLowerCase()} import queued`);
     } catch (err) {
       const responseData = err?.response?.data?.data;
       if (responseData) {
@@ -919,14 +956,21 @@ export default function Register() {
                 bulkPreviewing ||
                 bulkPreviewPageLoading ||
                 bulkImporting ||
+                bulkImportRunning ||
                 (bulkPreviewData?.summary?.invalid_rows || 0) > 0 ||
                 (bulkPreviewData?.summary?.valid_rows || 0) === 0
               }
             >
-              {bulkImporting ? "Importing..." : "Confirm Import"}
+              {bulkImporting || bulkImportRunning ? "Importing..." : "Confirm Import"}
             </button>
           </div>
 
+          {bulkImportJob && (
+            <p style={{ marginTop: 10 }}>
+              Bulk import: <strong>{bulkImportJob.status}</strong> | Processed: {bulkImportJob.processed_rows || 0} of {bulkImportJob.total_rows || 0}
+              {bulkImportJob.status === "failed" && bulkImportJob.error_message ? ` | ${bulkImportJob.error_message}` : ""}
+            </p>
+          )}
           {bulkPreviewData?.summary && (
             <p style={{ marginTop: 10 }}>
               Rows: {bulkPreviewData.summary.total_rows || 0} | Valid:{" "}
@@ -1025,7 +1069,7 @@ export default function Register() {
           )}
           {Array.isArray(bulkResult?.credentials) && bulkResult.credentials.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <h4>Imported {bulkTypeLabel} Login Credentials</h4>
+              <h4>Imported {bulkResult.import_type === "student" ? "Student" : "Staff"} Login Credentials</h4>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>

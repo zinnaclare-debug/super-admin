@@ -297,6 +297,8 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
         ->middleware('feature:register');
     Route::post('/school-admin/register/bulk/confirm', [RegistrationController::class, 'bulkConfirm'])
         ->middleware('feature:register');
+    Route::get('/school-admin/register/bulk/imports/{bulkRegistrationImport}', [RegistrationController::class, 'bulkImportStatus'])
+        ->middleware('feature:register');
 
     // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Users management
     Route::get('/school-admin/users', [UserManagementController::class, 'index'])
