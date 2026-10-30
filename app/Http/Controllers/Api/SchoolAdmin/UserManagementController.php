@@ -134,6 +134,7 @@ class UserManagementController extends Controller
                 'last_page' => $paginated['last_page'],
                 'per_page' => $paginated['per_page'],
                 'total' => $paginated['total'],
+                'status_counts' => $this->userStatusCounts($schoolId, $role),
             ],
         ]);
     }
@@ -1179,6 +1180,28 @@ class UserManagementController extends Controller
         ];
     }
 
+    private function userStatusCounts(int $schoolId, ?string $role): array
+    {
+        $counts = [];
+        $statuses = $role === 'staff'
+            ? ['active', 'inactive']
+            : ['active', 'inactive', 'pending_fees', 'graduated'];
+
+        foreach ($statuses as $status) {
+            $query = User::query()
+                ->where('school_id', $schoolId)
+                ->whereIn('role', ['student', 'staff']);
+
+            if ($role) {
+                $query->where('role', $role);
+            }
+
+            $this->applyUserStatusFilter($query, $status, $status === 'active');
+            $counts[$status] = (int) $query->count();
+        }
+
+        return $counts;
+    }
     private function applyUserStatusFilter($query, string $status, bool $isActive): void
     {
         $hasStudentStatus = Schema::hasColumn('students', 'status');

@@ -1,0 +1,40 @@
+.staff-scores-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #ffffff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.staff-scores-table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.staff-scores-table th {
+  color: #0b3a63;
+  background: #eff6ff;
+  font-size: 12px;
+}
+
+.staff-scores-table th,
+.staff-scores-table td {
+  padding: 10px;
+  border-color: #dbeafe;
+  vertical-align: middle;
+}
+
+.staff-scores-table input {
+  max-width: 100%;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 7px;
+}

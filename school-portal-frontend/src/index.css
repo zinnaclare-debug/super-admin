@@ -119,14 +119,21 @@ button:focus-visible {
     font-size: clamp(1rem, 4.5vw, 1.3rem);
   }
 
-  table {
-    display: block;
+  :where(.table-scroll, [class*="table-wrap"], [class*="table-container"], [class*="table-scroll"], [style*="overflowX"]) {
     width: 100%;
     max-width: 100%;
-    min-width: max-content;
-    overflow-x: auto;
-    white-space: nowrap;
+    min-width: 0;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
+  }
+
+  :where(.table-scroll, [class*="table-wrap"], [class*="table-container"], [class*="table-scroll"], [style*="overflowX"]) > table {
+    display: table;
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
   }
 
   th,

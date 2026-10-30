@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import "./SubjectScores.css";
 
 const DEFAULT_SCHEMA = {
   ca_maxes: [30, 0, 0, 0, 0],
@@ -290,7 +291,7 @@ export default function SubjectScores() {
       {loading ? (
         <p style={{ marginTop: 12 }}>Loading...</p>
       ) : (
-        <table border="1" cellPadding="10" width="100%" style={{ marginTop: 12 }}>
+        <div className="table-scroll staff-scores-table-wrap"><table className="staff-scores-table" border="1" cellPadding="10">
           <thead>
             <tr>
               <th style={{ width: 70 }}>S/N</th>
@@ -359,7 +360,7 @@ export default function SubjectScores() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       )}
     </StaffFeatureLayout>
   );

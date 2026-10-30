@@ -111,9 +111,9 @@ class SchoolSubscriptionBilling
                 self::CYCLE_TERMLY => $termlyQuote,
                 self::CYCLE_YEARLY => $yearlyQuote,
             ],
-            'active_invoice' => $activeInvoice ? self::invoicePayload($activeInvoice) : null,
-            'latest_pending_invoice' => $pendingInvoice ? self::invoicePayload($pendingInvoice) : null,
-            'recent_invoices' => self::recentInvoicesPayload((int) $school->id),
+            'active_invoice' => $activeInvoice ? self::invoicePayload($activeInvoice, $settings->manual_status_override) : null,
+            'latest_pending_invoice' => $pendingInvoice ? self::invoicePayload($pendingInvoice, $settings->manual_status_override) : null,
+            'recent_invoices' => self::recentInvoicesPayload((int) $school->id, $settings->manual_status_override),
         ];
     }
 
@@ -356,9 +356,11 @@ class SchoolSubscriptionBilling
             'created_at' => $receipt->created_at?->toDateTimeString(),
         ];
     }
-    public static function invoicePayload(SchoolSubscriptionInvoice $invoice): array
+    public static function invoicePayload(SchoolSubscriptionInvoice $invoice, ?string $manualStatusOverride = null): array
     {
         $meta = is_array($invoice->meta) ? $invoice->meta : [];
+        $isManuallyActivated = $manualStatusOverride === self::STATUS_ACTIVE
+            && in_array($invoice->status, ['pending', 'pending_manual_review'], true);
 
         return [
             'id' => (int) $invoice->id,
@@ -366,7 +368,7 @@ class SchoolSubscriptionBilling
             'billing_cycle_label' => $invoice->billing_cycle === self::CYCLE_YEARLY ? 'Yearly' : 'Termly',
             'reference' => $invoice->reference,
             'status' => $invoice->status,
-            'status_label' => match ($invoice->status) {
+            'status_label' => $isManuallyActivated ? 'Manual Active' : match ($invoice->status) {
                 'paid' => 'Active',
                 'pending_manual_review' => 'Pending Manual Review',
                 'failed' => 'Failed',
@@ -374,6 +376,7 @@ class SchoolSubscriptionBilling
                 default => 'Pending Payment',
             },
             'payment_channel' => $invoice->payment_channel,
+            'manually_activated' => $isManuallyActivated,
             'student_count_snapshot' => (int) $invoice->student_count_snapshot,
             'amount_per_student_snapshot' => self::money($invoice->amount_per_student_snapshot),
             'subtotal' => self::money($invoice->subtotal),
@@ -437,14 +440,14 @@ class SchoolSubscriptionBilling
         };
     }
 
-    private static function recentInvoicesPayload(int $schoolId): array
+    private static function recentInvoicesPayload(int $schoolId, ?string $manualStatusOverride = null): array
     {
         return SchoolSubscriptionInvoice::query()
             ->where('school_id', $schoolId)
             ->latest('id')
             ->limit(10)
             ->get()
-            ->map(fn (SchoolSubscriptionInvoice $invoice) => self::invoicePayload($invoice))
+            ->map(fn (SchoolSubscriptionInvoice $invoice) => self::invoicePayload($invoice, $manualStatusOverride))
             ->all();
     }
 

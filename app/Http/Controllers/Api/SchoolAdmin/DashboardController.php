@@ -26,26 +26,53 @@ class DashboardController extends Controller
         $schoolId = $request->user()->school_id;
         $school = School::find($schoolId);
 
-        $genderStats = User::query()
+        $hasExitReason = Schema::hasColumn('students', 'exit_reason');
+        $feesUnpaidCondition = $hasExitReason
+            ? "SUM(CASE WHEN users.is_active = 0 AND students.exit_reason = 'fees_unpaid' THEN 1 ELSE 0 END) as fees_unpaid_students"
+            : '0 as fees_unpaid_students';
+
+        $applyLiveStudentFilter = function ($query) use ($hasExitReason): void {
+            $query->where(function ($statusQuery) use ($hasExitReason) {
+                $statusQuery->where('users.is_active', true);
+                if ($hasExitReason) {
+                    $statusQuery->orWhere(function ($feesQuery) {
+                        $feesQuery->where('users.is_active', false)
+                            ->where('students.exit_reason', 'fees_unpaid');
+                    });
+                }
+            });
+        };
+
+        $genderStatsQuery = User::query()
             ->from('users')
             ->leftJoin('students', 'students.user_id', '=', 'users.id')
             ->where('users.school_id', $schoolId)
-            ->where('users.role', 'student')
+            ->where('users.role', 'student');
+        $applyLiveStudentFilter($genderStatsQuery);
+
+        $genderStats = $genderStatsQuery
             ->selectRaw('COUNT(users.id) as total_students')
+            ->selectRaw('SUM(CASE WHEN users.is_active = 1 THEN 1 ELSE 0 END) as active_students')
+            ->selectRaw($feesUnpaidCondition)
             ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(students.sex, ''))) IN ('m', 'male') THEN 1 ELSE 0 END) as male_students")
             ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(students.sex, ''))) IN ('f', 'female') THEN 1 ELSE 0 END) as female_students")
             ->first();
 
         $students = (int) ($genderStats->total_students ?? 0);
+        $activeStudents = (int) ($genderStats->active_students ?? 0);
+        $feesUnpaidStudents = (int) ($genderStats->fees_unpaid_students ?? 0);
         $maleStudents = (int) ($genderStats->male_students ?? 0);
         $femaleStudents = (int) ($genderStats->female_students ?? 0);
         $unspecifiedStudents = max(0, $students - ($maleStudents + $femaleStudents));
 
-        $missingGenderUserIds = User::query()
+        $missingGenderQuery = User::query()
             ->from('users')
             ->join('students', 'students.user_id', '=', 'users.id')
             ->where('users.school_id', $schoolId)
-            ->where('users.role', 'student')
+            ->where('users.role', 'student');
+        $applyLiveStudentFilter($missingGenderQuery);
+
+        $missingGenderUserIds = $missingGenderQuery
             ->where(function ($query) {
                 $query->whereNull('students.sex')
                     ->orWhereRaw("TRIM(COALESCE(students.sex, '')) = ''");
@@ -55,7 +82,6 @@ class DashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
-
         $profileCompletenessNotices = [];
         if ($unspecifiedStudents > 0) {
             $profileCompletenessNotices[] = [
@@ -69,6 +95,7 @@ class DashboardController extends Controller
 
         $staff = User::where('school_id', $schoolId)
             ->where('role', 'staff')
+            ->where('is_active', true)
             ->count();
 
         $enabledModules = SchoolFeature::where('school_id', $schoolId)
@@ -95,6 +122,8 @@ class DashboardController extends Controller
             'school_results_published' => (bool) ($school?->school_results_published),
             'results_effectively_published' => $school?->resultsArePublished() ?? false,
             'students' => $students,
+            'active_students' => $activeStudents,
+            'fees_unpaid_students' => $feesUnpaidStudents,
             'male_students' => $maleStudents,
             'female_students' => $femaleStudents,
             'unspecified_students' => $unspecifiedStudents,

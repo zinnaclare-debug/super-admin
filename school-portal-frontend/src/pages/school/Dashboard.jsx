@@ -17,6 +17,22 @@ const formatCount = (value) => {
   return Number.isFinite(n) ? n.toLocaleString() : "0";
 };
 
+const MetricIcon = ({ kind }) => {
+  const paths = {
+    students: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8c0-3.3 3.1-6 7-6s7 2.7 7 6",
+    fees: "M7 3h10v18H7zM9 7h6M9 11h6M12 15h.01",
+    gender: "M12 3v12m0-12 3 3m-3-3-3 3m0 12h6",
+    staff: "M4 20v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  };
+
+  return (
+    <span className="sd-metric-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d={paths[kind] || paths.students} />
+      </svg>
+    </span>
+  );
+};
 const formatSessionStatus = (status) => {
   const value = String(status || "").toLowerCase();
   if (value === "current") return "Current";
@@ -92,6 +108,8 @@ function SchoolDashboard() {
           head_of_school_name: res.data?.head_of_school_name ?? "",
           head_signature_url: res.data?.head_signature_url ?? "",
           students: res.data?.students ?? 0,
+          active_students: res.data?.active_students ?? 0,
+          fees_unpaid_students: res.data?.fees_unpaid_students ?? 0,
           male_students: res.data?.male_students ?? 0,
           female_students: res.data?.female_students ?? 0,
           unspecified_students: res.data?.unspecified_students ?? 0,
@@ -128,6 +146,8 @@ function SchoolDashboard() {
           head_of_school_name: "",
           head_signature_url: "",
           students: 0,
+          active_students: 0,
+          fees_unpaid_students: 0,
           male_students: 0,
           female_students: 0,
           unspecified_students: 0,
@@ -396,12 +416,13 @@ function SchoolDashboard() {
       : "Results are not available to students.";
 
   const populationStats = [
-    { key: "male", label: "Total Male Students", value: stats.male_students },
-    { key: "female", label: "Total Female Students", value: stats.female_students },
-    { key: "students", label: "Total Students", value: stats.students },
-    { key: "staff", label: "Total Staff", value: stats.staff },
+    { key: "students", icon: "students", label: "Students In Use", value: stats.students, detail: "Active plus fees unpaid" },
+    { key: "active", icon: "students", label: "Active Students", value: stats.active_students, detail: "Can sign in" },
+    { key: "fees", icon: "fees", label: "Fees Unpaid", value: stats.fees_unpaid_students, detail: "Included in billing" },
+    { key: "male", icon: "gender", label: "Male Students", value: stats.male_students, detail: "Live student profile count" },
+    { key: "female", icon: "gender", label: "Female Students", value: stats.female_students, detail: "Live student profile count" },
+    { key: "staff", icon: "staff", label: "Active Staff", value: stats.staff, detail: "Current staff access" },
   ];
-
   const websiteEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "website" && Boolean(item?.enabled));
   const entranceExamEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "entrance_exam" && Boolean(item?.enabled));
 
@@ -454,18 +475,30 @@ function SchoolDashboard() {
       <section className="sd-card sd-population">
         <div className="sd-section-head">
           <h2>Population Details</h2>
-          <p>Live count by gender, total students, and staff.</p>
+          <p>Live count of active students, fees-unpaid students, student profiles, and active staff.</p>
         </div>
 
         <div className="sd-population-grid">
-          {populationStats.map((item) => (
-            <div key={item.key} className="sd-population-item">
-              <p>{item.label}</p>
-              <h3>{loading ? "..." : formatCount(item.value)}</h3>
-            </div>
-          ))}
-        </div>
+          {populationStats.map((item) => {
+            const share = stats.students > 0 && item.key !== "staff"
+              ? Math.min(100, Math.round((Number(item.value || 0) / Number(stats.students || 1)) * 100))
+              : 100;
 
+            return (
+              <article key={item.key} className="sd-population-item">
+                <div className="sd-population-item__head">
+                  <MetricIcon kind={item.icon} />
+                  <p>{item.label}</p>
+                </div>
+                <h3>{loading ? "..." : formatCount(item.value)}</h3>
+                <small>{item.detail}</small>
+                <div className="sd-population-meter" aria-label={`${item.label}: ${share}%`}>
+                  <span style={{ width: `${share}%` }} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
         {!loading && (stats.profile_completeness_notices || []).map((notice) => {
           const count = Number(notice?.count || 0);
           if (count <= 0) return null;

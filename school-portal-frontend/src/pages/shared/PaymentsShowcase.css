@@ -310,8 +310,14 @@
 }
 
 .payx-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .payx-table {

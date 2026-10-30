@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
+const PlatformMetricIcon = ({ type }) => {
+  const paths = {
+    schools: "M3 20h18M5 20V9l7-5 7 5v11M9 20v-5h6v5M9 10h.01M15 10h.01",
+    users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+    admins: "M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Zm-2 10 1.5 1.5L15 10",
+  };
+  return <span style={styles.metricIcon}><svg style={{ width: 20, height: 20 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d={paths[type]} /></svg></span>;
+};
 const defaultPlatformContent = {
   about_text:
     "LyteBridge Professional Services is a dynamic and innovative solutions provider specializing in Education, ICT, and School Management Software. We help schools, educational institutions, and organizations improve efficiency, embrace digital transformation, and operate with professional standards.",
@@ -83,9 +91,9 @@ function Overview() {
       <p>System-wide statistics</p>
 
       <div style={styles.statsWrap}>
-        <Stat title="Total Schools" value={loading ? "..." : String(stats.schools)} />
-        <Stat title="Active Users" value={loading ? "..." : String(stats.active_users)} />
-        <Stat title="Admins" value={loading ? "..." : String(stats.admins)} />
+        <Stat type="schools" title="Total Schools" value={loading ? "..." : String(stats.schools)} />
+        <Stat type="users" title="Active Users" value={loading ? "..." : String(stats.active_users)} />
+        <Stat type="admins" title="Admins" value={loading ? "..." : String(stats.admins)} />
       </div>
 
       <section style={styles.editorCard}>
@@ -141,12 +149,16 @@ function Field({ label, children }) {
   );
 }
 
-function Stat({ title, value }) {
+function Stat({ type, title, value }) {
   return (
-    <div style={styles.card}>
-      <h3>{title}</h3>
-      <p style={{ fontSize: 24, fontWeight: "bold" }}>{value}</p>
-    </div>
+    <article style={styles.card}>
+      <div style={styles.cardHead}>
+        <PlatformMetricIcon type={type} />
+        <h3 style={styles.cardTitle}>{title}</h3>
+      </div>
+      <strong style={styles.cardValue}>{value}</strong>
+      <div style={styles.metricBar}><span style={{ ...styles.metricBarFill, width: type === "schools" ? "72%" : type === "users" ? "88%" : "54%" }} /></div>
+    </article>
   );
 }
 
@@ -165,9 +177,20 @@ const styles = {
     background: "#fff",
     padding: 20,
     borderRadius: 8,
-    width: 200,
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    flex: "1 1 220px",
+    minWidth: 0,
+    maxWidth: 340,
+    boxShadow: "0 12px 24px rgba(15,23,42,0.10)",
+    border: "1px solid #dbeafe",
+    display: "grid",
+    gap: 12,
   },
+  cardHead: { display: "flex", alignItems: "center", gap: 10 },
+  cardTitle: { margin: 0, color: "#0b3a63", fontSize: 15 },
+  cardValue: { fontSize: 30, color: "#0f172a" },
+  metricIcon: { display: "inline-flex", width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 12, color: "#075985", background: "#e0f2fe" },
+  metricBar: { height: 6, overflow: "hidden", borderRadius: 999, background: "#dbeafe" },
+  metricBarFill: { height: "100%", display: "block", borderRadius: 999, background: "linear-gradient(90deg, #0ea5e9, #14b8a6)" },
   editorCard: {
     background: "#fff",
     padding: 24,

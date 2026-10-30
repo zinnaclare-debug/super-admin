@@ -751,3 +751,14 @@
   color: #1d4ed8;
   background: #dbeafe;
 }
+
+/* Mobile cards and session tables stay inside the dashboard content column. */
+.school-dashboard { width: 100%; max-width: 100%; min-width: 0; }
+.sd-population-item { min-width: 0; background: linear-gradient(145deg, #ffffff, #f8fbff); }
+.sd-population-item__head { display: flex; align-items: center; gap: 8px; }
+.sd-metric-icon { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 10px; color: #075985; background: #e0f2fe; }
+.sd-metric-icon svg { width: 18px; height: 18px; }
+.sd-population-item small { display: block; color: #64748b; font-size: 11px; }
+.sd-population-meter { height: 5px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: #dbeafe; }
+.sd-population-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0ea5e9, #14b8a6); }
+.sd-session-table-wrap { width: 100%; max-width: 100%; min-width: 0; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }

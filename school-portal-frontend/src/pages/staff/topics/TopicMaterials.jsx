@@ -99,7 +99,7 @@ export default function TopicMaterials() {
         {loading ? (
           <p>Loading materials...</p>
         ) : (
-          <table border="1" cellPadding="10" width="100%">
+          <div className="table-scroll"><table border="1" cellPadding="10" style={{ minWidth: 600 }}>
             <thead>
               <tr>
                 <th style={{ width: 70 }}>S/N</th>
@@ -132,7 +132,7 @@ export default function TopicMaterials() {
                 </tr>
               )}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
     </StaffFeatureLayout>
