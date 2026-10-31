@@ -690,6 +690,7 @@ class SchoolController extends Controller
             'by_level.*.ca_labels' => 'nullable|array|size:5',
             'by_level.*.ca_labels.*' => 'nullable|string|max:30',
             'by_level.*.exam_max' => 'required_with:by_level|integer|min:0|max:100',
+            'by_level.*.comments_only' => 'nullable|boolean',
         ]);
 
         $normalizedClassTemplates = ClassTemplateSchema::normalize($school->class_templates);
@@ -719,6 +720,7 @@ class SchoolController extends Controller
                     'ca_maxes' => $caMaxes,
                     'ca_labels' => $caLabels,
                     'exam_max' => $examMax,
+                    'comments_only' => filter_var($submitted['comments_only'] ?? false, FILTER_VALIDATE_BOOL),
                 ]);
             }
 

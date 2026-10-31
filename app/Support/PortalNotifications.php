@@ -22,16 +22,18 @@ class PortalNotifications
             ->where('school_id', $school->id)
             ->where('is_active', true)
             ->whereIn('role', [User::ROLE_STAFF, User::ROLE_STUDENT])
-            ->with(['staffProfile:id,user_id,education_level', 'studentProfile:id,user_id,education_level'])
+            ->with(['staffProfile:id,user_id,education_level,education_levels', 'studentProfile:id,user_id,education_level'])
             ->get()
             ->filter(function (User $user) use ($announcement) {
                 if (!$announcement->level) {
                     return true;
                 }
 
-                $level = $user->role === User::ROLE_STAFF
-                    ? $user->staffProfile?->education_level
-                    : $user->studentProfile?->education_level;
+                if ($user->role === User::ROLE_STAFF) {
+                    return StaffEducationLevels::supports($user->staffProfile, $announcement->level);
+                }
+
+                $level = $user->studentProfile?->education_level;
 
                 return strtolower(trim((string) $level)) === strtolower(trim((string) $announcement->level));
             });

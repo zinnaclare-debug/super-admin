@@ -14,7 +14,7 @@ const DEFAULT_EXAM_RECORD = {
 };
 
 const DEFAULT_RESULT_TEMPLATE = {
-  layout: "classic",
+  layout: "compact",
   primary_color: "#111827",
   accent_color: "#1D4ED8",
   watermark_opacity: 0.07,
@@ -111,6 +111,7 @@ const normalizeExamRecord = (record) => {
     ca_labels: normalizedLabels,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
+    comments_only: Boolean(schema.comments_only),
   };
 };
 
@@ -517,6 +518,18 @@ export default function SchoolInformation() {
     });
   };
 
+  const updateExamDraftCommentsOnly = (levelKey, checked) => {
+    setExamRecord((prev) => {
+      const current = normalizeExamRecord(prev.by_level?.[levelKey] || prev.default);
+      return {
+        ...prev,
+        by_level: {
+          ...(prev.by_level || {}),
+          [levelKey]: { ...current, comments_only: Boolean(checked) },
+        },
+      };
+    });
+  };
   const saveExamRecord = async () => {
     if (!activeEducationLevels.length) {
       alert("Enable at least one education level before saving exam records.");
@@ -548,7 +561,7 @@ export default function SchoolInformation() {
         return;
       }
 
-      byLevel[level.key] = { ca_maxes: caMaxes, ca_labels: caLabels, exam_max: examMax };
+      byLevel[level.key] = { ca_maxes: caMaxes, ca_labels: caLabels, exam_max: examMax, comments_only: Boolean(record.comments_only) };
     }
 
     setSavingExamRecord(true);
@@ -1112,6 +1125,14 @@ export default function SchoolInformation() {
                       />
                     </div>
                   </div>
+                  <label className="sai-check sai-check-card sai-check-card--compact" style={{ marginTop: 12 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(record.comments_only)}
+                      onChange={(event) => updateExamDraftCommentsOnly(level.key, event.target.checked)}
+                    />
+                    <span>Comments only</span>
+                  </label>
                   <div className="sai-meta">
                     <span>CA total: {summary.caTotal}</span>
                     <span>Expected exam: {summary.expectedExam}</span>
@@ -1213,8 +1234,8 @@ export default function SchoolInformation() {
               value={resultTemplate.layout}
               onChange={(e) => updateResultTemplate("layout", e.target.value)}
             >
-              <option value="classic">Classic full result</option>
               <option value="compact">Compact result</option>
+              <option value="classic">Classic full result</option>
             </select>
           </div>
 

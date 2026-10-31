@@ -638,6 +638,7 @@ class RegistrationController extends Controller
                 'address' => $data['address'],
                 'position' => $data['staff_position'],
                 'education_level' => $data['education_level'],
+                'education_levels' => [$data['education_level']],
             ]);
         }
 
@@ -1496,6 +1497,7 @@ class RegistrationController extends Controller
                         'address' => $request->input('address') ?? null,
                         'position' => $request->input('staff_position') ?? null,
                         'education_level' => $educationLevel,
+                        'education_levels' => [$educationLevel],
                         'photo_path' => $photoPath,
                     ]);
                 }

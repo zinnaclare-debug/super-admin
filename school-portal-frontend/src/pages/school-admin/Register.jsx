@@ -59,6 +59,7 @@ export default function Register() {
 
   const [submitting, setSubmitting] = useState(false);
   const [educationLevels, setEducationLevels] = useState([]);
+  const [staffEducationLevels, setStaffEducationLevels] = useState([]);
   const [enrollmentContext, setEnrollmentContext] = useState({
     current_session: null,
     current_term: null,
@@ -207,6 +208,11 @@ export default function Register() {
         const data = res.data?.data || {};
 
         setUsername(data.username || "");
+        setStaffEducationLevels(
+          Array.from(new Set((Array.isArray(data.education_levels) && data.education_levels.length
+            ? data.education_levels
+            : [data.education_level]).filter(Boolean).map((level) => String(level).trim().toLowerCase())))
+        );
         setForm((prev) => ({
           ...prev,
           role: data.role || editRole || "",
@@ -367,6 +373,16 @@ export default function Register() {
     }
   };
 
+  const toggleStaffEducationLevel = (level, checked) => {
+    setStaffEducationLevels((current) => {
+      const normalized = String(level || '').trim().toLowerCase();
+      if (!normalized) return current;
+      return checked
+        ? Array.from(new Set([...current, normalized]))
+        : current.filter((item) => item !== normalized);
+    });
+  };
+
   const buildFormData = (extra = {}) => {
     const fd = new FormData();
 
@@ -379,6 +395,10 @@ export default function Register() {
     }
 
     if (photo) fd.append("photo", photo);
+
+    if (isEditMode && isStaff) {
+      staffEducationLevels.forEach((level) => fd.append("education_levels[]", level));
+    }
 
     return fd;
   };
@@ -426,6 +446,9 @@ export default function Register() {
     if (!isEditMode || !editUserId) return;
     if (!form.name) return alert("Enter full name");
     if (form.password && form.password.length < 6) return alert("Password must be at least 6 characters");
+    if (isStaff && staffEducationLevels.length === 0) {
+      return alert("Select at least one staff education level");
+    }
     if (isStudent && !form.class_id) return alert("Select student class");
     if (isStudent && selectedDepartments.length > 0 && !form.department_id) {
       return alert("Select student department");
@@ -651,17 +674,45 @@ export default function Register() {
                 <label className="reg-label">
                   Education Level {isStaff ? "(required for staff assignment)" : ""}
                 </label>
-                <select name="education_level" value={form.education_level} onChange={handleChange}>
-                  <option value="">Select Level</option>
-                  {educationLevels.map((level) => (
-                    <option key={level} value={level}>
-                      {prettyLevel(level)}
-                    </option>
-                  ))}
-                  {form.education_level && !educationLevels.includes(form.education_level) && (
-                    <option value={form.education_level}>{prettyLevel(form.education_level)}</option>
-                  )}
-                </select>
+                {isEditMode && isStaff ? (
+                  <div className="reg-level-checklist">
+                    {educationLevels.map((level) => (
+                      <label key={level} className="reg-level-check">
+                        <input
+                          type="checkbox"
+                          checked={staffEducationLevels.includes(level)}
+                          onChange={(event) => toggleStaffEducationLevel(level, event.target.checked)}
+                        />
+                        <span>{prettyLevel(level)}</span>
+                      </label>
+                    ))}
+                    {staffEducationLevels
+                      .filter((level) => !educationLevels.includes(level))
+                      .map((level) => (
+                        <label key={level} className="reg-level-check">
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={(event) => toggleStaffEducationLevel(level, event.target.checked)}
+                          />
+                          <span>{prettyLevel(level)}</span>
+                        </label>
+                      ))}
+                    <small>Select every education level this staff member can teach or manage.</small>
+                  </div>
+                ) : (
+                  <select name="education_level" value={form.education_level} onChange={handleChange}>
+                    <option value="">Select Level</option>
+                    {educationLevels.map((level) => (
+                      <option key={level} value={level}>
+                        {prettyLevel(level)}
+                      </option>
+                    ))}
+                    {form.education_level && !educationLevels.includes(form.education_level) && (
+                      <option value={form.education_level}>{prettyLevel(form.education_level)}</option>
+                    )}
+                  </select>
+                )}
               </div>
             </div>
           </div>

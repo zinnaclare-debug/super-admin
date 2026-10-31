@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Support\StaffEducationLevels;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,15 +14,15 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
         $schoolId = (int) $user->school_id;
-        $staffLevel = strtolower((string) optional($user->staffProfile)->education_level);
+        $staffLevels = StaffEducationLevels::forStaff($user->staffProfile);
 
         $query = Announcement::query()
             ->where('school_id', $schoolId)
             ->where('is_active', true)
-            ->where(function ($q) use ($staffLevel) {
+            ->where(function ($q) use ($staffLevels) {
                 $q->whereNull('level');
-                if ($staffLevel !== '') {
-                    $q->orWhere('level', $staffLevel);
+                if (!empty($staffLevels)) {
+                    $q->orWhereIn('level', $staffLevels);
                 }
             })
             ->where(function ($q) {

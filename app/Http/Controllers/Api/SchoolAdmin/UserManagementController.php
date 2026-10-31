@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\SchoolPublicWebsiteData;
+use App\Support\StaffEducationLevels;
 use App\Support\UserCredentialStore;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -479,6 +480,7 @@ class UserManagementController extends Controller
                 'username' => $user->username,
                 'password' => UserCredentialStore::reveal($credential?->password_encrypted) ?? '',
                 'education_level' => $student?->education_level ?? $staff?->education_level,
+                'education_levels' => $user->role === 'staff' ? StaffEducationLevels::forStaff($staff) : [],
                 'sex' => $student?->sex ?? $staff?->sex,
                 'religion' => $student?->religion,
                 'dob' => $student?->dob ?? $staff?->dob,
@@ -521,6 +523,8 @@ class UserManagementController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
 
             'education_level' => ['nullable', 'string', 'max:60'],
+            'education_levels' => ['nullable', 'array', 'min:1'],
+            'education_levels.*' => ['string', 'max:60'],
             'sex' => ['nullable', 'string', 'max:10'],
             'religion' => ['nullable', 'string', 'max:255'],
             'dob' => ['nullable', 'date'],
@@ -557,7 +561,19 @@ class UserManagementController extends Controller
             $user->email = $validated['email'];
         }
         $educationLevel = $this->normalizeEducationLevel($validated['education_level'] ?? null);
-        if ($educationLevel !== null && !$this->isValidEducationLevel((int) $user->school_id, $educationLevel)) {
+        $staffEducationLevels = [];
+        if ($user->role === 'staff' && array_key_exists('education_levels', $validated)) {
+            $staffEducationLevels = StaffEducationLevels::normalize($validated['education_levels']);
+            if (empty($staffEducationLevels)) {
+                return response()->json(['message' => 'Select at least one staff education level.'], 422);
+            }
+            foreach ($staffEducationLevels as $selectedLevel) {
+                if (!$this->isValidEducationLevel((int) $user->school_id, $selectedLevel)) {
+                    return response()->json(['message' => 'Invalid education level selected.'], 422);
+                }
+            }
+            $educationLevel = $staffEducationLevels[0];
+        } elseif ($educationLevel !== null && !$this->isValidEducationLevel((int) $user->school_id, $educationLevel)) {
             return response()->json([
                 'message' => 'Invalid education level selected.',
             ], 422);
@@ -665,7 +681,13 @@ class UserManagementController extends Controller
             $staff->dob = $validated['dob'] ?? $staff->dob;
             $staff->address = $validated['address'] ?? $staff->address;
             $staff->position = $validated['staff_position'] ?? $staff->position;
-            $staff->education_level = $educationLevel ?? $staff->education_level;
+            if (!empty($staffEducationLevels)) {
+                $staff->education_levels = $staffEducationLevels;
+                $staff->education_level = $staffEducationLevels[0];
+            } elseif ($educationLevel !== null) {
+                $staff->education_level = $educationLevel;
+                $staff->education_levels = StaffEducationLevels::normalize(null, $educationLevel);
+            }
             if ($photoPath) {
                 $staff->photo_path = $photoPath;
             } elseif ($removePhoto) {
@@ -994,7 +1016,7 @@ class UserManagementController extends Controller
         $staffByUserId = Staff::query()
             ->where('school_id', $schoolId)
             ->whereIn('user_id', $userIds)
-            ->get(['id', 'user_id', 'education_level'])
+            ->get(['id', 'user_id', 'education_level', 'education_levels'])
             ->keyBy('user_id');
 
         $staffAssignments = $this->resolveStaffAssignmentsForUsers($schoolId, $userIds);
@@ -1056,16 +1078,15 @@ class UserManagementController extends Controller
                     'departments' => [],
                 ];
 
-                $educationLevel = $this->normalizeEducationLevel($staff?->education_level ?? null);
+                $staffProfileLevels = StaffEducationLevels::forStaff($staff);
+                $educationLevel = $staffProfileLevels[0] ?? null;
                 $levels = collect($assignment['levels'] ?? [])
+                    ->merge($staffProfileLevels)
                     ->map(fn ($level) => $this->normalizeEducationLevel((string) $level))
                     ->filter()
                     ->unique()
                     ->values()
                     ->all();
-                if ($educationLevel && !in_array($educationLevel, $levels, true)) {
-                    array_unshift($levels, $educationLevel);
-                }
 
                 $classes = collect($assignment['classes'] ?? [])
                     ->map(fn ($name) => trim((string) $name))

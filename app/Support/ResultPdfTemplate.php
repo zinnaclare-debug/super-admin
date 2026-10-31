@@ -7,7 +7,8 @@ class ResultPdfTemplate
     public static function default(): array
     {
         return [
-            'layout' => 'classic',
+            'layout' => 'compact',
+            'layout_version' => 2,
             'primary_color' => '#111827',
             'accent_color' => '#1d4ed8',
             'watermark_opacity' => 0.07,
@@ -34,7 +35,11 @@ class ResultPdfTemplate
         $base = self::default();
 
         $layout = strtolower(trim((string) ($source['layout'] ?? $base['layout'])));
-        if (!in_array($layout, ['classic', 'compact'], true)) {
+        // Before version 2, classic was the current compact renderer. Keep old schools stable.
+        if (!array_key_exists('layout_version', $source) && $layout === 'classic') {
+            $layout = 'compact';
+        }
+        if (!in_array($layout, ['classic', 'compact', 'comments_only'], true)) {
             $layout = $base['layout'];
         }
 
@@ -46,6 +51,7 @@ class ResultPdfTemplate
 
         return [
             'layout' => $layout,
+            'layout_version' => 2,
             'primary_color' => self::color($source['primary_color'] ?? null, $base['primary_color']),
             'accent_color' => self::color($source['accent_color'] ?? null, $base['accent_color']),
             'watermark_opacity' => $watermarkOpacity,

@@ -14,7 +14,12 @@ class Staff extends Model
         'address',
         'position',
         'education_level',
+        'education_levels',
         'photo_path',
+    ];
+
+    protected $casts = [
+        'education_levels' => 'array',
     ];
 
     public function user()

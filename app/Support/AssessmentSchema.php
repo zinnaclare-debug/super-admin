@@ -11,6 +11,7 @@ class AssessmentSchema
             'ca_labels' => ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],
             'exam_max' => 70,
             'total_max' => 100,
+            'comments_only' => false,
         ];
     }
 
@@ -51,6 +52,7 @@ class AssessmentSchema
             'ca_labels' => $labels,
             'exam_max' => $examMax,
             'total_max' => 100,
+            'comments_only' => filter_var($schema['comments_only'] ?? false, FILTER_VALIDATE_BOOL),
         ];
     }
 
@@ -118,6 +120,10 @@ class AssessmentSchema
         return self::normalizeSchema($normalized['default'] ?? $raw);
     }
 
+    public static function commentsOnlyForLevel(mixed $raw, ?string $level): bool
+    {
+        return (bool) (self::schemaForLevel($raw, $level)['comments_only'] ?? false);
+    }
     public static function activeCaIndices(array $schema): array
     {
         $indices = [];

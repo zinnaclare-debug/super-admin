@@ -1280,6 +1280,9 @@ class ResultsController extends Controller
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
         $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
+        if (AssessmentSchema::commentsOnlyForLevel($school?->assessment_schema, $class->level ?? null)) {
+            $resultTemplate['layout'] = 'comments_only';
+        }
         $rows = $this->addThirdTermPreviousTotalsToRows(
             $schoolId,
             $classId,
@@ -2403,7 +2406,14 @@ class ResultsController extends Controller
 
     private function renderStudentResultPdf(array $viewData): string
     {
-        $html = view('pdf.student_result', $viewData)->render();
+        $layout = (string) data_get($viewData, 'resultTemplate.layout', 'compact');
+        $view = match ($layout) {
+            'classic' => 'pdf.student_result_classic',
+            'comments_only' => 'pdf.student_result_comments',
+            default => 'pdf.student_result',
+        };
+
+        $html = view($view, $viewData)->render();
         return $this->renderPdfFromHtml($html);
     }
 

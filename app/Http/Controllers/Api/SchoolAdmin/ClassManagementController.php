@@ -11,6 +11,7 @@ use App\Models\Term;
 use App\Models\User;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
+use App\Support\StaffEducationLevels;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,12 +31,12 @@ class ClassManagementController extends Controller
         $teachers = User::query()
             ->where('school_id', $schoolId)
             ->where('role', 'staff')
-            ->whereHas('staffProfile', function ($q) use ($level) {
-                $q->where('education_level', $level);
-            })
+            ->with('staffProfile:id,user_id,education_level,education_levels')
             ->select('id', 'name', 'email')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (User $teacher) => StaffEducationLevels::supports($teacher->staffProfile, $level))
+            ->values();
 
         $departments = $this->loadTemplateScopedClassDepartments($schoolId, $class);
 
@@ -132,7 +133,7 @@ class ClassManagementController extends Controller
             ->where('school_id', $schoolId)
             ->first();
 
-        if (!$staff || $staff->education_level !== $class->level) {
+        if (!StaffEducationLevels::supports($staff, $class->level)) {
             return response()->json(['message' => 'Teacher level does not match this class'], 422);
         }
 
