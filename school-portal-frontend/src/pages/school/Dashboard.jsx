@@ -416,12 +416,12 @@ function SchoolDashboard() {
       : "Results are not available to students.";
 
   const populationStats = [
-    { key: "students", icon: "students", label: "Students In Use", value: stats.students, detail: "Active plus fees unpaid" },
-    { key: "active", icon: "students", label: "Active Students", value: stats.active_students, detail: "Can sign in" },
-    { key: "fees", icon: "fees", label: "Fees Unpaid", value: stats.fees_unpaid_students, detail: "Included in billing" },
-    { key: "male", icon: "gender", label: "Male Students", value: stats.male_students, detail: "Live student profile count" },
-    { key: "female", icon: "gender", label: "Female Students", value: stats.female_students, detail: "Live student profile count" },
-    { key: "staff", icon: "staff", label: "Active Staff", value: stats.staff, detail: "Current staff access" },
+    { key: "students", icon: "students", label: "Students In Use", value: stats.students, detail: "Active plus fees unpaid", tone: "ocean" },
+    { key: "active", icon: "students", label: "Active Students", value: stats.active_students, detail: "Can sign in", tone: "emerald" },
+    { key: "fees", icon: "fees", label: "Fees Unpaid", value: stats.fees_unpaid_students, detail: "Included in billing", tone: "amber" },
+    { key: "male", icon: "gender", label: "Male Students", value: stats.male_students, detail: "Live student profile count", tone: "violet" },
+    { key: "female", icon: "gender", label: "Female Students", value: stats.female_students, detail: "Live student profile count", tone: "rose" },
+    { key: "staff", icon: "staff", label: "Active Staff", value: stats.staff, detail: "Current staff access", tone: "indigo" },
   ];
   const websiteEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "website" && Boolean(item?.enabled));
   const entranceExamEnabled = enabledFeatures.some((item) => String(item?.feature || "").toLowerCase() === "entrance_exam" && Boolean(item?.enabled));
@@ -485,7 +485,7 @@ function SchoolDashboard() {
               : 100;
 
             return (
-              <article key={item.key} className="sd-population-item">
+              <article key={item.key} className={`sd-population-item sd-population-item--${item.tone}`}>
                 <div className="sd-population-item__head">
                   <MetricIcon kind={item.icon} />
                   <p>{item.label}</p>

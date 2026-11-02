@@ -1,6 +1,9 @@
 .ctp-page {
   display: grid;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .ctp-hero,
@@ -18,6 +21,12 @@
   align-items: center;
   overflow: hidden;
   padding: clamp(24px, 4vw, 36px);
+}
+
+.ctp-hero > *,
+.ctp-panel,
+.ctp-summary-copy {
+  min-width: 0;
 }
 
 .ctp-pill {
@@ -210,7 +219,13 @@
 }
 
 .ctp-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ctp-table {
@@ -289,6 +304,72 @@
 
   .ctp-collapse-summary {
     align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ctp-hero {
+    gap: 16px;
+  }
+
+  .ctp-hero h2 {
+    font-size: clamp(1.65rem, 8vw, 2.2rem);
+    overflow-wrap: anywhere;
+  }
+
+  .ctp-subtitle {
+    font-size: 0.96rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .ctp-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ctp-metrics span {
+    min-width: 0;
+    min-height: 54px;
+    justify-content: center;
+    padding: 9px 10px;
+    border-radius: 16px;
+    text-align: center;
+    font-size: 0.82rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .ctp-hero-art {
+    min-height: 180px;
+    width: min(100%, 340px);
+    margin-inline: auto;
+  }
+
+  .ctp-art--main {
+    inset: 12px 52px 8px 0;
+    padding: 12px;
+  }
+
+  .ctp-art--students {
+    right: 8px;
+    bottom: -4px;
+    width: 118px;
+    height: 104px;
+    padding: 10px;
+  }
+
+  .ctp-summary-tags {
+    gap: 8px;
+  }
+
+  .ctp-summary-tag {
+    min-width: 0;
+    max-width: 100%;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
   }
 
   .ctp-table {

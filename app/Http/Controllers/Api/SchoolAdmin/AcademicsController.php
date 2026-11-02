@@ -276,6 +276,7 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
         ]);
 
         $name = trim((string) $payload['name']);
+        $code = filled($payload['code'] ?? null) ? trim((string) $payload['code']) : null;
         if ($name === '') {
             return response()->json(['message' => 'Subject name is required'], 422);
         }
@@ -289,14 +290,27 @@ public function termCourses(Request $request, SchoolClass $class, Term $term)
             return response()->json(['message' => 'A subject with this name already exists'], 422);
         }
 
+        if ($code !== null) {
+            $codeInUse = Subject::where('school_id', $schoolId)
+                ->where('id', '!=', $subject->id)
+                ->whereRaw('LOWER(code) = ?', [strtolower($code)])
+                ->exists();
+
+            if ($codeInUse) {
+                return response()->json([
+                    'message' => 'Another subject in this school already uses this subject code.',
+                ], 422);
+            }
+        }
+
         $subject->name = $name;
-        $subject->code = filled($payload['code'] ?? null) ? trim((string) $payload['code']) : null;
+        $subject->code = $code;
 
         try {
             $subject->save();
         } catch (QueryException $e) {
             return response()->json([
-                'message' => 'Subject code is already used. Use another code or leave it empty.',
+                'message' => 'This subject could not be updated because its name or code is already in use.',
             ], 422);
         }
 

@@ -40,6 +40,7 @@ const normalizeSchema = (schema) => {
     ca_labels: normalizedLabels,
     exam_max: examMax,
     total_max: 100,
+    comments_only: Boolean(raw.comments_only),
   };
 };
 
@@ -105,6 +106,7 @@ export default function SubjectScores() {
 
   const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
   const caIndices = useMemo(() => activeCaIndices(schema), [schema]);
+  const commentsOnly = Boolean(schema.comments_only);
   const caPattern = useMemo(
     () =>
       caIndices
@@ -209,6 +211,13 @@ export default function SubjectScores() {
     );
   };
 
+  const updateTeacherComment = (studentId, value) => {
+    if (resultsPublished) return;
+    setRows((prev) => prev.map((row) => (
+      row.student_id === studentId ? { ...row, teacher_comment: value } : row
+    )));
+  };
+
   const saveAll = async () => {
     if (resultsPublished) {
       alert("Results have been published. Staff can edit again after results are unpublished.");
@@ -218,13 +227,17 @@ export default function SubjectScores() {
     setSaving(true);
     try {
       await api.post(`/api/staff/results/subjects/${termSubjectId}/scores`, {
-        scores: rows.map((row) => ({
-          student_id: row.student_id,
-          ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
-          exam: Number(row.exam || 0),
-        })),
+        scores: rows.map((row) => (
+          commentsOnly
+            ? { student_id: row.student_id, teacher_comment: String(row.teacher_comment || "").trim() }
+            : {
+                student_id: row.student_id,
+                ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
+                exam: Number(row.exam || 0),
+              }
+        )),
       });
-      alert("Saved successfully");
+      alert(commentsOnly ? "Teacher observations saved successfully" : "Saved successfully");
     } catch (e) {
       alert(e.response?.data?.message || "Failed to save scores");
     } finally {
@@ -235,7 +248,9 @@ export default function SubjectScores() {
   return (
     <StaffFeatureLayout title={subjectName ? `Enter Results - ${subjectName}` : "Enter Results"}>
       <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
-        Assessment pattern: {caPattern}. Total max: 100.
+        {commentsOnly
+          ? "Enter a clear learning observation for each student. No CA or exam score is used for this level."
+          : `Assessment pattern: ${caPattern}. Total max: 100.`}
       </div>
 
       {resultsPublished ? (
@@ -284,7 +299,7 @@ export default function SubjectScores() {
           {selectedDepartmentId !== "all" && <span style={{ opacity: 0.75 }}> filtered from {rows.length}</span>}
         </div>
         <button onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>
-          {saving ? "Saving..." : "Save Scores"}
+          {saving ? "Saving..." : commentsOnly ? "Save Observations" : "Save Scores"}
         </button>
       </div>
 
@@ -296,15 +311,21 @@ export default function SubjectScores() {
             <tr>
               <th style={{ width: 70 }}>S/N</th>
               <th>Student</th>
-              {caIndices.map((idx) => (
-                <th key={`ca-head-${idx}`} style={{ width: 110 }}>
-                  {schema.ca_labels?.[idx] || `CA${idx + 1}`} ({schema.ca_maxes[idx]})
-                </th>
-              ))}
-              <th style={{ width: 110 }}>CA Total</th>
-              <th style={{ width: 120 }}>Exam ({schema.exam_max})</th>
-              <th style={{ width: 110 }}>Total</th>
-              <th style={{ width: 90 }}>Grade</th>
+              {commentsOnly ? (
+                <th className="staff-scores-table__observation-head">Teacher's Observation</th>
+              ) : (
+                <>
+                  {caIndices.map((idx) => (
+                    <th key={`ca-head-${idx}`} style={{ width: 110 }}>
+                      {schema.ca_labels?.[idx] || `CA${idx + 1}`} ({schema.ca_maxes[idx]})
+                    </th>
+                  ))}
+                  <th style={{ width: 110 }}>CA Total</th>
+                  <th style={{ width: 120 }}>Exam ({schema.exam_max})</th>
+                  <th style={{ width: 110 }}>Total</th>
+                  <th style={{ width: 90 }}>Grade</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -315,44 +336,53 @@ export default function SubjectScores() {
                   <div>{row.student_name}</div>
                   {row.department_name && <small style={{ opacity: 0.7 }}>{row.department_name}</small>}
                 </td>
-                {caIndices.map((idx) => (
-                  <td key={`ca-input-${row.student_id}-${idx}`}>
-                    <input
-                      type="number"
-                      value={Number(row.ca_breakdown?.[idx] || 0)}
-                      min="0"
-                      max={schema.ca_maxes[idx]}
-                      onChange={(e) => updateCa(row.student_id, idx, e.target.value)}
+                {commentsOnly ? (
+                  <td className="staff-scores-table__observation-cell">
+                    <textarea
+                      value={row.teacher_comment || ""}
+                      onChange={(e) => updateTeacherComment(row.student_id, e.target.value)}
                       disabled={resultsPublished}
-                      style={{ width: 80 }}
+                      maxLength={1000}
+                      rows={3}
+                      placeholder="Write the student's learning observation"
                     />
                   </td>
-                ))}
-                <td>
-                  <strong>{row.ca}</strong>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    value={row.exam}
-                    min="0"
-                    max={schema.exam_max}
-                    onChange={(e) => updateExam(row.student_id, e.target.value)}
-                    disabled={resultsPublished}
-                    style={{ width: 80 }}
-                  />
-                </td>
-                <td>
-                  <strong>{row.total}</strong>
-                </td>
-                <td>
-                  <strong>{row.grade}</strong>
-                </td>
+                ) : (
+                  <>
+                    {caIndices.map((idx) => (
+                      <td key={`ca-input-${row.student_id}-${idx}`}>
+                        <input
+                          type="number"
+                          value={Number(row.ca_breakdown?.[idx] || 0)}
+                          min="0"
+                          max={schema.ca_maxes[idx]}
+                          onChange={(e) => updateCa(row.student_id, idx, e.target.value)}
+                          disabled={resultsPublished}
+                          style={{ width: 80 }}
+                        />
+                      </td>
+                    ))}
+                    <td><strong>{row.ca}</strong></td>
+                    <td>
+                      <input
+                        type="number"
+                        value={row.exam}
+                        min="0"
+                        max={schema.exam_max}
+                        onChange={(e) => updateExam(row.student_id, e.target.value)}
+                        disabled={resultsPublished}
+                        style={{ width: 80 }}
+                      />
+                    </td>
+                    <td><strong>{row.total}</strong></td>
+                    <td><strong>{row.grade}</strong></td>
+                  </>
+                )}
               </tr>
             ))}
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={6 + caIndices.length}>
+                <td colSpan={commentsOnly ? 3 : 6 + caIndices.length}>
                   {rows.length === 0
                     ? "No enrolled students found for this class and term."
                     : "No students found for the selected subclass."}

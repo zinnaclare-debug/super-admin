@@ -23,6 +23,11 @@ class TeacherResultsController extends Controller
     return Schema::hasColumn('results', 'ca_breakdown');
   }
 
+  private function hasResultTeacherCommentColumn(): bool
+  {
+    return Schema::hasColumn('results', 'teacher_comment');
+  }
+
   private function canUseStudentSubjectExclusions(): bool
   {
     if (!Schema::hasTable('student_subject_exclusions')) {
@@ -94,6 +99,7 @@ class TeacherResultsController extends Controller
     $school = School::find((int) $schoolId);
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
+    $hasTeacherComment = $this->hasResultTeacherCommentColumn();
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
@@ -179,6 +185,7 @@ class TeacherResultsController extends Controller
           'results.ca',
           ...($hasCaBreakdown ? ['results.ca_breakdown'] : [DB::raw('NULL as ca_breakdown')]),
           'results.exam',
+          ...($hasTeacherComment ? ['results.teacher_comment'] : [DB::raw('NULL as teacher_comment')]),
         ]);
 
       $resultsByStudentId = $resultsQuery
@@ -209,6 +216,7 @@ class TeacherResultsController extends Controller
           'exam' => $exam,
           'total' => $total,
           'grade' => $this->gradeFromTotal($schoolId, $total),
+          'teacher_comment' => trim((string) ($resultRow->teacher_comment ?? '')),
         ];
       })
       ->values();
@@ -249,8 +257,10 @@ class TeacherResultsController extends Controller
     $caTotalMax = array_sum($caMaxes);
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
+    $hasTeacherComment = $this->hasResultTeacherCommentColumn();
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
     $caSlotCount = max(1, count($caMaxes));
+    $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
@@ -267,14 +277,21 @@ class TeacherResultsController extends Controller
       ], 423);
     }
 
-    $payload = $request->validate([
+    $rules = [
       'scores' => 'required|array|min:1',
       'scores.*.student_id' => 'required|integer',
-      'scores.*.ca' => 'nullable|integer|min:0|max:100',
-      'scores.*.ca_breakdown' => 'nullable|array|size:' . $caSlotCount,
-      'scores.*.ca_breakdown.*' => 'nullable|numeric|min:0|max:100',
-      'scores.*.exam' => 'required|integer|min:0|max:100',
-    ]);
+    ];
+
+    if ($commentsOnly) {
+      $rules['scores.*.teacher_comment'] = 'nullable|string|max:1000';
+    } else {
+      $rules['scores.*.ca'] = 'nullable|integer|min:0|max:100';
+      $rules['scores.*.ca_breakdown'] = 'nullable|array|size:' . $caSlotCount;
+      $rules['scores.*.ca_breakdown.*'] = 'nullable|numeric|min:0|max:100';
+      $rules['scores.*.exam'] = 'required|integer|min:0|max:100';
+    }
+
+    $payload = $request->validate($rules);
 
     $eligibleStudentIdsQuery = Enrollment::query()
       ->where('enrollments.class_id', $termSubject->class_id)
@@ -303,6 +320,25 @@ class TeacherResultsController extends Controller
     $errors = [];
 
     foreach ($payload['scores'] as $idx => $score) {
+      $studentId = (int) $score['student_id'];
+
+      if (!in_array($studentId, $eligibleStudentIds, true)) {
+        $errors["scores.$idx.student_id"] = [
+          'Student is not eligible for this subject in the current term.',
+        ];
+      }
+
+      if ($commentsOnly) {
+        $preparedScores[] = [
+          'student_id' => $studentId,
+          'ca' => 0,
+          'ca_breakdown' => array_fill(0, 5, 0),
+          'exam' => 0,
+          'teacher_comment' => trim((string) ($score['teacher_comment'] ?? '')),
+        ];
+        continue;
+      }
+
       $rawBreakdown = $score['ca_breakdown'] ?? null;
       $legacyCa = (int) ($score['ca'] ?? 0);
 
@@ -324,14 +360,6 @@ class TeacherResultsController extends Controller
       $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $assessmentSchema, $legacyCa);
       $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
       $exam = (int) ($score['exam'] ?? 0);
-      $studentId = (int) $score['student_id'];
-
-      if (!in_array($studentId, $eligibleStudentIds, true)) {
-        $errors["scores.$idx.student_id"] = [
-          'Student is not eligible for this subject in the current term.',
-        ];
-      }
-
       if ($exam > $examMax) {
         $errors["scores.$idx.exam"] = [
           "Exam score cannot be more than {$examMax}.",
@@ -356,7 +384,7 @@ class TeacherResultsController extends Controller
       throw ValidationException::withMessages($errors);
     }
 
-    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId) {
+    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment) {
       $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
       foreach ($preparedScores as $score) {
         $updateData = [
@@ -365,6 +393,9 @@ class TeacherResultsController extends Controller
         ];
         if ($hasCaBreakdown) {
           $updateData['ca_breakdown'] = $score['ca_breakdown'];
+        }
+        if ($hasTeacherComment) {
+          $updateData['teacher_comment'] = $commentsOnly ? $score['teacher_comment'] : null;
         }
 
         Result::updateOrCreate(
@@ -378,7 +409,9 @@ class TeacherResultsController extends Controller
       }
     });
 
-    return response()->json(['message' => 'Scores saved successfully']);
+    return response()->json([
+      'message' => $commentsOnly ? 'Teacher observations saved successfully' : 'Scores saved successfully',
+    ]);
   }
 
   private function gradeFromTotal(int $schoolId, int $total): string

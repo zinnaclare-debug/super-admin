@@ -13,6 +13,7 @@ class Result extends Model
     'ca',
     'ca_breakdown',
     'exam',
+    'teacher_comment',
   ];
 
   protected $casts = [

@@ -1534,6 +1534,10 @@ class ResultsController extends Controller
         int $studentId
     ): array {
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
+        if ((bool) ($assessmentSchema['comments_only'] ?? false)) {
+            return $this->subjectRows($schoolId, $classId, (int) $selectedTerm->id, $studentId);
+        }
+
         $termsByOrder = $this->cumulativeTermsByOrder($schoolId, (int) $session->id);
         $termIdsByOrder = collect($termsByOrder)
             ->filter()
@@ -1817,6 +1821,7 @@ class ResultsController extends Controller
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
+        $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $subjects = TermSubject::query()
@@ -1862,7 +1867,8 @@ class ResultsController extends Controller
         $subjectStats = $this->buildSubjectStats($schoolId, $termSubjectIds, $assessmentSchema);
 
         return $subjects
-            ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema, $schoolId) {
+            ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema, $schoolId, $commentsOnly) {
+                $teacherComment = trim((string) ($r->teacher_comment ?? ''));
                 $isGraded = $this->isResultRecordGraded(
                     $r->result_id ?? null,
                     $r->ca ?? null,
@@ -1872,9 +1878,17 @@ class ResultsController extends Controller
                 );
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
-                $position = $isGraded ? ($stats['positions'][$studentId] ?? null) : null;
+                $position = (!$commentsOnly && $isGraded) ? ($stats['positions'][$studentId] ?? null) : null;
 
-                if ($isGraded) {
+                if ($commentsOnly) {
+                    $caBreakdown = array_fill(0, 5, null);
+                    $ca = '-';
+                    $exam = '-';
+                    $total = '-';
+                    $grade = '-';
+                    $remark = $teacherComment;
+                    $caBreakdownText = '-';
+                } elseif ($isGraded) {
                     $caBreakdown = AssessmentSchema::normalizeBreakdown(
                         $r->ca_breakdown ?? null,
                         $assessmentSchema,
@@ -1901,7 +1915,8 @@ class ResultsController extends Controller
                     'subject_id' => (int) $r->subject_id,
                     'subject_name' => $r->subject_name,
                     'subject_code' => $r->subject_code,
-                    'is_graded' => $isGraded,
+                    'is_graded' => $commentsOnly ? $teacherComment !== '' : $isGraded,
+                    'teacher_comment' => $teacherComment,
                     'ca' => $ca,
                     'ca_breakdown' => $caBreakdown,
                     'ca_breakdown_text' => $caBreakdownText,

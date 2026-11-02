@@ -767,6 +767,8 @@
 .sai-check-card--compact {
   min-height: auto;
   padding: 8px 12px;
+  min-width: 154px;
+  white-space: nowrap;
 }
 
 .sai-meta-chip {

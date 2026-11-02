@@ -1,6 +1,9 @@
 .school-dashboard {
   display: grid;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   color: #0f172a;
   font-family: "Poppins", "Segoe UI", Tahoma, sans-serif;
 }
@@ -18,6 +21,11 @@
   gap: 14px;
   grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.9fr);
   background: linear-gradient(135deg, #ecf6ff 0%, #f4fcfa 100%);
+}
+
+.sd-hero > *,
+.sd-card {
+  min-width: 0;
 }
 
 .sd-hero__content h1 {
@@ -138,10 +146,24 @@
 }
 
 .sd-population-item {
+  position: relative;
+  overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 12px;
   background: #ffffff;
+}
+
+.sd-population-item::after {
+  position: absolute;
+  top: -28px;
+  right: -20px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--sd-glow, rgba(14, 165, 233, 0.16));
+  content: "";
+  pointer-events: none;
 }
 
 .sd-population-item p {
@@ -155,6 +177,13 @@
   font-size: 1.4rem;
   color: #0f172a;
 }
+
+.sd-population-item--ocean { --sd-icon-bg: #dff5ff; --sd-icon-color: #0369a1; --sd-meter-start: #0284c7; --sd-meter-end: #22d3ee; --sd-glow: rgba(34, 211, 238, 0.18); }
+.sd-population-item--emerald { --sd-icon-bg: #dff9eb; --sd-icon-color: #047857; --sd-meter-start: #059669; --sd-meter-end: #6ee7b7; --sd-glow: rgba(16, 185, 129, 0.16); }
+.sd-population-item--amber { --sd-icon-bg: #fff3cc; --sd-icon-color: #b45309; --sd-meter-start: #d97706; --sd-meter-end: #fcd34d; --sd-glow: rgba(245, 158, 11, 0.18); }
+.sd-population-item--violet { --sd-icon-bg: #efe7ff; --sd-icon-color: #6d28d9; --sd-meter-start: #7c3aed; --sd-meter-end: #c4b5fd; --sd-glow: rgba(139, 92, 246, 0.16); }
+.sd-population-item--rose { --sd-icon-bg: #ffe5ef; --sd-icon-color: #be185d; --sd-meter-start: #db2777; --sd-meter-end: #f9a8d4; --sd-glow: rgba(236, 72, 153, 0.15); }
+.sd-population-item--indigo { --sd-icon-bg: #e4ebff; --sd-icon-color: #3730a3; --sd-meter-start: #4f46e5; --sd-meter-end: #93c5fd; --sd-glow: rgba(99, 102, 241, 0.15); }
 
 .sd-note {
   margin: 10px 0 0;
@@ -756,9 +785,51 @@
 .school-dashboard { width: 100%; max-width: 100%; min-width: 0; }
 .sd-population-item { min-width: 0; background: linear-gradient(145deg, #ffffff, #f8fbff); }
 .sd-population-item__head { display: flex; align-items: center; gap: 8px; }
-.sd-metric-icon { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 10px; color: #075985; background: #e0f2fe; }
+.sd-metric-icon { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 10px; color: var(--sd-icon-color, #075985); background: var(--sd-icon-bg, #e0f2fe); box-shadow: 0 8px 18px color-mix(in srgb, var(--sd-icon-color, #075985) 16%, transparent); }
 .sd-metric-icon svg { width: 18px; height: 18px; }
 .sd-population-item small { display: block; color: #64748b; font-size: 11px; }
 .sd-population-meter { height: 5px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: #dbeafe; }
-.sd-population-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0ea5e9, #14b8a6); }
+.sd-population-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--sd-meter-start, #0ea5e9), var(--sd-meter-end, #14b8a6)); }
 .sd-session-table-wrap { width: 100%; max-width: 100%; min-width: 0; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 700px) {
+  .school-dashboard {
+    gap: 12px;
+  }
+
+  .sd-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sd-hero__visual {
+    max-height: 190px;
+  }
+
+  .sd-hero__visual img {
+    width: min(100%, 230px);
+  }
+
+  .sd-features-grid,
+  .sd-population-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sd-feature-card {
+    min-width: 0;
+  }
+
+  .sd-feature-card p,
+  .sd-section-head p {
+    overflow-wrap: anywhere;
+  }
+
+  .sd-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sd-link-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
