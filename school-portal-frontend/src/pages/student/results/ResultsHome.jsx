@@ -34,6 +34,7 @@ const normalizeSchema = (schema) => {
     ca_labels: normalizedLabels,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
+    comments_only: Boolean(raw.comments_only),
   };
 };
 
@@ -100,6 +101,7 @@ export default function StudentResultsHome() {
   const [error, setError] = useState("");
 
   const caIndices = useMemo(() => activeCaIndices(assessmentSchema), [assessmentSchema]);
+  const commentsOnly = Boolean(assessmentSchema.comments_only);
   const isPdfProcessing = pdfJob && ["pending", "processing"].includes(pdfJob.status);
   const supportsCumulative = itemSupportsCumulative(selected);
   const isCumulative = supportsCumulative && resultType === "cumulative";
@@ -114,11 +116,10 @@ export default function StudentResultsHome() {
         )
     );
   const currentItems = useMemo(() => classes.filter((item) => item.is_current_period), [classes]);
-  const historyGroups = useMemo(() => {
-    const historyItems = classes.filter((item) => !item.is_current_period);
+  const groupSessionItems = (items) => {
     const grouped = new Map();
 
-    historyItems.forEach((item) => {
+    items.forEach((item) => {
       const key = String(item.academic_session_id || "unknown");
       if (!grouped.has(key)) {
         grouped.set(key, {
@@ -132,8 +133,16 @@ export default function StudentResultsHome() {
     });
 
     return Array.from(grouped.values());
-  }, [classes]);
+  };
 
+  const currentSessionGroups = useMemo(
+    () => groupSessionItems(classes.filter((item) => item.session_status === "current" && !item.is_current_period)),
+    [classes]
+  );
+  const pastSessionGroups = useMemo(
+    () => groupSessionItems(classes.filter((item) => item.session_status === "completed")),
+    [classes]
+  );
   const loadClasses = async () => {
     setLoadingClasses(true);
     setError("");
@@ -400,12 +409,14 @@ export default function StudentResultsHome() {
           <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>
         ) : (
           <div className="rs-table-wrap">
-            <table className="rs-table">
+            <table className={`rs-table${commentsOnly ? " rs-table--comments" : ""}`}>
               <thead>
                 <tr>
                   <th style={{ width: 70 }}>S/N</th>
                   <th>Subject</th>
-                  {isCumulative ? (
+                  {commentsOnly ? (
+                    <th>Teacher's Observation</th>
+                  ) : isCumulative ? (
                     <>
                       <th style={{ width: 100 }}>First Term</th>
                       <th style={{ width: 110 }}>Second Term</th>
@@ -436,7 +447,7 @@ export default function StudentResultsHome() {
                       )}
                     </>
                   )}
-                  <th style={{ width: 80 }}>Grade</th>
+                  {!commentsOnly ? <th style={{ width: 80 }}>Grade</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -444,7 +455,9 @@ export default function StudentResultsHome() {
                   <tr key={row.term_subject_id}>
                     <td>{idx + 1}</td>
                     <td>{row.subject_name}</td>
-                    {isCumulative ? (
+                    {commentsOnly ? (
+                      <td className="rs-teacher-comment">{row.teacher_comment || "No observation entered yet."}</td>
+                    ) : isCumulative ? (
                       <>
                         <td>{displayScore(row.first_term_total)}</td>
                         <td>{displayScore(row.second_term_total)}</td>
@@ -475,12 +488,12 @@ export default function StudentResultsHome() {
                         )}
                       </>
                     )}
-                    <td>{showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade}</td>
+                    {!commentsOnly ? <td>{showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade}</td> : null}
                   </tr>
                 ))}
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={isCumulative ? 7 : caIndices.length + (showThirdTermPreviousTotals ? 8 : 6)}>
+                    <td colSpan={commentsOnly ? 3 : isCumulative ? 7 : caIndices.length + (showThirdTermPreviousTotals ? 8 : 6)}>
                       No result records for this class and term.
                     </td>
                   </tr>
@@ -571,52 +584,51 @@ export default function StudentResultsHome() {
             </div>
 
             <div className="rs-section-block">
-              <h3 className="rs-results-title">Past Results</h3>
-              {historyGroups.length > 0 ? historyGroups.map((group) => (
+              <h3 className="rs-results-title">Current Session</h3>
+              <p className="rs-card-meta">Other terms in the active academic session remain here until the session is completed.</p>
+              {currentSessionGroups.length > 0 ? currentSessionGroups.map((group) => (
                 <details className="rs-accordion" key={group.id}>
-                  <summary>
-                    <span>{group.label}</span>
-                    <small>{group.items.length} term record{group.items.length === 1 ? "" : "s"}</small>
-                  </summary>
+                  <summary><span>{group.label}</span><small>{group.items.length} term record{group.items.length === 1 ? "" : "s"}</small></summary>
                   <div className="rs-term-list">
                     {group.items.map((item) => {
-                      const isActive =
-                        selected?.class_id === item.class_id && selected?.term_id === item.term_id;
-                      return (
-                        <details
-                          className="rs-term-accordion"
-                          key={`${item.class_id}-${item.term_id}`}
-                          open={isActive || undefined}
-                        >
-                          <summary>
-                            <span>{item.term_name}</span>
-                            <small>{item.class_name}</small>
-                          </summary>
-                          <button
-                            type="button"
-                            className={`rs-card-btn rs-card-btn--compact${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`}
-                            onClick={() => {
-                              setPdfJob(null);
-                              setSelected(item);
-                            }}
-                          >
-                            <h3 className="rs-card-title">{item.class_name}</h3>
-                            <p className="rs-card-meta">
-                              {item.class_level} | {item.term_name}
-                            </p>
-                            {itemSupportsCumulative(item) ? (
-                              <p className="rs-card-meta" style={{ marginTop: 6 }}>Cumulative Result available</p>
-                            ) : null}
-                          </button>
-                          {isActive ? <div className="rs-inline-result">{renderSelectedResultPanel()}</div> : null}
-                        </details>
-                      );
+                      const isActive = selected?.class_id === item.class_id && selected?.term_id === item.term_id;
+                      return <details className="rs-term-accordion" key={`${item.class_id}-${item.term_id}`} open={isActive || undefined}>
+                        <summary><span>{item.term_name}</span><small>{item.class_name}</small></summary>
+                        <button type="button" className={`rs-card-btn rs-card-btn--compact${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`} onClick={() => { setPdfJob(null); setSelected(item); }}>
+                          <h3 className="rs-card-title">{item.class_name}</h3>
+                          <p className="rs-card-meta">{item.class_level} | {item.term_name}</p>
+                          {itemSupportsCumulative(item) ? <p className="rs-card-meta" style={{ marginTop: 6 }}>Cumulative Result available</p> : null}
+                        </button>
+                        {isActive ? <div className="rs-inline-result">{renderSelectedResultPanel()}</div> : null}
+                      </details>;
                     })}
                   </div>
                 </details>
-              )) : (
-                <p className="rs-state rs-state--empty">Past results will appear here after a term or session becomes past.</p>
-              )}
+              )) : <p className="rs-state rs-state--empty">No other term records are available in the current session yet.</p>}
+            </div>
+
+            <div className="rs-section-block">
+              <h3 className="rs-results-title">Past Records</h3>
+              <p className="rs-card-meta">Completed academic sessions appear here after the student has participated in at least one term.</p>
+              {pastSessionGroups.length > 0 ? pastSessionGroups.map((group) => (
+                <details className="rs-accordion" key={group.id}>
+                  <summary><span>{group.label}</span><small>{group.items.length} term record{group.items.length === 1 ? "" : "s"}</small></summary>
+                  <div className="rs-term-list">
+                    {group.items.map((item) => {
+                      const isActive = selected?.class_id === item.class_id && selected?.term_id === item.term_id;
+                      return <details className="rs-term-accordion" key={`${item.class_id}-${item.term_id}`} open={isActive || undefined}>
+                        <summary><span>{item.term_name}</span><small>{item.class_name}</small></summary>
+                        <button type="button" className={`rs-card-btn rs-card-btn--compact${isActive ? " rs-card-btn--active" : ""}${!item.results_open ? " rs-card-btn--locked" : ""}`} onClick={() => { setPdfJob(null); setSelected(item); }}>
+                          <h3 className="rs-card-title">{item.class_name}</h3>
+                          <p className="rs-card-meta">{item.class_level} | {item.term_name}</p>
+                          {itemSupportsCumulative(item) ? <p className="rs-card-meta" style={{ marginTop: 6 }}>Cumulative Result available</p> : null}
+                        </button>
+                        {isActive ? <div className="rs-inline-result">{renderSelectedResultPanel()}</div> : null}
+                      </details>;
+                    })}
+                  </div>
+                </details>
+              )) : <p className="rs-state rs-state--empty">Past records will appear after a completed session contains a student term record.</p>}
             </div>
           </>
         ) : null}

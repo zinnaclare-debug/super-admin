@@ -393,9 +393,10 @@ class ResultsController extends Controller
                 ->get(['id', 'name', 'is_current']);
 
             $preferredResultClassIdByTerm = [];
+            $sessionHasResultRecord = false;
             $sessionScoredClassId = null;
             if ($terms->isNotEmpty()) {
-                $preferredResultClassIdByTerm = DB::table('results')
+                $resultRows = DB::table('results')
                     ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
                     ->where('results.school_id', $schoolId)
                     ->where('results.student_id', (int) $student->id)
@@ -409,9 +410,12 @@ class ResultsController extends Controller
                         'results.id as result_id',
                         'results.ca',
                         'results.exam',
+                        'results.teacher_comment',
                         'results.created_at as result_created_at',
                         'results.updated_at as result_updated_at',
-                    ])
+                    ]);
+                $sessionHasResultRecord = $resultRows->isNotEmpty();
+                $preferredResultClassIdByTerm = $resultRows
                     ->groupBy('term_id')
                     ->map(function ($termRows) {
                         return $termRows
@@ -420,7 +424,8 @@ class ResultsController extends Controller
                                 $row->ca ?? null,
                                 $row->exam ?? null,
                                 $row->result_created_at ?? null,
-                                $row->result_updated_at ?? null
+                                $row->result_updated_at ?? null,
+                                $row->teacher_comment ?? null
                             ))
                             ->groupBy('class_id')
                             ->sortByDesc(fn ($classRows) => $classRows->count())
@@ -437,6 +442,10 @@ class ResultsController extends Controller
                     ->keys()
                     ->map(fn ($id) => (int) $id)
                     ->first();
+            }
+
+            if ((string) $session->status === 'completed' && !$sessionHasResultRecord) {
+                continue;
             }
 
             $latestAssignedClassId = DB::table('class_students')
@@ -1602,6 +1611,7 @@ class ResultsController extends Controller
                 'results.ca',
                 'results.ca_breakdown',
                 'results.exam',
+                'results.teacher_comment',
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
             ])
@@ -1857,6 +1867,7 @@ class ResultsController extends Controller
                 'results.ca',
                 'results.ca_breakdown',
                 'results.exam',
+                'results.teacher_comment',
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
             ])
@@ -2232,10 +2243,15 @@ class ResultsController extends Controller
         $ca,
         $exam,
         $createdAt,
-        $updatedAt
+        $updatedAt,
+        $teacherComment = null
     ): bool {
         if (empty($resultId)) {
             return false;
+        }
+
+        if (trim((string) ($teacherComment ?? '')) !== '') {
+            return true;
         }
 
         $caScore = (int) ($ca ?? 0);

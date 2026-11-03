@@ -241,6 +241,7 @@
 
 .rs-table {
   width: 100%;
+  max-width: none;
   border-collapse: collapse;
   min-width: 720px;
   background: #ffffff;
@@ -363,4 +364,14 @@
   .rs-art--main {
     inset: 8px 46px 14px 0;
   }
+}
+
+.rs-table--comments {
+  min-width: 560px;
+}
+
+.rs-teacher-comment {
+  min-width: 280px;
+  white-space: pre-wrap;
+  line-height: 1.5;
 }

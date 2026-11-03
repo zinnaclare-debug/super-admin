@@ -6,6 +6,16 @@
   min-width: 0;
 }
 
+.ctp-page > *,
+.ctp-filter-row,
+.ctp-filter,
+.ctp-collapse,
+.ctp-collapse-summary,
+.ctp-summary-tags {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .ctp-hero,
 .ctp-panel {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(244, 249, 255, 0.92));
@@ -121,6 +131,9 @@
 
 .ctp-panel {
   padding: 20px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ctp-state {
@@ -226,10 +239,13 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-gutter: stable;
 }
 
 .ctp-table {
-  width: 100%;
+  width: max(100%, 760px);
+  max-width: none;
   min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
@@ -373,6 +389,7 @@
   }
 
   .ctp-table {
+    width: max(100%, 680px);
     min-width: 680px;
   }
 }
