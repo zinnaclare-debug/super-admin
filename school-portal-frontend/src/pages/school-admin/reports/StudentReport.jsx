@@ -19,6 +19,16 @@ const toCsvCell = (value) => {
   return `"${escaped}"`;
 };
 
+const classicComponentCells = (row) => Array.from(
+  { length: 5 },
+  (_, index) => asDash(row?.classic_components?.psychomotor?.[index])
+);
+
+const resultTemplateLabel = (template, commentsOnly) => {
+  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
+  return template?.layout === "classic" ? "Classic full result" : "Compact result";
+};
+
 const asDash = (value) => (value == null || value === "" ? "-" : value);
 
 const formatMaybeNumber = (value, digits = 2) => {
@@ -178,6 +188,9 @@ export default function StudentReport() {
   const isResultCumulative = supportsResultCumulative && resultType === "cumulative";
   const showResultThirdTermPreviousTotals = shouldShowThirdTermPreviousTotals(resultEntry);
   const resultEntryCaIndices = activeCaIndicesForEntry(resultEntry);
+  const resultEntryCommentsOnly = Boolean(resultEntry?.assessment_schema?.comments_only) || resultEntry?.result_template?.layout === "comments_only";
+  const usesClassicResultPreview = !resultEntryCommentsOnly && resultEntry?.result_type !== "cumulative" && resultEntry?.result_template?.layout === "classic";
+  const resultEntryTemplateLabel = resultTemplateLabel(resultEntry?.result_template, resultEntryCommentsOnly);
   const totalSummaryPages = Math.max(1, Math.ceil(rows.length / STUDENT_REPORT_PAGE_SIZE));
 
   const paginatedRows = useMemo(() => {
@@ -578,6 +591,7 @@ export default function StudentReport() {
               <p className="student-report-result-head">
                 {resultEntry.term?.name || "-"}{resultEntry.result_type === "cumulative" ? " Cumulative" : ""} | {resultEntry.class?.name || "-"} | Average: {formatMaybeNumber(resultEntry.summary?.average_score)} | Grade: {asDash(resultEntry.summary?.overall_grade)}
               </p>
+              <p className="student-report-meta">Preview: {resultEntryTemplateLabel}</p>
 
               <div className="student-report-note-block">
                 <div className="student-report-note-label">Teacher Comment</div>
@@ -596,11 +610,11 @@ export default function StudentReport() {
               ) : null}
 
               <div className="student-report-table-wrap">
-                <table className="student-report-table student-report-table--result">
+                <table className={`student-report-table student-report-table--result${resultEntryCommentsOnly ? " student-report-table--comments" : ""}${usesClassicResultPreview ? " student-report-table--classic" : ""}`}>
                   <thead>
                     <tr>
                       <th>Subject</th>
-                      {resultEntry.result_type === "cumulative" ? (
+                      {resultEntryCommentsOnly ? (<><th>Teacher's Observation</th></>) : resultEntry.result_type === "cumulative" ? (
                         <>
                           <th>First Term</th>
                           <th>Second Term</th>
@@ -617,6 +631,7 @@ export default function StudentReport() {
                                 </th>
                               ))}
                               <th>Third Term Exam</th>
+                              {usesClassicResultPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
                               <th>First Term Total</th>
                               <th>Second Term Total</th>
                               <th>Total Score</th>
@@ -626,6 +641,7 @@ export default function StudentReport() {
                             <>
                               <th>CA</th>
                               <th>Exam</th>
+                              {usesClassicResultPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
                               <th>Total</th>
                               <th>Min</th>
                               <th>Max</th>
@@ -635,15 +651,14 @@ export default function StudentReport() {
                           )}
                         </>
                       )}
-                      <th>Grade</th>
-                      <th>Remark</th>
+                      {!resultEntryCommentsOnly ? <><th>Grade</th><th>Remark</th></> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {(resultEntry.rows || []).map((row) => (
                       <tr key={row.term_subject_id}>
                         <td>{row.subject_name}</td>
-                        {resultEntry.result_type === "cumulative" ? (
+                        {resultEntryCommentsOnly ? (<td className="student-report-teacher-comment">{row.teacher_comment || "No observation entered yet."}</td>) : resultEntry.result_type === "cumulative" ? (
                           <>
                             <td>{asDash(row.first_term_total)}</td>
                             <td>{asDash(row.second_term_total)}</td>
@@ -660,6 +675,7 @@ export default function StudentReport() {
                                   </td>
                                 ))}
                                 <td>{asDash(row.exam)}</td>
+                                {usesClassicResultPreview ? (<>{classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}<td>{asDash(row.classic_components?.quiz)}</td><td>{asDash(row.classic_components?.note_copying)}</td></>) : null}
                                 <td>{asDash(row.first_term_total)}</td>
                                 <td>{asDash(row.second_term_total)}</td>
                                 <td>{asDash(row.combined_total_score)}</td>
@@ -669,6 +685,7 @@ export default function StudentReport() {
                               <>
                                 <td>{asDash(row.ca)}</td>
                                 <td>{asDash(row.exam)}</td>
+                                {usesClassicResultPreview ? (<>{classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}<td>{asDash(row.classic_components?.quiz)}</td><td>{asDash(row.classic_components?.note_copying)}</td></>) : null}
                                 <td>{asDash(row.total)}</td>
                                 <td>{asDash(row.min_score)}</td>
                                 <td>{asDash(row.max_score)}</td>
@@ -678,13 +695,12 @@ export default function StudentReport() {
                             )}
                           </>
                         )}
-                        <td>{asDash(showResultThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade)}</td>
-                        <td>{asDash(showResultThirdTermPreviousTotals ? row.third_term_combined_remark || row.remark : row.remark)}</td>
+                        {!resultEntryCommentsOnly ? <><td>{asDash(showResultThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade)}</td><td>{asDash(showResultThirdTermPreviousTotals ? row.third_term_combined_remark || row.remark : row.remark)}</td></> : null}
                       </tr>
                     ))}
                     {(resultEntry.rows || []).length === 0 ? (
                       <tr>
-                        <td colSpan={resultEntry.result_type === "cumulative" ? 7 : 10}>No result records found for this student.</td>
+                        <td colSpan={resultEntryCommentsOnly ? 2 : resultEntry.result_type === "cumulative" ? 7 : (showResultThirdTermPreviousTotals ? resultEntryCaIndices.length + 8 : 10) + (usesClassicResultPreview ? 7 : 0)}>No result records found for this student.</td>
                       </tr>
                     ) : null}
                   </tbody>

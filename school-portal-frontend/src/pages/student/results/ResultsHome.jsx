@@ -38,6 +38,16 @@ const normalizeSchema = (schema) => {
   };
 };
 
+const classicComponentCells = (row) => Array.from(
+  { length: 5 },
+  (_, index) => displayScore(row?.classic_components?.psychomotor?.[index])
+);
+
+const resultTemplateLabel = (template, commentsOnly) => {
+  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
+  return template?.layout === "classic" ? "Classic full result" : "Compact result";
+};
+
 const activeCaIndices = (schema) => {
   const indices = [];
   schema.ca_maxes.forEach((max, idx) => {
@@ -115,6 +125,8 @@ export default function StudentResultsHome() {
           Object.prototype.hasOwnProperty.call(row || {}, "third_term_total")
         )
     );
+  const usesClassicPreview = !commentsOnly && !isCumulative && resultTemplate?.layout === "classic";
+  const selectedTemplateLabel = resultTemplateLabel(resultTemplate, commentsOnly);
   const currentItems = useMemo(() => classes.filter((item) => item.is_current_period), [classes]);
   const groupSessionItems = (items) => {
     const grouped = new Map();
@@ -349,6 +361,7 @@ export default function StudentResultsHome() {
             {selected.class_name} - {sessionLabel(selected)} - {selected.term_name}
             {isCumulative ? " Cumulative" : ""}
           </h3>
+          <span className="rs-card-meta">Preview: {selectedTemplateLabel}</span>
           <button
             className="rs-btn"
             onClick={handlePdfAction}
@@ -409,7 +422,7 @@ export default function StudentResultsHome() {
           <p className="rs-state rs-state--loading" style={{ marginTop: 10 }}>Loading results...</p>
         ) : (
           <div className="rs-table-wrap">
-            <table className={`rs-table${commentsOnly ? " rs-table--comments" : ""}`}>
+            <table className={`rs-table${commentsOnly ? " rs-table--comments" : ""}${usesClassicPreview ? " rs-table--classic" : ""}`}>
               <thead>
                 <tr>
                   <th style={{ width: 70 }}>S/N</th>
@@ -433,6 +446,11 @@ export default function StudentResultsHome() {
                       {showThirdTermPreviousTotals ? (
                         <>
                           <th style={{ width: 100 }}>Third Term Exam ({assessmentSchema.exam_max})</th>
+                          {usesClassicPreview ? (
+                            <>
+                              <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th>
+                            </>
+                          ) : null}
                           <th style={{ width: 110 }}>First Term Total</th>
                           <th style={{ width: 120 }}>Second Term Total</th>
                           <th style={{ width: 100 }}>Total Score</th>
@@ -442,6 +460,11 @@ export default function StudentResultsHome() {
                         <>
                           <th style={{ width: 80 }}>CA Total</th>
                           <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
+                          {usesClassicPreview ? (
+                            <>
+                              <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th>
+                            </>
+                          ) : null}
                           <th style={{ width: 80 }}>Total</th>
                         </>
                       )}
@@ -474,6 +497,13 @@ export default function StudentResultsHome() {
                         {showThirdTermPreviousTotals ? (
                           <>
                             <td>{displayScore(row.exam)}</td>
+                            {usesClassicPreview ? (
+                              <>
+                                {classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}
+                                <td>{displayScore(row.classic_components?.quiz)}</td>
+                                <td>{displayScore(row.classic_components?.note_copying)}</td>
+                              </>
+                            ) : null}
                             <td>{displayScore(row.first_term_total)}</td>
                             <td>{displayScore(row.second_term_total)}</td>
                             <td>{displayScore(row.combined_total_score)}</td>
@@ -483,6 +513,13 @@ export default function StudentResultsHome() {
                           <>
                             <td>{displayScore(row.ca)}</td>
                             <td>{displayScore(row.exam)}</td>
+                            {usesClassicPreview ? (
+                              <>
+                                {classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}
+                                <td>{displayScore(row.classic_components?.quiz)}</td>
+                                <td>{displayScore(row.classic_components?.note_copying)}</td>
+                              </>
+                            ) : null}
                             <td>{displayScore(row.total)}</td>
                           </>
                         )}
@@ -493,7 +530,7 @@ export default function StudentResultsHome() {
                 ))}
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={commentsOnly ? 3 : isCumulative ? 7 : caIndices.length + (showThirdTermPreviousTotals ? 8 : 6)}>
+                    <td colSpan={commentsOnly ? 3 : isCumulative ? 7 : caIndices.length + (showThirdTermPreviousTotals ? 8 : 6) + (usesClassicPreview ? 7 : 0)}>
                       No result records for this class and term.
                     </td>
                   </tr>

@@ -52,7 +52,7 @@ table { width: 100%; border-collapse: collapse; }
 .comment-grid td { width: 50%; vertical-align: top; padding: 4px; }
 .comment-card { min-height: 47px; border: 1px solid #758399; padding: 5px; }
 .comment-card strong { color: {{ $primary }}; }
-.signatures td { width: 50%; text-align: center; padding-top: 14px; vertical-align: bottom; }
+.signatures td { width: 100%; text-align: center; padding-top: 14px; vertical-align: bottom; }
 .signature { max-width: 112px; max-height: 35px; object-fit: contain; }
 .signature-line { border-top: 1px solid #475569; margin: 7px auto 2px; width: 78%; }
 .center { text-align: center; }
@@ -65,9 +65,12 @@ table { width: 100%; border-collapse: collapse; }
 </tr></table>
 <div class="report-title">{{ strtoupper($term?->name ?? '-') }} TERM, {{ $sessionLabel }} ACADEMIC SESSION</div>
 <table class="info">
-<tr><th>STUDENT NAME</th><td>{{ strtoupper($studentUser?->name ?? '-') }}</td><th>ADMISSION NO.</th><td>{{ strtoupper($studentUser?->username ?? '-') }}</td><th>CLASS</th><td>{{ strtoupper($class?->name ?? '-') }}</td></tr>
-<tr><th>GENDER</th><td>{{ strtoupper($student?->sex ?? '-') }}</td><th>ATTENDANCE</th><td>{{ $showAttendance ? ($daysPresent . '/' . $schoolDays) : '-' }}</td><th>NEXT TERM</th><td>{{ $nextTerm }}</td></tr>
-<tr><th>AVERAGE</th><td>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</td><th>POSITION</th><td>{{ $showPosition ? ($classPositionDisplay ?? '-') : '-' }}</td><th>CLASS SIZE</th><td>{{ $classSize ?? '-' }}</td></tr>
+<tr><th>NAME</th><td>{{ strtoupper($studentUser?->name ?? '-') }}</td><th>CLASS</th><td>{{ strtoupper($class?->name ?? '-') }}</td></tr>
+<tr><th>SERIAL NO.</th><td>{{ strtoupper($studentUser?->username ?? '-') }}</td><th>NEXT TERM BEGINS</th><td>{{ $nextTerm }}</td></tr>
+<tr><th>GENDER</th><td>{{ strtoupper($student?->sex ?? '-') }}</td><th>AVERAGE</th><td>{{ $averageDisplay ?? number_format((float) $averageScore, 2) }}</td></tr>
+@if($showPosition)<tr><th>POSITION</th><td colspan="3">{{ $classPositionDisplay ?? '-' }}</td></tr>@endif
+<tr><th>{{ $showAttendance ? 'ATTENDANCE' : 'TERM' }}</th><td>{{ $showAttendance ? ($daysPresent . '/' . $schoolDays) : strtoupper($term?->name ?? '-') }}</td><th>TOTAL STUDENTS</th><td>{{ $classSize ?? '-' }}</td></tr>
+<tr><th>TOTAL OBTAINED</th><td>{{ $totalScore ?? '-' }}</td><th>TOTAL OBTAINABLE</th><td>{{ max(1, count($rows ?? [])) * 100 }}</td></tr>
 </table>
 <table class="scores"><thead>
 @if($isCumulative)
@@ -104,5 +107,5 @@ table { width: 100%; border-collapse: collapse; }
 <div class="section"><div class="section-title">GRADE INTERPRETATION</div><div class="grade-key">{{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}</div></div>
 @if($showBehaviour)<div class="section"><div class="section-title">GENERAL BEHAVIOUR / PSYCHOMOTOR ASSESSMENT</div><table class="traits">@foreach(collect($behaviourTraits ?? [])->chunk(5) as $traitChunk)<tr>@foreach($traitChunk as $trait)<th>{{ strtoupper($trait['label'] ?? '') }}</th><td>{{ $trait['value'] ?? '-' }}</td>@endforeach</tr>@endforeach</table></div>@endif
 <div class="section"><div class="section-title">COMMENTS</div><table class="comment-grid"><tr><td><div class="comment-card"><strong>CLASS TEACHER: {{ strtoupper($classTeacher?->name ?? '-') }}</strong><br>{{ strtoupper($teacherComment ?? '-') }}</div></td><td><div class="comment-card"><strong>HEAD OF SCHOOL: {{ strtoupper($school?->head_of_school_name ?? '-') }}</strong><br>{{ strtoupper($schoolHeadComment ?? '-') }}</div></td></tr></table></div>
-<table class="signatures"><tr><td><div class="signature-line"></div>Class Teacher's Signature</td><td>@if($showSignature && $headSignatureDataUri)<img class="signature" src="{{ $headSignatureDataUri }}">@endif<div class="signature-line"></div>Head of School's Signature</td></tr></table>
+<table class="signatures"><tr><td>@if($showSignature && $headSignatureDataUri)<img class="signature" src="{{ $headSignatureDataUri }}">@endif<div class="signature-line"></div>Head of School's Signature</td></tr></table>
 </div></body></html>

@@ -15,6 +15,16 @@ const formatMaybeNumber = (value, digits = 2) => {
   return num.toFixed(digits);
 };
 
+const classicComponentCells = (row) => Array.from(
+  { length: 5 },
+  (_, index) => asDash(row?.classic_components?.psychomotor?.[index])
+);
+
+const resultTemplateLabel = (template, commentsOnly) => {
+  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
+  return template?.layout === "classic" ? "Classic full result" : "Compact result";
+};
+
 const isThirdTermName = (name = "") => {
   const value = String(name).toLowerCase();
   return value.includes("third") || /(^|\D)3(rd)?(\D|$)/.test(value);
@@ -71,6 +81,9 @@ export default function StudentResult() {
   const isCumulative = supportsCumulative && resultType === "cumulative";
   const showThirdTermPreviousTotals = shouldShowThirdTermPreviousTotals(entry);
   const entryCaIndices = activeCaIndicesForEntry(entry);
+  const entryCommentsOnly = Boolean(entry?.assessment_schema?.comments_only) || entry?.result_template?.layout === "comments_only";
+  const usesClassicPreview = !entryCommentsOnly && entry?.result_type !== "cumulative" && entry?.result_template?.layout === "classic";
+  const entryTemplateLabel = resultTemplateLabel(entry?.result_template, entryCommentsOnly);
 
   const resetPdfState = () => {
     setJob(null);
@@ -371,6 +384,7 @@ export default function StudentResult() {
               <h3 className="rs-results-title">
                 {entry.term?.name || "Term Result"}{entry.result_type === "cumulative" ? " Cumulative" : ""}
               </h3>
+              <span className="rs-card-meta">Preview: {entryTemplateLabel}</span>
               <span className="rs-meta" style={{ marginTop: 0 }}>
                 <span>{entry.class?.name || "-"}</span>
                 <span>Average: {formatMaybeNumber(entry.summary?.average_score)}</span>
@@ -393,11 +407,11 @@ export default function StudentResult() {
             </div>
 
             <div className="rs-table-wrap">
-              <table className="rs-table">
+              <table className={`rs-table${entryCommentsOnly ? " rs-table--comments" : ""}${usesClassicPreview ? " rs-table--classic" : ""}`}>
                 <thead>
                   <tr>
                     <th>Subject</th>
-                    {entry.result_type === "cumulative" ? (
+                    {entryCommentsOnly ? (<><th>Teacher's Observation</th></>) : entry.result_type === "cumulative" ? (
                       <>
                         <th>First Term</th>
                         <th>Second Term</th>
@@ -414,6 +428,7 @@ export default function StudentResult() {
                               </th>
                             ))}
                             <th>Third Term Exam</th>
+                            {usesClassicPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
                             <th>First Term Total</th>
                             <th>Second Term Total</th>
                             <th>Total Score</th>
@@ -423,6 +438,7 @@ export default function StudentResult() {
                           <>
                             <th>CA</th>
                             <th>Exam</th>
+                            {usesClassicPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
                             <th>Total</th>
                             <th>Min</th>
                             <th>Max</th>
@@ -432,15 +448,14 @@ export default function StudentResult() {
                         )}
                       </>
                     )}
-                    <th>Grade</th>
-                    <th>Remark</th>
+                    {!entryCommentsOnly ? <><th>Grade</th><th>Remark</th></> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {(entry.rows || []).map((row) => (
                     <tr key={row.term_subject_id}>
                       <td>{row.subject_name}</td>
-                      {entry.result_type === "cumulative" ? (
+                      {entryCommentsOnly ? (<td className="rs-teacher-comment">{row.teacher_comment || "No observation entered yet."}</td>) : entry.result_type === "cumulative" ? (
                         <>
                           <td>{asDash(row.first_term_total)}</td>
                           <td>{asDash(row.second_term_total)}</td>
@@ -457,6 +472,7 @@ export default function StudentResult() {
                                 </td>
                               ))}
                               <td>{asDash(row.exam)}</td>
+                              {usesClassicPreview ? (<>{classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}<td>{asDash(row.classic_components?.quiz)}</td><td>{asDash(row.classic_components?.note_copying)}</td></>) : null}
                               <td>{asDash(row.first_term_total)}</td>
                               <td>{asDash(row.second_term_total)}</td>
                               <td>{asDash(row.combined_total_score)}</td>
@@ -466,6 +482,7 @@ export default function StudentResult() {
                             <>
                               <td>{asDash(row.ca)}</td>
                               <td>{asDash(row.exam)}</td>
+                              {usesClassicPreview ? (<>{classicComponentCells(row).map((value, componentIndex) => <td key={`classic-psy-${row.term_subject_id}-${componentIndex}`}>{value}</td>)}<td>{asDash(row.classic_components?.quiz)}</td><td>{asDash(row.classic_components?.note_copying)}</td></>) : null}
                               <td>{asDash(row.total)}</td>
                               <td>{asDash(row.min_score)}</td>
                               <td>{asDash(row.max_score)}</td>
@@ -475,13 +492,12 @@ export default function StudentResult() {
                           )}
                         </>
                       )}
-                      <td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade)}</td>
-                      <td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_remark || row.remark : row.remark)}</td>
+                      {!entryCommentsOnly ? <><td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_grade || row.grade : row.grade)}</td><td>{asDash(showThirdTermPreviousTotals ? row.third_term_combined_remark || row.remark : row.remark)}</td></> : null}
                     </tr>
                   ))}
                   {(entry.rows || []).length === 0 ? (
                     <tr>
-                      <td colSpan={entry.result_type === "cumulative" ? 7 : 10}>No records found for this student and term.</td>
+                      <td colSpan={entryCommentsOnly ? 2 : entry.result_type === "cumulative" ? 7 : (showThirdTermPreviousTotals ? entryCaIndices.length + 8 : 10) + (usesClassicPreview ? 7 : 0)}>No records found for this student and term.</td>
                     </tr>
                   ) : null}
                 </tbody>
