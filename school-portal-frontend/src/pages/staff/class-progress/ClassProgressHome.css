@@ -388,9 +388,77 @@
     overflow-wrap: anywhere;
   }
 
-  .ctp-table {
-    width: max(100%, 680px);
-    min-width: 680px;
+  .ctp-table-wrap {
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .ctp-table,
+  .ctp-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ctp-table thead {
+    display: none;
+  }
+
+  .ctp-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .ctp-table tbody tr {
+    display: grid;
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 16px;
+    background: rgba(226, 232, 240, 0.72);
+  }
+
+  .ctp-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    white-space: normal;
+    padding: 11px 12px;
+    border: 0;
+    background: #ffffff;
+  }
+
+  .ctp-table td::before {
+    flex: 0 0 auto;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .ctp-table td:nth-child(1)::before { content: "S/N"; }
+  .ctp-table td:nth-child(2)::before { content: "Student"; }
+  .ctp-table td:nth-child(3)::before { content: "Results"; }
+  .ctp-table td:nth-child(4)::before { content: "Comments"; }
+  .ctp-table td:nth-child(5)::before { content: "Behaviour Rating"; }
+
+  .ctp-table td:nth-child(2) {
+    align-items: flex-start;
+    overflow-wrap: anywhere;
+  }
+
+  .ctp-table td[colspan] {
+    display: block;
+    color: #64748b;
+    text-align: center;
+  }
+
+  .ctp-table td[colspan]::before {
+    content: none;
   }
 }
 .ctp-summary-tag--department {
