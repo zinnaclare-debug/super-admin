@@ -6,15 +6,10 @@ import splitTestingArt from "../../../assets/behaviour-rating/split-testing.svg"
 import customerSurveyArt from "../../../assets/behaviour-rating/customer-survey.svg";
 import "./BehaviourRatingHome.css";
 
-const cols = [
-  ["handwriting", "Handwriting"],
-  ["speech", "Speech"],
-  ["attitude", "Attitude"],
-  ["reading", "Reading"],
-  ["punctuality", "Punctuality"],
-  ["teamwork", "Teamwork"],
-  ["self_control", "Self Control"],
-];
+const DEFAULT_CRITERIA = [
+  "Handwriting", "Speech", "Attitude", "Reading", "Punctuality",
+  "Teamwork", "Self Control", "Neatness", "Honesty", "Obedience",
+].map((label, index) => ({ key: `criterion_${index + 1}`, label }));
 
 export default function BehaviourRatingHome() {
   const [loading, setLoading] = useState(true);
@@ -25,6 +20,7 @@ export default function BehaviourRatingHome() {
   const [classId, setClassId] = useState("");
   const [termId, setTermId] = useState("");
   const [students, setStudents] = useState([]);
+  const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
 
   const load = async (nextClassId = "") => {
     setLoading(true);
@@ -48,6 +44,7 @@ export default function BehaviourRatingHome() {
       setTerms(data.terms || []);
       setClassId(String(data.selected_class_id || ""));
       setTermId(String(data.selected_term_id || ""));
+      setCriteria(Array.isArray(data.behaviour_schema?.criteria) ? data.behaviour_schema.criteria : DEFAULT_CRITERIA);
       setStudents(data.students || []);
     } catch (err) {
       setMessage(err?.response?.data?.message || "Failed to load behaviour rating");
@@ -69,13 +66,10 @@ export default function BehaviourRatingHome() {
         term_id: Number(termId),
         rows: students.map((s) => ({
           student_id: s.student_id,
-          handwriting: Number(s.handwriting || 0),
-          speech: Number(s.speech || 0),
-          attitude: Number(s.attitude || 0),
-          reading: Number(s.reading || 0),
-          punctuality: Number(s.punctuality || 0),
-          teamwork: Number(s.teamwork || 0),
-          self_control: Number(s.self_control || 0),
+          ratings: Object.fromEntries(criteria.map((criterion) => [
+            criterion.key,
+            Number(s.ratings?.[criterion.key] || 0),
+          ])),
         })),
       });
       alert("Behaviour ratings saved");
@@ -99,7 +93,7 @@ export default function BehaviourRatingHome() {
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
-              <span>{cols.length} behaviour criteria</span>
+              <span>{criteria.length} behaviour criteria</span>
             </div>
           </div>
 
@@ -159,8 +153,8 @@ export default function BehaviourRatingHome() {
                   <tr>
                     <th style={{ width: 70 }}>S/N</th>
                     <th style={{ minWidth: 190 }}>Student Name</th>
-                    {cols.map(([, label]) => (
-                      <th key={label}>{label}</th>
+                    {criteria.map((criterion) => (
+                      <th key={criterion.key}>{criterion.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -169,18 +163,20 @@ export default function BehaviourRatingHome() {
                     <tr key={s.student_id}>
                       <td>{idx + 1}</td>
                       <td>{s.student_name}</td>
-                      {cols.map(([key]) => (
-                        <td key={key}>
+                      {criteria.map((criterion) => (
+                        <td key={criterion.key}>
                           <input
                             className="bvr-field bvr-field--score"
                             type="number"
                             min="0"
                             max="5"
-                            value={s[key] ?? 0}
+                            value={s.ratings?.[criterion.key] ?? 0}
                             onChange={(e) => {
                               const v = Number(e.target.value || 0);
                               setStudents((prev) =>
-                                prev.map((x) => (x.student_id === s.student_id ? { ...x, [key]: v } : x))
+                                prev.map((x) => (x.student_id === s.student_id
+                                  ? { ...x, ratings: { ...x.ratings, [criterion.key]: v } }
+                                  : x))
                               );
                             }}
                           />
@@ -191,7 +187,7 @@ export default function BehaviourRatingHome() {
                   ))}
                   {!students.length && (
                     <tr>
-                      <td colSpan={3 + cols.length}>No enrolled students found for this class and term.</td>
+                      <td colSpan={2 + criteria.length}>No enrolled students found for this class and term.</td>
                     </tr>
                   )}
                 </tbody>

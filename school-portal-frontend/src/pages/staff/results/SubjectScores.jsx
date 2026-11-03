@@ -89,6 +89,11 @@ const normalizeRow = (row, schema, gradingSchema) => {
     exam,
     total,
     grade: gradeFromTotal(total, gradingSchema),
+    classic_components: {
+      psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, 2)),
+      quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, 5),
+      note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, 5),
+    },
   };
 };
 
@@ -102,6 +107,7 @@ export default function SubjectScores() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resultsPublished, setResultsPublished] = useState(false);
+  const [usesClassicComponents, setUsesClassicComponents] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
   const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
@@ -167,11 +173,13 @@ export default function SubjectScores() {
       setGradingSchema(normalizedGradingSchema);
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
       setResultsPublished(Boolean(res.data?.data?.results_published));
+      setUsesClassicComponents(Boolean(res.data?.data?.uses_classic_components));
       setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
       setResultsPublished(false);
+      setUsesClassicComponents(false);
     } finally {
       setLoading(false);
     }
@@ -218,6 +226,20 @@ export default function SubjectScores() {
     )));
   };
 
+  const updateClassicComponent = (studentId, key, value, index = null) => {
+    if (resultsPublished) return;
+    setRows((prev) => prev.map((row) => {
+      if (row.student_id !== studentId) return row;
+      const current = row.classic_components || { psychomotor: [0, 0, 0, 0, 0], quiz: 0, note_copying: 0 };
+      if (key === "psychomotor") {
+        const psychomotor = [...current.psychomotor];
+        psychomotor[index] = clamp(Number(value || 0), 0, 2);
+        return { ...row, classic_components: { ...current, psychomotor } };
+      }
+      return { ...row, classic_components: { ...current, [key]: clamp(Number(value || 0), 0, 5) } };
+    }));
+  };
+
   const saveAll = async () => {
     if (resultsPublished) {
       alert("Results have been published. Staff can edit again after results are unpublished.");
@@ -234,6 +256,7 @@ export default function SubjectScores() {
                 student_id: row.student_id,
                 ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
                 exam: Number(row.exam || 0),
+                ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
               }
         )),
       });
@@ -252,6 +275,10 @@ export default function SubjectScores() {
           ? "Enter a clear learning observation for each student. No CA or exam score is used for this level."
           : `Assessment pattern: ${caPattern}. Total max: 100.`}
       </div>
+
+      {!commentsOnly && usesClassicComponents ? (
+        <p className="staff-scores-classic-note">Classic full result fields are recorded separately from the school&apos;s configured CA and exam total.</p>
+      ) : null}
 
       {resultsPublished ? (
         <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 14, fontWeight: 600 }}>
@@ -322,6 +349,9 @@ export default function SubjectScores() {
                   ))}
                   <th style={{ width: 110 }}>CA Total</th>
                   <th style={{ width: 120 }}>Exam ({schema.exam_max})</th>
+                  {usesClassicComponents ? <th colSpan="5">Psychomotor / Affective (10%)</th> : null}
+                  {usesClassicComponents ? <th style={{ width: 85 }}>Quiz (5)</th> : null}
+                  {usesClassicComponents ? <th style={{ width: 105 }}>Note Copying (5)</th> : null}
                   <th style={{ width: 110 }}>Total</th>
                   <th style={{ width: 90 }}>Grade</th>
                 </>
@@ -374,6 +404,13 @@ export default function SubjectScores() {
                         style={{ width: 80 }}
                       />
                     </td>
+                    {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => (
+                      <td key={`psy-${row.student_id}-${index}`}>
+                        <input type="number" value={value} min="0" max="2" onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} style={{ width: 58 }} />
+                      </td>
+                    )) : null}
+                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.quiz} min="0" max="5" onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
+                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.note_copying} min="0" max="5" onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
                     <td><strong>{row.total}</strong></td>
                     <td><strong>{row.grade}</strong></td>
                   </>

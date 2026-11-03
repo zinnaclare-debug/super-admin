@@ -58,3 +58,9 @@
   font: inherit;
   line-height: 1.4;
 }
+.staff-scores-classic-note {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}

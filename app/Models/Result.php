@@ -14,9 +14,11 @@ class Result extends Model
     'ca_breakdown',
     'exam',
     'teacher_comment',
+    'classic_components',
   ];
 
   protected $casts = [
     'ca_breakdown' => 'array',
+    'classic_components' => 'array',
   ];
 }

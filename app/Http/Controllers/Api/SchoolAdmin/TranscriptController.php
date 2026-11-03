@@ -17,6 +17,7 @@ use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
 use App\Support\GeneratedDocumentData;
+use App\Support\BehaviourSchema;
 use App\Support\GradingSchema;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -898,15 +899,7 @@ class TranscriptController extends Controller
             }
             $schoolHeadComment = $this->defaultHeadComment((int) round($averageScore));
 
-            $behaviourTraits = [
-                ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-                ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-                ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-                ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-                ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-                ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-                ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-            ];
+            $behaviourTraits = BehaviourSchema::traits($behaviour, $school?->behaviour_schema);
 
             $viewData = [
                 'school' => $school,

@@ -10,6 +10,7 @@ use App\Models\SchoolClass;
 use App\Models\SchoolFeature;
 use App\Models\User;
 use App\Support\AssessmentSchema;
+use App\Support\BehaviourSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\SchoolPublicWebsiteData;
@@ -116,6 +117,7 @@ class DashboardController extends Controller
             'head_signature_url' => $this->storageUrl($school?->head_signature_path),
             'school_motto' => $websiteContent['motto'] ?? '',
             'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
+            'behaviour_schema' => BehaviourSchema::normalize($school?->behaviour_schema),
             'department_templates' => $this->resolveDepartmentTemplates($school),
             'class_templates' => ClassTemplateSchema::normalize($school?->class_templates),
             'results_published' => (bool) ($school?->results_published),
@@ -130,6 +132,27 @@ class DashboardController extends Controller
             'profile_completeness_notices' => $profileCompletenessNotices,
             'staff' => $staff,
             'enabled_modules' => $enabledModules,
+        ]);
+    }
+
+    public function updateBehaviourSchema(Request $request)
+    {
+        $school = School::query()->find((int) $request->user()->school_id);
+        if (! $school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $payload = $request->validate([
+            'criteria' => 'required|array|size:10',
+            'criteria.*.label' => 'nullable|string|max:60',
+        ]);
+
+        $school->behaviour_schema = BehaviourSchema::normalize(['criteria' => $payload['criteria']]);
+        $school->save();
+
+        return response()->json([
+            'message' => 'General behaviour criteria saved.',
+            'data' => $school->behaviour_schema,
         ]);
     }
 

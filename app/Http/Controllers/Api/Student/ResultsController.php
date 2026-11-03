@@ -17,6 +17,8 @@ use App\Models\TermAttendanceSetting;
 use App\Models\TermSubject;
 use App\Models\User;
 use App\Support\AssessmentSchema;
+use App\Support\BehaviourSchema;
+use App\Support\ClassicResultComponents;
 use App\Support\GradingSchema;
 use App\Support\ResultPdfTemplate;
 use Dompdf\Dompdf;
@@ -1051,28 +1053,12 @@ class ResultsController extends Controller
                 : 'No graded subject available yet.';
         }
 
-        $behaviourTraits = [
-            ['label' => 'Handwriting', 'value' => (int) ($behaviour?->handwriting ?? 0)],
-            ['label' => 'Speech', 'value' => (int) ($behaviour?->speech ?? 0)],
-            ['label' => 'Attitude', 'value' => (int) ($behaviour?->attitude ?? 0)],
-            ['label' => 'Reading', 'value' => (int) ($behaviour?->reading ?? 0)],
-            ['label' => 'Punctuality', 'value' => (int) ($behaviour?->punctuality ?? 0)],
-            ['label' => 'Teamwork', 'value' => (int) ($behaviour?->teamwork ?? 0)],
-            ['label' => 'Self Control', 'value' => (int) ($behaviour?->self_control ?? 0)],
-        ];
+        $behaviourTraits = $this->behaviourTraitsFromRating($behaviour, $school?->behaviour_schema);
 
         $behaviourSummary = collect($behaviourTraits)
             ->map(function (array $trait) {
-                $label = match ((string) ($trait['label'] ?? '')) {
-                    'Handwriting' => 'HW',
-                    'Speech' => 'SP',
-                    'Attitude' => 'AT',
-                    'Reading' => 'RD',
-                    'Punctuality' => 'PU',
-                    'Teamwork' => 'TW',
-                    'Self Control' => 'SC',
-                    default => strtoupper(substr((string) ($trait['label'] ?? ''), 0, 2)),
-                };
+                $words = preg_split('/\\s+/', trim((string) ($trait['label'] ?? ''))) ?: [];
+                $label = strtoupper(substr(implode('', array_map(fn ($word) => substr($word, 0, 1), $words)), 0, 3));
 
                 return $label . ':' . (int) ($trait['value'] ?? 0);
             })
@@ -1333,8 +1319,8 @@ class ResultsController extends Controller
             : 'No graded subject available yet.';
 
         $behaviourTraits = $resultType === self::RESULT_TYPE_CUMULATIVE
-            ? $this->cumulativeBehaviourTraits($schoolId, (int) $class->id, $session, (int) $student->id)
-            : $this->behaviourTraitsFromRating($behaviour);
+            ? $this->cumulativeBehaviourTraits($schoolId, (int) $class->id, $session, (int) $student->id, $school?->behaviour_schema)
+            : $this->behaviourTraitsFromRating($behaviour, $school?->behaviour_schema);
 
         $viewData = [
             'school' => $school,
@@ -1688,31 +1674,12 @@ class ResultsController extends Controller
         ];
     }
 
-    private function behaviourTraitDefinitions(): array
+    private function behaviourTraitsFromRating(?StudentBehaviourRating $behaviour, mixed $schema): array
     {
-        return [
-            'handwriting' => 'Handwriting',
-            'speech' => 'Speech',
-            'attitude' => 'Attitude',
-            'reading' => 'Reading',
-            'punctuality' => 'Punctuality',
-            'teamwork' => 'Teamwork',
-            'self_control' => 'Self Control',
-        ];
+        return BehaviourSchema::traits($behaviour, $schema);
     }
 
-    private function behaviourTraitsFromRating(?StudentBehaviourRating $behaviour): array
-    {
-        return collect($this->behaviourTraitDefinitions())
-            ->map(fn (string $label, string $field) => [
-                'label' => $label,
-                'value' => (int) ($behaviour?->{$field} ?? 0),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function cumulativeBehaviourTraits(int $schoolId, int $classId, AcademicSession $session, int $studentId): array
+    private function cumulativeBehaviourTraits(int $schoolId, int $classId, AcademicSession $session, int $studentId, mixed $schema): array
     {
         $termIds = collect($this->cumulativeTermsByOrder($schoolId, (int) $session->id))
             ->filter()
@@ -1721,7 +1688,7 @@ class ResultsController extends Controller
             ->all();
 
         if (empty($termIds)) {
-            return $this->behaviourTraitsFromRating(null);
+            return $this->behaviourTraitsFromRating(null, $schema);
         }
 
         $ratings = StudentBehaviourRating::where('school_id', $schoolId)
@@ -1730,15 +1697,16 @@ class ResultsController extends Controller
             ->whereIn('term_id', $termIds)
             ->get();
 
-        return collect($this->behaviourTraitDefinitions())
-            ->map(function (string $label, string $field) use ($ratings) {
+        $criteria = BehaviourSchema::normalize($schema)['criteria'];
+        return collect($criteria)
+            ->map(function (array $criterion) use ($ratings, $schema) {
                 $values = $ratings
-                    ->map(fn ($rating) => (int) ($rating->{$field} ?? 0))
+                    ->map(fn ($rating) => BehaviourSchema::values($rating, $schema)[$criterion['key']] ?? 0)
                     ->filter(fn (int $value) => $value > 0)
                     ->values();
 
                 return [
-                    'label' => $label,
+                    'label' => $criterion['label'],
                     'value' => $values->isEmpty() ? 0 : (int) round((float) $values->avg()),
                 ];
             })
@@ -1832,6 +1800,7 @@ class ResultsController extends Controller
     {
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
+        $hasClassicComponents = Schema::hasColumn('results', 'classic_components');
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $subjects = TermSubject::query()
@@ -1868,6 +1837,7 @@ class ResultsController extends Controller
                 'results.ca_breakdown',
                 'results.exam',
                 'results.teacher_comment',
+                ...($hasClassicComponents ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
             ])
@@ -1932,6 +1902,7 @@ class ResultsController extends Controller
                     'ca_breakdown' => $caBreakdown,
                     'ca_breakdown_text' => $caBreakdownText,
                     'exam' => $exam,
+                    'classic_components' => ClassicResultComponents::normalize($r->classic_components ?? null),
                     'total' => $total,
                     'min_score' => $isGraded ? ($stats['min_score'] ?? 0) : '-',
                     'max_score' => $isGraded ? ($stats['max_score'] ?? 0) : '-',

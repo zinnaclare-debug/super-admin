@@ -172,6 +172,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
 */
 Route::middleware(['auth:sanctum', 'role:school_admin'])->group(function () {
     Route::get('/school-admin/stats', [SchoolAdminDashboardController::class, 'stats']);
+    Route::put('/school-admin/general-behaviour', [SchoolAdminDashboardController::class, 'updateBehaviourSchema']);
     Route::get('/school-admin/generated-documents/{generatedDocument}', [SchoolAdminGeneratedDocumentController::class, 'show']);
     Route::get('/school-admin/generated-documents/{generatedDocument}/file', [SchoolAdminGeneratedDocumentController::class, 'download']);
     Route::post('/school-admin/logo', [SchoolAdminDashboardController::class, 'uploadLogo']);

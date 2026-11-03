@@ -809,7 +809,12 @@ class SchoolController extends Controller
             'cumulative.show_average' => 'nullable|boolean',
         ]);
 
-        $school->result_template_config = ResultPdfTemplate::normalize($payload);
+        // New saves must carry the renderer version.  Without it, a valid classic
+        // choice is intentionally treated as the legacy compact renderer.
+        $school->result_template_config = ResultPdfTemplate::normalize([
+            ...$payload,
+            'layout_version' => 2,
+        ]);
         $school->save();
 
         return response()->json([

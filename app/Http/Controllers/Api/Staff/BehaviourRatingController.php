@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
+use App\Models\School;
 use App\Models\StudentBehaviourRating;
 use App\Models\Term;
+use App\Support\BehaviourSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -191,18 +193,15 @@ class BehaviourRatingController extends Controller
       ->get()
       ->keyBy('student_id');
 
-    $students = $enrollments->map(function ($s) use ($ratings) {
+    $school = School::find($schoolId);
+    $behaviourSchema = BehaviourSchema::normalize($school?->behaviour_schema);
+
+    $students = $enrollments->map(function ($s) use ($ratings, $behaviourSchema) {
       $r = $ratings->get($s->student_id);
       return [
         'student_id' => (int)$s->student_id,
         'student_name' => $s->student_name,
-        'handwriting' => (int)($r->handwriting ?? 0),
-        'speech' => (int)($r->speech ?? 0),
-        'attitude' => (int)($r->attitude ?? 0),
-        'reading' => (int)($r->reading ?? 0),
-        'punctuality' => (int)($r->punctuality ?? 0),
-        'teamwork' => (int)($r->teamwork ?? 0),
-        'self_control' => (int)($r->self_control ?? 0),
+        'ratings' => BehaviourSchema::values($r, $behaviourSchema),
         'teacher_comment' => (string)($r->teacher_comment ?? ''),
       ];
     })->values();
@@ -218,6 +217,7 @@ class BehaviourRatingController extends Controller
         'terms' => $ctx['terms'],
         'selected_class_id' => (int)$ctx['class']->id,
         'selected_term_id' => (int)$ctx['term']->id,
+        'behaviour_schema' => $behaviourSchema,
         'students' => $students,
       ],
     ]);
@@ -236,13 +236,8 @@ class BehaviourRatingController extends Controller
       'term_id' => 'required|integer',
       'rows' => 'required|array',
       'rows.*.student_id' => 'required|integer',
-      'rows.*.handwriting' => 'required|integer|min:0|max:5',
-      'rows.*.speech' => 'required|integer|min:0|max:5',
-      'rows.*.attitude' => 'required|integer|min:0|max:5',
-      'rows.*.reading' => 'required|integer|min:0|max:5',
-      'rows.*.punctuality' => 'required|integer|min:0|max:5',
-      'rows.*.teamwork' => 'required|integer|min:0|max:5',
-      'rows.*.self_control' => 'required|integer|min:0|max:5',
+      'rows.*.ratings' => 'required|array|size:10',
+      'rows.*.ratings.*' => 'required|integer|min:0|max:5',
       'rows.*.teacher_comment' => 'nullable|string|max:500',
     ]);
 
@@ -278,10 +273,19 @@ class BehaviourRatingController extends Controller
       ->toArray();
     $validSet = array_flip($validStudentIds);
 
-    DB::transaction(function () use ($data, $schoolId, $user, $ctx, $validSet) {
+    $school = School::find($schoolId);
+    $criteria = BehaviourSchema::normalize($school?->behaviour_schema)['criteria'];
+
+    DB::transaction(function () use ($data, $schoolId, $user, $ctx, $validSet, $criteria) {
       foreach ($data['rows'] as $row) {
         $studentId = (int)$row['student_id'];
         if (!isset($validSet[$studentId])) continue;
+
+        $ratings = [];
+        foreach ($criteria as $criterion) {
+          $key = $criterion['key'];
+          $ratings[$key] = max(0, min(5, (int) ($row['ratings'][$key] ?? 0)));
+        }
 
         StudentBehaviourRating::updateOrCreate(
           [
@@ -291,13 +295,8 @@ class BehaviourRatingController extends Controller
             'student_id' => $studentId,
           ],
           [
-            'handwriting' => (int)$row['handwriting'],
-            'speech' => (int)$row['speech'],
-            'attitude' => (int)$row['attitude'],
-            'reading' => (int)$row['reading'],
-            'punctuality' => (int)$row['punctuality'],
-            'teamwork' => (int)$row['teamwork'],
-            'self_control' => (int)$row['self_control'],
+            ...BehaviourSchema::legacyValues($ratings),
+            'ratings' => $ratings,
             'teacher_comment' => isset($row['teacher_comment']) ? (trim((string)$row['teacher_comment']) ?: null) : null,
             'set_by_user_id' => $user->id,
           ]

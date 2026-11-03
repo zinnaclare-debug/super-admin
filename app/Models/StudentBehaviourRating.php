@@ -18,7 +18,12 @@ class StudentBehaviourRating extends Model
     'punctuality',
     'teamwork',
     'self_control',
+    'ratings',
     'teacher_comment',
     'set_by_user_id',
+  ];
+
+  protected $casts = [
+    'ratings' => 'array',
   ];
 }

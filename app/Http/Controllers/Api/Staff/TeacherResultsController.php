@@ -10,7 +10,9 @@ use App\Models\School;
 use App\Models\Term;
 use App\Models\TermSubject;
 use App\Support\AssessmentSchema;
+use App\Support\ClassicResultComponents;
 use App\Support\GradingSchema;
+use App\Support\ResultPdfTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -26,6 +28,11 @@ class TeacherResultsController extends Controller
   private function hasResultTeacherCommentColumn(): bool
   {
     return Schema::hasColumn('results', 'teacher_comment');
+  }
+
+  private function hasClassicComponentsColumn(): bool
+  {
+    return Schema::hasColumn('results', 'classic_components');
   }
 
   private function canUseStudentSubjectExclusions(): bool
@@ -100,6 +107,8 @@ class TeacherResultsController extends Controller
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
     $hasTeacherComment = $this->hasResultTeacherCommentColumn();
+    $hasClassicComponents = $this->hasClassicComponentsColumn();
+    $usesClassicComponents = ResultPdfTemplate::normalize($school?->result_template_config)['layout'] === 'classic';
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
@@ -186,6 +195,7 @@ class TeacherResultsController extends Controller
           ...($hasCaBreakdown ? ['results.ca_breakdown'] : [DB::raw('NULL as ca_breakdown')]),
           'results.exam',
           ...($hasTeacherComment ? ['results.teacher_comment'] : [DB::raw('NULL as teacher_comment')]),
+          ...($hasClassicComponents ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
         ]);
 
       $resultsByStudentId = $resultsQuery
@@ -195,7 +205,7 @@ class TeacherResultsController extends Controller
     }
 
     $rows = $students
-      ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId) {
+      ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId, $usesClassicComponents) {
         $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
         $caBreakdown = AssessmentSchema::normalizeBreakdown(
           $resultRow->ca_breakdown ?? null,
@@ -217,6 +227,9 @@ class TeacherResultsController extends Controller
           'total' => $total,
           'grade' => $this->gradeFromTotal($schoolId, $total),
           'teacher_comment' => trim((string) ($resultRow->teacher_comment ?? '')),
+          'classic_components' => $usesClassicComponents
+            ? ClassicResultComponents::normalize($resultRow->classic_components ?? null)
+            : null,
         ];
       })
       ->values();
@@ -231,6 +244,7 @@ class TeacherResultsController extends Controller
         'assessment_schema' => $assessmentSchema,
         'grading_schema' => GradingSchema::normalize($school?->grading_schema),
         'results_published' => $school?->resultsArePublished() ?? false,
+        'uses_classic_components' => $usesClassicComponents,
         'departments' => $rows
           ->map(fn ($row) => [
             'id' => (int) ($row['department_id'] ?? 0),
@@ -258,6 +272,8 @@ class TeacherResultsController extends Controller
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
     $hasTeacherComment = $this->hasResultTeacherCommentColumn();
+    $hasClassicComponents = $this->hasClassicComponentsColumn();
+    $usesClassicComponents = ResultPdfTemplate::normalize($school?->result_template_config)['layout'] === 'classic';
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
     $caSlotCount = max(1, count($caMaxes));
     $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
@@ -289,6 +305,13 @@ class TeacherResultsController extends Controller
       $rules['scores.*.ca_breakdown'] = 'nullable|array|size:' . $caSlotCount;
       $rules['scores.*.ca_breakdown.*'] = 'nullable|numeric|min:0|max:100';
       $rules['scores.*.exam'] = 'required|integer|min:0|max:100';
+      if ($usesClassicComponents) {
+        $rules['scores.*.classic_components'] = 'nullable|array';
+        $rules['scores.*.classic_components.psychomotor'] = 'nullable|array|size:5';
+        $rules['scores.*.classic_components.psychomotor.*'] = 'nullable|integer|min:0|max:2';
+        $rules['scores.*.classic_components.quiz'] = 'nullable|integer|min:0|max:5';
+        $rules['scores.*.classic_components.note_copying'] = 'nullable|integer|min:0|max:5';
+      }
     }
 
     $payload = $request->validate($rules);
@@ -335,6 +358,7 @@ class TeacherResultsController extends Controller
           'ca_breakdown' => array_fill(0, 5, 0),
           'exam' => 0,
           'teacher_comment' => trim((string) ($score['teacher_comment'] ?? '')),
+          'classic_components' => null,
         ];
         continue;
       }
@@ -377,6 +401,9 @@ class TeacherResultsController extends Controller
         'ca' => $caTotal,
         'ca_breakdown' => $caBreakdown,
         'exam' => $exam,
+        'classic_components' => $usesClassicComponents
+          ? ClassicResultComponents::normalize($score['classic_components'] ?? null)
+          : null,
       ];
     }
 
@@ -384,7 +411,7 @@ class TeacherResultsController extends Controller
       throw ValidationException::withMessages($errors);
     }
 
-    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment) {
+    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment, $hasClassicComponents, $usesClassicComponents) {
       $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
       foreach ($preparedScores as $score) {
         $updateData = [
@@ -396,6 +423,9 @@ class TeacherResultsController extends Controller
         }
         if ($hasTeacherComment) {
           $updateData['teacher_comment'] = $commentsOnly ? $score['teacher_comment'] : null;
+        }
+        if ($hasClassicComponents) {
+          $updateData['classic_components'] = $usesClassicComponents ? $score['classic_components'] : null;
         }
 
         Result::updateOrCreate(

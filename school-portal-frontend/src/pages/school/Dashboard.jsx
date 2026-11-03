@@ -40,6 +40,11 @@ const formatSessionStatus = (status) => {
   return "Pending";
 };
 
+const defaultBehaviourCriteria = () => Array.from({ length: 10 }, (_, index) => ({
+  key: `criterion_${index + 1}`,
+  label: "",
+}));
+
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
@@ -61,6 +66,7 @@ function SchoolDashboard() {
     profile_completeness_notices: [],
     staff: 0,
     enabled_modules: 0,
+    behaviour_schema: { criteria: defaultBehaviourCriteria() },
   });
   const [loading, setLoading] = useState(true);
   const [headOfSchoolName, setHeadOfSchoolName] = useState("");
@@ -83,6 +89,8 @@ function SchoolDashboard() {
   const [enabledFeatures, setEnabledFeatures] = useState(() => getStoredFeatures());
   const [sessions, setSessions] = useState([]);
   const [updatingSessionId, setUpdatingSessionId] = useState(null);
+  const [behaviourCriteria, setBehaviourCriteria] = useState(defaultBehaviourCriteria);
+  const [savingBehaviourCriteria, setSavingBehaviourCriteria] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -118,7 +126,9 @@ function SchoolDashboard() {
             : [],
           staff: res.data?.staff ?? 0,
           enabled_modules: res.data?.enabled_modules ?? 0,
+          behaviour_schema: res.data?.behaviour_schema ?? { criteria: defaultBehaviourCriteria() },
         });
+        setBehaviourCriteria(Array.isArray(res.data?.behaviour_schema?.criteria) ? res.data.behaviour_schema.criteria : defaultBehaviourCriteria());
         setHeadOfSchoolName(res.data?.head_of_school_name ?? "");
         setSchoolLocation(res.data?.school_location ?? "");
         setContactEmail(res.data?.contact_email ?? "");
@@ -153,6 +163,7 @@ function SchoolDashboard() {
           unspecified_students: 0,
           staff: 0,
           enabled_modules: 0,
+          behaviour_schema: { criteria: defaultBehaviourCriteria() },
         });
         setHeadOfSchoolName("");
         setSchoolLocation("");
@@ -305,6 +316,30 @@ function SchoolDashboard() {
       alert(firstValidationError || apiMessage || "Failed to update contact information");
     } finally {
       setSavingBranding(false);
+    }
+  };
+
+  const saveBehaviourCriteria = async () => {
+    const criteria = behaviourCriteria.map((criterion, index) => ({
+      key: `criterion_${index + 1}`,
+      label: String(criterion.label || "").trim(),
+    }));
+    if (criteria.some((criterion) => !criterion.label)) {
+      return alert("Name all 10 general behaviour criteria before saving.");
+    }
+
+    setSavingBehaviourCriteria(true);
+    try {
+      const res = await api.put("/api/school-admin/general-behaviour", { criteria });
+      const schema = res.data?.data ?? { criteria };
+      setBehaviourCriteria(Array.isArray(schema.criteria) ? schema.criteria : criteria);
+      setStats((prev) => ({ ...prev, behaviour_schema: schema }));
+      alert(res.data?.message || "General behaviour criteria saved.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {}).flat().find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to save general behaviour criteria.");
+    } finally {
+      setSavingBehaviourCriteria(false);
     }
   };
 
@@ -631,6 +666,34 @@ function SchoolDashboard() {
 
         <div className="sd-branding__art">
           <img src={brandingArt} alt="School information artwork" />
+        </div>
+      </section>
+
+      <section className="sd-card sd-general-behaviour">
+        <div className="sd-section-head">
+          <h2>General Behaviour</h2>
+          <p>Name the ten psychomotor and affective criteria class teachers will rate on a 0-5 scale. These labels are unique to your school and appear on student result sheets.</p>
+        </div>
+        <div className="sd-behaviour-grid">
+          {behaviourCriteria.map((criterion, index) => (
+            <label key={criterion.key || index} className="sd-field">
+              <span>Criterion {index + 1}</span>
+              <input
+                type="text"
+                maxLength={60}
+                value={criterion.label || ""}
+                onChange={(event) => setBehaviourCriteria((previous) => previous.map((item, itemIndex) => (
+                  itemIndex === index ? { ...item, label: event.target.value } : item
+                )))}
+                placeholder={`Behaviour criterion ${index + 1}`}
+              />
+            </label>
+          ))}
+        </div>
+        <div className="sd-actions">
+          <button onClick={saveBehaviourCriteria} disabled={savingBehaviourCriteria}>
+            {savingBehaviourCriteria ? "Saving..." : "Save General Behaviour"}
+          </button>
         </div>
       </section>
 
