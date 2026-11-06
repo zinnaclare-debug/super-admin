@@ -28,7 +28,8 @@ class ResultPdfTemplate
 
     public static function normalize(mixed $raw): array
     {
-        $source = is_array($raw) ? $raw : [];
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        $source = is_array($raw) ? $raw : (is_array($decoded) ? $decoded : []);
         $base = self::default();
         $layout = strtolower(trim((string) ($source['layout'] ?? $base['layout'])));
         if (!in_array($layout, ['classic', 'compact', 'comments_only'], true)) {
@@ -81,7 +82,8 @@ class ResultPdfTemplate
     public static function normalizeScoreProfile(mixed $raw, string $layout): array
     {
         $defaults = self::scoreProfileDefaults($layout);
-        $source = is_array($raw) ? $raw : [];
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        $source = is_array($raw) ? $raw : (is_array($decoded) ? $decoded : []);
         $isClassic = $layout === 'classic';
         $maxes = isset($source['ca_maxes']) && is_array($source['ca_maxes']) ? $source['ca_maxes'] : $defaults['ca_maxes'];
         $labels = isset($source['ca_labels']) && is_array($source['ca_labels']) ? $source['ca_labels'] : $defaults['ca_labels'];
@@ -153,7 +155,10 @@ class ResultPdfTemplate
         $template = self::normalize($raw);
         $isThirdTerm = self::termOrderFromName($termName) === 3;
         $template['is_third_term'] = $isThirdTerm;
-        $template['show_third_term_previous_totals'] = $resultType !== 'cumulative' && $isThirdTerm && (bool) ($template['third_term']['show_previous_term_totals'] ?? true);
+        $template['show_third_term_previous_totals'] = $resultType !== 'cumulative'
+            && $isThirdTerm
+            && $template['layout'] !== 'classic'
+            && (bool) ($template['third_term']['show_previous_term_totals'] ?? true);
         return $template;
     }
 

@@ -5,7 +5,6 @@
     $isCumulative = (bool) ($isCumulativeResult ?? (($resultType ?? 'term') === 'cumulative'));
     $schema = \App\Support\AssessmentSchema::normalizeSchema($assessmentSchema ?? []);
     $caIndices = \App\Support\AssessmentSchema::activeCaIndices($schema);
-    $showPrevious = (bool) ($template['show_third_term_previous_totals'] ?? false);
     $showTermTotals = (bool) data_get($template, 'cumulative.show_term_totals', true);
     $showAverage = (bool) data_get($template, 'cumulative.show_average', true);
     $showPhoto = (bool) ($template['show_student_photo'] ?? true);
@@ -63,7 +62,7 @@ table { width: 100%; border-collapse: collapse; }
 <td class="center"><div class="school-name">{{ strtoupper($school?->name ?? 'SCHOOL NAME') }}</div><div class="school-location">{{ strtoupper($school?->location ?? '') }}</div><div>{{ $isCumulative ? 'CUMULATIVE ACADEMIC REPORT' : 'STUDENT PROGRESS REPORT' }}</div></td>
 <td style="width:76px" class="center">@if($showPhoto && $studentPhotoDataUri)<img class="photo" src="{{ $studentPhotoDataUri }}">@endif</td>
 </tr></table>
-<div class="report-title">{{ strtoupper($term?->name ?? '-') }} TERM, {{ $sessionLabel }} ACADEMIC SESSION</div>
+<div class="report-title">{{ $isCumulative ? 'CUMULATIVE' : strtoupper($term?->name ?? '-') }}, {{ $sessionLabel }} ACADEMIC SESSION</div>
 <table class="info">
 <tr><th>NAME</th><td>{{ strtoupper($studentUser?->name ?? '-') }}</td><th>CLASS</th><td>{{ strtoupper($class?->name ?? '-') }}</td></tr>
 <tr><th>SERIAL NO.</th><td>{{ strtoupper($studentUser?->username ?? '-') }}</td><th>NEXT TERM BEGINS</th><td>{{ $nextTerm }}</td></tr>
@@ -83,7 +82,7 @@ table { width: 100%; border-collapse: collapse; }
 <th rowspan="2">LEARNING AREA / SUBJECT</th>
 @if(count($caIndices) > 0)<th colspan="{{ count($caIndices) }}">CONTINUOUS ASSESSMENT</th>@endif
 <th rowspan="2">EXAM</th><th colspan="5">PSYCHOMOTOR / AFFECTIVE {{ array_sum($schema['psychomotor_maxes'] ?? []) }}%</th><th colspan="2">QUIZ / NOTE COPYING {{ (int) ($schema['quiz_max'] ?? 0) + (int) ($schema['note_copying_max'] ?? 0) }}%</th>
-@if($showPrevious)<th rowspan="2">1ST TOTAL</th><th rowspan="2">2ND TOTAL</th><th rowspan="2">TERM TOTAL</th><th rowspan="2">AVERAGE</th>@else<th rowspan="2">TOTAL</th>@endif
+<th rowspan="2">TOTAL</th>
 <th rowspan="2">GRADE</th><th rowspan="2">REMARK</th>
 </tr>
 <tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach@foreach(range(0, 4) as $index)<th>{{ strtoupper($schema['psychomotor_labels'][$index] ?? ('P'.($index + 1))) }} ({{ $schema['psychomotor_maxes'][$index] ?? 0 }})</th>@endforeach<th>{{ strtoupper($schema['quiz_label'] ?? 'QUIZ') }} ({{ $schema['quiz_max'] ?? 0 }})</th><th>{{ strtoupper($schema['note_copying_label'] ?? 'NOTE COPYING') }} ({{ $schema['note_copying_max'] ?? 0 }})</th></tr>
@@ -99,9 +98,9 @@ table { width: 100%; border-collapse: collapse; }
 @php($classicComponents = \App\Support\ClassicResultComponents::normalize($row['classic_components'] ?? null, $schema))
 @foreach($classicComponents['psychomotor'] as $component)<td>{{ $component }}</td>@endforeach
 <td>{{ $classicComponents['quiz'] }}</td><td>{{ $classicComponents['note_copying'] }}</td>
-@if($showPrevious)<td>{{ $row['first_term_total'] ?? '-' }}</td><td>{{ $row['second_term_total'] ?? '-' }}</td><td>{{ $row['combined_total_score'] ?? '-' }}</td><td>{{ $row['combined_average'] ?? '-' }}</td>@else<td>{{ $row['total'] ?? '-' }}</td>@endif
+<td>{{ $row['total'] ?? '-' }}</td>
 @endif
-<td>{{ strtoupper($showPrevious ? ($row['third_term_combined_grade'] ?? $row['grade'] ?? '-') : ($row['grade'] ?? '-')) }}</td><td>{{ strtoupper($showPrevious ? ($row['third_term_combined_remark'] ?? $row['remark'] ?? '-') : ($row['remark'] ?? '-')) }}</td></tr>
+<td>{{ strtoupper($row['grade'] ?? '-') }}</td><td>{{ strtoupper($row['remark'] ?? '-') }}</td></tr>
 @empty<tr><td colspan="20" class="center">No result data found.</td></tr>@endforelse
 </tbody></table>
 <div class="section"><div class="section-title">GRADE INTERPRETATION</div><div class="grade-key">{{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}</div></div>

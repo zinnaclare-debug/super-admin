@@ -119,6 +119,7 @@ export default function StudentResultsHome() {
   const isCumulative = supportsCumulative && resultType === "cumulative";
   const showThirdTermPreviousTotals =
     !isCumulative &&
+    resultTemplate?.layout !== "classic" &&
     Boolean(
       resultTemplate?.show_third_term_previous_totals ||
         results.some((row) =>

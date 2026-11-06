@@ -2489,6 +2489,7 @@ class ResultsController extends Controller
         $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
         $resultTemplate = (array) data_get($viewData, 'resultTemplate', []);
         $showThirdTermPreviousTotals = !$isCumulative
+            && (string) ($resultTemplate['layout'] ?? 'compact') !== 'classic'
             && (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false);
         $caSummaryParts = [];
         $activeCaIndices = AssessmentSchema::activeCaIndices($assessmentSchema);

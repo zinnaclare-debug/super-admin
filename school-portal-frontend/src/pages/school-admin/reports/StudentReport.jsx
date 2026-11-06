@@ -41,6 +41,7 @@ const isThirdTermName = (name = "") => {
 
 const shouldShowThirdTermPreviousTotals = (entry) =>
   entry?.result_type !== "cumulative" &&
+  entry?.result_template?.layout !== "classic" &&
   Boolean(
     entry?.result_template?.show_third_term_previous_totals ||
       (entry?.rows || []).some((row) =>
@@ -626,7 +627,7 @@ export default function StudentReport() {
                                 </th>
                               ))}
                               <th>Third Term Exam</th>
-                              {usesClassicResultPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
+                              {usesClassicResultPreview ? (<>{Array.from({ length: 5 }, (_, index) => <th key={`classic-psy-head-${index}`}>{resultEntry.assessment_schema?.psychomotor_labels?.[index] || `P${index + 1}`} ({resultEntry.assessment_schema?.psychomotor_maxes?.[index] ?? 0})</th>)}<th>{resultEntry.assessment_schema?.quiz_label || "Quiz"} ({resultEntry.assessment_schema?.quiz_max ?? 0})</th><th>{resultEntry.assessment_schema?.note_copying_label || "Note Copying"} ({resultEntry.assessment_schema?.note_copying_max ?? 0})</th></>) : null}
                               <th>First Term Total</th>
                               <th>Second Term Total</th>
                               <th>Total Score</th>
@@ -636,7 +637,7 @@ export default function StudentReport() {
                             <>
                               <th>CA</th>
                               <th>Exam</th>
-                              {usesClassicResultPreview ? (<><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th></>) : null}
+                              {usesClassicResultPreview ? (<>{Array.from({ length: 5 }, (_, index) => <th key={`classic-psy-head-${index}`}>{resultEntry.assessment_schema?.psychomotor_labels?.[index] || `P${index + 1}`} ({resultEntry.assessment_schema?.psychomotor_maxes?.[index] ?? 0})</th>)}<th>{resultEntry.assessment_schema?.quiz_label || "Quiz"} ({resultEntry.assessment_schema?.quiz_max ?? 0})</th><th>{resultEntry.assessment_schema?.note_copying_label || "Note Copying"} ({resultEntry.assessment_schema?.note_copying_max ?? 0})</th></>) : null}
                               <th>Total</th>
                               <th>Min</th>
                               <th>Max</th>
