@@ -24,10 +24,6 @@ const classicComponentCells = (row) => Array.from(
   (_, index) => asDash(row?.classic_components?.psychomotor?.[index])
 );
 
-const resultTemplateLabel = (template, commentsOnly) => {
-  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
-  return template?.layout === "classic" ? "Classic full result" : "Compact result";
-};
 
 const asDash = (value) => (value == null || value === "" ? "-" : value);
 
@@ -190,7 +186,6 @@ export default function StudentReport() {
   const resultEntryCaIndices = activeCaIndicesForEntry(resultEntry);
   const resultEntryCommentsOnly = Boolean(resultEntry?.assessment_schema?.comments_only) || resultEntry?.result_template?.layout === "comments_only";
   const usesClassicResultPreview = !resultEntryCommentsOnly && resultEntry?.result_type !== "cumulative" && resultEntry?.result_template?.layout === "classic";
-  const resultEntryTemplateLabel = resultTemplateLabel(resultEntry?.result_template, resultEntryCommentsOnly);
   const totalSummaryPages = Math.max(1, Math.ceil(rows.length / STUDENT_REPORT_PAGE_SIZE));
 
   const paginatedRows = useMemo(() => {
@@ -591,7 +586,7 @@ export default function StudentReport() {
               <p className="student-report-result-head">
                 {resultEntry.term?.name || "-"}{resultEntry.result_type === "cumulative" ? " Cumulative" : ""} | {resultEntry.class?.name || "-"} | Average: {formatMaybeNumber(resultEntry.summary?.average_score)} | Grade: {asDash(resultEntry.summary?.overall_grade)}
               </p>
-              <p className="student-report-meta">Preview: {resultEntryTemplateLabel}</p>
+
 
               <div className="student-report-note-block">
                 <div className="student-report-note-label">Teacher Comment</div>

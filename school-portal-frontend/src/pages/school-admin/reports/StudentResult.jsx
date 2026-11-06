@@ -20,10 +20,6 @@ const classicComponentCells = (row) => Array.from(
   (_, index) => asDash(row?.classic_components?.psychomotor?.[index])
 );
 
-const resultTemplateLabel = (template, commentsOnly) => {
-  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
-  return template?.layout === "classic" ? "Classic full result" : "Compact result";
-};
 
 const isThirdTermName = (name = "") => {
   const value = String(name).toLowerCase();
@@ -83,7 +79,6 @@ export default function StudentResult() {
   const entryCaIndices = activeCaIndicesForEntry(entry);
   const entryCommentsOnly = Boolean(entry?.assessment_schema?.comments_only) || entry?.result_template?.layout === "comments_only";
   const usesClassicPreview = !entryCommentsOnly && entry?.result_type !== "cumulative" && entry?.result_template?.layout === "classic";
-  const entryTemplateLabel = resultTemplateLabel(entry?.result_template, entryCommentsOnly);
 
   const resetPdfState = () => {
     setJob(null);
@@ -384,7 +379,7 @@ export default function StudentResult() {
               <h3 className="rs-results-title">
                 {entry.term?.name || "Term Result"}{entry.result_type === "cumulative" ? " Cumulative" : ""}
               </h3>
-              <span className="rs-card-meta">Preview: {entryTemplateLabel}</span>
+
               <span className="rs-meta" style={{ marginTop: 0 }}>
                 <span>{entry.class?.name || "-"}</span>
                 <span>Average: {formatMaybeNumber(entry.summary?.average_score)}</span>

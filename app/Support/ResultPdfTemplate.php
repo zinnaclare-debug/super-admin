@@ -31,9 +31,6 @@ class ResultPdfTemplate
         $source = is_array($raw) ? $raw : [];
         $base = self::default();
         $layout = strtolower(trim((string) ($source['layout'] ?? $base['layout'])));
-        if (!array_key_exists('layout_version', $source) && $layout === 'classic') {
-            $layout = 'compact';
-        }
         if (!in_array($layout, ['classic', 'compact', 'comments_only'], true)) {
             $layout = $base['layout'];
         }

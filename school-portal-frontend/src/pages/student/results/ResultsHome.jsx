@@ -49,10 +49,6 @@ const classicComponentCells = (row) => Array.from(
   (_, index) => displayScore(row?.classic_components?.psychomotor?.[index])
 );
 
-const resultTemplateLabel = (template, commentsOnly) => {
-  if (commentsOnly || template?.layout === "comments_only") return "Assessment sheet";
-  return template?.layout === "classic" ? "Classic full result" : "Compact result";
-};
 
 const activeCaIndices = (schema) => {
   const indices = [];
@@ -132,7 +128,6 @@ export default function StudentResultsHome() {
         )
     );
   const usesClassicPreview = !commentsOnly && !isCumulative && resultTemplate?.layout === "classic";
-  const selectedTemplateLabel = resultTemplateLabel(resultTemplate, commentsOnly);
   const currentItems = useMemo(() => classes.filter((item) => item.is_current_period), [classes]);
   const groupSessionItems = (items) => {
     const grouped = new Map();
@@ -367,7 +362,7 @@ export default function StudentResultsHome() {
             {selected.class_name} - {sessionLabel(selected)} - {selected.term_name}
             {isCumulative ? " Cumulative" : ""}
           </h3>
-          <span className="rs-card-meta">Preview: {selectedTemplateLabel}</span>
+
           <button
             className="rs-btn"
             onClick={handlePdfAction}
