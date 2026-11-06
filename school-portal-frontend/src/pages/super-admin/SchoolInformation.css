@@ -1017,3 +1017,4 @@
     grid-template-columns: minmax(0, 1fr) 76px;
   }
 }
+.sai-note--error { color: #b91c1c; font-weight: 700; }

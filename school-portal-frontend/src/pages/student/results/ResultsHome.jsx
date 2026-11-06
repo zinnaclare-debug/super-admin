@@ -11,33 +11,39 @@ const DEFAULT_SCHEMA = {
   ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   exam_max: 70,
   total_max: 100,
+  layout: "compact",
+  psychomotor_maxes: [0, 0, 0, 0, 0],
+  psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
+  quiz_max: 0,
+  quiz_label: "Quiz",
+  note_copying_max: 0,
+  note_copying_label: "Note Copying",
 };
 
 const normalizeSchema = (schema) => {
   const raw = schema || {};
-  const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
-  const caLabels = Array.isArray(raw.ca_labels) ? raw.ca_labels : DEFAULT_SCHEMA.ca_labels;
-  const normalizedCa = Array.from({ length: 5 }, (_, idx) => {
-    const n = Number(caMaxes[idx] || 0);
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
-  });
-  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => {
-    const label = String(caLabels[idx] || "").trim();
-    return label || `CA${idx + 1}`;
-  });
-  const caTotal = normalizedCa.reduce((sum, value) => sum + value, 0);
-  const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
-  const examMax = Number.isFinite(requestedExam) ? Math.max(0, Math.min(100, Math.round(requestedExam))) : 0;
+  const number = (value, fallback) => {
+    const parsed = Number(value ?? fallback);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : fallback;
+  };
+  const values = (field, fallback) => Array.from({ length: 5 }, (_, index) => number(raw[field]?.[index], fallback[index]));
+  const labels = (field, fallback) => Array.from({ length: 5 }, (_, index) => String(raw[field]?.[index] || fallback[index]).trim() || fallback[index]);
 
   return {
-    ca_maxes: normalizedCa,
-    ca_labels: normalizedLabels,
-    exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
+    ca_maxes: values("ca_maxes", DEFAULT_SCHEMA.ca_maxes),
+    ca_labels: labels("ca_labels", DEFAULT_SCHEMA.ca_labels),
+    exam_max: number(raw.exam_max, DEFAULT_SCHEMA.exam_max),
     total_max: 100,
+    layout: raw.layout === "classic" ? "classic" : "compact",
+    psychomotor_maxes: values("psychomotor_maxes", DEFAULT_SCHEMA.psychomotor_maxes),
+    psychomotor_labels: labels("psychomotor_labels", DEFAULT_SCHEMA.psychomotor_labels),
+    quiz_max: number(raw.quiz_max, DEFAULT_SCHEMA.quiz_max),
+    quiz_label: String(raw.quiz_label || DEFAULT_SCHEMA.quiz_label).trim() || DEFAULT_SCHEMA.quiz_label,
+    note_copying_max: number(raw.note_copying_max, DEFAULT_SCHEMA.note_copying_max),
+    note_copying_label: String(raw.note_copying_label || DEFAULT_SCHEMA.note_copying_label).trim() || DEFAULT_SCHEMA.note_copying_label,
     comments_only: Boolean(raw.comments_only),
   };
 };
-
 const classicComponentCells = (row) => Array.from(
   { length: 5 },
   (_, index) => displayScore(row?.classic_components?.psychomotor?.[index])
@@ -448,7 +454,7 @@ export default function StudentResultsHome() {
                           <th style={{ width: 100 }}>Third Term Exam ({assessmentSchema.exam_max})</th>
                           {usesClassicPreview ? (
                             <>
-                              <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th>
+                              {assessmentSchema.psychomotor_labels.map((label, index) => <th key={`preview-psy-head-${index}`}>{label} ({assessmentSchema.psychomotor_maxes[index]})</th>)}<th>{assessmentSchema.quiz_label} ({assessmentSchema.quiz_max})</th><th>{assessmentSchema.note_copying_label} ({assessmentSchema.note_copying_max})</th>
                             </>
                           ) : null}
                           <th style={{ width: 110 }}>First Term Total</th>
@@ -462,7 +468,7 @@ export default function StudentResultsHome() {
                           <th style={{ width: 90 }}>Exam ({assessmentSchema.exam_max})</th>
                           {usesClassicPreview ? (
                             <>
-                              <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>Quiz</th><th>Note</th>
+                              {assessmentSchema.psychomotor_labels.map((label, index) => <th key={`preview-psy-head-${index}`}>{label} ({assessmentSchema.psychomotor_maxes[index]})</th>)}<th>{assessmentSchema.quiz_label} ({assessmentSchema.quiz_max})</th><th>{assessmentSchema.note_copying_label} ({assessmentSchema.note_copying_max})</th>
                             </>
                           ) : null}
                           <th style={{ width: 80 }}>Total</th>

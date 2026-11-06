@@ -9,8 +9,11 @@ const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const defaultScoreProfile = (layout = "compact") => ({
   ca_maxes: layout === "classic" ? [4, 4, 4, 4, 4] : [6, 6, 6, 6, 6],
   ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
+  psychomotor_maxes: layout === "classic" ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
   psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
+  quiz_max: layout === "classic" ? 5 : 0,
   quiz_label: "Quiz",
+  note_copying_max: layout === "classic" ? 5 : 0,
   note_copying_label: "Note Copying",
   exam_max: layout === "classic" ? 60 : 70,
 });
@@ -18,23 +21,34 @@ const defaultScoreProfile = (layout = "compact") => ({
 const normalizeScoreProfile = (raw, layout) => {
   const defaults = defaultScoreProfile(layout);
   const source = raw && typeof raw === "object" ? raw : {};
-  const target = layout === "classic" ? 80 : 100;
-  const ca_maxes = Array.from({ length: 5 }, (_, index) => {
-    const value = Number(source.ca_maxes?.[index] ?? defaults.ca_maxes[index]);
-    return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : defaults.ca_maxes[index];
-  });
-  const caTotal = ca_maxes.reduce((sum, value) => sum + value, 0);
+  const number = (value, fallback) => {
+    const parsed = Number(value ?? fallback);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : fallback;
+  };
+  const values = (field, fallback) => Array.from({ length: 5 }, (_, index) => number(source[field]?.[index], fallback[index]));
   const labels = (field, fallback) => Array.from({ length: 5 }, (_, index) => String(source[field]?.[index] || fallback[index]).trim().slice(0, 30) || fallback[index]);
-  const safeMaxes = caTotal <= target ? ca_maxes : defaults.ca_maxes;
 
   return {
-    ca_maxes: safeMaxes,
+    ca_maxes: values("ca_maxes", defaults.ca_maxes),
     ca_labels: labels("ca_labels", defaults.ca_labels),
+    psychomotor_maxes: values("psychomotor_maxes", defaults.psychomotor_maxes),
     psychomotor_labels: labels("psychomotor_labels", defaults.psychomotor_labels),
+    quiz_max: layout === "classic" ? number(source.quiz_max, defaults.quiz_max) : 0,
     quiz_label: String(source.quiz_label || defaults.quiz_label).trim().slice(0, 30) || defaults.quiz_label,
+    note_copying_max: layout === "classic" ? number(source.note_copying_max, defaults.note_copying_max) : 0,
     note_copying_label: String(source.note_copying_label || defaults.note_copying_label).trim().slice(0, 30) || defaults.note_copying_label,
-    exam_max: target - safeMaxes.reduce((sum, value) => sum + value, 0),
+    exam_max: number(source.exam_max, defaults.exam_max),
   };
+};
+
+const scoreProfileTotal = (profile, layout) => {
+  const ca = (profile?.ca_maxes || []).reduce((sum, value) => sum + Number(value || 0), 0);
+  if (layout !== "classic") return ca + Number(profile?.exam_max || 0);
+  return ca
+    + Number(profile?.exam_max || 0)
+    + (profile?.psychomotor_maxes || []).reduce((sum, value) => sum + Number(value || 0), 0)
+    + Number(profile?.quiz_max || 0)
+    + Number(profile?.note_copying_max || 0);
 };
 const DEFAULT_EXAM_RECORD = {
   ca_maxes: [30, 0, 0, 0, 0],
@@ -1178,8 +1192,8 @@ export default function SchoolInformation() {
           <h4>Score Allocation: Total 100</h4>
           <p className="sai-note">
             {resultTemplate.layout === "classic"
-              ? "Classic: five CA fields and exam must equal 80. Psychomotor / Affective (10), plus the two fields below (10), complete the 100 marks."
-              : "Compact: five CA fields and exam must equal 100."}
+              ? "Choose the maximum for every field. CA, Exam, Psychomotor / Affective, Quiz and Note Copying must add up to exactly 100."
+              : "Choose the five CA and Exam maximums. They must add up to exactly 100."}
           </p>
           <div className="sai-grid">
             {Array.from({ length: 5 }, (_, index) => (
@@ -1187,38 +1201,49 @@ export default function SchoolInformation() {
                 <label>CA {index + 1} name and maximum</label>
                 <div className="sai-inline-fields">
                   <input value={resultTemplate.score_profile.ca_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("ca_labels", e.target.value, index)} />
-                  <input type="number" min="1" max="100" value={resultTemplate.score_profile.ca_maxes[index]} onChange={(e) => updateScoreProfile("ca_maxes", e.target.value, index)} />
+                  <input type="number" min="0" max="100" value={resultTemplate.score_profile.ca_maxes[index]} onChange={(e) => updateScoreProfile("ca_maxes", e.target.value, index)} />
                 </div>
               </div>
             ))}
             <div className="sai-field">
               <label>Examination maximum</label>
-              <input type="number" min="0" max="100" value={resultTemplate.score_profile.exam_max} readOnly />
+              <input type="number" min="0" max="100" value={resultTemplate.score_profile.exam_max} onChange={(e) => updateScoreProfile("exam_max", e.target.value)} />
             </div>
           </div>
           {resultTemplate.layout === "classic" ? (
             <>
-              <h4>Psychomotor / Affective (10%)</h4>
+              <h4>Psychomotor / Affective</h4>
               <div className="sai-grid">
                 {Array.from({ length: 5 }, (_, index) => (
                   <div className="sai-field" key={`profile-psy-${index}`}>
-                    <label>P{index + 1} name (2 marks)</label>
-                    <input value={resultTemplate.score_profile.psychomotor_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("psychomotor_labels", e.target.value, index)} />
+                    <label>P{index + 1} name and maximum</label>
+                    <div className="sai-inline-fields">
+                      <input value={resultTemplate.score_profile.psychomotor_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("psychomotor_labels", e.target.value, index)} />
+                      <input type="number" min="0" max="100" value={resultTemplate.score_profile.psychomotor_maxes[index]} onChange={(e) => updateScoreProfile("psychomotor_maxes", e.target.value, index)} />
+                    </div>
                   </div>
                 ))}
                 <div className="sai-field">
-                  <label>Quiz / Reading field (5 marks)</label>
-                  <input value={resultTemplate.score_profile.quiz_label} maxLength={30} onChange={(e) => updateScoreProfile("quiz_label", e.target.value)} />
+                  <label>Quiz / Reading field name and maximum</label>
+                  <div className="sai-inline-fields">
+                    <input value={resultTemplate.score_profile.quiz_label} maxLength={30} onChange={(e) => updateScoreProfile("quiz_label", e.target.value)} />
+                    <input type="number" min="0" max="100" value={resultTemplate.score_profile.quiz_max} onChange={(e) => updateScoreProfile("quiz_max", e.target.value)} />
+                  </div>
                 </div>
                 <div className="sai-field">
-                  <label>Note taking / copying field (5 marks)</label>
-                  <input value={resultTemplate.score_profile.note_copying_label} maxLength={30} onChange={(e) => updateScoreProfile("note_copying_label", e.target.value)} />
+                  <label>Note taking / copying field name and maximum</label>
+                  <div className="sai-inline-fields">
+                    <input value={resultTemplate.score_profile.note_copying_label} maxLength={30} onChange={(e) => updateScoreProfile("note_copying_label", e.target.value)} />
+                    <input type="number" min="0" max="100" value={resultTemplate.score_profile.note_copying_max} onChange={(e) => updateScoreProfile("note_copying_max", e.target.value)} />
+                  </div>
                 </div>
               </div>
             </>
           ) : null}
+          <p className={`sai-note ${scoreProfileTotal(resultTemplate.score_profile, resultTemplate.layout) === 100 ? "" : "sai-note--error"}`}>
+            Configured allocation: {scoreProfileTotal(resultTemplate.score_profile, resultTemplate.layout)} / 100. Saving is allowed only at 100.
+          </p>
         </div>
-
         <div className="sai-template-option-card">
           <h4>Result Mode By Education Level</h4>
           <p className="sai-note">Check Comments only only for the education levels that should use observation sheets instead of numeric marks.</p>

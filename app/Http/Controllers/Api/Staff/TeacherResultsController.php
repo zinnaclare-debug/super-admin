@@ -234,7 +234,7 @@ class TeacherResultsController extends Controller
           'grade' => $this->gradeFromTotal($schoolId, $total),
           'teacher_comment' => trim((string) ($resultRow->teacher_comment ?? '')),
           'classic_components' => $usesClassicComponents
-            ? ClassicResultComponents::normalize($resultRow->classic_components ?? null)
+            ? ClassicResultComponents::normalize($resultRow->classic_components ?? null, $rowSchema)
             : null,
         ];
       })
@@ -314,9 +314,11 @@ class TeacherResultsController extends Controller
       if ($usesClassicComponents) {
         $rules['scores.*.classic_components'] = 'nullable|array';
         $rules['scores.*.classic_components.psychomotor'] = 'nullable|array|size:5';
-        $rules['scores.*.classic_components.psychomotor.*'] = 'nullable|integer|min:0|max:2';
-        $rules['scores.*.classic_components.quiz'] = 'nullable|integer|min:0|max:5';
-        $rules['scores.*.classic_components.note_copying'] = 'nullable|integer|min:0|max:5';
+        foreach ($assessmentSchema['psychomotor_maxes'] as $index => $maximum) {
+          $rules['scores.*.classic_components.psychomotor.' . $index] = 'nullable|integer|min:0|max:' . (int) $maximum;
+        }
+        $rules['scores.*.classic_components.quiz'] = 'nullable|integer|min:0|max:' . (int) $assessmentSchema['quiz_max'];
+        $rules['scores.*.classic_components.note_copying'] = 'nullable|integer|min:0|max:' . (int) $assessmentSchema['note_copying_max'];
       }
     }
 
@@ -398,7 +400,7 @@ class TeacherResultsController extends Controller
       }
 
       $classicComponents = $usesClassicComponents
-        ? ClassicResultComponents::normalize($score['classic_components'] ?? null)
+        ? ClassicResultComponents::normalize($score['classic_components'] ?? null, $assessmentSchema)
         : null;
       if (AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $classicComponents, $assessmentSchema) > 100) {
         $errors["scores.$idx.total"] = ['The combined assessment score cannot be more than 100.'];

@@ -10,11 +10,13 @@ const DEFAULT_SCHEMA = {
   exam_max: 70,
   total_max: 100,
   layout: "compact",
+  psychomotor_maxes: [0, 0, 0, 0, 0],
   psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
+  quiz_max: 0,
   quiz_label: "Quiz",
+  note_copying_max: 0,
   note_copying_label: "Note Copying",
 };
-
 const DEFAULT_GRADING_SCHEMA = [
   { from: 0, to: 29, grade: "F", remark: "FAIL" },
   { from: 30, to: 39, grade: "E", remark: "POOR" },
@@ -29,37 +31,33 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeSchema = (schema) => {
   const raw = schema || {};
   const usesClassicComponents = raw.layout === "classic";
+  const numeric = (value, fallback) => {
+    const parsed = Number(value ?? fallback);
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 100) : fallback;
+  };
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
   const caLabels = Array.isArray(raw.ca_labels) ? raw.ca_labels : DEFAULT_SCHEMA.ca_labels;
-  const normalizedCa = Array.from({ length: 5 }, (_, idx) => clamp(Number(caMaxes[idx] || 0), 0, 100));
-  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => {
-    const label = String(caLabels[idx] || "").trim();
-    return label || `CA${idx + 1}`;
-  });
-  const psychomotorLabels = Array.from({ length: 5 }, (_, idx) => {
-    const label = String(raw.psychomotor_labels?.[idx] || "").trim();
-    return label || `P${idx + 1}`;
-  });
-  const numericTarget = usesClassicComponents ? 80 : 100;
-  const caTotal = normalizedCa.reduce((sum, value) => sum + value, 0);
-  const requestedExam = Number(raw.exam_max ?? numericTarget - caTotal);
-  const examMax = caTotal + requestedExam === numericTarget
-    ? clamp(requestedExam, 0, numericTarget)
-    : clamp(numericTarget - caTotal, 0, numericTarget);
+  const psychomotorMaxes = Array.isArray(raw.psychomotor_maxes) ? raw.psychomotor_maxes : DEFAULT_SCHEMA.psychomotor_maxes;
+  const normalizedCa = Array.from({ length: 5 }, (_, idx) => numeric(caMaxes[idx], 0));
+  const normalizedLabels = Array.from({ length: 5 }, (_, idx) => String(caLabels[idx] || "").trim() || `CA${idx + 1}`);
+  const normalizedPsychomotorMaxes = Array.from({ length: 5 }, (_, idx) => usesClassicComponents ? numeric(psychomotorMaxes[idx], 0) : 0);
+  const psychomotorLabels = Array.from({ length: 5 }, (_, idx) => String(raw.psychomotor_labels?.[idx] || "").trim() || `P${idx + 1}`);
 
   return {
     ca_maxes: normalizedCa,
     ca_labels: normalizedLabels,
-    exam_max: examMax,
+    exam_max: numeric(raw.exam_max, 100 - normalizedCa.reduce((sum, value) => sum + value, 0)),
     total_max: 100,
     layout: usesClassicComponents ? "classic" : "compact",
+    psychomotor_maxes: normalizedPsychomotorMaxes,
     psychomotor_labels: psychomotorLabels,
+    quiz_max: usesClassicComponents ? numeric(raw.quiz_max, 0) : 0,
     quiz_label: String(raw.quiz_label || "Quiz").trim() || "Quiz",
+    note_copying_max: usesClassicComponents ? numeric(raw.note_copying_max, 0) : 0,
     note_copying_label: String(raw.note_copying_label || "Note Copying").trim() || "Note Copying",
     comments_only: Boolean(raw.comments_only),
   };
 };
-
 const normalizeGradingSchema = (rows) => {
   const source = Array.isArray(rows) ? rows : [];
   const normalized = source
@@ -89,12 +87,11 @@ const activeCaIndices = (schema) => {
   return out.length ? out : [0];
 };
 
-const normalizedClassicComponents = (row) => ({
-  psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, 2)),
-  quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, 5),
-  note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, 5),
+const normalizedClassicComponents = (row, schema) => ({
+  psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0))),
+  quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, Number(schema.quiz_max || 0)),
+  note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, Number(schema.note_copying_max || 0)),
 });
-
 const scoreTotal = (ca, exam, components, usesClassicComponents) => {
   const extras = usesClassicComponents
     ? components.psychomotor.reduce((sum, score) => sum + Number(score || 0), 0) + Number(components.quiz || 0) + Number(components.note_copying || 0)
@@ -107,7 +104,7 @@ const normalizeRow = (row, schema, gradingSchema, usesClassicComponents = false)
   const breakdown = Array.from({ length: 5 }, (_, idx) => clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0));
   const ca = breakdown.reduce((sum, score) => sum + score, 0);
   const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
-  const classicComponents = normalizedClassicComponents(row);
+  const classicComponents = normalizedClassicComponents(row, schema);
   const total = scoreTotal(ca, exam, classicComponents, usesClassicComponents);
 
   return {
@@ -259,12 +256,13 @@ export default function SubjectScores() {
       const current = row.classic_components || { psychomotor: [0, 0, 0, 0, 0], quiz: 0, note_copying: 0 };
       if (key === "psychomotor") {
         const psychomotor = [...current.psychomotor];
-        psychomotor[index] = clamp(Number(value || 0), 0, 2);
+        psychomotor[index] = clamp(Number(value || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0));
         const classic_components = { ...current, psychomotor };
         const total = scoreTotal(row.ca, row.exam, classic_components, true);
         return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
       }
-      const classic_components = { ...current, [key]: clamp(Number(value || 0), 0, 5) };
+      const maximum = key === "quiz" ? Number(schema.quiz_max || 0) : Number(schema.note_copying_max || 0);
+      const classic_components = { ...current, [key]: clamp(Number(value || 0), 0, maximum) };
       const total = scoreTotal(row.ca, row.exam, classic_components, true);
       return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
     }));
@@ -307,7 +305,7 @@ export default function SubjectScores() {
       </div>
 
       {!commentsOnly && usesClassicComponents ? (
-        <p className="staff-scores-classic-note">Classic scores are combined into one total out of 100: CA + Exam = 80, then Psychomotor / Affective, Quiz and Note Copying add the final 20.</p>
+        <p className="staff-scores-classic-note">Classic scores use this school&apos;s configured CA, Exam, Psychomotor / Affective, Quiz and Note Copying maximums, with a total out of 100.</p>
       ) : null}
 
       {resultsPublished ? (
@@ -379,8 +377,8 @@ export default function SubjectScores() {
                   ))}
                   <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>CA Total</th>
                   <th style={{ width: 120 }} rowSpan={usesClassicComponents ? 2 : 1}>Exam ({schema.exam_max})</th>
-                  {usesClassicComponents ? <th colSpan="5">Psychomotor / Affective (10%)</th> : null}
-                  {usesClassicComponents ? <th colSpan="2">Quiz / Note Copying (10%)</th> : null}
+                  {usesClassicComponents ? <th colSpan="5">Psychomotor / Affective ({schema.psychomotor_maxes.reduce((sum, value) => sum + Number(value || 0), 0)})</th> : null}
+                  {usesClassicComponents ? <th colSpan="2">Quiz / Note Copying ({Number(schema.quiz_max || 0) + Number(schema.note_copying_max || 0)})</th> : null}
 
                   <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>Total</th>
                   <th style={{ width: 90 }} rowSpan={usesClassicComponents ? 2 : 1}>Grade</th>
@@ -389,9 +387,9 @@ export default function SubjectScores() {
             </tr>
             {usesClassicComponents && !commentsOnly ? (
               <tr>
-                {schema.psychomotor_labels.map((label, index) => <th key={'psy-head-' + index}>{label} (2)</th>)}
-                <th>{schema.quiz_label} (5)</th>
-                <th>{schema.note_copying_label} (5)</th>
+                {schema.psychomotor_labels.map((label, index) => <th key={'psy-head-' + index}>{label} ({schema.psychomotor_maxes[index]})</th>)}
+                <th>{schema.quiz_label} ({schema.quiz_max})</th>
+                <th>{schema.note_copying_label} ({schema.note_copying_max})</th>
               </tr>
             ) : null}
           </thead>
@@ -443,11 +441,11 @@ export default function SubjectScores() {
                     </td>
                     {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => (
                       <td key={`psy-${row.student_id}-${index}`}>
-                        <input type="number" value={value} min="0" max="2" onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} style={{ width: 58 }} />
+                        <input type="number" value={value} min="0" max={schema.psychomotor_maxes[index]} onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} style={{ width: 58 }} />
                       </td>
                     )) : null}
-                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.quiz} min="0" max="5" onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
-                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.note_copying} min="0" max="5" onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
+                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.quiz} min="0" max={schema.quiz_max} onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
+                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.note_copying} min="0" max={schema.note_copying_max} onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
                     <td><strong>{row.total}</strong></td>
                     <td><strong>{row.grade}</strong></td>
                   </>

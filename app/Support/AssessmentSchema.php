@@ -26,7 +26,6 @@ class AssessmentSchema
     public static function normalizeSchema(mixed $raw): array
     {
         $base = self::default();
-
         $schema = is_array($raw) ? $raw : [];
         if (isset($schema['default']) && is_array($schema['default'])) {
             $schema = $schema['default'];
@@ -35,48 +34,47 @@ class AssessmentSchema
         $layout = strtolower(trim((string) ($schema['layout'] ?? 'compact')));
         $layout = $layout === 'classic' ? 'classic' : 'compact';
         $isClassic = $layout === 'classic';
-        $psychomotorMaxes = $isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0];
+        $caMaxes = is_array($schema['ca_maxes'] ?? null) ? $schema['ca_maxes'] : $base['ca_maxes'];
+        $caLabels = is_array($schema['ca_labels'] ?? null) ? $schema['ca_labels'] : $base['ca_labels'];
+        $psychomotorMaxes = is_array($schema['psychomotor_maxes'] ?? null) ? $schema['psychomotor_maxes'] : ($isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0]);
         $psychomotorLabels = is_array($schema['psychomotor_labels'] ?? null) ? $schema['psychomotor_labels'] : $base['psychomotor_labels'];
-        $psychomotorLabels = array_map(fn ($label, $index) => ($trimmed = trim((string) $label)) !== '' ? substr($trimmed, 0, 30) : 'P' . ($index + 1), $psychomotorLabels, range(0, 4));
-        $quizLabel = trim((string) ($schema['quiz_label'] ?? $base['quiz_label']));
-        $noteCopyingLabel = trim((string) ($schema['note_copying_label'] ?? $base['note_copying_label']));
-        $quizMax = $isClassic ? 5 : 0;
-        $noteCopyingMax = $isClassic ? 5 : 0;
-        $componentsTotalMax = array_sum($psychomotorMaxes) + $quizMax + $noteCopyingMax;
-        $numericTotalMax = 100 - $componentsTotalMax;
-
-        $caMaxes = isset($schema['ca_maxes']) && is_array($schema['ca_maxes'])
-            ? $schema['ca_maxes']
-            : $base['ca_maxes'];
-        $caLabels = isset($schema['ca_labels']) && is_array($schema['ca_labels'])
-            ? $schema['ca_labels']
-            : $base['ca_labels'];
-
-        $normalized = [];
+        $normalizedCa = [];
         $labels = [];
-        for ($i = 0; $i < 5; $i++) {
-            $normalized[$i] = max(0, (int) ($caMaxes[$i] ?? 0));
-            $label = trim((string) ($caLabels[$i] ?? ''));
-            $labels[$i] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($i + 1);
+        $normalizedPsychomotor = [];
+        $normalizedPsychomotorLabels = [];
+
+        for ($index = 0; $index < 5; $index++) {
+            $normalizedCa[$index] = max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
+            $label = trim((string) ($caLabels[$index] ?? ''));
+            $labels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
+            $normalizedPsychomotor[$index] = $isClassic ? max(0, min(100, (int) ($psychomotorMaxes[$index] ?? 0))) : 0;
+            $psychomotorLabel = trim((string) ($psychomotorLabels[$index] ?? ''));
+            $normalizedPsychomotorLabels[$index] = $psychomotorLabel !== '' ? substr($psychomotorLabel, 0, 30) : 'P' . ($index + 1);
         }
 
-        $caTotalMax = array_sum($normalized);
+        $quizMax = $isClassic ? max(0, min(100, (int) ($schema['quiz_max'] ?? 5))) : 0;
+        $noteCopyingMax = $isClassic ? max(0, min(100, (int) ($schema['note_copying_max'] ?? 5))) : 0;
+        $componentsTotalMax = array_sum($normalizedPsychomotor) + $quizMax + $noteCopyingMax;
+        $numericTotalMax = max(0, 100 - $componentsTotalMax);
+        $caTotalMax = array_sum($normalizedCa);
         $examMax = isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax);
         $examMax = max(0, min(100, $examMax));
-
         if (($caTotalMax + $examMax) !== $numericTotalMax) {
             $examMax = max(0, $numericTotalMax - $caTotalMax);
         }
 
+        $quizLabel = trim((string) ($schema['quiz_label'] ?? $base['quiz_label']));
+        $noteCopyingLabel = trim((string) ($schema['note_copying_label'] ?? $base['note_copying_label']));
+
         return [
-            'ca_maxes' => $normalized,
+            'ca_maxes' => $normalizedCa,
             'ca_labels' => $labels,
             'exam_max' => $examMax,
             'total_max' => 100,
             'layout' => $layout,
             'profile_version' => max(0, (int) ($schema['profile_version'] ?? 0)),
-            'psychomotor_maxes' => $psychomotorMaxes,
-            'psychomotor_labels' => $psychomotorLabels,
+            'psychomotor_maxes' => $normalizedPsychomotor,
+            'psychomotor_labels' => $normalizedPsychomotorLabels,
             'quiz_max' => $quizMax,
             'quiz_label' => $quizLabel !== '' ? substr($quizLabel, 0, 30) : 'Quiz',
             'note_copying_max' => $noteCopyingMax,
@@ -193,7 +191,7 @@ class AssessmentSchema
             return 0;
         }
 
-        $components = ClassicResultComponents::normalize($rawComponents);
+        $components = ClassicResultComponents::normalize($rawComponents, $schema);
 
         return array_sum($components['psychomotor']) + $components['quiz'] + $components['note_copying'];
     }

@@ -1908,7 +1908,7 @@ class ResultsController extends Controller
                     'ca_breakdown' => $caBreakdown,
                     'ca_breakdown_text' => $caBreakdownText,
                     'exam' => $exam,
-                    'classic_components' => ClassicResultComponents::normalize($r->classic_components ?? null),
+                    'classic_components' => ClassicResultComponents::normalize($r->classic_components ?? null, $rowSchema),
                     'total' => $total,
                     'min_score' => $isGraded ? ($stats['min_score'] ?? 0) : '-',
                     'max_score' => $isGraded ? ($stats['max_score'] ?? 0) : '-',
