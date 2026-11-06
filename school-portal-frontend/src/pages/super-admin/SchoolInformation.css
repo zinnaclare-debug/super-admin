@@ -1005,3 +1005,15 @@
 .sai-receipt-modal h4 { margin: 0; color: #0f172a; }
 .sai-receipt-modal-totals { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin: 16px 0; padding: 13px; border-radius: 10px; background: #f0f7ff; color: #475569; }
 .sai-receipt-modal-totals strong { color: #0f172a; text-align: right; }
+
+.sai-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .sai-inline-fields {
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+}

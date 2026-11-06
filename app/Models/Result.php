@@ -15,10 +15,12 @@ class Result extends Model
     'exam',
     'teacher_comment',
     'classic_components',
+    'assessment_profile',
   ];
 
   protected $casts = [
     'ca_breakdown' => 'array',
     'classic_components' => 'array',
+    'assessment_profile' => 'array',
   ];
 }

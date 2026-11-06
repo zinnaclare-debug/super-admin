@@ -6,6 +6,36 @@ import { BRANDING_IMAGE_GUIDE, compressBrandingImage } from "../../utils/profile
 import schoolInformationArt from "../../assets/dashboard/branding.svg";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const defaultScoreProfile = (layout = "compact") => ({
+  ca_maxes: layout === "classic" ? [4, 4, 4, 4, 4] : [6, 6, 6, 6, 6],
+  ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
+  psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
+  quiz_label: "Quiz",
+  note_copying_label: "Note Copying",
+  exam_max: layout === "classic" ? 60 : 70,
+});
+
+const normalizeScoreProfile = (raw, layout) => {
+  const defaults = defaultScoreProfile(layout);
+  const source = raw && typeof raw === "object" ? raw : {};
+  const target = layout === "classic" ? 80 : 100;
+  const ca_maxes = Array.from({ length: 5 }, (_, index) => {
+    const value = Number(source.ca_maxes?.[index] ?? defaults.ca_maxes[index]);
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : defaults.ca_maxes[index];
+  });
+  const caTotal = ca_maxes.reduce((sum, value) => sum + value, 0);
+  const labels = (field, fallback) => Array.from({ length: 5 }, (_, index) => String(source[field]?.[index] || fallback[index]).trim().slice(0, 30) || fallback[index]);
+  const safeMaxes = caTotal <= target ? ca_maxes : defaults.ca_maxes;
+
+  return {
+    ca_maxes: safeMaxes,
+    ca_labels: labels("ca_labels", defaults.ca_labels),
+    psychomotor_labels: labels("psychomotor_labels", defaults.psychomotor_labels),
+    quiz_label: String(source.quiz_label || defaults.quiz_label).trim().slice(0, 30) || defaults.quiz_label,
+    note_copying_label: String(source.note_copying_label || defaults.note_copying_label).trim().slice(0, 30) || defaults.note_copying_label,
+    exam_max: target - safeMaxes.reduce((sum, value) => sum + value, 0),
+  };
+};
 const DEFAULT_EXAM_RECORD = {
   ca_maxes: [30, 0, 0, 0, 0],
   ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
@@ -15,6 +45,7 @@ const DEFAULT_EXAM_RECORD = {
 
 const DEFAULT_RESULT_TEMPLATE = {
   layout: "compact",
+  score_profile: defaultScoreProfile("compact"),
   primary_color: "#111827",
   accent_color: "#1D4ED8",
   watermark_opacity: 0.07,
@@ -188,10 +219,13 @@ const normalizeResultTemplate = (raw) => {
   const cumulative = source.cumulative && typeof source.cumulative === "object" ? source.cumulative : {};
   const opacity = Number(source.watermark_opacity ?? DEFAULT_RESULT_TEMPLATE.watermark_opacity);
 
+  const layout = ["classic", "compact"].includes(source.layout) ? source.layout : DEFAULT_RESULT_TEMPLATE.layout;
+
   return {
     ...DEFAULT_RESULT_TEMPLATE,
     ...source,
-    layout: ["classic", "compact"].includes(source.layout) ? source.layout : DEFAULT_RESULT_TEMPLATE.layout,
+    layout,
+    score_profile: normalizeScoreProfile(source.score_profile, layout),
     primary_color: /^#[0-9a-fA-F]{6}$/.test(String(source.primary_color || ""))
       ? source.primary_color
       : DEFAULT_RESULT_TEMPLATE.primary_color,
@@ -670,7 +704,21 @@ export default function SchoolInformation() {
   };
 
   const updateResultTemplate = (field, value) => {
-    setResultTemplate((prev) => normalizeResultTemplate({ ...prev, [field]: value }));
+    setResultTemplate((prev) => normalizeResultTemplate({
+      ...prev,
+      [field]: value,
+      ...(field === "layout" ? { score_profile: defaultScoreProfile(value) } : {}),
+    }));
+  };
+
+  const updateScoreProfile = (field, value, index = null) => {
+    setResultTemplate((prev) => {
+      const profile = normalizeScoreProfile(prev.score_profile, prev.layout);
+      const next = Array.isArray(profile[field])
+        ? { ...profile, [field]: profile[field].map((item, itemIndex) => itemIndex === index ? value : item) }
+        : { ...profile, [field]: value };
+      return normalizeResultTemplate({ ...prev, score_profile: next });
+    });
   };
 
   const updateNestedResultTemplate = (group, field, value) => {
@@ -687,6 +735,7 @@ export default function SchoolInformation() {
 
   const saveResultTemplate = async () => {
     const payload = normalizeResultTemplate(resultTemplate);
+    payload.comments_only_levels = Object.fromEntries(activeEducationLevels.map((level) => [level.key, Boolean(examRecord.by_level?.[level.key]?.comments_only)]));
     setSavingResultTemplate(true);
     try {
       const res = await api.put(`/api/super-admin/schools/${schoolId}/information/result-template`, payload);
@@ -1074,153 +1123,7 @@ export default function SchoolInformation() {
         </div>
       </section>
 
-      <section className="sai-card">
-        <h3>Exam Records By Education Level</h3>
-        <p className="sai-note">
-          Configure each CA name, CA maximum, and exam maximum for each enabled education level. Each level must total 100.
-        </p>
-        <div className="sai-level-exam-list">
-          {activeEducationLevels.length === 0 ? (
-            <p className="sai-note">No education level is enabled for this school yet.</p>
-          ) : (
-            activeEducationLevels.map((level) => {
-              const record = normalizeExamRecord(examRecord.by_level?.[level.key] || examRecord.default);
-              const summary = examDraftSummaries[level.key] || { caTotal: 0, expectedExam: 100, total: 0 };
-
-              return (
-                <div key={`exam-record-${level.key}`} className="sai-level-exam-card">
-                  <div className="sai-level-exam-head">
-                    <h4>{level.label || level.key}</h4>
-                    <span>{level.key}</span>
-                  </div>
-                  <div className="sai-exam-grid">
-                    {[0, 1, 2, 3, 4].map((index) => (
-                      <div key={`${level.key}-ca-record-${index}`} className="sai-field">
-                        <label>CA {index + 1} Name</label>
-                        <input
-                          type="text"
-                          maxLength="30"
-                          value={record.ca_labels[index]}
-                          onChange={(e) => updateExamDraftCaLabel(level.key, index, e.target.value)}
-                          placeholder={`CA${index + 1}`}
-                        />
-                        <label style={{ marginTop: 8 }}>{record.ca_labels[index] || `CA${index + 1}`} Max</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={record.ca_maxes[index]}
-                          onChange={(e) => updateExamDraftCa(level.key, index, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                    <div className="sai-field">
-                      <label>Exam</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={record.exam_max}
-                        onChange={(e) => updateExamDraftExam(level.key, e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <label className="sai-check sai-check-card sai-check-card--compact" style={{ marginTop: 12 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(record.comments_only)}
-                      onChange={(event) => updateExamDraftCommentsOnly(level.key, event.target.checked)}
-                    />
-                    <span>Comments only</span>
-                  </label>
-                  <div className="sai-meta">
-                    <span>CA total: {summary.caTotal}</span>
-                    <span>Expected exam: {summary.expectedExam}</span>
-                    <span>Total: {summary.total}</span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-        <div className="sai-actions">
-          <button type="button" onClick={saveExamRecord} disabled={savingExamRecord}>
-            {savingExamRecord ? "Saving..." : "Save Exam Records"}
-          </button>
-        </div>
-      </section>
-
-      <section className="sai-card">
-        <h3>Grading System</h3>
-        <p className="sai-note">
-          Set each school&apos;s score range, grade label, and remark. Each next row starts automatically from
-          the previous row&apos;s To score + 1, and the final row must end at 100.
-        </p>
-
-        <div className="sai-grade-table-wrap">
-          <table className="sai-grade-table">
-            <thead>
-              <tr>
-                <th style={{ width: "70px" }}>Row</th>
-                <th style={{ width: "110px" }}>From</th>
-                <th style={{ width: "110px" }}>To</th>
-                <th style={{ width: "160px" }}>Grade</th>
-                <th>Remark</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gradingRows.map((row, index) => {
-                const rowEnabled = index === 0 || row.from !== "";
-                return (
-                  <tr key={`grading-row-${index}`}>
-                    <td>{index + 1}</td>
-                    <td>
-                      <input type="number" value={row.from} readOnly disabled />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min={row.from === "" ? 0 : row.from}
-                        max="100"
-                        value={row.to}
-                        onChange={(e) => updateGradingRow(index, "to", e.target.value)}
-                        disabled={!rowEnabled}
-                        placeholder={rowEnabled ? "To" : "Complete previous row"}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={row.grade}
-                        onChange={(e) => updateGradingRow(index, "grade", e.target.value)}
-                        disabled={!rowEnabled}
-                        placeholder={rowEnabled ? "A1, B2, C3" : "Waiting"}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={row.remark}
-                        onChange={(e) => updateGradingRow(index, "remark", e.target.value)}
-                        disabled={!rowEnabled}
-                        placeholder={rowEnabled ? "Excellent, Credit, Pass" : "Waiting"}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="sai-actions">
-          <button type="button" onClick={saveGradingSchema} disabled={savingGradingSchema}>
-            {savingGradingSchema ? "Saving..." : "Save Grading System"}
-          </button>
-        </div>
-      </section>
-
-      <section className="sai-card sai-result-template-card">
+<section className="sai-card sai-result-template-card">
         <h3>Result PDF Template</h3>
         <p className="sai-note">
           Configure how this school&apos;s normal result PDF and cumulative result PDF should appear. The CA columns
@@ -1270,6 +1173,64 @@ export default function SchoolInformation() {
           </div>
         </div>
 
+
+        <div className="sai-template-option-card">
+          <h4>Score Allocation: Total 100</h4>
+          <p className="sai-note">
+            {resultTemplate.layout === "classic"
+              ? "Classic: five CA fields and exam must equal 80. Psychomotor / Affective (10), plus the two fields below (10), complete the 100 marks."
+              : "Compact: five CA fields and exam must equal 100."}
+          </p>
+          <div className="sai-grid">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div className="sai-field" key={`profile-ca-${index}`}>
+                <label>CA {index + 1} name and maximum</label>
+                <div className="sai-inline-fields">
+                  <input value={resultTemplate.score_profile.ca_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("ca_labels", e.target.value, index)} />
+                  <input type="number" min="1" max="100" value={resultTemplate.score_profile.ca_maxes[index]} onChange={(e) => updateScoreProfile("ca_maxes", e.target.value, index)} />
+                </div>
+              </div>
+            ))}
+            <div className="sai-field">
+              <label>Examination maximum</label>
+              <input type="number" min="0" max="100" value={resultTemplate.score_profile.exam_max} readOnly />
+            </div>
+          </div>
+          {resultTemplate.layout === "classic" ? (
+            <>
+              <h4>Psychomotor / Affective (10%)</h4>
+              <div className="sai-grid">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <div className="sai-field" key={`profile-psy-${index}`}>
+                    <label>P{index + 1} name (2 marks)</label>
+                    <input value={resultTemplate.score_profile.psychomotor_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("psychomotor_labels", e.target.value, index)} />
+                  </div>
+                ))}
+                <div className="sai-field">
+                  <label>Quiz / Reading field (5 marks)</label>
+                  <input value={resultTemplate.score_profile.quiz_label} maxLength={30} onChange={(e) => updateScoreProfile("quiz_label", e.target.value)} />
+                </div>
+                <div className="sai-field">
+                  <label>Note taking / copying field (5 marks)</label>
+                  <input value={resultTemplate.score_profile.note_copying_label} maxLength={30} onChange={(e) => updateScoreProfile("note_copying_label", e.target.value)} />
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <div className="sai-template-option-card">
+          <h4>Result Mode By Education Level</h4>
+          <p className="sai-note">Check Comments only only for the education levels that should use observation sheets instead of numeric marks.</p>
+          <div className="sai-check-stack">
+            {activeEducationLevels.map((level) => (
+              <label className="sai-check sai-check-card sai-check-card--compact" key={level.key}>
+                <input type="checkbox" checked={Boolean(examRecord.by_level?.[level.key]?.comments_only)} onChange={(event) => updateExamDraftCommentsOnly(level.key, event.target.checked)} />
+                <span>{level.label}: Comments only</span>
+              </label>
+            ))}
+          </div>
+        </div>
         <div className="sai-result-template-grid">
           <div className="sai-template-option-card">
             <h4>Visible Sections</h4>

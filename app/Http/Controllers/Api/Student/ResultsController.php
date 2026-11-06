@@ -1496,19 +1496,18 @@ class ResultsController extends Controller
             $row->ca ?? null,
             $row->exam ?? null,
             $row->result_created_at ?? $row->created_at ?? null,
-            $row->result_updated_at ?? $row->updated_at ?? null
+            $row->result_updated_at ?? $row->updated_at ?? null,
+            null,
+            $row->classic_components ?? null
         )) {
             return null;
         }
 
-        $caBreakdown = AssessmentSchema::normalizeBreakdown(
-            $row->ca_breakdown ?? null,
-            $assessmentSchema,
-            (int) ($row->ca ?? 0)
-        );
-        $exam = max(0, min((int) ($assessmentSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+        $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
+        $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
+        $exam = max(0, min((int) ($rowSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
 
-        return AssessmentSchema::breakdownTotal($caBreakdown) + $exam;
+        return AssessmentSchema::totalFromScores($caBreakdown, AssessmentSchema::breakdownTotal($caBreakdown), $exam, $row->classic_components ?? null, $rowSchema);
     }
 
     private function formatCumulativeScore(?float $value)
@@ -1598,6 +1597,8 @@ class ResultsController extends Controller
                 'results.ca_breakdown',
                 'results.exam',
                 'results.teacher_comment',
+                ...(Schema::hasColumn('results', 'classic_components') ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
+                ...(Schema::hasColumn('results', 'assessment_profile') ? ['results.assessment_profile'] : [DB::raw('NULL as assessment_profile')]),
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
             ])
@@ -1801,6 +1802,7 @@ class ResultsController extends Controller
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
         $hasClassicComponents = Schema::hasColumn('results', 'classic_components');
+        $hasAssessmentProfile = Schema::hasColumn('results', 'assessment_profile');
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
 
         $subjects = TermSubject::query()
@@ -1838,6 +1840,7 @@ class ResultsController extends Controller
                 'results.exam',
                 'results.teacher_comment',
                 ...($hasClassicComponents ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
+                ...($hasAssessmentProfile ? ['results.assessment_profile'] : [DB::raw('NULL as assessment_profile')]),
                 'results.created_at as result_created_at',
                 'results.updated_at as result_updated_at',
             ])
@@ -1849,13 +1852,16 @@ class ResultsController extends Controller
 
         return $subjects
             ->map(function ($r) use ($subjectStats, $studentId, $assessmentSchema, $schoolId, $commentsOnly) {
+                $rowSchema = AssessmentSchema::schemaForResult($r->assessment_profile ?? null, $assessmentSchema);
                 $teacherComment = trim((string) ($r->teacher_comment ?? ''));
                 $isGraded = $this->isResultRecordGraded(
                     $r->result_id ?? null,
                     $r->ca ?? null,
                     $r->exam ?? null,
                     $r->result_created_at ?? null,
-                    $r->result_updated_at ?? null
+                    $r->result_updated_at ?? null,
+                    null,
+                    $r->classic_components ?? null
                 );
                 $termSubjectId = (int) $r->term_subject_id;
                 $stats = $subjectStats[$termSubjectId] ?? null;
@@ -1872,15 +1878,15 @@ class ResultsController extends Controller
                 } elseif ($isGraded) {
                     $caBreakdown = AssessmentSchema::normalizeBreakdown(
                         $r->ca_breakdown ?? null,
-                        $assessmentSchema,
+                        $rowSchema,
                         (int) ($r->ca ?? 0)
                     );
                     $ca = AssessmentSchema::breakdownTotal($caBreakdown);
-                    $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($r->exam ?? 0)));
-                    $total = $ca + $exam;
+                    $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($r->exam ?? 0)));
+                    $total = AssessmentSchema::totalFromScores($caBreakdown, $ca, $exam, $r->classic_components ?? null, $rowSchema);
                     $grade = $this->gradeFromTotal($schoolId, $total);
                     $remark = $this->remarkFromTotal($schoolId, $total);
-                    $caBreakdownText = AssessmentSchema::formatBreakdown($caBreakdown, $assessmentSchema);
+                    $caBreakdownText = AssessmentSchema::formatBreakdown($caBreakdown, $rowSchema);
                 } else {
                     $caBreakdown = array_fill(0, 5, null);
                     $ca = '-';
@@ -1942,8 +1948,10 @@ class ResultsController extends Controller
                 ->whereNull('student_subject_exclusions.id');
         }
 
+        $hasClassicComponents = Schema::hasColumn('results', 'classic_components');
+        $hasAssessmentProfile = Schema::hasColumn('results', 'assessment_profile');
         $rows = $rowsQuery
-            ->select(['results.id', 'results.term_subject_id', 'results.student_id', 'results.ca', 'results.exam', 'results.created_at', 'results.updated_at'])
+            ->select(['results.id', 'results.term_subject_id', 'results.student_id', 'results.ca', 'results.ca_breakdown', 'results.exam', ...($hasClassicComponents ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]), ...($hasAssessmentProfile ? ['results.assessment_profile'] : [DB::raw('NULL as assessment_profile')]), 'results.created_at', 'results.updated_at'])
             ->get();
 
         $gradedRows = $rows->filter(function ($row) {
@@ -1952,7 +1960,9 @@ class ResultsController extends Controller
                 $row->ca ?? null,
                 $row->exam ?? null,
                 $row->created_at ?? null,
-                $row->updated_at ?? null
+                $row->updated_at ?? null,
+                null,
+                $row->classic_components ?? null
             );
         });
 
@@ -1961,12 +1971,22 @@ class ResultsController extends Controller
 
         foreach ($grouped as $termSubjectId => $subjectRows) {
             $totals = $subjectRows
-                ->map(fn ($row) => [
-                    'student_id' => (int) $row->student_id,
-                    'total' => (int) $row->ca + (int) $row->exam,
-                ])
+                ->map(function ($row) use ($assessmentSchema) {
+                    $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
+                    $breakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
+                    $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($row->exam ?? 0)));
+                    return [
+                        'student_id' => (int) $row->student_id,
+                        'total' => AssessmentSchema::totalFromScores(
+                            $breakdown,
+                            AssessmentSchema::breakdownTotal($breakdown),
+                            $exam,
+                            $row->classic_components ?? null,
+                            $rowSchema
+                        ),
+                    ];
+                })
                 ->values();
-
             if ($totals->isEmpty()) {
                 $stats[(int) $termSubjectId] = [
                     'min_score' => 0,
@@ -2109,6 +2129,8 @@ class ResultsController extends Controller
                 'results.ca',
                 'results.ca_breakdown',
                 'results.exam',
+                ...(Schema::hasColumn('results', 'classic_components') ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
+                ...(Schema::hasColumn('results', 'assessment_profile') ? ['results.assessment_profile'] : [DB::raw('NULL as assessment_profile')]),
                 'results.created_at',
                 'results.updated_at',
             ])
@@ -2126,14 +2148,11 @@ class ResultsController extends Controller
                 continue;
             }
 
-            $caBreakdown = AssessmentSchema::normalizeBreakdown(
-                $row->ca_breakdown ?? null,
-                $assessmentSchema,
-                (int) ($row->ca ?? 0)
-            );
-            $exam = max(0, min((int) ($assessmentSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+            $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
+            $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
+            $exam = max(0, min((int) ($rowSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
             $totalsByStudentAndSubject[(int) $row->student_id][(int) $row->term_subject_id] =
-                AssessmentSchema::breakdownTotal($caBreakdown) + $exam;
+                AssessmentSchema::totalFromScores($caBreakdown, AssessmentSchema::breakdownTotal($caBreakdown), $exam, $row->classic_components ?? null, $rowSchema);
         }
 
         $studentIds = !empty($enrolledStudentIds)
@@ -2215,7 +2234,8 @@ class ResultsController extends Controller
         $exam,
         $createdAt,
         $updatedAt,
-        $teacherComment = null
+        $teacherComment = null,
+        $classicComponents = null
     ): bool {
         if (empty($resultId)) {
             return false;
@@ -2228,6 +2248,11 @@ class ResultsController extends Controller
         $caScore = (int) ($ca ?? 0);
         $examScore = (int) ($exam ?? 0);
         if (($caScore + $examScore) > 0) {
+            return true;
+        }
+
+        $components = ClassicResultComponents::normalize($classicComponents);
+        if (array_sum($components['psychomotor']) + $components['quiz'] + $components['note_copying'] > 0) {
             return true;
         }
 
@@ -2268,7 +2293,7 @@ class ResultsController extends Controller
             ->join('schools', 'schools.id', '=', 'classes.school_id')
             ->where('classes.id', $classId)
             ->where('classes.school_id', $schoolId)
-            ->select(['classes.level', 'schools.assessment_schema'])
+            ->select(['classes.level', 'schools.assessment_schema', 'schools.result_template_config'])
             ->first();
 
         if (!$row) {
@@ -2282,7 +2307,7 @@ class ResultsController extends Controller
             $rawSchema = is_array($decoded) ? $decoded : null;
         }
 
-        $cache[$cacheKey] = AssessmentSchema::schemaForLevel($rawSchema, $row->level ?? null);
+        $cache[$cacheKey] = AssessmentSchema::schemaForTemplateLevel($rawSchema, $row->level ?? null, $row->result_template_config ?? null);
 
         return $cache[$cacheKey];
     }

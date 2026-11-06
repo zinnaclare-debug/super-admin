@@ -9,6 +9,10 @@ const DEFAULT_SCHEMA = {
   ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   exam_max: 70,
   total_max: 100,
+  layout: "compact",
+  psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
+  quiz_label: "Quiz",
+  note_copying_label: "Note Copying",
 };
 
 const DEFAULT_GRADING_SCHEMA = [
@@ -24,6 +28,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const normalizeSchema = (schema) => {
   const raw = schema || {};
+  const usesClassicComponents = raw.layout === "classic";
   const caMaxes = Array.isArray(raw.ca_maxes) ? raw.ca_maxes : DEFAULT_SCHEMA.ca_maxes;
   const caLabels = Array.isArray(raw.ca_labels) ? raw.ca_labels : DEFAULT_SCHEMA.ca_labels;
   const normalizedCa = Array.from({ length: 5 }, (_, idx) => clamp(Number(caMaxes[idx] || 0), 0, 100));
@@ -31,15 +36,26 @@ const normalizeSchema = (schema) => {
     const label = String(caLabels[idx] || "").trim();
     return label || `CA${idx + 1}`;
   });
-  const caTotal = normalizedCa.reduce((sum, v) => sum + v, 0);
-  const requestedExam = Number(raw.exam_max ?? 100 - caTotal);
-  const examMax = caTotal + requestedExam === 100 ? clamp(requestedExam, 0, 100) : clamp(100 - caTotal, 0, 100);
+  const psychomotorLabels = Array.from({ length: 5 }, (_, idx) => {
+    const label = String(raw.psychomotor_labels?.[idx] || "").trim();
+    return label || `P${idx + 1}`;
+  });
+  const numericTarget = usesClassicComponents ? 80 : 100;
+  const caTotal = normalizedCa.reduce((sum, value) => sum + value, 0);
+  const requestedExam = Number(raw.exam_max ?? numericTarget - caTotal);
+  const examMax = caTotal + requestedExam === numericTarget
+    ? clamp(requestedExam, 0, numericTarget)
+    : clamp(numericTarget - caTotal, 0, numericTarget);
 
   return {
     ca_maxes: normalizedCa,
     ca_labels: normalizedLabels,
     exam_max: examMax,
     total_max: 100,
+    layout: usesClassicComponents ? "classic" : "compact",
+    psychomotor_labels: psychomotorLabels,
+    quiz_label: String(raw.quiz_label || "Quiz").trim() || "Quiz",
+    note_copying_label: String(raw.note_copying_label || "Note Copying").trim() || "Note Copying",
     comments_only: Boolean(raw.comments_only),
   };
 };
@@ -73,12 +89,26 @@ const activeCaIndices = (schema) => {
   return out.length ? out : [0];
 };
 
-const normalizeRow = (row, schema, gradingSchema) => {
+const normalizedClassicComponents = (row) => ({
+  psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, 2)),
+  quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, 5),
+  note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, 5),
+});
+
+const scoreTotal = (ca, exam, components, usesClassicComponents) => {
+  const extras = usesClassicComponents
+    ? components.psychomotor.reduce((sum, score) => sum + Number(score || 0), 0) + Number(components.quiz || 0) + Number(components.note_copying || 0)
+    : 0;
+  return clamp(Number(ca || 0) + Number(exam || 0) + extras, 0, 100);
+};
+
+const normalizeRow = (row, schema, gradingSchema, usesClassicComponents = false) => {
   const rawBreakdown = Array.isArray(row.ca_breakdown) ? row.ca_breakdown : [];
   const breakdown = Array.from({ length: 5 }, (_, idx) => clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0));
   const ca = breakdown.reduce((sum, score) => sum + score, 0);
   const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
-  const total = ca + exam;
+  const classicComponents = normalizedClassicComponents(row);
+  const total = scoreTotal(ca, exam, classicComponents, usesClassicComponents);
 
   return {
     ...row,
@@ -89,11 +119,7 @@ const normalizeRow = (row, schema, gradingSchema) => {
     exam,
     total,
     grade: gradeFromTotal(total, gradingSchema),
-    classic_components: {
-      psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, 2)),
-      quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, 5),
-      note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, 5),
-    },
+    classic_components: classicComponents,
   };
 };
 
@@ -174,7 +200,7 @@ export default function SubjectScores() {
       setSubjectName(String(res.data?.data?.subject_name || "").trim());
       setResultsPublished(Boolean(res.data?.data?.results_published));
       setUsesClassicComponents(Boolean(res.data?.data?.uses_classic_components));
-      setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema)));
+      setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema, Boolean(res.data?.data?.uses_classic_components))));
     } catch (e) {
       alert("Failed to load students for this subject");
       setSubjectName("");
@@ -199,7 +225,7 @@ export default function SubjectScores() {
         breakdown[caIndex] = score;
         const ca = breakdown.reduce((sum, item) => sum + Number(item || 0), 0);
         const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
-        const total = ca + exam;
+        const total = scoreTotal(ca, exam, row.classic_components, usesClassicComponents);
 
         return { ...row, ca_breakdown: breakdown, ca, exam, total, grade: gradeFromTotal(total, gradingSchema) };
       })
@@ -213,7 +239,7 @@ export default function SubjectScores() {
       prev.map((row) => {
         if (row.student_id !== studentId) return row;
         const ca = Number(row.ca || 0);
-        const total = ca + exam;
+        const total = scoreTotal(ca, exam, row.classic_components, usesClassicComponents);
         return { ...row, exam, total, grade: gradeFromTotal(total, gradingSchema) };
       })
     );
@@ -234,9 +260,13 @@ export default function SubjectScores() {
       if (key === "psychomotor") {
         const psychomotor = [...current.psychomotor];
         psychomotor[index] = clamp(Number(value || 0), 0, 2);
-        return { ...row, classic_components: { ...current, psychomotor } };
+        const classic_components = { ...current, psychomotor };
+        const total = scoreTotal(row.ca, row.exam, classic_components, true);
+        return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
       }
-      return { ...row, classic_components: { ...current, [key]: clamp(Number(value || 0), 0, 5) } };
+      const classic_components = { ...current, [key]: clamp(Number(value || 0), 0, 5) };
+      const total = scoreTotal(row.ca, row.exam, classic_components, true);
+      return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
     }));
   };
 
@@ -277,7 +307,7 @@ export default function SubjectScores() {
       </div>
 
       {!commentsOnly && usesClassicComponents ? (
-        <p className="staff-scores-classic-note">Classic full result fields are recorded separately from the school&apos;s configured CA and exam total.</p>
+        <p className="staff-scores-classic-note">Classic scores are combined into one total out of 100: CA + Exam = 80, then Psychomotor / Affective, Quiz and Note Copying add the final 20.</p>
       ) : null}
 
       {resultsPublished ? (
@@ -336,27 +366,34 @@ export default function SubjectScores() {
         <div className="table-scroll staff-scores-table-wrap"><table className="staff-scores-table" border="1" cellPadding="10">
           <thead>
             <tr>
-              <th style={{ width: 70 }}>S/N</th>
-              <th>Student</th>
+              <th style={{ width: 70 }} rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>S/N</th>
+              <th rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>Student</th>
               {commentsOnly ? (
                 <th className="staff-scores-table__observation-head">Teacher's Observation</th>
               ) : (
                 <>
                   {caIndices.map((idx) => (
-                    <th key={`ca-head-${idx}`} style={{ width: 110 }}>
+                    <th key={`ca-head-${idx}`} style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>
                       {schema.ca_labels?.[idx] || `CA${idx + 1}`} ({schema.ca_maxes[idx]})
                     </th>
                   ))}
-                  <th style={{ width: 110 }}>CA Total</th>
-                  <th style={{ width: 120 }}>Exam ({schema.exam_max})</th>
+                  <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>CA Total</th>
+                  <th style={{ width: 120 }} rowSpan={usesClassicComponents ? 2 : 1}>Exam ({schema.exam_max})</th>
                   {usesClassicComponents ? <th colSpan="5">Psychomotor / Affective (10%)</th> : null}
-                  {usesClassicComponents ? <th style={{ width: 85 }}>Quiz (5)</th> : null}
-                  {usesClassicComponents ? <th style={{ width: 105 }}>Note Copying (5)</th> : null}
-                  <th style={{ width: 110 }}>Total</th>
-                  <th style={{ width: 90 }}>Grade</th>
+                  {usesClassicComponents ? <th colSpan="2">Quiz / Note Copying (10%)</th> : null}
+
+                  <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>Total</th>
+                  <th style={{ width: 90 }} rowSpan={usesClassicComponents ? 2 : 1}>Grade</th>
                 </>
               )}
             </tr>
+            {usesClassicComponents && !commentsOnly ? (
+              <tr>
+                {schema.psychomotor_labels.map((label, index) => <th key={'psy-head-' + index}>{label} (2)</th>)}
+                <th>{schema.quiz_label} (5)</th>
+                <th>{schema.note_copying_label} (5)</th>
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             {filteredRows.map((row, rowIndex) => (

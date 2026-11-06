@@ -792,6 +792,18 @@ class SchoolController extends Controller
     {
         $payload = $request->validate([
             'layout' => 'nullable|string|in:classic,compact',
+            'score_profile' => 'nullable|array',
+            'score_profile.ca_maxes' => 'nullable|array|size:5',
+            'score_profile.ca_maxes.*' => 'nullable|numeric|min:0|max:100',
+            'score_profile.ca_labels' => 'nullable|array|size:5',
+            'score_profile.ca_labels.*' => 'nullable|string|max:30',
+            'score_profile.psychomotor_labels' => 'nullable|array|size:5',
+            'score_profile.psychomotor_labels.*' => 'nullable|string|max:30',
+            'score_profile.quiz_label' => 'nullable|string|max:30',
+            'score_profile.note_copying_label' => 'nullable|string|max:30',
+            'score_profile.exam_max' => 'nullable|numeric|min:0|max:100',
+            'comments_only_levels' => 'nullable|array',
+            'comments_only_levels.*' => 'nullable|boolean',
             'primary_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'accent_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'watermark_opacity' => 'nullable|numeric|min:0|max:0.2',
@@ -809,12 +821,28 @@ class SchoolController extends Controller
             'cumulative.show_average' => 'nullable|boolean',
         ]);
 
-        // New saves must carry the renderer version.  Without it, a valid classic
-        // choice is intentionally treated as the legacy compact renderer.
+        $layout = $payload['layout'] ?? 'compact';
+        $profileError = ResultPdfTemplate::validateScoreProfile($payload['score_profile'] ?? null, $layout);
+        if ($profileError !== null) {
+            throw ValidationException::withMessages(['score_profile' => [$profileError]]);
+        }
+
+        // Saving this screen explicitly opts the school into its selected template's score profile.
         $school->result_template_config = ResultPdfTemplate::normalize([
             ...$payload,
             'layout_version' => 2,
+            'score_profile_version' => 1,
         ]);
+
+        $levels = ClassTemplateSchema::activeLevelKeys(ClassTemplateSchema::normalize($school->class_templates));
+        $assessmentSchemas = AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $levels);
+        foreach ($levels as $level) {
+            $existing = AssessmentSchema::schemaForLevel($assessmentSchemas, $level);
+            $key = AssessmentSchema::normalizeLevelKey($level);
+            $existing['comments_only'] = filter_var($payload['comments_only_levels'][$key] ?? false, FILTER_VALIDATE_BOOL);
+            $assessmentSchemas['by_level'][$key] = AssessmentSchema::normalizeSchema($existing);
+        }
+        $school->assessment_schema = $assessmentSchemas;
         $school->save();
 
         return response()->json([

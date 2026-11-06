@@ -11,6 +11,14 @@ class AssessmentSchema
             'ca_labels' => ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],
             'exam_max' => 70,
             'total_max' => 100,
+            'layout' => 'compact',
+            'profile_version' => 0,
+            'psychomotor_maxes' => [0, 0, 0, 0, 0],
+            'psychomotor_labels' => ['P1', 'P2', 'P3', 'P4', 'P5'],
+            'quiz_max' => 0,
+            'quiz_label' => 'Quiz',
+            'note_copying_max' => 0,
+            'note_copying_label' => 'Note Copying',
             'comments_only' => false,
         ];
     }
@@ -23,6 +31,19 @@ class AssessmentSchema
         if (isset($schema['default']) && is_array($schema['default'])) {
             $schema = $schema['default'];
         }
+
+        $layout = strtolower(trim((string) ($schema['layout'] ?? 'compact')));
+        $layout = $layout === 'classic' ? 'classic' : 'compact';
+        $isClassic = $layout === 'classic';
+        $psychomotorMaxes = $isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0];
+        $psychomotorLabels = is_array($schema['psychomotor_labels'] ?? null) ? $schema['psychomotor_labels'] : $base['psychomotor_labels'];
+        $psychomotorLabels = array_map(fn ($label, $index) => ($trimmed = trim((string) $label)) !== '' ? substr($trimmed, 0, 30) : 'P' . ($index + 1), $psychomotorLabels, range(0, 4));
+        $quizLabel = trim((string) ($schema['quiz_label'] ?? $base['quiz_label']));
+        $noteCopyingLabel = trim((string) ($schema['note_copying_label'] ?? $base['note_copying_label']));
+        $quizMax = $isClassic ? 5 : 0;
+        $noteCopyingMax = $isClassic ? 5 : 0;
+        $componentsTotalMax = array_sum($psychomotorMaxes) + $quizMax + $noteCopyingMax;
+        $numericTotalMax = 100 - $componentsTotalMax;
 
         $caMaxes = isset($schema['ca_maxes']) && is_array($schema['ca_maxes'])
             ? $schema['ca_maxes']
@@ -40,11 +61,11 @@ class AssessmentSchema
         }
 
         $caTotalMax = array_sum($normalized);
-        $examMax = isset($schema['exam_max']) ? (int) $schema['exam_max'] : (100 - $caTotalMax);
+        $examMax = isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax);
         $examMax = max(0, min(100, $examMax));
 
-        if (($caTotalMax + $examMax) !== 100) {
-            $examMax = max(0, 100 - $caTotalMax);
+        if (($caTotalMax + $examMax) !== $numericTotalMax) {
+            $examMax = max(0, $numericTotalMax - $caTotalMax);
         }
 
         return [
@@ -52,6 +73,15 @@ class AssessmentSchema
             'ca_labels' => $labels,
             'exam_max' => $examMax,
             'total_max' => 100,
+            'layout' => $layout,
+            'profile_version' => max(0, (int) ($schema['profile_version'] ?? 0)),
+            'psychomotor_maxes' => $psychomotorMaxes,
+            'psychomotor_labels' => $psychomotorLabels,
+            'quiz_max' => $quizMax,
+            'quiz_label' => $quizLabel !== '' ? substr($quizLabel, 0, 30) : 'Quiz',
+            'note_copying_max' => $noteCopyingMax,
+            'note_copying_label' => $noteCopyingLabel !== '' ? substr($noteCopyingLabel, 0, 30) : 'Note Copying',
+            'components_total_max' => $componentsTotalMax,
             'comments_only' => filter_var($schema['comments_only'] ?? false, FILTER_VALIDATE_BOOL),
         ];
     }
@@ -123,6 +153,63 @@ class AssessmentSchema
     public static function commentsOnlyForLevel(mixed $raw, ?string $level): bool
     {
         return (bool) (self::schemaForLevel($raw, $level)['comments_only'] ?? false);
+    }
+
+    public static function schemaForTemplateLevel(mixed $raw, ?string $level, mixed $templateRaw): array
+    {
+        $levelSchema = self::schemaForLevel($raw, $level);
+        $template = ResultPdfTemplate::normalize($templateRaw);
+
+        // Schools opt in when they save this versioned profile; legacy results retain their prior maths.
+        if ((int) ($template['score_profile_version'] ?? 0) < 1) {
+            return $levelSchema;
+        }
+
+        $profile = $template['score_profile'] ?? [];
+        $profile['layout'] = ($template['layout'] ?? 'compact') === 'classic' ? 'classic' : 'compact';
+        $profile['profile_version'] = 1;
+        $profile['comments_only'] = (bool) ($levelSchema['comments_only'] ?? false);
+
+        return self::normalizeSchema($profile);
+    }
+
+    public static function schemaForResult(mixed $savedProfile, array $fallback): array
+    {
+        if (is_array($savedProfile) && isset($savedProfile['ca_maxes'])) {
+            return self::normalizeSchema($savedProfile);
+        }
+
+        return self::normalizeSchema($fallback);
+    }
+
+    public static function usesClassicComponents(array $schema): bool
+    {
+        return self::normalizeSchema($schema)['layout'] === 'classic';
+    }
+
+    public static function componentsTotal(mixed $rawComponents, array $schema): int
+    {
+        if (!self::usesClassicComponents($schema)) {
+            return 0;
+        }
+
+        $components = ClassicResultComponents::normalize($rawComponents);
+
+        return array_sum($components['psychomotor']) + $components['quiz'] + $components['note_copying'];
+    }
+
+    public static function totalFromScores(
+        mixed $rawBreakdown,
+        int $legacyCa,
+        int $exam,
+        mixed $rawComponents,
+        array $schema
+    ): int {
+        $normalized = self::normalizeSchema($schema);
+        $breakdown = self::normalizeBreakdown($rawBreakdown, $normalized, $legacyCa);
+        $examScore = max(0, min((int) $normalized['exam_max'], $exam));
+
+        return min(100, self::breakdownTotal($breakdown) + $examScore + self::componentsTotal($rawComponents, $normalized));
     }
     public static function activeCaIndices(array $schema): array
     {

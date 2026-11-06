@@ -86,7 +86,7 @@ table { width: 100%; border-collapse: collapse; }
 @if($showPrevious)<th rowspan="2">1ST TOTAL</th><th rowspan="2">2ND TOTAL</th><th rowspan="2">TERM TOTAL</th><th rowspan="2">AVERAGE</th>@else<th rowspan="2">TOTAL</th>@endif
 <th rowspan="2">GRADE</th><th rowspan="2">REMARK</th>
 </tr>
-<tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach<th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>QUIZ</th><th>NOTE</th></tr>
+<tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach@foreach(range(0, 4) as $index)<th>{{ strtoupper($schema['psychomotor_labels'][$index] ?? ('P'.($index + 1))) }}</th>@endforeach<th>{{ strtoupper($schema['quiz_label'] ?? 'QUIZ') }}</th><th>{{ strtoupper($schema['note_copying_label'] ?? 'NOTE COPYING') }}</th></tr>
 </thead><tbody>
 @endif
 @forelse($rows as $row)<tr><td>{{ strtoupper($row['subject_name'] ?? '-') }}</td>

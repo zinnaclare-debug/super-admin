@@ -35,6 +35,11 @@ class TeacherResultsController extends Controller
     return Schema::hasColumn('results', 'classic_components');
   }
 
+  private function hasAssessmentProfileColumn(): bool
+  {
+    return Schema::hasColumn('results', 'assessment_profile');
+  }
+
   private function canUseStudentSubjectExclusions(): bool
   {
     if (!Schema::hasTable('student_subject_exclusions')) {
@@ -108,7 +113,8 @@ class TeacherResultsController extends Controller
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
     $hasTeacherComment = $this->hasResultTeacherCommentColumn();
     $hasClassicComponents = $this->hasClassicComponentsColumn();
-    $usesClassicComponents = ResultPdfTemplate::normalize($school?->result_template_config)['layout'] === 'classic';
+    $hasAssessmentProfile = $this->hasAssessmentProfileColumn();
+    $usesClassicComponents = false;
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
@@ -132,10 +138,12 @@ class TeacherResultsController extends Controller
         'terms.name as term_name',
       ])
       ->first();
-    $assessmentSchema = AssessmentSchema::schemaForLevel(
+    $assessmentSchema = AssessmentSchema::schemaForTemplateLevel(
       $school?->assessment_schema,
-      $subjectSummary->class_level ?? null
+      $subjectSummary->class_level ?? null,
+      $school?->result_template_config
     );
+    $usesClassicComponents = AssessmentSchema::usesClassicComponents($assessmentSchema);
 
     // Build the class list from current term enrollments first, then layer exclusions/results on top.
     $canUseDepartments = Schema::hasTable('class_departments')
@@ -196,6 +204,7 @@ class TeacherResultsController extends Controller
           'results.exam',
           ...($hasTeacherComment ? ['results.teacher_comment'] : [DB::raw('NULL as teacher_comment')]),
           ...($hasClassicComponents ? ['results.classic_components'] : [DB::raw('NULL as classic_components')]),
+          ...($hasAssessmentProfile ? ['results.assessment_profile'] : [DB::raw('NULL as assessment_profile')]),
         ]);
 
       $resultsByStudentId = $resultsQuery
@@ -207,14 +216,11 @@ class TeacherResultsController extends Controller
     $rows = $students
       ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId, $usesClassicComponents) {
         $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
-        $caBreakdown = AssessmentSchema::normalizeBreakdown(
-          $resultRow->ca_breakdown ?? null,
-          $assessmentSchema,
-          (int) ($resultRow->ca ?? 0)
-        );
+        $rowSchema = AssessmentSchema::schemaForResult($resultRow->assessment_profile ?? null, $assessmentSchema);
+        $caBreakdown = AssessmentSchema::normalizeBreakdown($resultRow->ca_breakdown ?? null, $rowSchema, (int) ($resultRow->ca ?? 0));
         $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
-        $exam = max(0, min((int) $assessmentSchema['exam_max'], (int) ($resultRow->exam ?? 0)));
-        $total = $caTotal + $exam;
+        $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($resultRow->exam ?? 0)));
+        $total = AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $resultRow->classic_components ?? null, $rowSchema);
 
         return [
           'student_id' => (int) $student->student_id,
@@ -273,7 +279,7 @@ class TeacherResultsController extends Controller
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
     $hasTeacherComment = $this->hasResultTeacherCommentColumn();
     $hasClassicComponents = $this->hasClassicComponentsColumn();
-    $usesClassicComponents = ResultPdfTemplate::normalize($school?->result_template_config)['layout'] === 'classic';
+    $usesClassicComponents = AssessmentSchema::usesClassicComponents($assessmentSchema);
     $canUseExclusions = $this->canUseStudentSubjectExclusions();
     $caSlotCount = max(1, count($caMaxes));
     $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
@@ -359,6 +365,7 @@ class TeacherResultsController extends Controller
           'exam' => 0,
           'teacher_comment' => trim((string) ($score['teacher_comment'] ?? '')),
           'classic_components' => null,
+          'assessment_profile' => $assessmentSchema,
         ];
         continue;
       }
@@ -390,10 +397,11 @@ class TeacherResultsController extends Controller
         ];
       }
 
-      if (($caTotal + $exam) > 100) {
-        $errors["scores.$idx.total"] = [
-          'CA total and exam score cannot be more than 100.',
-        ];
+      $classicComponents = $usesClassicComponents
+        ? ClassicResultComponents::normalize($score['classic_components'] ?? null)
+        : null;
+      if (AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $classicComponents, $assessmentSchema) > 100) {
+        $errors["scores.$idx.total"] = ['The combined assessment score cannot be more than 100.'];
       }
 
       $preparedScores[] = [
@@ -401,9 +409,8 @@ class TeacherResultsController extends Controller
         'ca' => $caTotal,
         'ca_breakdown' => $caBreakdown,
         'exam' => $exam,
-        'classic_components' => $usesClassicComponents
-          ? ClassicResultComponents::normalize($score['classic_components'] ?? null)
-          : null,
+        'classic_components' => $classicComponents,
+        'assessment_profile' => $assessmentSchema,
       ];
     }
 
@@ -411,7 +418,8 @@ class TeacherResultsController extends Controller
       throw ValidationException::withMessages($errors);
     }
 
-    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment, $hasClassicComponents, $usesClassicComponents) {
+    $hasAssessmentProfile = $this->hasAssessmentProfileColumn();
+    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment, $hasClassicComponents, $usesClassicComponents, $hasAssessmentProfile) {
       $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
       foreach ($preparedScores as $score) {
         $updateData = [
@@ -426,6 +434,9 @@ class TeacherResultsController extends Controller
         }
         if ($hasClassicComponents) {
           $updateData['classic_components'] = $usesClassicComponents ? $score['classic_components'] : null;
+        }
+        if ($hasAssessmentProfile) {
+          $updateData['assessment_profile'] = $score['assessment_profile'];
         }
 
         Result::updateOrCreate(
@@ -457,7 +468,7 @@ class TeacherResultsController extends Controller
       ->where('school_id', (int) $termSubject->school_id)
       ->value('level');
 
-    return AssessmentSchema::schemaForLevel($school?->assessment_schema, $classLevel);
+    return AssessmentSchema::schemaForTemplateLevel($school?->assessment_schema, $classLevel, $school?->result_template_config);
   }
 }
 
