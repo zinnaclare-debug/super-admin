@@ -2488,6 +2488,12 @@ class ResultsController extends Controller
         }
         $assessmentSchema = AssessmentSchema::normalizeSchema(data_get($viewData, 'assessmentSchema', []));
         $resultTemplate = (array) data_get($viewData, 'resultTemplate', []);
+        $isClassic = !$isCumulative && (string) ($resultTemplate['layout'] ?? 'compact') === 'classic';
+        if ($isClassic && ($assessmentSchema['layout'] ?? 'compact') !== 'classic') {
+            $classicProfile = ResultPdfTemplate::normalize($resultTemplate)['score_profile'] ?? [];
+            $classicProfile['layout'] = 'classic';
+            $assessmentSchema = AssessmentSchema::normalizeSchema($classicProfile);
+        }
         $showThirdTermPreviousTotals = !$isCumulative
             && (string) ($resultTemplate['layout'] ?? 'compact') !== 'classic'
             && (bool) ($resultTemplate['show_third_term_previous_totals'] ?? false);
@@ -2511,6 +2517,16 @@ class ResultsController extends Controller
                 $caHeaderHtml .= '<th style="width:8%;">' . e(strtoupper($caLabel)) . ' (' . ((int) ($assessmentSchema['ca_maxes'][$index] ?? 0)) . ')</th>';
             }
         }
+        $classicHeaderHtml = '';
+        if ($isClassic) {
+            foreach (range(0, 4) as $index) {
+                $label = strtoupper((string) ($assessmentSchema['psychomotor_labels'][$index] ?? ('P' . ($index + 1))));
+                $maximum = (int) ($assessmentSchema['psychomotor_maxes'][$index] ?? 0);
+                $classicHeaderHtml .= '<th>' . e($label) . ' (' . $maximum . ')</th>';
+            }
+            $classicHeaderHtml .= '<th>' . e(strtoupper((string) ($assessmentSchema['quiz_label'] ?? 'QUIZ'))) . ' (' . ((int) ($assessmentSchema['quiz_max'] ?? 0)) . ')</th>';
+            $classicHeaderHtml .= '<th>' . e(strtoupper((string) ($assessmentSchema['note_copying_label'] ?? 'NOTE COPYING'))) . ' (' . ((int) ($assessmentSchema['note_copying_max'] ?? 0)) . ')</th>';
+        }
         $thirdTermHeaderHtml = $showThirdTermPreviousTotals
             ? '<th style="width:8%;">First Term Total</th><th style="width:8%;">Second Term Total</th><th style="width:8%;">Total Score</th><th style="width:8%;">Total Average</th>'
             : '';
@@ -2523,6 +2539,7 @@ class ResultsController extends Controller
             $grade = strtoupper((string) ($row['grade'] ?? '-'));
             $remark = strtoupper((string) ($row['remark'] ?? '-'));
             $caCellsHtml = '';
+            $classicCellsHtml = '';
             $thirdTermCellsHtml = '';
             if ($isCumulative) {
                 $caCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
@@ -2536,6 +2553,14 @@ class ResultsController extends Controller
                     $caCellsHtml .= '<td style="text-align:center;">'
                         . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
                         . '</td>';
+                }
+                if ($isClassic) {
+                    $classicComponents = ClassicResultComponents::normalize($row['classic_components'] ?? null, $assessmentSchema);
+                    foreach ($classicComponents['psychomotor'] as $component) {
+                        $classicCellsHtml .= '<td style="text-align:center;">' . e((string) $component) . '</td>';
+                    }
+                    $classicCellsHtml .= '<td style="text-align:center;">' . e((string) $classicComponents['quiz']) . '</td>';
+                    $classicCellsHtml .= '<td style="text-align:center;">' . e((string) $classicComponents['note_copying']) . '</td>';
                 }
                 if ($showThirdTermPreviousTotals) {
                     $thirdTermCellsHtml = '<td style="text-align:center;">' . e((string) ($row['first_term_total'] ?? '-')) . '</td>'
@@ -2554,7 +2579,7 @@ class ResultsController extends Controller
             $rowsHtml .= '<tr>'
                 . '<td>' . e($subject) . '</td>'
                 . $caCellsHtml
-                . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td>' . ($showThirdTermPreviousTotals ? '' : '<td style="text-align:center;">' . $score . '</td>'))
+                . ($isCumulative ? '' : '<td style="text-align:center;">' . $exam . '</td>' . $classicCellsHtml . ($showThirdTermPreviousTotals ? '' : '<td style="text-align:center;">' . $score . '</td>'))
                 . $thirdTermCellsHtml
                 . '<td style="text-align:center;">' . e($gradeDisplay) . '</td>'
                 . '<td>' . e($remarkDisplay) . '</td>'
@@ -2562,7 +2587,7 @@ class ResultsController extends Controller
         }
 
         if ($rowsHtml === '') {
-            $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 6 : 5 + count($activeCaIndices) + ($showThirdTermPreviousTotals ? 3 : 0)) . '" style="text-align:center;">No result data found.</td></tr>';
+            $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 7 : 5 + count($activeCaIndices) + ($isClassic ? 7 : 0) + ($showThirdTermPreviousTotals ? 4 : 0)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
         $behaviourCellsPerRow = 5;
@@ -2600,9 +2625,13 @@ class ResultsController extends Controller
             ? '<img class="wm" src="' . e($schoolLogoDataUri) . '" alt="" />'
             : '';
 
+        $classicPdfCss = $isClassic
+            ? '@page { size: A4 landscape; margin: 8mm; }.scores{table-layout:fixed;font-size:5.5px;}.scores th,.scores td{padding:2px;overflow-wrap:anywhere;}'
+            : '';
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
-            . 'body{font-family:Arial,Helvetica,DejaVu Sans,sans-serif;font-size:9px;color:#111;}'
+            . $classicPdfCss
+            . 'body{font-family:Arial,Helvetica,DejaVu Sans,sans-serif;font-size:' . ($isClassic ? '7px' : '9px') . ';color:#111;}'
             . '.sheet{position:relative;border:1px solid #d1d5db;padding:10px;overflow:hidden;}'
             . '.wm{position:absolute;top:28%;left:50%;width:300px;height:300px;margin-left:-150px;opacity:.07;object-fit:contain;z-index:0;}'
             . '.content{position:relative;z-index:1;}'
@@ -2638,10 +2667,10 @@ class ResultsController extends Controller
             . '<tr><th>Total Score</th><td>' . $total . '</td><th>Term</th><td>' . e($termName) . '</td></tr>'
             . '<tr><th>Assessment Pattern</th><td colspan="3">' . e($assessmentSummary) . '</td></tr>'
             . '</table>'
-            . '<table>'
-            . '<thead><tr><th style="width:30%;">Subject</th>'
+            . '<table class="scores">'
+            . '<thead><tr><th style="width:' . ($isClassic ? '14%' : '30%') . ';">Subject</th>'
             . $caHeaderHtml
-            . ($isCumulative ? '' : '<th style="width:8%;">' . ($showThirdTermPreviousTotals ? 'Third Term Exam' : 'Exam') . ' (' . ((int) $assessmentSchema['exam_max']) . ')</th>' . ($showThirdTermPreviousTotals ? '' : '<th style="width:8%;">Total</th>'))
+            . ($isCumulative ? '' : '<th style="width:8%;">' . ($showThirdTermPreviousTotals ? 'Third Term Exam' : 'Exam') . ' (' . ((int) $assessmentSchema['exam_max']) . ')</th>' . $classicHeaderHtml . ($showThirdTermPreviousTotals ? '' : '<th style="width:8%;">Total</th>'))
             . $thirdTermHeaderHtml
             . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
@@ -2686,7 +2715,7 @@ class ResultsController extends Controller
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->setPaper('A4', str_contains($html, '@page { size: A4 landscape') ? 'landscape' : 'portrait');
         $dompdf->render();
 
         return $dompdf->output();

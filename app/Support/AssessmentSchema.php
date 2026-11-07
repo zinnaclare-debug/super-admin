@@ -158,8 +158,11 @@ class AssessmentSchema
         $levelSchema = self::schemaForLevel($raw, $level);
         $template = ResultPdfTemplate::normalize($templateRaw);
 
-        // Schools opt in when they save this versioned profile; legacy results retain their prior maths.
-        if ((int) ($template['score_profile_version'] ?? 0) < 1) {
+        // Older saved classic templates still need their classic scoring fields.
+        if (
+            (int) ($template['score_profile_version'] ?? 0) < 1
+            && ($template['layout'] ?? 'compact') !== 'classic'
+        ) {
             return $levelSchema;
         }
 
@@ -173,8 +176,11 @@ class AssessmentSchema
 
     public static function schemaForResult(mixed $savedProfile, array $fallback): array
     {
-        if (is_array($savedProfile) && isset($savedProfile['ca_maxes'])) {
-            return self::normalizeSchema($savedProfile);
+        $decoded = is_string($savedProfile) ? json_decode($savedProfile, true) : null;
+        $profile = is_array($savedProfile) ? $savedProfile : (is_array($decoded) ? $decoded : null);
+
+        if (is_array($profile) && isset($profile['ca_maxes'])) {
+            return self::normalizeSchema($profile);
         }
 
         return self::normalizeSchema($fallback);

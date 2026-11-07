@@ -6,7 +6,8 @@ final class ClassicResultComponents
 {
     public static function normalize(mixed $value, ?array $schema = null): array
     {
-        $source = is_array($value) ? $value : [];
+        $decoded = is_string($value) ? json_decode($value, true) : null;
+        $source = is_array($value) ? $value : (is_array($decoded) ? $decoded : []);
         $psychomotor = is_array($source['psychomotor'] ?? null) ? $source['psychomotor'] : [];
         $sourceSchema = is_array($schema) ? $schema : [];
         $configuredMaxes = is_array($sourceSchema['psychomotor_maxes'] ?? null)
