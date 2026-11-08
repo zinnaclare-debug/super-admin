@@ -542,7 +542,7 @@ export default function SchoolSubscriptionSection({ schoolId }) {
             </div>
 
             <div className="sai-grade-table-wrap">
-              <table className="sai-grade-table sai-invoice-table">
+              <table className="sai-grade-table sai-invoice-table" data-sticky-identity="one">
                 <thead>
                   <tr>
                     <th>Reference</th>

@@ -1534,7 +1534,7 @@ export default function SchoolInformation() {
 
           <h4 className="sai-login-subtitle">Active Devices</h4>
           <div className="sai-table-wrap">
-            <table className="sai-login-table">
+            <table className="sai-login-table" data-sticky-identity="two">
               <thead>
                 <tr>
                   <th>S/N</th>
@@ -1591,7 +1591,7 @@ export default function SchoolInformation() {
 
           <h4 className="sai-login-subtitle">Recent Login History</h4>
           <div className="sai-table-wrap">
-            <table className="sai-login-table">
+            <table className="sai-login-table" data-sticky-identity="two">
               <thead>
                 <tr>
                   <th>S/N</th>

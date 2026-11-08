@@ -189,7 +189,7 @@ export default function StudentPaymentSetup() {
           </div>
 
           <div className="payx-table-wrap student-payment-setup__table-wrap">
-            <table className="payx-table student-payment-setup__table">
+            <table className="payx-table student-payment-setup__table sticky-identity-table--fee" data-sticky-identity="three">
               <thead>
                 <tr>
                   <th style={{ width: 80 }}>No.</th>
