@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../../services/api";
 import StaffFeatureLayout from "../../../components/StaffFeatureLayout";
+import scoreStudioArt from "../../../assets/class-progress-sharing-knowledge.svg";
 import "./SubjectScores.css";
 
 const DEFAULT_SCHEMA = {
@@ -298,172 +299,101 @@ export default function SubjectScores() {
 
   return (
     <StaffFeatureLayout title={subjectName ? `Enter Results - ${subjectName}` : "Enter Results"}>
-      <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
-        {commentsOnly
-          ? "Enter a clear learning observation for each student. No CA or exam score is used for this level."
-          : `Assessment pattern: ${caPattern}. Total max: 100.`}
-      </div>
+      <main className="staff-scores">
+        <section className="staff-scores__hero">
+          <div className="staff-scores__hero-copy">
+            <span className="staff-scores__eyebrow">Score studio</span>
+            <h2>{subjectName || "Student assessment"}</h2>
+            <p>{commentsOnly ? "Record clear, individual learning observations for every student in this class." : `Enter and review scores with the school's ${usesClassicComponents ? "classic" : "compact"} assessment pattern.`}</p>
+            <div className="staff-scores__hero-tags">
+              <span>{filteredRows.length} student{filteredRows.length === 1 ? "" : "s"}</span>
+              <span>{commentsOnly ? "Observation sheet" : `Total: ${schema.total_max}`}</span>
+              {selectedDepartmentId !== "all" ? <span>Filtered class</span> : null}
+            </div>
+          </div>
+          <div className="staff-scores__hero-art" aria-hidden="true">
+            <div className="staff-scores__hero-orb staff-scores__hero-orb--one" />
+            <div className="staff-scores__hero-orb staff-scores__hero-orb--two" />
+            <img src={scoreStudioArt} alt="" />
+          </div>
+        </section>
 
-      {!commentsOnly && usesClassicComponents ? (
-        <p className="staff-scores-classic-note">Classic scores use this school&apos;s configured CA, Exam, Psychomotor / Affective, Quiz and Note Copying maximums, with a total out of 100.</p>
-      ) : null}
+        <section className="staff-scores__summary" aria-label="Assessment summary">
+          <div className="staff-scores__summary-icon" aria-hidden="true">%</div>
+          <div>
+            <strong>{commentsOnly ? "Observation-based assessment" : "Assessment pattern"}</strong>
+            <p>{commentsOnly ? "Numeric CA and examination scores are disabled for this education level." : `${caPattern}. Total maximum: 100.`}</p>
+          </div>
+        </section>
 
-      {resultsPublished ? (
-        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 14, fontWeight: 600 }}>
-          Results are currently published. Staff editing is locked until the results are unpublished.
-        </div>
-      ) : null}
+        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic assessment includes the configured CA, exam, Psychomotor / Affective, Quiz and Note Copying fields. All entries combine to 100.</p> : null}
+        {resultsPublished ? <div className="staff-scores__locked" role="status"><span aria-hidden="true">!</span>Results are published. Editing is locked until the school administrator unpublishes them.</div> : null}
 
-      {departmentOptions.length > 0 && (
-        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => setSelectedDepartmentId("all")}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              border: "1px solid #cbd5e1",
-              background: selectedDepartmentId === "all" ? "#1d4ed8" : "#fff",
-              color: selectedDepartmentId === "all" ? "#fff" : "#0f172a",
-            }}
-          >
-            All Students ({rows.length})
-          </button>
-          {departmentOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setSelectedDepartmentId(option.id)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 999,
-                border: "1px solid #cbd5e1",
-                background: selectedDepartmentId === option.id ? "#1d4ed8" : "#fff",
-                color: selectedDepartmentId === option.id ? "#fff" : "#0f172a",
-              }}
-            >
-              {option.name} ({option.count})
-            </button>
-          ))}
-        </div>
-      )}
+        {departmentOptions.length > 0 ? (
+          <section className="staff-scores__filters" aria-label="Student subclass filters">
+            <span className="staff-scores__filters-label">Show</span>
+            <div className="staff-scores__filter-list">
+              <button type="button" className={selectedDepartmentId === "all" ? "is-active" : ""} onClick={() => setSelectedDepartmentId("all")}>All students <b>{rows.length}</b></button>
+              {departmentOptions.map((option) => <button key={option.id} type="button" className={selectedDepartmentId === option.id ? "is-active" : ""} onClick={() => setSelectedDepartmentId(option.id)}>{option.name} <b>{option.count}</b></button>)}
+            </div>
+          </section>
+        ) : null}
 
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <strong>Students:</strong> {filteredRows.length}
-          {selectedDepartmentId !== "all" && <span style={{ opacity: 0.75 }}> filtered from {rows.length}</span>}
-        </div>
-        <button onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>
-          {saving ? "Saving..." : commentsOnly ? "Save Observations" : "Save Scores"}
-        </button>
-      </div>
+        <section className="staff-scores__workspace">
+          <div className="staff-scores__workspace-head">
+            <div>
+              <span className="staff-scores__eyebrow">Entry register</span>
+              <h3>{commentsOnly ? "Student observations" : "Enter student scores"}</h3>
+              <p>{selectedDepartmentId === "all" ? `${filteredRows.length} students ready for entry.` : `${filteredRows.length} students shown from ${rows.length}.`}</p>
+            </div>
+            <button className="staff-scores__save" type="button" onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>{saving ? "Saving..." : commentsOnly ? "Save observations" : "Save scores"}</button>
+          </div>
 
-      {loading ? (
-        <p style={{ marginTop: 12 }}>Loading...</p>
-      ) : (
-        <div className="table-scroll staff-scores-table-wrap"><table className="staff-scores-table" border="1" cellPadding="10">
-          <thead>
-            <tr>
-              <th style={{ width: 70 }} rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>S/N</th>
-              <th rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>Student</th>
-              {commentsOnly ? (
-                <th className="staff-scores-table__observation-head">Teacher's Observation</th>
-              ) : (
-                <>
-                  {caIndices.map((idx) => (
-                    <th key={`ca-head-${idx}`} style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>
-                      {schema.ca_labels?.[idx] || `CA${idx + 1}`} ({schema.ca_maxes[idx]})
-                    </th>
-                  ))}
-                  <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>CA Total</th>
-                  <th style={{ width: 120 }} rowSpan={usesClassicComponents ? 2 : 1}>Exam ({schema.exam_max})</th>
-                  {usesClassicComponents ? <th colSpan="5">Psychomotor / Affective ({schema.psychomotor_maxes.reduce((sum, value) => sum + Number(value || 0), 0)})</th> : null}
-                  {usesClassicComponents ? <th colSpan="2">Quiz / Note Copying ({Number(schema.quiz_max || 0) + Number(schema.note_copying_max || 0)})</th> : null}
-
-                  <th style={{ width: 110 }} rowSpan={usesClassicComponents ? 2 : 1}>Total</th>
-                  <th style={{ width: 90 }} rowSpan={usesClassicComponents ? 2 : 1}>Grade</th>
-                </>
-              )}
-            </tr>
-            {usesClassicComponents && !commentsOnly ? (
-              <tr>
-                {schema.psychomotor_labels.map((label, index) => <th key={'psy-head-' + index}>{label} ({schema.psychomotor_maxes[index]})</th>)}
-                <th>{schema.quiz_label} ({schema.quiz_max})</th>
-                <th>{schema.note_copying_label} ({schema.note_copying_max})</th>
-              </tr>
-            ) : null}
-          </thead>
-          <tbody>
-            {filteredRows.map((row, rowIndex) => (
-              <tr key={row.student_id}>
-                <td>{rowIndex + 1}</td>
-                <td>
-                  <div>{row.student_name}</div>
-                  {row.department_name && <small style={{ opacity: 0.7 }}>{row.department_name}</small>}
-                </td>
-                {commentsOnly ? (
-                  <td className="staff-scores-table__observation-cell">
-                    <textarea
-                      value={row.teacher_comment || ""}
-                      onChange={(e) => updateTeacherComment(row.student_id, e.target.value)}
-                      disabled={resultsPublished}
-                      maxLength={1000}
-                      rows={3}
-                      placeholder="Write the student's learning observation"
-                    />
-                  </td>
-                ) : (
-                  <>
-                    {caIndices.map((idx) => (
-                      <td key={`ca-input-${row.student_id}-${idx}`}>
-                        <input
-                          type="number"
-                          value={Number(row.ca_breakdown?.[idx] || 0)}
-                          min="0"
-                          max={schema.ca_maxes[idx]}
-                          onChange={(e) => updateCa(row.student_id, idx, e.target.value)}
-                          disabled={resultsPublished}
-                          style={{ width: 80 }}
-                        />
-                      </td>
-                    ))}
-                    <td><strong>{row.ca}</strong></td>
-                    <td>
-                      <input
-                        type="number"
-                        value={row.exam}
-                        min="0"
-                        max={schema.exam_max}
-                        onChange={(e) => updateExam(row.student_id, e.target.value)}
-                        disabled={resultsPublished}
-                        style={{ width: 80 }}
-                      />
-                    </td>
-                    {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => (
-                      <td key={`psy-${row.student_id}-${index}`}>
-                        <input type="number" value={value} min="0" max={schema.psychomotor_maxes[index]} onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} style={{ width: 58 }} />
-                      </td>
-                    )) : null}
-                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.quiz} min="0" max={schema.quiz_max} onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
-                    {usesClassicComponents ? <td><input type="number" value={row.classic_components.note_copying} min="0" max={schema.note_copying_max} onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} style={{ width: 58 }} /></td> : null}
-                    <td><strong>{row.total}</strong></td>
-                    <td><strong>{row.grade}</strong></td>
-                  </>
-                )}
-              </tr>
-            ))}
-            {filteredRows.length === 0 && (
-              <tr>
-                <td colSpan={commentsOnly ? 3 : 6 + caIndices.length}>
-                  {rows.length === 0
-                    ? "No enrolled students found for this class and term."
-                    : "No students found for the selected subclass."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table></div>
-      )}
+          {loading ? <div className="staff-scores__loading">Loading the score register...</div> : (
+            <>
+              <p className="staff-scores__scroll-hint"><span aria-hidden="true">←</span> Swipe the score fields to the side. Student names stay in view.</p>
+              <div className="table-scroll staff-scores-table-wrap" aria-label="Student score entry table">
+                <table className={`staff-scores-table ${usesClassicComponents && !commentsOnly ? "staff-scores-table--classic" : ""}`}>
+                  <thead>
+                    <tr>
+                      <th className="staff-scores-table__serial staff-scores-table__serial--head" style={{ width: 70 }} rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>S/N</th>
+                      <th className="staff-scores-table__student staff-scores-table__student--head" rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>Student</th>
+                      {commentsOnly ? <th className="staff-scores-table__observation-head">Teacher&apos;s observation</th> : <>
+                        {caIndices.map((idx) => <th key={`ca-head-${idx}`} rowSpan={usesClassicComponents ? 2 : 1}>{schema.ca_labels?.[idx] || `CA${idx + 1}`} <small>/{schema.ca_maxes[idx]}</small></th>)}
+                        <th rowSpan={usesClassicComponents ? 2 : 1}>CA total</th>
+                        <th rowSpan={usesClassicComponents ? 2 : 1}>Exam <small>/{schema.exam_max}</small></th>
+                        {usesClassicComponents ? <th colSpan="5" className="staff-scores-table__group-head">Psychomotor / Affective</th> : null}
+                        {usesClassicComponents ? <th colSpan="2" className="staff-scores-table__group-head">Quiz / Note Copying</th> : null}
+                        <th rowSpan={usesClassicComponents ? 2 : 1}>Total</th><th rowSpan={usesClassicComponents ? 2 : 1}>Grade</th>
+                      </>}
+                    </tr>
+                    {usesClassicComponents && !commentsOnly ? <tr>
+                      {schema.psychomotor_labels.map((label, index) => <th key={`psy-head-${index}`}>{label} <small>/{schema.psychomotor_maxes[index]}</small></th>)}
+                      <th>{schema.quiz_label} <small>/{schema.quiz_max}</small></th><th>{schema.note_copying_label} <small>/{schema.note_copying_max}</small></th>
+                    </tr> : null}
+                  </thead>
+                  <tbody>
+                    {filteredRows.map((row, rowIndex) => <tr key={row.student_id}>
+                      <td className="staff-scores-table__serial">{rowIndex + 1}</td>
+                      <td className="staff-scores-table__student"><strong>{row.student_name}</strong>{row.department_name ? <small>{row.department_name}</small> : null}</td>
+                      {commentsOnly ? <td className="staff-scores-table__observation-cell"><textarea value={row.teacher_comment || ""} onChange={(e) => updateTeacherComment(row.student_id, e.target.value)} disabled={resultsPublished} maxLength={1000} rows={3} placeholder="Write the student's learning observation" /></td> : <>
+                        {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" value={Number(row.ca_breakdown?.[idx] || 0)} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
+                        <td className="staff-scores-table__calculated">{row.ca}</td>
+                        <td><input className="staff-score-input" type="number" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
+                        {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`}><input className="staff-score-input staff-score-input--compact" type="number" value={value} min="0" max={schema.psychomotor_maxes[index]} onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} score`} /></td>) : null}
+                        {usesClassicComponents ? <td><input className="staff-score-input staff-score-input--compact" type="number" value={row.classic_components.quiz} min="0" max={schema.quiz_max} onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.quiz_label} score`} /></td> : null}
+                        {usesClassicComponents ? <td><input className="staff-score-input staff-score-input--compact" type="number" value={row.classic_components.note_copying} min="0" max={schema.note_copying_max} onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.note_copying_label} score`} /></td> : null}
+                        <td className="staff-scores-table__total">{row.total}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
+                      </>}
+                    </tr>)}
+                    {filteredRows.length === 0 ? <tr><td colSpan={commentsOnly ? 3 : (usesClassicComponents ? 13 + caIndices.length : 6 + caIndices.length)} className="staff-scores-table__empty">{rows.length === 0 ? "No enrolled students found for this class and term." : "No students found for the selected subclass."}</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
     </StaffFeatureLayout>
   );
 }
