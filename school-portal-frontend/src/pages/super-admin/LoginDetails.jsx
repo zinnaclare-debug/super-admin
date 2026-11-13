@@ -102,8 +102,8 @@ export default function SuperAdminLoginDetails() {
         {loading ? (
           <p>Loading login details...</p>
         ) : (
-          <div className="sticky-identity-wrap">
-            <table data-sticky-identity="three" border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ minWidth: 900 }}>
+          <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ minWidth: 900 }}>
               <thead>
                 <tr>
                   <th>S/N</th>

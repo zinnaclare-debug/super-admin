@@ -404,7 +404,7 @@ function Schools() {
       )}
 
       <div className="sa-table-wrap">
-        <table className="sa-table" data-sticky-identity="one" border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980 }}>
+        <table className="sa-table" border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980 }}>
           <thead>
             <tr>
               <th>School Name</th>

@@ -14,8 +14,7 @@ export default function SuperAdmin() {
     <div style={{ padding: 30 }}>
       <h1>Super Admin Dashboard</h1>
 
-      <div className="sticky-identity-wrap">
-        <table data-sticky-identity="one" border="1" cellPadding="10">
+      <table border="1" cellPadding="10">
         <thead>
           <tr>
             <th>School Name</th>
@@ -33,8 +32,7 @@ export default function SuperAdmin() {
             </tr>
           ))}
         </tbody>
-        </table>
-      </div>
+      </table>
     </div>
   );
 }

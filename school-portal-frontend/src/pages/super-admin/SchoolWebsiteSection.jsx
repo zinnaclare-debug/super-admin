@@ -547,7 +547,7 @@ export default function SchoolWebsiteSection({ schoolId, classTemplates }) {
         </div>
 
         <div className="sai-grade-table-wrap">
-          <table className="sai-grade-table sai-app-table" data-sticky-identity="two">
+          <table className="sai-grade-table sai-app-table">
             <thead>
               <tr>
                 <th>S/N</th>

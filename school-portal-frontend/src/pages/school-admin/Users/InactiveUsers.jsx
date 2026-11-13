@@ -311,8 +311,8 @@ export default function InactiveUsers() {
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <div className="sticky-identity-wrap">
-            <table data-sticky-identity="two" border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", background: "#fff" }}>
+          <div style={{ width: "100%", maxWidth: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table border="1" cellPadding="10" cellSpacing="0" style={{ width: "100%", minWidth: 980, borderCollapse: "collapse", background: "#fff" }}>
               <thead>
                 <tr>
                   <th>

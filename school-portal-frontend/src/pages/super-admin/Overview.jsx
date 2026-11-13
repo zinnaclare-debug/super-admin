@@ -126,7 +126,7 @@ function SuperAdminSchools() {
         <img className="sa-page-art" src={overviewArt} alt="" aria-hidden="true" />
       </section>
 
-      <div className="sa-table-wrap"><table className="sa-table" data-sticky-identity="one" border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ marginTop: 20 }}>
+      <div className="sa-table-wrap"><table className="sa-table" border="1" cellPadding="10" cellSpacing="0" width="100%" style={{ marginTop: 20 }}>
         <thead>
           <tr>
             <th>School Name</th>
