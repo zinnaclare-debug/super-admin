@@ -11,7 +11,7 @@ const DEFAULT_CRITERIA = [
   "Teamwork", "Self Control", "Neatness", "Honesty", "Obedience",
 ].map((label, index) => ({ key: `criterion_${index + 1}`, label }));
 
-const DEFAULT_COMMENT_ONLY_CRITERIA = Array.from({ length: 15 }, (_, index) => ({
+const DEFAULT_COMMENT_ONLY_CRITERIA = Array.from({ length: 10 }, (_, index) => ({
   key: `learning_area_${index + 1}`,
   label: `Learning Area ${index + 1}`,
 }));

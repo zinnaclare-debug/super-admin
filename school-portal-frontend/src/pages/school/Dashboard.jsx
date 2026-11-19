@@ -45,7 +45,7 @@ const defaultBehaviourCriteria = () => Array.from({ length: 10 }, (_, index) => 
   label: "",
 }));
 
-const defaultCommentOnlyCriteria = () => Array.from({ length: 15 }, (_, index) => ({
+const defaultCommentOnlyCriteria = (count = 10) => Array.from({ length: count }, (_, index) => ({
   key: `learning_area_${index + 1}`,
   label: `Learning Area ${index + 1}`,
 }));
@@ -132,6 +132,7 @@ function SchoolDashboard() {
   const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows(DEFAULT_GRADING_ROWS));
   const [savingGradingRules, setSavingGradingRules] = useState(false);
   const [commentOnlyCriteria, setCommentOnlyCriteria] = useState(defaultCommentOnlyCriteria);
+  const [commentOnlyAreaCount, setCommentOnlyAreaCount] = useState(10);
   const [savingCommentOnlyCriteria, setSavingCommentOnlyCriteria] = useState(false);
 
   useEffect(() => {
@@ -173,7 +174,11 @@ function SchoolDashboard() {
           grading_schema: res.data?.grading_schema ?? DEFAULT_GRADING_ROWS,
         });
         setBehaviourCriteria(Array.isArray(res.data?.behaviour_schema?.criteria) ? res.data.behaviour_schema.criteria : defaultBehaviourCriteria());
-        setCommentOnlyCriteria(Array.isArray(res.data?.comment_only_schema?.criteria) ? res.data.comment_only_schema.criteria : defaultCommentOnlyCriteria());
+        const savedCommentOnlyCriteria = Array.isArray(res.data?.comment_only_schema?.criteria) && res.data.comment_only_schema.criteria.length
+          ? res.data.comment_only_schema.criteria
+          : defaultCommentOnlyCriteria();
+        setCommentOnlyCriteria(savedCommentOnlyCriteria);
+        setCommentOnlyAreaCount(Math.max(1, Math.min(15, savedCommentOnlyCriteria.length)));
         setGradingRows(normalizeGradingRows(res.data?.grading_schema));
         setHeadOfSchoolName(res.data?.head_of_school_name ?? "");
         setSchoolLocation(res.data?.school_location ?? "");
@@ -435,13 +440,21 @@ function SchoolDashboard() {
     }
   };
 
+  const updateCommentOnlyAreaCount = (value) => {
+    const count = Math.max(1, Math.min(15, Number(value) || 1));
+    setCommentOnlyAreaCount(count);
+    setCommentOnlyCriteria((previous) => Array.from({ length: count }, (_, index) => (
+      previous[index] || { key: `learning_area_${index + 1}`, label: `Learning Area ${index + 1}` }
+    )));
+  };
+
   const saveCommentOnlyCriteria = async () => {
-    const criteria = commentOnlyCriteria.map((criterion, index) => ({
+    const criteria = commentOnlyCriteria.slice(0, commentOnlyAreaCount).map((criterion, index) => ({
       key: `learning_area_${index + 1}`,
       label: String(criterion.label || "").trim(),
     }));
     if (criteria.some((criterion) => !criterion.label)) {
-      alert("Name all 15 comments-only learning areas before saving.");
+      alert(`Name all ${commentOnlyAreaCount} comments-only learning areas before saving.`);
       return;
     }
 
@@ -836,8 +849,12 @@ function SchoolDashboard() {
       <section className="sd-card sd-comment-only-areas">
         <div className="sd-section-head">
           <h2>Comments-Only Learning Areas</h2>
-          <p>Name the fifteen learning areas used only by classes marked Comments-only Result in Super Admin / School Information / Class Templates. Class teachers will enter a written observation for each area, and the same labels and observations appear in previews and assessment-sheet PDFs.</p>
+          <p>Choose 1 to 15 learning areas for classes marked Comments-only Result in Super Admin / School Information / Class Templates. Saved assessments keep their own labels, so changing this setup does not rewrite older results.</p>
         </div>
+        <label className="sd-field sd-comment-only-count">
+          <span>Number of learning areas</span>
+          <input type="number" min="1" max="15" value={commentOnlyAreaCount} onChange={(event) => updateCommentOnlyAreaCount(event.target.value)} />
+        </label>
         <div className="sd-behaviour-grid sd-comment-only-grid">
           {commentOnlyCriteria.map((criterion, index) => (
             <label key={criterion.key || index} className="sd-field">

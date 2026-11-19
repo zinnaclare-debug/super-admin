@@ -246,7 +246,7 @@ class BehaviourRatingController extends Controller
       'rows.*.ratings' => 'required|array|size:10',
       'rows.*.ratings.*' => 'required|integer|min:0|max:5',
       'rows.*.teacher_comment' => 'nullable|string|max:500',
-      'rows.*.learning_observations' => 'nullable|array|size:' . CommentOnlySchema::CRITERIA_COUNT,
+      'rows.*.learning_observations' => 'nullable|array|max:' . CommentOnlySchema::MAX_CRITERIA_COUNT,
       'rows.*.learning_observations.*' => 'nullable|string|max:1000',
     ]);
 
@@ -309,7 +309,10 @@ class BehaviourRatingController extends Controller
             ...BehaviourSchema::legacyValues($ratings),
             'ratings' => $ratings,
             'teacher_comment' => isset($row['teacher_comment']) ? (trim((string)$row['teacher_comment']) ?: null) : null,
-            ...($commentOnly ? ['learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema)] : []),
+            ...($commentOnly ? [
+              'learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema),
+              'learning_area_schema' => $commentOnlySchema,
+            ] : []),
             'set_by_user_id' => $user->id,
           ]
         );

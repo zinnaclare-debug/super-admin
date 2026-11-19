@@ -1801,13 +1801,14 @@ class ResultsController extends Controller
     private function commentOnlyLearningAreaRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
         $school = School::find($schoolId);
-        $schema = CommentOnlySchema::normalize($school?->comment_only_schema);
         $rating = StudentBehaviourRating::query()
             ->where('school_id', $schoolId)
             ->where('class_id', $classId)
             ->where('term_id', $termId)
             ->where('student_id', $studentId)
             ->first();
+        // A saved observation keeps its original labels even if the school later changes its setup.
+        $schema = CommentOnlySchema::normalize($rating?->learning_area_schema ?: $school?->comment_only_schema);
         $observations = CommentOnlySchema::observations($rating?->learning_observations, $schema);
 
         // Preserve observations entered before structured learning areas were introduced.

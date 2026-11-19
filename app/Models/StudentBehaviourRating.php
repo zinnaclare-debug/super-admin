@@ -20,6 +20,7 @@ class StudentBehaviourRating extends Model
     'self_control',
     'ratings',
     'learning_observations',
+    'learning_area_schema',
     'teacher_comment',
     'set_by_user_id',
   ];
@@ -27,5 +28,6 @@ class StudentBehaviourRating extends Model
   protected $casts = [
     'ratings' => 'array',
     'learning_observations' => 'array',
+    'learning_area_schema' => 'array',
   ];
 }
