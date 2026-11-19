@@ -32,5 +32,10 @@ Route::get('/{any}', function () {
     if (!File::exists($path)) {
         abort(404, 'Frontend build not found. Run npm run build.');
     }
-    return File::get($path);
+    // The hashed assets can be cached, but the HTML entry must stay fresh after deployments.
+    return response(File::get($path), 200, [
+        'Content-Type' => 'text/html; charset=UTF-8',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+    ]);
 })->where('any', '^(?!(api|storage)).*$');
