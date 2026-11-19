@@ -169,9 +169,23 @@ class AssessmentSchema
         $profile = $template['score_profile'] ?? [];
         $profile['layout'] = ($template['layout'] ?? 'compact') === 'classic' ? 'classic' : 'compact';
         $profile['profile_version'] = 1;
-        $profile['comments_only'] = (bool) ($levelSchema['comments_only'] ?? false);
+        // Result mode is now selected by the individual class template, not its whole level.
+        $profile['comments_only'] = false;
 
         return self::normalizeSchema($profile);
+    }
+
+    public static function schemaForTemplateClass(
+        mixed $raw,
+        ?string $level,
+        ?string $className,
+        mixed $templateRaw,
+        mixed $classTemplates
+    ): array {
+        $schema = self::schemaForTemplateLevel($raw, $level, $templateRaw);
+        $schema['comments_only'] = ClassTemplateSchema::commentsOnlyForClass($classTemplates, $level, $className);
+
+        return self::normalizeSchema($schema);
     }
 
     public static function schemaForResult(mixed $savedProfile, array $fallback): array

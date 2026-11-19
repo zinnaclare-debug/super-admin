@@ -138,11 +138,7 @@ class TeacherResultsController extends Controller
         'terms.name as term_name',
       ])
       ->first();
-    $assessmentSchema = AssessmentSchema::schemaForTemplateLevel(
-      $school?->assessment_schema,
-      $subjectSummary->class_level ?? null,
-      $school?->result_template_config
-    );
+    $assessmentSchema = $this->assessmentSchemaForTermSubject($school, $termSubject);
     $usesClassicComponents = AssessmentSchema::usesClassicComponents($assessmentSchema);
 
     // Build the class list from current term enrollments first, then layer exclusions/results on top.
@@ -465,12 +461,18 @@ class TeacherResultsController extends Controller
 
   private function assessmentSchemaForTermSubject(?School $school, TermSubject $termSubject): array
   {
-    $classLevel = DB::table('classes')
+    $class = DB::table('classes')
       ->where('id', (int) $termSubject->class_id)
       ->where('school_id', (int) $termSubject->school_id)
-      ->value('level');
+      ->first(['level', 'name']);
 
-    return AssessmentSchema::schemaForTemplateLevel($school?->assessment_schema, $classLevel, $school?->result_template_config);
+    return AssessmentSchema::schemaForTemplateClass(
+      $school?->assessment_schema,
+      $class->level ?? null,
+      $class->name ?? null,
+      $school?->result_template_config,
+      $school?->class_templates
+    );
   }
 }
 

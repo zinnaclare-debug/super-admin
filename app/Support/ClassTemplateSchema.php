@@ -166,6 +166,34 @@ class ClassTemplateSchema
         return self::SECTION_SIZES[$key] ?? 0;
     }
 
+    public static function commentsOnlyForClass(mixed $templates, ?string $level, ?string $className): bool
+    {
+        if (is_string($templates)) {
+            $decoded = json_decode($templates, true);
+            $templates = is_array($decoded) ? $decoded : [];
+        }
+
+        $levelKey = self::normalizeKey((string) $level);
+        $classKey = self::normalizeClassName((string) $className);
+        if ($levelKey === '' || $classKey === '') {
+            return false;
+        }
+
+        foreach (self::normalize($templates) as $section) {
+            if (($section['key'] ?? '') !== $levelKey) {
+                continue;
+            }
+
+            foreach (($section['classes'] ?? []) as $classRow) {
+                if (self::normalizeClassName((string) ($classRow['name'] ?? '')) === $classKey) {
+                    return (bool) ($classRow['comments_only'] ?? false);
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static function normalizeKey(string $value): string
     {
         $value = strtolower(trim($value));
@@ -188,6 +216,7 @@ class ClassTemplateSchema
             return [
                 'name' => $name,
                 'enabled' => $enabled,
+                'comments_only' => (bool) ($value['comments_only'] ?? false),
             ];
         }
 
@@ -199,7 +228,13 @@ class ClassTemplateSchema
         return [
             'name' => $name,
             'enabled' => true,
+            'comments_only' => false,
         ];
+    }
+
+    private static function normalizeClassName(string $value): string
+    {
+        return strtolower(trim((string) preg_replace('/\s+/', ' ', $value)));
     }
 
     private static function defaultClassRows(string $label, int $count): array
@@ -209,6 +244,7 @@ class ClassTemplateSchema
             $rows[] = [
                 'name' => trim($label) . ' ' . $i,
                 'enabled' => true,
+                'comments_only' => false,
             ];
         }
         return $rows;

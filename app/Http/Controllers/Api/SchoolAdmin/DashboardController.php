@@ -11,6 +11,8 @@ use App\Models\SchoolFeature;
 use App\Models\User;
 use App\Support\AssessmentSchema;
 use App\Support\BehaviourSchema;
+use App\Support\CommentOnlySchema;
+use App\Support\GradingSchema;
 use App\Support\ClassTemplateSchema;
 use App\Support\DepartmentTemplateSync;
 use App\Support\SchoolPublicWebsiteData;
@@ -118,6 +120,8 @@ class DashboardController extends Controller
             'school_motto' => $websiteContent['motto'] ?? '',
             'assessment_schema' => AssessmentSchema::normalizeSchema($school?->assessment_schema),
             'behaviour_schema' => BehaviourSchema::normalize($school?->behaviour_schema),
+            'comment_only_schema' => CommentOnlySchema::normalize($school?->comment_only_schema),
+            'grading_schema' => GradingSchema::normalize($school?->grading_schema),
             'department_templates' => $this->resolveDepartmentTemplates($school),
             'class_templates' => ClassTemplateSchema::normalize($school?->class_templates),
             'results_published' => (bool) ($school?->results_published),
@@ -156,6 +160,39 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function updateGradingSchema(Request $request)
+    {
+        $school = School::query()->find((int) $request->user()->school_id);
+        if (! $school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $schema = GradingSchema::validateAndNormalize($request->input('grading_schema'));
+        $school->grading_schema = $schema;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Grading rules saved.',
+            'data' => $schema,
+        ]);
+    }
+
+    public function updateCommentOnlyLearningAreas(Request $request)
+    {
+        $school = School::query()->find((int) $request->user()->school_id);
+        if (! $school) {
+            return response()->json(['message' => 'School not found.'], 404);
+        }
+
+        $schema = CommentOnlySchema::validateAndNormalize(['criteria' => $request->input('criteria')]);
+        $school->comment_only_schema = $schema;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Comments-only learning areas saved.',
+            'data' => $schema,
+        ]);
+    }
     public function updateResultsPublication(Request $request)
     {
         $school = School::query()->find((int) $request->user()->school_id);

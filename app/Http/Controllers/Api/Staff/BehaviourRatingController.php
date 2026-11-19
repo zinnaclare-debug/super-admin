@@ -10,6 +10,8 @@ use App\Models\School;
 use App\Models\StudentBehaviourRating;
 use App\Models\Term;
 use App\Support\BehaviourSchema;
+use App\Support\CommentOnlySchema;
+use App\Support\ClassTemplateSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -195,14 +197,17 @@ class BehaviourRatingController extends Controller
 
     $school = School::find($schoolId);
     $behaviourSchema = BehaviourSchema::normalize($school?->behaviour_schema);
+    $commentOnly = ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $ctx['class']->level ?? null, $ctx['class']->name ?? null);
+    $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
 
-    $students = $enrollments->map(function ($s) use ($ratings, $behaviourSchema) {
+    $students = $enrollments->map(function ($s) use ($ratings, $behaviourSchema, $commentOnlySchema) {
       $r = $ratings->get($s->student_id);
       return [
         'student_id' => (int)$s->student_id,
         'student_name' => $s->student_name,
         'ratings' => BehaviourSchema::values($r, $behaviourSchema),
         'teacher_comment' => (string)($r->teacher_comment ?? ''),
+        'learning_observations' => CommentOnlySchema::observations($r?->learning_observations, $commentOnlySchema),
       ];
     })->values();
 
@@ -218,6 +223,8 @@ class BehaviourRatingController extends Controller
         'selected_class_id' => (int)$ctx['class']->id,
         'selected_term_id' => (int)$ctx['term']->id,
         'behaviour_schema' => $behaviourSchema,
+        'comments_only' => $commentOnly,
+        'comment_only_schema' => $commentOnlySchema,
         'students' => $students,
       ],
     ]);
@@ -239,6 +246,8 @@ class BehaviourRatingController extends Controller
       'rows.*.ratings' => 'required|array|size:10',
       'rows.*.ratings.*' => 'required|integer|min:0|max:5',
       'rows.*.teacher_comment' => 'nullable|string|max:500',
+      'rows.*.learning_observations' => 'nullable|array|size:' . CommentOnlySchema::CRITERIA_COUNT,
+      'rows.*.learning_observations.*' => 'nullable|string|max:1000',
     ]);
 
     $ctx = $this->resolveCurrentContext($schoolId, (int)$user->id, (int)$data['class_id'], (int)$data['term_id']);
@@ -275,8 +284,10 @@ class BehaviourRatingController extends Controller
 
     $school = School::find($schoolId);
     $criteria = BehaviourSchema::normalize($school?->behaviour_schema)['criteria'];
+    $commentOnly = ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $ctx['class']->level ?? null, $ctx['class']->name ?? null);
+    $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
 
-    DB::transaction(function () use ($data, $schoolId, $user, $ctx, $validSet, $criteria) {
+    DB::transaction(function () use ($data, $schoolId, $user, $ctx, $validSet, $criteria, $commentOnly, $commentOnlySchema) {
       foreach ($data['rows'] as $row) {
         $studentId = (int)$row['student_id'];
         if (!isset($validSet[$studentId])) continue;
@@ -298,6 +309,7 @@ class BehaviourRatingController extends Controller
             ...BehaviourSchema::legacyValues($ratings),
             'ratings' => $ratings,
             'teacher_comment' => isset($row['teacher_comment']) ? (trim((string)$row['teacher_comment']) ?: null) : null,
+            ...($commentOnly ? ['learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema)] : []),
             'set_by_user_id' => $user->id,
           ]
         );

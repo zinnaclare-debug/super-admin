@@ -690,7 +690,6 @@ class SchoolController extends Controller
             'by_level.*.ca_labels' => 'nullable|array|size:5',
             'by_level.*.ca_labels.*' => 'nullable|string|max:30',
             'by_level.*.exam_max' => 'required_with:by_level|integer|min:0|max:100',
-            'by_level.*.comments_only' => 'nullable|boolean',
         ]);
 
         $normalizedClassTemplates = ClassTemplateSchema::normalize($school->class_templates);
@@ -720,7 +719,6 @@ class SchoolController extends Controller
                     'ca_maxes' => $caMaxes,
                     'ca_labels' => $caLabels,
                     'exam_max' => $examMax,
-                    'comments_only' => filter_var($submitted['comments_only'] ?? false, FILTER_VALIDATE_BOOL),
                 ]);
             }
 
@@ -806,8 +804,6 @@ class SchoolController extends Controller
             'score_profile.note_copying_max' => 'nullable|numeric|min:0|max:100',
             'score_profile.note_copying_label' => 'nullable|string|max:30',
             'score_profile.exam_max' => 'nullable|numeric|min:0|max:100',
-            'comments_only_levels' => 'nullable|array',
-            'comments_only_levels.*' => 'nullable|boolean',
             'primary_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'accent_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'watermark_opacity' => 'nullable|numeric|min:0|max:0.2',
@@ -838,16 +834,8 @@ class SchoolController extends Controller
             'score_profile_version' => 1,
         ]);
 
-        $levels = ClassTemplateSchema::activeLevelKeys(ClassTemplateSchema::normalize($school->class_templates));
-        $assessmentSchemas = AssessmentSchema::normalizeLevelSchemas($school->assessment_schema, $levels);
-        foreach ($levels as $level) {
-            $existing = AssessmentSchema::schemaForLevel($assessmentSchemas, $level);
-            $key = AssessmentSchema::normalizeLevelKey($level);
-            $existing['comments_only'] = filter_var($payload['comments_only_levels'][$key] ?? false, FILTER_VALIDATE_BOOL);
-            $assessmentSchemas['by_level'][$key] = AssessmentSchema::normalizeSchema($existing);
-        }
-        $school->assessment_schema = $assessmentSchemas;
         $school->save();
+
 
         return response()->json([
             'message' => 'Result PDF template updated successfully.',
@@ -896,6 +884,7 @@ class SchoolController extends Controller
             'class_templates.*.classes.*' => 'nullable',
             'class_templates.*.classes.*.name' => 'nullable|string|max:80',
             'class_templates.*.classes.*.enabled' => 'nullable|boolean',
+            'class_templates.*.classes.*.comments_only' => 'nullable|boolean',
             'class_templates.*.classes.*.department_enabled' => 'nullable|boolean',
             'class_templates.*.classes.*.department_names' => 'nullable|array|max:30',
             'class_templates.*.classes.*.department_names.*' => 'nullable|string|max:80',

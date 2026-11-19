@@ -11,6 +11,10 @@ const DEFAULT_CRITERIA = [
   "Teamwork", "Self Control", "Neatness", "Honesty", "Obedience",
 ].map((label, index) => ({ key: `criterion_${index + 1}`, label }));
 
+const DEFAULT_COMMENT_ONLY_CRITERIA = Array.from({ length: 15 }, (_, index) => ({
+  key: `learning_area_${index + 1}`,
+  label: `Learning Area ${index + 1}`,
+}));
 export default function BehaviourRatingHome() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -21,6 +25,8 @@ export default function BehaviourRatingHome() {
   const [termId, setTermId] = useState("");
   const [students, setStudents] = useState([]);
   const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
+  const [commentsOnly, setCommentsOnly] = useState(false);
+  const [commentOnlyCriteria, setCommentOnlyCriteria] = useState(DEFAULT_COMMENT_ONLY_CRITERIA);
 
   const load = async (nextClassId = "") => {
     setLoading(true);
@@ -45,6 +51,8 @@ export default function BehaviourRatingHome() {
       setClassId(String(data.selected_class_id || ""));
       setTermId(String(data.selected_term_id || ""));
       setCriteria(Array.isArray(data.behaviour_schema?.criteria) ? data.behaviour_schema.criteria : DEFAULT_CRITERIA);
+      setCommentsOnly(Boolean(data.comments_only));
+      setCommentOnlyCriteria(Array.isArray(data.comment_only_schema?.criteria) ? data.comment_only_schema.criteria : DEFAULT_COMMENT_ONLY_CRITERIA);
       setStudents(data.students || []);
     } catch (err) {
       setMessage(err?.response?.data?.message || "Failed to load behaviour rating");
@@ -70,6 +78,12 @@ export default function BehaviourRatingHome() {
             criterion.key,
             Number(s.ratings?.[criterion.key] || 0),
           ])),
+          ...(commentsOnly ? {
+            learning_observations: Object.fromEntries(commentOnlyCriteria.map((criterion) => [
+              criterion.key,
+              String(s.learning_observations?.[criterion.key] || '').trim(),
+            ])),
+          } : {}),
         })),
       });
       alert("Behaviour ratings saved");
@@ -89,11 +103,11 @@ export default function BehaviourRatingHome() {
             <span className="bvr-pill">Staff Behaviour Rating</span>
             <h2>Rate classroom behaviour with structure and speed</h2>
             <p className="bvr-subtitle">
-              Select your assigned class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student.
+              Select your assigned class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student. Classes marked Comments-only Result use the configured written learning-area observations instead of numeric scoring.
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
-              <span>{criteria.length} behaviour criteria</span>
+              <span>{commentsOnly ? `${commentOnlyCriteria.length} learning areas` : `${criteria.length} behaviour criteria`}</span>
             </div>
           </div>
 
@@ -143,12 +157,13 @@ export default function BehaviourRatingHome() {
           </div>
         </section>
 
-        <section className="bvr-panel">
-          {loading ? (
-            <p className="bvr-state bvr-state--loading">Loading behaviour rating...</p>
-          ) : (
-            <div className="bvr-table-wrap">
-              <table className="bvr-table">
+        {!commentsOnly ? (
+          <section className="bvr-panel">
+            {loading ? (
+              <p className="bvr-state bvr-state--loading">Loading behaviour rating...</p>
+            ) : (
+              <div className="bvr-table-wrap">
+                <table className="bvr-table">
                 <thead>
                   <tr>
                     <th style={{ width: 70 }}>S/N</th>
@@ -191,14 +206,63 @@ export default function BehaviourRatingHome() {
                     </tr>
                   )}
                 </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {commentsOnly ? (
+          <section className="bvr-panel bvr-observation-panel">
+            <div className="bvr-observation-head">
+              <div>
+                <span className="bvr-observation-kicker">Comments-only assessment</span>
+                <h3>Learning area observations</h3>
+                <p>Write a clear observation for every learning area. These entries appear in the student result preview and assessment-sheet PDF.</p>
+              </div>
+            </div>
+            <div className="bvr-table-wrap bvr-observation-wrap">
+              <table className="bvr-table bvr-observation-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 70 }}>S/N</th>
+                    <th style={{ minWidth: 190 }}>Student Name</th>
+                    {commentOnlyCriteria.map((criterion) => <th key={criterion.key}>{criterion.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student, index) => (
+                    <tr key={student.student_id}>
+                      <td>{index + 1}</td>
+                      <td>{student.student_name}</td>
+                      {commentOnlyCriteria.map((criterion) => (
+                        <td key={criterion.key}>
+                          <textarea
+                            className="bvr-observation-input"
+                            rows={3}
+                            maxLength={1000}
+                            value={student.learning_observations?.[criterion.key] || ""}
+                            onChange={(event) => setStudents((previous) => previous.map((item) => (
+                              item.student_id === student.student_id
+                                ? { ...item, learning_observations: { ...item.learning_observations, [criterion.key]: event.target.value } }
+                                : item
+                            )))}
+                            placeholder="Write observation"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {!students.length ? <tr><td colSpan={2 + commentOnlyCriteria.length}>No enrolled students found for this class and term.</td></tr> : null}
+                </tbody>
               </table>
             </div>
-          )}
-        </section>
+          </section>
+        ) : null}
 
         <section className="bvr-panel">
           <button className="bvr-btn" onClick={save} disabled={saving || loading || !classId || !termId}>
-            {saving ? "Saving..." : "Save Behaviour Ratings"}
+            {saving ? "Saving..." : commentsOnly ? "Save Assessment Observations" : "Save Behaviour Ratings"}
           </button>
         </section>
       </div>

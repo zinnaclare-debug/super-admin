@@ -45,6 +45,42 @@ const defaultBehaviourCriteria = () => Array.from({ length: 10 }, (_, index) => 
   label: "",
 }));
 
+const defaultCommentOnlyCriteria = () => Array.from({ length: 15 }, (_, index) => ({
+  key: `learning_area_${index + 1}`,
+  label: `Learning Area ${index + 1}`,
+}));
+
+const DEFAULT_GRADING_ROWS = [
+  { from: 0, to: 29, grade: "F", remark: "FAIL" },
+  { from: 30, to: 39, grade: "E", remark: "NEEDS IMPROVEMENT" },
+  { from: 40, to: 49, grade: "D", remark: "DEVELOPING" },
+  { from: 50, to: 59, grade: "C", remark: "SATISFACTORY" },
+  { from: 60, to: 69, grade: "B", remark: "GOOD" },
+  { from: 70, to: 79, grade: "B+", remark: "VERY GOOD" },
+  { from: 80, to: 89, grade: "A", remark: "EXCELLENT" },
+  { from: 90, to: 100, grade: "A+", remark: "OUTSTANDING" },
+];
+
+const normalizeGradingRows = (rawRows) => {
+  const source = Array.isArray(rawRows) && rawRows.length ? rawRows : DEFAULT_GRADING_ROWS;
+  let nextFrom = 0;
+  let canContinue = true;
+  const rows = source.slice(0, 10).map((row) => {
+    const toValue = row?.to === "" || row?.to === null || row?.to === undefined ? "" : Math.max(0, Math.min(100, Number(row.to)));
+    const grade = String(row?.grade || "").trim();
+    const remark = String(row?.remark || "").trim();
+    const isBlank = toValue === "" && grade === "" && remark === "";
+    const from = !isBlank && canContinue ? nextFrom : "";
+    if (toValue === "" || Number(toValue) < Number(nextFrom)) {
+      canContinue = false;
+    } else if (!isBlank) {
+      nextFrom = Number(toValue) + 1;
+    }
+    return { from, to: toValue, grade, remark };
+  });
+  while (rows.length < 10) rows.push({ from: "", to: "", grade: "", remark: "" });
+  return rows;
+};
 function SchoolDashboard() {
   const [stats, setStats] = useState({
     school_name: "",
@@ -67,6 +103,8 @@ function SchoolDashboard() {
     staff: 0,
     enabled_modules: 0,
     behaviour_schema: { criteria: defaultBehaviourCriteria() },
+    comment_only_schema: { criteria: defaultCommentOnlyCriteria() },
+    grading_schema: DEFAULT_GRADING_ROWS,
   });
   const [loading, setLoading] = useState(true);
   const [headOfSchoolName, setHeadOfSchoolName] = useState("");
@@ -91,6 +129,10 @@ function SchoolDashboard() {
   const [updatingSessionId, setUpdatingSessionId] = useState(null);
   const [behaviourCriteria, setBehaviourCriteria] = useState(defaultBehaviourCriteria);
   const [savingBehaviourCriteria, setSavingBehaviourCriteria] = useState(false);
+  const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows(DEFAULT_GRADING_ROWS));
+  const [savingGradingRules, setSavingGradingRules] = useState(false);
+  const [commentOnlyCriteria, setCommentOnlyCriteria] = useState(defaultCommentOnlyCriteria);
+  const [savingCommentOnlyCriteria, setSavingCommentOnlyCriteria] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -127,8 +169,12 @@ function SchoolDashboard() {
           staff: res.data?.staff ?? 0,
           enabled_modules: res.data?.enabled_modules ?? 0,
           behaviour_schema: res.data?.behaviour_schema ?? { criteria: defaultBehaviourCriteria() },
+          comment_only_schema: res.data?.comment_only_schema ?? { criteria: defaultCommentOnlyCriteria() },
+          grading_schema: res.data?.grading_schema ?? DEFAULT_GRADING_ROWS,
         });
         setBehaviourCriteria(Array.isArray(res.data?.behaviour_schema?.criteria) ? res.data.behaviour_schema.criteria : defaultBehaviourCriteria());
+        setCommentOnlyCriteria(Array.isArray(res.data?.comment_only_schema?.criteria) ? res.data.comment_only_schema.criteria : defaultCommentOnlyCriteria());
+        setGradingRows(normalizeGradingRows(res.data?.grading_schema));
         setHeadOfSchoolName(res.data?.head_of_school_name ?? "");
         setSchoolLocation(res.data?.school_location ?? "");
         setContactEmail(res.data?.contact_email ?? "");
@@ -164,6 +210,8 @@ function SchoolDashboard() {
           staff: 0,
           enabled_modules: 0,
           behaviour_schema: { criteria: defaultBehaviourCriteria() },
+          comment_only_schema: { criteria: defaultCommentOnlyCriteria() },
+          grading_schema: DEFAULT_GRADING_ROWS,
         });
         setHeadOfSchoolName("");
         setSchoolLocation("");
@@ -343,6 +391,74 @@ function SchoolDashboard() {
     }
   };
 
+  const updateGradingRow = (index, field, value) => {
+    setGradingRows((previous) => {
+      const next = previous.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: field === "to" ? value.replace(/[^0-9]/g, "") : value } : { ...row });
+      return normalizeGradingRows(next);
+    });
+  };
+
+  const saveGradingRules = async () => {
+    const usedRows = [];
+    let expectedFrom = 0;
+    for (let index = 0; index < gradingRows.length; index += 1) {
+      const row = gradingRows[index];
+      const grade = String(row.grade || "").trim();
+      const remark = String(row.remark || "").trim();
+      const to = row.to === "" ? "" : Number(row.to);
+      const blank = grade === "" && remark === "" && to === "";
+      if (blank) continue;
+      if (!Number.isInteger(to) || to < expectedFrom || to > 100 || grade === "") {
+        alert(`Complete grading row ${index + 1} with a valid To score and grade.`);
+        return;
+      }
+      usedRows.push({ from: expectedFrom, to, grade, remark });
+      expectedFrom = to + 1;
+    }
+    if (!usedRows.length || usedRows[usedRows.length - 1].to !== 100) {
+      alert("Your grading rules must cover every score from 0 to 100.");
+      return;
+    }
+
+    setSavingGradingRules(true);
+    try {
+      const res = await api.put("/api/school-admin/grading-schema", { grading_schema: usedRows });
+      const saved = res.data?.data || usedRows;
+      setGradingRows(normalizeGradingRows(saved));
+      setStats((previous) => ({ ...previous, grading_schema: saved }));
+      alert(res.data?.message || "Grading rules saved.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {}).flat().find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to save grading rules.");
+    } finally {
+      setSavingGradingRules(false);
+    }
+  };
+
+  const saveCommentOnlyCriteria = async () => {
+    const criteria = commentOnlyCriteria.map((criterion, index) => ({
+      key: `learning_area_${index + 1}`,
+      label: String(criterion.label || "").trim(),
+    }));
+    if (criteria.some((criterion) => !criterion.label)) {
+      alert("Name all 15 comments-only learning areas before saving.");
+      return;
+    }
+
+    setSavingCommentOnlyCriteria(true);
+    try {
+      const res = await api.put("/api/school-admin/comment-only-learning-areas", { criteria });
+      const schema = res.data?.data || { criteria };
+      setCommentOnlyCriteria(Array.isArray(schema.criteria) ? schema.criteria : criteria);
+      setStats((previous) => ({ ...previous, comment_only_schema: schema }));
+      alert(res.data?.message || "Comments-only learning areas saved.");
+    } catch (err) {
+      const firstValidationError = Object.values(err?.response?.data?.errors || {}).flat().find(Boolean);
+      alert(firstValidationError || err?.response?.data?.message || "Failed to save comments-only learning areas.");
+    } finally {
+      setSavingCommentOnlyCriteria(false);
+    }
+  };
   const cancelResultPublication = () => {
     setResultPublication(stats.school_results_published ? "publish" : "unpublish");
     setResultPublicationCode("");
@@ -697,6 +813,43 @@ function SchoolDashboard() {
         </div>
       </section>
 
+      <section className="sd-card sd-grading-rules">
+        <div className="sd-section-head">
+          <h2>Grading Rules</h2>
+          <p>Set the school-wide score bands used for compact and classic results, previews, transcripts, and PDFs. The bands must run continuously from 0 to 100. A+ is labelled Outstanding by default, and every label can be changed.</p>
+        </div>
+        <div className="sd-grading-rule-list">
+          {gradingRows.map((row, index) => (
+            <div className="sd-grading-rule-row" key={`grading-rule-${index}`}>
+              <label className="sd-field"><span>From</span><input value={row.from} readOnly placeholder="-" /></label>
+              <label className="sd-field"><span>To</span><input type="number" min="0" max="100" value={row.to} onChange={(event) => updateGradingRow(index, "to", event.target.value)} placeholder="-" /></label>
+              <label className="sd-field"><span>Grade</span><input maxLength={20} value={row.grade} onChange={(event) => updateGradingRow(index, "grade", event.target.value)} placeholder="A+" /></label>
+              <label className="sd-field"><span>Interpretation</span><input maxLength={120} value={row.remark} onChange={(event) => updateGradingRow(index, "remark", event.target.value)} placeholder="OUTSTANDING" /></label>
+            </div>
+          ))}
+        </div>
+        <div className="sd-actions">
+          <button onClick={saveGradingRules} disabled={savingGradingRules}>{savingGradingRules ? "Saving..." : "Save Grading Rules"}</button>
+        </div>
+      </section>
+
+      <section className="sd-card sd-comment-only-areas">
+        <div className="sd-section-head">
+          <h2>Comments-Only Learning Areas</h2>
+          <p>Name the fifteen learning areas used only by classes marked Comments-only Result in Super Admin / School Information / Class Templates. Class teachers will enter a written observation for each area, and the same labels and observations appear in previews and assessment-sheet PDFs.</p>
+        </div>
+        <div className="sd-behaviour-grid sd-comment-only-grid">
+          {commentOnlyCriteria.map((criterion, index) => (
+            <label key={criterion.key || index} className="sd-field">
+              <span>Learning Area {index + 1}</span>
+              <input type="text" maxLength={80} value={criterion.label || ""} onChange={(event) => setCommentOnlyCriteria((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} placeholder={`Learning area ${index + 1}`} />
+            </label>
+          ))}
+        </div>
+        <div className="sd-actions">
+          <button onClick={saveCommentOnlyCriteria} disabled={savingCommentOnlyCriteria}>{savingCommentOnlyCriteria ? "Saving..." : "Save Comments-Only Learning Areas"}</button>
+        </div>
+      </section>
       <section className="sd-card sd-result-publication">
         <div className="sd-section-head">
           <h2>RESULT</h2>

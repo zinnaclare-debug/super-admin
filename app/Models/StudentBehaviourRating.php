@@ -19,11 +19,13 @@ class StudentBehaviourRating extends Model
     'teamwork',
     'self_control',
     'ratings',
+    'learning_observations',
     'teacher_comment',
     'set_by_user_id',
   ];
 
   protected $casts = [
     'ratings' => 'array',
+    'learning_observations' => 'array',
   ];
 }

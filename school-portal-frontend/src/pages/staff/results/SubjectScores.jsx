@@ -20,11 +20,13 @@ const DEFAULT_SCHEMA = {
 };
 const DEFAULT_GRADING_SCHEMA = [
   { from: 0, to: 29, grade: "F", remark: "FAIL" },
-  { from: 30, to: 39, grade: "E", remark: "POOR" },
-  { from: 40, to: 49, grade: "D", remark: "FAIR" },
-  { from: 50, to: 59, grade: "C", remark: "GOOD" },
-  { from: 60, to: 69, grade: "B", remark: "VERY GOOD" },
-  { from: 70, to: 100, grade: "A", remark: "EXCELLENT" },
+  { from: 30, to: 39, grade: "E", remark: "NEEDS IMPROVEMENT" },
+  { from: 40, to: 49, grade: "D", remark: "DEVELOPING" },
+  { from: 50, to: 59, grade: "C", remark: "SATISFACTORY" },
+  { from: 60, to: 69, grade: "B", remark: "GOOD" },
+  { from: 70, to: 79, grade: "B+", remark: "VERY GOOD" },
+  { from: 80, to: 89, grade: "A", remark: "EXCELLENT" },
+  { from: 90, to: 100, grade: "A+", remark: "OUTSTANDING" },
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -322,7 +324,7 @@ export default function SubjectScores() {
           <div className="staff-scores__summary-icon" aria-hidden="true">%</div>
           <div>
             <strong>{commentsOnly ? "Observation-based assessment" : "Assessment pattern"}</strong>
-            <p>{commentsOnly ? "Numeric CA and examination scores are disabled for this education level." : `${caPattern}. Total maximum: 100.`}</p>
+            <p>{commentsOnly ? "Numeric CA and examination scores are disabled for this class." : `${caPattern}. Total maximum: 100.`}</p>
           </div>
         </section>
 

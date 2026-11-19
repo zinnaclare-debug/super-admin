@@ -248,3 +248,92 @@
     grid-template-columns: 1fr;
   }
 }
+
+.bvr-observation-panel {
+  overflow: hidden;
+}
+
+.bvr-observation-head {
+  margin-bottom: 12px;
+}
+
+.bvr-observation-kicker {
+  margin: 0 0 4px;
+  color: #0e7490;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bvr-observation-head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.bvr-observation-head p:last-child {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bvr-observation-wrap {
+  max-width: 100%;
+}
+
+.bvr-observation-table {
+  min-width: 2920px;
+}
+
+.bvr-observation-table th:first-child,
+.bvr-observation-table td:first-child {
+  min-width: 58px;
+}
+
+.bvr-observation-table th:nth-child(2),
+.bvr-observation-table td:nth-child(2) {
+  min-width: 190px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 8px 0 12px rgba(15, 23, 42, 0.06);
+}
+
+.bvr-observation-table th:nth-child(2) {
+  z-index: 4;
+}
+
+.bvr-observation-table tbody tr:nth-child(odd) td:nth-child(2) {
+  background: #ffffff;
+}
+
+.bvr-observation-table tbody tr:nth-child(even) td:nth-child(2) {
+  background: #f8fafc;
+}
+
+.bvr-observation-table th:nth-child(n + 3),
+.bvr-observation-table td:nth-child(n + 3) {
+  min-width: 174px;
+}
+
+.bvr-observation-input {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  box-sizing: border-box;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  padding: 8px;
+  color: #0f172a;
+  font: inherit;
+  line-height: 1.4;
+  background: #ffffff;
+}
+
+.bvr-observation-input:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+}

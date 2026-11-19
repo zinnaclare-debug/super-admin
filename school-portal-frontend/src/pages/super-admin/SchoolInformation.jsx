@@ -156,7 +156,6 @@ const normalizeExamRecord = (record) => {
     ca_labels: normalizedLabels,
     exam_max: caTotal + examMax === 100 ? examMax : Math.max(0, 100 - caTotal),
     total_max: 100,
-    comments_only: Boolean(schema.comments_only),
   };
 };
 
@@ -186,6 +185,7 @@ const normalizeClassRow = (row) => {
     return {
       name: String(row.name || "").trim(),
       enabled: classEnabled,
+      comments_only: Boolean(row.comments_only),
       department_enabled: classEnabled && row.department_enabled !== false,
       department_input: departmentInput,
     };
@@ -194,6 +194,7 @@ const normalizeClassRow = (row) => {
   return {
     name: String(row || "").trim(),
     enabled: true,
+    comments_only: false,
     department_enabled: true,
     department_input: "",
   };
@@ -566,18 +567,6 @@ export default function SchoolInformation() {
     });
   };
 
-  const updateExamDraftCommentsOnly = (levelKey, checked) => {
-    setExamRecord((prev) => {
-      const current = normalizeExamRecord(prev.by_level?.[levelKey] || prev.default);
-      return {
-        ...prev,
-        by_level: {
-          ...(prev.by_level || {}),
-          [levelKey]: { ...current, comments_only: Boolean(checked) },
-        },
-      };
-    });
-  };
   const saveExamRecord = async () => {
     if (!activeEducationLevels.length) {
       alert("Enable at least one education level before saving exam records.");
@@ -609,7 +598,7 @@ export default function SchoolInformation() {
         return;
       }
 
-      byLevel[level.key] = { ca_maxes: caMaxes, ca_labels: caLabels, exam_max: examMax, comments_only: Boolean(record.comments_only) };
+      byLevel[level.key] = { ca_maxes: caMaxes, ca_labels: caLabels, exam_max: examMax };
     }
 
     setSavingExamRecord(true);
@@ -749,7 +738,6 @@ export default function SchoolInformation() {
 
   const saveResultTemplate = async () => {
     const payload = normalizeResultTemplate(resultTemplate);
-    payload.comments_only_levels = Object.fromEntries(activeEducationLevels.map((level) => [level.key, Boolean(examRecord.by_level?.[level.key]?.comments_only)]));
     setSavingResultTemplate(true);
     try {
       const res = await api.put(`/api/super-admin/schools/${schoolId}/information/result-template`, payload);
@@ -799,6 +787,17 @@ export default function SchoolInformation() {
     );
   };
 
+  const updateClassCommentsOnly = (sectionIndex, classIndex, commentsOnly) => {
+    setClassTemplates((prev) =>
+      prev.map((section, idx) => {
+        if (idx !== sectionIndex) return section;
+        const classes = Array.isArray(section.classes) ? [...section.classes] : [];
+        const current = normalizeClassRow(classes[classIndex]);
+        classes[classIndex] = { ...current, comments_only: Boolean(commentsOnly) };
+        return { ...section, classes };
+      })
+    );
+  };
   const updateClassDepartmentEnabled = (sectionIndex, classIndex, enabled) => {
     setClassTemplates((prev) =>
       prev.map((section, idx) => {
@@ -865,6 +864,7 @@ export default function SchoolInformation() {
       classes: (Array.isArray(section.classes) ? section.classes : []).map((row) => ({
         name: String(row?.name || "").trim(),
         enabled: Boolean(row?.enabled),
+        comments_only: Boolean(section.enabled) && Boolean(row?.enabled) && Boolean(row?.comments_only),
         department_enabled: Boolean(section.enabled) && Boolean(row?.enabled) && Boolean(row?.department_enabled),
         department_names:
           Boolean(section.enabled) && Boolean(row?.enabled) && Boolean(row?.department_enabled)
@@ -1244,18 +1244,6 @@ export default function SchoolInformation() {
             Configured allocation: {scoreProfileTotal(resultTemplate.score_profile, resultTemplate.layout)} / 100. Saving is allowed only at 100.
           </p>
         </div>
-        <div className="sai-template-option-card">
-          <h4>Result Mode By Education Level</h4>
-          <p className="sai-note">Check Comments only only for the education levels that should use observation sheets instead of numeric marks.</p>
-          <div className="sai-check-stack">
-            {activeEducationLevels.map((level) => (
-              <label className="sai-check sai-check-card sai-check-card--compact" key={level.key}>
-                <input type="checkbox" checked={Boolean(examRecord.by_level?.[level.key]?.comments_only)} onChange={(event) => updateExamDraftCommentsOnly(level.key, event.target.checked)} />
-                <span>{level.label}: Comments only</span>
-              </label>
-            ))}
-          </div>
-        </div>
         <div className="sai-result-template-grid">
           <div className="sai-template-option-card">
             <h4>Visible Sections</h4>
@@ -1364,6 +1352,7 @@ export default function SchoolInformation() {
             <div>Level Setup</div>
             <div>Class Setup</div>
             <div>Department Setup</div>
+            <div>Comments-only Result</div>
           </div>
 
           {classTemplates.map((section, sectionIndex) => (
@@ -1438,6 +1427,24 @@ export default function SchoolInformation() {
                     );
                   })}
                   <small>Each class has its own department list.</small>
+                </div>
+
+                <div className="sai-template-comments">
+                  {(section.classes || []).map((row, classIndex) => {
+                    const classRow = normalizeClassRow(row);
+                    return (
+                      <label key={`${section.key}-comments-${classIndex}`} className="sai-check sai-template-comment-check">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(classRow.comments_only)}
+                          onChange={(e) => updateClassCommentsOnly(sectionIndex, classIndex, e.target.checked)}
+                          disabled={!section.enabled || !classRow.enabled}
+                        />
+                        <span>{classRow.name || `Class ${classIndex + 1}`}</span>
+                      </label>
+                    );
+                  })}
+                  <small>Use assessment sheets with written learning-area observations instead of numeric scores.</small>
                 </div>
               </div>
             ))}

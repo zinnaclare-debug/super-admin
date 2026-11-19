@@ -846,3 +846,50 @@
     justify-content: center;
   }
 }
+
+.sd-grading-rules,
+.sd-comment-only-areas {
+  overflow: hidden;
+}
+
+.sd-grading-rule-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.sd-grading-rule-row {
+  display: grid;
+  grid-template-columns: 78px 78px minmax(92px, 0.65fr) minmax(170px, 1.35fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dbe7f3;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff, #ffffff);
+}
+
+.sd-grading-rule-row .sd-field {
+  min-width: 0;
+}
+
+.sd-grading-rule-row .sd-field span {
+  display: block;
+  margin-bottom: 5px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sd-grading-rule-row input[readonly] {
+  color: #2563eb;
+  background: #eff6ff;
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .sd-grading-rule-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -483,7 +483,7 @@
 
 .sai-template-header {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(170px, 0.9fr) minmax(210px, 1.2fr) minmax(220px, 1fr) minmax(190px, 0.8fr);
   background: #eef4ff;
   color: #1e293b;
   font-weight: 700;
@@ -501,13 +501,14 @@
 
 .sai-template-line {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(170px, 0.9fr) minmax(210px, 1.2fr) minmax(220px, 1fr) minmax(190px, 0.8fr);
   border-top: 1px solid #dbe3ef;
 }
 
 .sai-template-level,
 .sai-template-classes,
-.sai-template-departments {
+.sai-template-departments,
+.sai-template-comments {
   padding: 10px;
   border-right: 1px solid #dbe3ef;
   display: grid;
@@ -517,7 +518,8 @@
 
 .sai-template-level:last-child,
 .sai-template-classes:last-child,
-.sai-template-departments:last-child {
+.sai-template-departments:last-child,
+.sai-template-comments:last-child {
   border-right: 0;
 }
 
@@ -531,6 +533,23 @@
   padding: 9px 10px;
 }
 
+.sai-template-comments {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.sai-template-comment-check {
+  min-height: 38px;
+  padding: 0 4px;
+}
+
+.sai-template-comments small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .sai-template-departments small {
   color: #64748b;
   font-size: 12px;
@@ -551,7 +570,8 @@
 
   .sai-template-level,
   .sai-template-classes,
-  .sai-template-departments {
+  .sai-template-departments,
+.sai-template-comments {
     border-right: 0;
     border-top: 1px solid #dbe3ef;
   }

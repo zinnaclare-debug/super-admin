@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Support\AssessmentSchema;
 use App\Support\BehaviourSchema;
 use App\Support\ClassicResultComponents;
+use App\Support\CommentOnlySchema;
 use App\Support\GradingSchema;
 use App\Support\ResultPdfTemplate;
 use Dompdf\Dompdf;
@@ -1275,7 +1276,7 @@ class ResultsController extends Controller
         $schoolWebsiteContent = \App\Support\SchoolPublicWebsiteData::normalizeWebsiteContent($school?->website_content, $school);
         $studentPhotoPath = $student?->photo_path ?: $studentUser?->photo_path;
         $resultTemplate = $this->resultPdfTemplateForSchool($school, $resultType, $term);
-        if (AssessmentSchema::commentsOnlyForLevel($school?->assessment_schema, $class->level ?? null)) {
+        if ((bool) ($assessmentSchema['comments_only'] ?? false)) {
             $resultTemplate['layout'] = 'comments_only';
         }
         $rows = $this->addThirdTermPreviousTotalsToRows(
@@ -1797,10 +1798,77 @@ class ResultsController extends Controller
         ];
     }
 
+    private function commentOnlyLearningAreaRows(int $schoolId, int $classId, int $termId, int $studentId): array
+    {
+        $school = School::find($schoolId);
+        $schema = CommentOnlySchema::normalize($school?->comment_only_schema);
+        $rating = StudentBehaviourRating::query()
+            ->where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('term_id', $termId)
+            ->where('student_id', $studentId)
+            ->first();
+        $observations = CommentOnlySchema::observations($rating?->learning_observations, $schema);
+
+        // Preserve observations entered before structured learning areas were introduced.
+        $legacyComments = [];
+        if (Schema::hasColumn('results', 'teacher_comment')) {
+            $legacyComments = TermSubject::query()
+                ->where('term_subjects.school_id', $schoolId)
+                ->where('term_subjects.class_id', $classId)
+                ->where('term_subjects.term_id', $termId)
+                ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
+                ->leftJoin('results', function ($join) use ($schoolId, $studentId) {
+                    $join->on('results.term_subject_id', '=', 'term_subjects.id')
+                        ->where('results.school_id', '=', $schoolId)
+                        ->where('results.student_id', '=', $studentId);
+                })
+                ->orderBy('subjects.name')
+                ->pluck('results.teacher_comment')
+                ->map(fn ($comment) => trim((string) $comment))
+                ->values()
+                ->all();
+        }
+
+        return collect($schema['criteria'])
+            ->values()
+            ->map(function (array $criterion, int $index) use ($observations, $legacyComments) {
+                $observation = trim((string) ($observations[$criterion['key']] ?? ''));
+                if ($observation === '') {
+                    $observation = trim((string) ($legacyComments[$index] ?? ''));
+                }
+
+                return [
+                    'term_subject_id' => 'comment-only-' . $criterion['key'],
+                    'subject_id' => 0,
+                    'subject_name' => $criterion['label'],
+                    'subject_code' => '',
+                    'is_graded' => $observation !== '',
+                    'teacher_comment' => $observation,
+                    'ca' => '-',
+                    'ca_breakdown' => array_fill(0, 5, null),
+                    'ca_breakdown_text' => '-',
+                    'exam' => '-',
+                    'classic_components' => ClassicResultComponents::normalize(null),
+                    'total' => '-',
+                    'min_score' => '-',
+                    'max_score' => '-',
+                    'class_average' => '-',
+                    'position' => null,
+                    'position_label' => '-',
+                    'grade' => '-',
+                    'remark' => $observation,
+                ];
+            })
+            ->all();
+    }
     private function subjectRows(int $schoolId, int $classId, int $termId, int $studentId): array
     {
         $assessmentSchema = $this->assessmentSchemaForClass($schoolId, $classId);
         $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
+        if ($commentsOnly) {
+            return $this->commentOnlyLearningAreaRows($schoolId, $classId, $termId, $studentId);
+        }
         $hasClassicComponents = Schema::hasColumn('results', 'classic_components');
         $hasAssessmentProfile = Schema::hasColumn('results', 'assessment_profile');
         $termSessionId = (int) (Term::query()->where('id', $termId)->value('academic_session_id') ?? 0);
@@ -2293,7 +2361,7 @@ class ResultsController extends Controller
             ->join('schools', 'schools.id', '=', 'classes.school_id')
             ->where('classes.id', $classId)
             ->where('classes.school_id', $schoolId)
-            ->select(['classes.level', 'schools.assessment_schema', 'schools.result_template_config'])
+            ->select(['classes.level', 'classes.name as class_name', 'schools.assessment_schema', 'schools.result_template_config', 'schools.class_templates'])
             ->first();
 
         if (!$row) {
@@ -2307,7 +2375,13 @@ class ResultsController extends Controller
             $rawSchema = is_array($decoded) ? $decoded : null;
         }
 
-        $cache[$cacheKey] = AssessmentSchema::schemaForTemplateLevel($rawSchema, $row->level ?? null, $row->result_template_config ?? null);
+        $cache[$cacheKey] = AssessmentSchema::schemaForTemplateClass(
+            $rawSchema,
+            $row->level ?? null,
+            $row->class_name ?? null,
+            $row->result_template_config ?? null,
+            $row->class_templates ?? null
+        );
 
         return $cache[$cacheKey];
     }

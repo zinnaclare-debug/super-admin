@@ -12,11 +12,13 @@ class GradingSchema
     {
         return [
             ['from' => 0, 'to' => 29, 'grade' => 'F', 'remark' => 'FAIL'],
-            ['from' => 30, 'to' => 39, 'grade' => 'E', 'remark' => 'POOR'],
-            ['from' => 40, 'to' => 49, 'grade' => 'D', 'remark' => 'FAIR'],
-            ['from' => 50, 'to' => 59, 'grade' => 'C', 'remark' => 'GOOD'],
-            ['from' => 60, 'to' => 69, 'grade' => 'B', 'remark' => 'VERY GOOD'],
-            ['from' => 70, 'to' => 100, 'grade' => 'A', 'remark' => 'EXCELLENT'],
+            ['from' => 30, 'to' => 39, 'grade' => 'E', 'remark' => 'NEEDS IMPROVEMENT'],
+            ['from' => 40, 'to' => 49, 'grade' => 'D', 'remark' => 'DEVELOPING'],
+            ['from' => 50, 'to' => 59, 'grade' => 'C', 'remark' => 'SATISFACTORY'],
+            ['from' => 60, 'to' => 69, 'grade' => 'B', 'remark' => 'GOOD'],
+            ['from' => 70, 'to' => 79, 'grade' => 'B+', 'remark' => 'VERY GOOD'],
+            ['from' => 80, 'to' => 89, 'grade' => 'A', 'remark' => 'EXCELLENT'],
+            ['from' => 90, 'to' => 100, 'grade' => 'A+', 'remark' => 'OUTSTANDING'],
         ];
     }
 
