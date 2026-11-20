@@ -67,7 +67,7 @@ class ResultPdfTemplate
         $classic = $layout === 'classic';
 
         return [
-            'ca_maxes' => $classic ? [4, 4, 4, 4, 4] : [6, 6, 6, 6, 6],
+            'ca_maxes' => $classic ? [8, 8, 8, 8, 8] : [6, 6, 6, 6, 6],
             'ca_labels' => ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],
             'psychomotor_maxes' => $classic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
             'psychomotor_labels' => ['P1', 'P2', 'P3', 'P4', 'P5'],
@@ -75,7 +75,7 @@ class ResultPdfTemplate
             'quiz_label' => 'Quiz',
             'note_copying_max' => $classic ? 5 : 0,
             'note_copying_label' => 'Note Copying',
-            'exam_max' => $classic ? 60 : 70,
+            'exam_max' => $classic ? 40 : 70,
         ];
     }
 
@@ -87,7 +87,6 @@ class ResultPdfTemplate
         $isClassic = $layout === 'classic';
         $maxes = isset($source['ca_maxes']) && is_array($source['ca_maxes']) ? $source['ca_maxes'] : $defaults['ca_maxes'];
         $labels = isset($source['ca_labels']) && is_array($source['ca_labels']) ? $source['ca_labels'] : $defaults['ca_labels'];
-        $psychomotor = isset($source['psychomotor_maxes']) && is_array($source['psychomotor_maxes']) ? $source['psychomotor_maxes'] : $defaults['psychomotor_maxes'];
         $psychomotorLabels = isset($source['psychomotor_labels']) && is_array($source['psychomotor_labels']) ? $source['psychomotor_labels'] : $defaults['psychomotor_labels'];
         $normalizedMaxes = [];
         $normalizedLabels = [];
@@ -95,10 +94,10 @@ class ResultPdfTemplate
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            $normalizedMaxes[$index] = max(0, min(100, (int) ($maxes[$index] ?? 0)));
+            $normalizedMaxes[$index] = $isClassic ? 8 : max(0, min(100, (int) ($maxes[$index] ?? 0)));
             $label = trim((string) ($labels[$index] ?? ''));
             $normalizedLabels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
-            $normalizedPsychomotor[$index] = $isClassic ? max(0, min(100, (int) ($psychomotor[$index] ?? 0))) : 0;
+            $normalizedPsychomotor[$index] = $isClassic ? 2 : 0;
             $psychomotorLabel = trim((string) ($psychomotorLabels[$index] ?? ''));
             $normalizedPsychomotorLabels[$index] = $psychomotorLabel !== '' ? substr($psychomotorLabel, 0, 30) : 'P' . ($index + 1);
         }
@@ -111,11 +110,11 @@ class ResultPdfTemplate
             'ca_labels' => $normalizedLabels,
             'psychomotor_maxes' => $normalizedPsychomotor,
             'psychomotor_labels' => $normalizedPsychomotorLabels,
-            'quiz_max' => $isClassic ? max(0, min(100, (int) ($source['quiz_max'] ?? $defaults['quiz_max']))) : 0,
+            'quiz_max' => $isClassic ? 5 : 0,
             'quiz_label' => $quiz !== '' ? substr($quiz, 0, 30) : 'Quiz',
-            'note_copying_max' => $isClassic ? max(0, min(100, (int) ($source['note_copying_max'] ?? $defaults['note_copying_max']))) : 0,
+            'note_copying_max' => $isClassic ? 5 : 0,
             'note_copying_label' => $note !== '' ? substr($note, 0, 30) : 'Note Copying',
-            'exam_max' => max(0, min(100, (int) ($source['exam_max'] ?? $defaults['exam_max']))),
+            'exam_max' => $isClassic ? 40 : max(0, min(100, (int) ($source['exam_max'] ?? $defaults['exam_max']))),
         ];
     }
 
@@ -131,21 +130,13 @@ class ResultPdfTemplate
         }
         $exam = $raw['exam_max'] ?? null;
         if (!is_numeric($exam) || (int) $exam < 0 || (int) $exam > 100) return 'The examination allocation must be a whole number between 0 and 100.';
-        $total += (int) $exam;
-
         if ($layout === 'classic') {
-            $psychomotor = $raw['psychomotor_maxes'] ?? null;
-            if (!is_array($psychomotor) || count($psychomotor) !== 5) return 'Provide the five Psychomotor / Affective score allocations.';
-            foreach ($psychomotor as $max) {
-                if (!is_numeric($max) || (int) $max < 0 || (int) $max > 100) return 'Each Psychomotor / Affective allocation must be between 0 and 100.';
-                $total += (int) $max;
-            }
-            foreach (['quiz_max' => 'Quiz', 'note_copying_max' => 'Note Copying'] as $field => $label) {
-                $max = $raw[$field] ?? null;
-                if (!is_numeric($max) || (int) $max < 0 || (int) $max > 100) return $label . ' allocation must be between 0 and 100.';
-                $total += (int) $max;
-            }
+            return $total === 40 && (int) $exam === 40
+                ? null
+                : 'Classic Full uses five CA fields totaling 40, an examination maximum of 40, and fixed 20 marks for Psychomotor, Quiz and Note Copying.';
         }
+
+        $total += (int) $exam;
 
         return $total === 100 ? null : 'All assessment allocations combined must equal exactly 100.';
     }

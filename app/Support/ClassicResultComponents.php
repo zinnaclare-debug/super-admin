@@ -6,6 +6,16 @@ final class ClassicResultComponents
 {
     public static function normalize(mixed $value, ?array $schema = null): array
     {
+        // Classic Full uses a fixed 20-mark enrichment component. It is displayed on
+        // every result but is not entered by staff alongside CA and examination marks.
+        if (($schema['layout'] ?? null) === 'classic') {
+            return [
+                'psychomotor' => [2, 2, 2, 2, 2],
+                'quiz' => 5,
+                'note_copying' => 5,
+            ];
+        }
+
         $decoded = is_string($value) ? json_decode($value, true) : null;
         $source = is_array($value) ? $value : (is_array($decoded) ? $decoded : []);
         $psychomotor = is_array($source['psychomotor'] ?? null) ? $source['psychomotor'] : [];

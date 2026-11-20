@@ -36,7 +36,7 @@ class AssessmentSchema
         $isClassic = $layout === 'classic';
         $caMaxes = is_array($schema['ca_maxes'] ?? null) ? $schema['ca_maxes'] : $base['ca_maxes'];
         $caLabels = is_array($schema['ca_labels'] ?? null) ? $schema['ca_labels'] : $base['ca_labels'];
-        $psychomotorMaxes = is_array($schema['psychomotor_maxes'] ?? null) ? $schema['psychomotor_maxes'] : ($isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0]);
+        $psychomotorMaxes = $isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0];
         $psychomotorLabels = is_array($schema['psychomotor_labels'] ?? null) ? $schema['psychomotor_labels'] : $base['psychomotor_labels'];
         $normalizedCa = [];
         $labels = [];
@@ -44,20 +44,22 @@ class AssessmentSchema
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            $normalizedCa[$index] = max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
+            $normalizedCa[$index] = $isClassic
+                ? 8
+                : max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
             $label = trim((string) ($caLabels[$index] ?? ''));
             $labels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
-            $normalizedPsychomotor[$index] = $isClassic ? max(0, min(100, (int) ($psychomotorMaxes[$index] ?? 0))) : 0;
+            $normalizedPsychomotor[$index] = $isClassic ? 2 : 0;
             $psychomotorLabel = trim((string) ($psychomotorLabels[$index] ?? ''));
             $normalizedPsychomotorLabels[$index] = $psychomotorLabel !== '' ? substr($psychomotorLabel, 0, 30) : 'P' . ($index + 1);
         }
 
-        $quizMax = $isClassic ? max(0, min(100, (int) ($schema['quiz_max'] ?? 5))) : 0;
-        $noteCopyingMax = $isClassic ? max(0, min(100, (int) ($schema['note_copying_max'] ?? 5))) : 0;
+        $quizMax = $isClassic ? 5 : 0;
+        $noteCopyingMax = $isClassic ? 5 : 0;
         $componentsTotalMax = array_sum($normalizedPsychomotor) + $quizMax + $noteCopyingMax;
         $numericTotalMax = max(0, 100 - $componentsTotalMax);
         $caTotalMax = array_sum($normalizedCa);
-        $examMax = isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax);
+        $examMax = $isClassic ? 40 : (isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax));
         $examMax = max(0, min(100, $examMax));
         if (($caTotalMax + $examMax) !== $numericTotalMax) {
             $examMax = max(0, $numericTotalMax - $caTotalMax);

@@ -91,9 +91,9 @@ const activeCaIndices = (schema) => {
 };
 
 const normalizedClassicComponents = (row, schema) => ({
-  psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(row?.classic_components?.psychomotor?.[index] || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0))),
-  quiz: clamp(Number(row?.classic_components?.quiz || 0), 0, Number(schema.quiz_max || 0)),
-  note_copying: clamp(Number(row?.classic_components?.note_copying || 0), 0, Number(schema.note_copying_max || 0)),
+  psychomotor: schema.layout === "classic" ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
+  quiz: schema.layout === "classic" ? 5 : 0,
+  note_copying: schema.layout === "classic" ? 5 : 0,
 });
 const scoreTotal = (ca, exam, components, usesClassicComponents) => {
   const extras = usesClassicComponents
@@ -267,25 +267,6 @@ export default function SubjectScores() {
     )));
   };
 
-  const updateClassicComponent = (studentId, key, value, index = null) => {
-    if (resultsPublished) return;
-    setRows((prev) => prev.map((row) => {
-      if (row.student_id !== studentId) return row;
-      const current = row.classic_components || { psychomotor: [0, 0, 0, 0, 0], quiz: 0, note_copying: 0 };
-      if (key === "psychomotor") {
-        const psychomotor = [...current.psychomotor];
-        psychomotor[index] = clamp(Number(value || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0));
-        const classic_components = { ...current, psychomotor };
-        const total = scoreTotal(row.ca, row.exam, classic_components, true);
-        return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
-      }
-      const maximum = key === "quiz" ? Number(schema.quiz_max || 0) : Number(schema.note_copying_max || 0);
-      const classic_components = { ...current, [key]: clamp(Number(value || 0), 0, maximum) };
-      const total = scoreTotal(row.ca, row.exam, classic_components, true);
-      return { ...row, classic_components, total, grade: gradeFromTotal(total, gradingSchema) };
-    }));
-  };
-
   const saveAll = async () => {
     if (resultsPublished) {
       alert('Results have been published. Staff can edit again after results are unpublished.');
@@ -310,7 +291,6 @@ export default function SubjectScores() {
             student_id: row.student_id,
             ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
             exam: Number(row.exam || 0),
-            ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
           })),
         });
       }
@@ -351,7 +331,7 @@ export default function SubjectScores() {
           </div>
         </section>
 
-        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic assessment includes the configured CA, exam, Psychomotor / Affective, Quiz and Note Copying fields. All entries combine to 100.</p> : null}
+        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic Full is fixed at CA 40, Exam 40, Psychomotor / Affective 10, Quiz 5 and Note Copying 5. Enter only CA and Exam scores.</p> : null}
         {resultsPublished ? <div className="staff-scores__locked" role="status"><span aria-hidden="true">!</span>Results are published. Editing is locked until the school administrator unpublishes them.</div> : null}
 
         {departmentOptions.length > 0 ? (
@@ -405,9 +385,9 @@ export default function SubjectScores() {
                         {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" value={Number(row.ca_breakdown?.[idx] || 0)} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
                         <td className="staff-scores-table__calculated">{row.ca}</td>
                         <td><input className="staff-score-input" type="number" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
-                        {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`}><input className="staff-score-input staff-score-input--compact" type="number" value={value} min="0" max={schema.psychomotor_maxes[index]} onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} score`} /></td>) : null}
-                        {usesClassicComponents ? <td><input className="staff-score-input staff-score-input--compact" type="number" value={row.classic_components.quiz} min="0" max={schema.quiz_max} onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.quiz_label} score`} /></td> : null}
-                        {usesClassicComponents ? <td><input className="staff-score-input staff-score-input--compact" type="number" value={row.classic_components.note_copying} min="0" max={schema.note_copying_max} onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.note_copying_label} score`} /></td> : null}
+                        {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`} className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} fixed score`}>{value}</td>) : null}
+                        {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.quiz_label} fixed score`}>{row.classic_components.quiz}</td> : null}
+                        {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.note_copying_label} fixed score`}>{row.classic_components.note_copying}</td> : null}
                         <td className="staff-scores-table__total">{row.total}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
                       </>}
                     </tr>)}

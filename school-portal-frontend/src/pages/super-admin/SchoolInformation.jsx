@@ -7,7 +7,7 @@ import schoolInformationArt from "../../assets/dashboard/branding.svg";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const defaultScoreProfile = (layout = "compact") => ({
-  ca_maxes: layout === "classic" ? [4, 4, 4, 4, 4] : [6, 6, 6, 6, 6],
+  ca_maxes: layout === "classic" ? [8, 8, 8, 8, 8] : [6, 6, 6, 6, 6],
   ca_labels: ["CA1", "CA2", "CA3", "CA4", "CA5"],
   psychomotor_maxes: layout === "classic" ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
   psychomotor_labels: ["P1", "P2", "P3", "P4", "P5"],
@@ -15,7 +15,7 @@ const defaultScoreProfile = (layout = "compact") => ({
   quiz_label: "Quiz",
   note_copying_max: layout === "classic" ? 5 : 0,
   note_copying_label: "Note Copying",
-  exam_max: layout === "classic" ? 60 : 70,
+  exam_max: layout === "classic" ? 40 : 70,
 });
 
 const normalizeScoreProfile = (raw, layout) => {
@@ -29,15 +29,15 @@ const normalizeScoreProfile = (raw, layout) => {
   const labels = (field, fallback) => Array.from({ length: 5 }, (_, index) => String(source[field]?.[index] || fallback[index]).trim().slice(0, 30) || fallback[index]);
 
   return {
-    ca_maxes: values("ca_maxes", defaults.ca_maxes),
+    ca_maxes: layout === "classic" ? [8, 8, 8, 8, 8] : values("ca_maxes", defaults.ca_maxes),
     ca_labels: labels("ca_labels", defaults.ca_labels),
-    psychomotor_maxes: values("psychomotor_maxes", defaults.psychomotor_maxes),
+    psychomotor_maxes: layout === "classic" ? [2, 2, 2, 2, 2] : values("psychomotor_maxes", defaults.psychomotor_maxes),
     psychomotor_labels: labels("psychomotor_labels", defaults.psychomotor_labels),
-    quiz_max: layout === "classic" ? number(source.quiz_max, defaults.quiz_max) : 0,
+    quiz_max: layout === "classic" ? 5 : 0,
     quiz_label: String(source.quiz_label || defaults.quiz_label).trim().slice(0, 30) || defaults.quiz_label,
-    note_copying_max: layout === "classic" ? number(source.note_copying_max, defaults.note_copying_max) : 0,
+    note_copying_max: layout === "classic" ? 5 : 0,
     note_copying_label: String(source.note_copying_label || defaults.note_copying_label).trim().slice(0, 30) || defaults.note_copying_label,
-    exam_max: number(source.exam_max, defaults.exam_max),
+    exam_max: layout === "classic" ? 40 : number(source.exam_max, defaults.exam_max),
   };
 };
 
@@ -1192,7 +1192,7 @@ export default function SchoolInformation() {
           <h4>Score Allocation: Total 100</h4>
           <p className="sai-note">
             {resultTemplate.layout === "classic"
-              ? "Choose the maximum for every field. CA, Exam, Psychomotor / Affective, Quiz and Note Copying must add up to exactly 100."
+              ? "Classic Full is fixed at CA 40, Exam 40, Psychomotor / Affective 10, Quiz 5 and Note Copying 5. You can rename the fields below."
               : "Choose the five CA and Exam maximums. They must add up to exactly 100."}
           </p>
           <div className="sai-grid">
@@ -1201,13 +1201,13 @@ export default function SchoolInformation() {
                 <label>CA {index + 1} name and maximum</label>
                 <div className="sai-inline-fields">
                   <input value={resultTemplate.score_profile.ca_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("ca_labels", e.target.value, index)} />
-                  <input type="number" min="0" max="100" value={resultTemplate.score_profile.ca_maxes[index]} onChange={(e) => updateScoreProfile("ca_maxes", e.target.value, index)} />
+                  <input type="number" value={resultTemplate.score_profile.ca_maxes[index]} readOnly disabled aria-label={`CA ${index + 1} fixed maximum`} />
                 </div>
               </div>
             ))}
             <div className="sai-field">
               <label>Examination maximum</label>
-              <input type="number" min="0" max="100" value={resultTemplate.score_profile.exam_max} onChange={(e) => updateScoreProfile("exam_max", e.target.value)} />
+              <input type="number" value={resultTemplate.score_profile.exam_max} readOnly disabled aria-label="Fixed examination maximum" />
             </div>
           </div>
           {resultTemplate.layout === "classic" ? (
@@ -1219,7 +1219,7 @@ export default function SchoolInformation() {
                     <label>P{index + 1} name and maximum</label>
                     <div className="sai-inline-fields">
                       <input value={resultTemplate.score_profile.psychomotor_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("psychomotor_labels", e.target.value, index)} />
-                      <input type="number" min="0" max="100" value={resultTemplate.score_profile.psychomotor_maxes[index]} onChange={(e) => updateScoreProfile("psychomotor_maxes", e.target.value, index)} />
+                    <input type="number" value={resultTemplate.score_profile.psychomotor_maxes[index]} readOnly disabled aria-label={`P${index + 1} fixed maximum`} />
                     </div>
                   </div>
                 ))}
@@ -1227,14 +1227,14 @@ export default function SchoolInformation() {
                   <label>Quiz / Reading field name and maximum</label>
                   <div className="sai-inline-fields">
                     <input value={resultTemplate.score_profile.quiz_label} maxLength={30} onChange={(e) => updateScoreProfile("quiz_label", e.target.value)} />
-                    <input type="number" min="0" max="100" value={resultTemplate.score_profile.quiz_max} onChange={(e) => updateScoreProfile("quiz_max", e.target.value)} />
+                    <input type="number" value={resultTemplate.score_profile.quiz_max} readOnly disabled aria-label="Fixed quiz maximum" />
                   </div>
                 </div>
                 <div className="sai-field">
                   <label>Note taking / copying field name and maximum</label>
                   <div className="sai-inline-fields">
                     <input value={resultTemplate.score_profile.note_copying_label} maxLength={30} onChange={(e) => updateScoreProfile("note_copying_label", e.target.value)} />
-                    <input type="number" min="0" max="100" value={resultTemplate.score_profile.note_copying_max} onChange={(e) => updateScoreProfile("note_copying_max", e.target.value)} />
+                    <input type="number" value={resultTemplate.score_profile.note_copying_max} readOnly disabled aria-label="Fixed note copying maximum" />
                   </div>
                 </div>
               </div>
