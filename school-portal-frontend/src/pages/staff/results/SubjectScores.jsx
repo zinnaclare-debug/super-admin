@@ -124,7 +124,8 @@ const normalizeRow = (row, schema, gradingSchema, usesClassicComponents = false)
 };
 
 export default function SubjectScores() {
-  const { termSubjectId } = useParams();
+  const { termSubjectId, classId } = useParams();
+  const isCommentsOnlySheet = Boolean(classId);
 
   const [schema, setSchema] = useState(DEFAULT_SCHEMA);
   const [gradingSchema, setGradingSchema] = useState(DEFAULT_GRADING_SCHEMA);
@@ -134,9 +135,10 @@ export default function SubjectScores() {
   const [saving, setSaving] = useState(false);
   const [resultsPublished, setResultsPublished] = useState(false);
   const [usesClassicComponents, setUsesClassicComponents] = useState(false);
+  const [commentOnlyCriteria, setCommentOnlyCriteria] = useState([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
-  const departmentStorageKey = useMemo(() => `staff-results-department:${termSubjectId}`, [termSubjectId]);
+  const departmentStorageKey = useMemo(() => `staff-results-department:${isCommentsOnlySheet ? `comments-only-${classId}` : termSubjectId}`, [classId, isCommentsOnlySheet, termSubjectId]);
   const caIndices = useMemo(() => activeCaIndices(schema), [schema]);
   const commentsOnly = Boolean(schema.comments_only);
   const caPattern = useMemo(
@@ -192,20 +194,31 @@ export default function SubjectScores() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/staff/results/subjects/${termSubjectId}/students`);
-      const normalizedSchema = normalizeSchema(res.data?.data?.assessment_schema);
-      const normalizedGradingSchema = normalizeGradingSchema(res.data?.data?.grading_schema);
+      const endpoint = isCommentsOnlySheet
+        ? `/api/staff/results/comments-only/classes/${classId}/students`
+        : `/api/staff/results/subjects/${termSubjectId}/students`;
+      const res = await api.get(endpoint);
+      const data = res.data?.data || {};
+      const normalizedSchema = normalizeSchema(data.assessment_schema);
+      const normalizedGradingSchema = normalizeGradingSchema(data.grading_schema);
+      const criteria = Array.isArray(data.comment_only_schema?.criteria) ? data.comment_only_schema.criteria : [];
       setSchema(normalizedSchema);
       setGradingSchema(normalizedGradingSchema);
-      setSubjectName(String(res.data?.data?.subject_name || "").trim());
-      setResultsPublished(Boolean(res.data?.data?.results_published));
-      setUsesClassicComponents(Boolean(res.data?.data?.uses_classic_components));
-      setRows((res.data?.data?.students || []).map((row) => normalizeRow(row, normalizedSchema, normalizedGradingSchema, Boolean(res.data?.data?.uses_classic_components))));
+      setCommentOnlyCriteria(criteria);
+      setSubjectName(String(data.subject_name || '').trim());
+      setResultsPublished(Boolean(data.results_published));
+      setUsesClassicComponents(Boolean(data.uses_classic_components));
+      setRows((data.students || []).map((row) => (
+        isCommentsOnlySheet
+          ? { ...row, learning_observations: row.learning_observations || {} }
+          : normalizeRow(row, normalizedSchema, normalizedGradingSchema, Boolean(data.uses_classic_components))
+      )));
     } catch (e) {
-      alert("Failed to load students for this subject");
-      setSubjectName("");
+      alert(isCommentsOnlySheet ? 'Failed to load the assessment sheet' : 'Failed to load students for this subject');
+      setSubjectName('');
       setResultsPublished(false);
       setUsesClassicComponents(false);
+      setCommentOnlyCriteria([]);
     } finally {
       setLoading(false);
     }
@@ -213,7 +226,7 @@ export default function SubjectScores() {
 
   useEffect(() => {
     load();
-  }, [termSubjectId]);
+  }, [classId, isCommentsOnlySheet, termSubjectId]);
 
   const updateCa = (studentId, caIndex, value) => {
     if (resultsPublished) return;
@@ -245,10 +258,12 @@ export default function SubjectScores() {
     );
   };
 
-  const updateTeacherComment = (studentId, value) => {
+  const updateLearningObservation = (studentId, key, value) => {
     if (resultsPublished) return;
     setRows((prev) => prev.map((row) => (
-      row.student_id === studentId ? { ...row, teacher_comment: value } : row
+      row.student_id === studentId
+        ? { ...row, learning_observations: { ...row.learning_observations, [key]: value } }
+        : row
     )));
   };
 
@@ -273,27 +288,35 @@ export default function SubjectScores() {
 
   const saveAll = async () => {
     if (resultsPublished) {
-      alert("Results have been published. Staff can edit again after results are unpublished.");
+      alert('Results have been published. Staff can edit again after results are unpublished.');
       return;
     }
 
     setSaving(true);
     try {
-      await api.post(`/api/staff/results/subjects/${termSubjectId}/scores`, {
-        scores: rows.map((row) => (
-          commentsOnly
-            ? { student_id: row.student_id, teacher_comment: String(row.teacher_comment || "").trim() }
-            : {
-                student_id: row.student_id,
-                ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
-                exam: Number(row.exam || 0),
-                ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
-              }
-        )),
-      });
-      alert(commentsOnly ? "Teacher observations saved successfully" : "Saved successfully");
+      if (isCommentsOnlySheet) {
+        await api.post(`/api/staff/results/comments-only/classes/${classId}/observations`, {
+          rows: rows.map((row) => ({
+            student_id: row.student_id,
+            learning_observations: commentOnlyCriteria.reduce((observations, criterion) => ({
+              ...observations,
+              [criterion.key]: String(row.learning_observations?.[criterion.key] || '').trim(),
+            }), {}),
+          })),
+        });
+      } else {
+        await api.post(`/api/staff/results/subjects/${termSubjectId}/scores`, {
+          scores: rows.map((row) => ({
+            student_id: row.student_id,
+            ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
+            exam: Number(row.exam || 0),
+            ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
+          })),
+        });
+      }
+      alert(isCommentsOnlySheet ? 'Assessment observations saved successfully' : 'Saved successfully');
     } catch (e) {
-      alert(e.response?.data?.message || "Failed to save scores");
+      alert(e.response?.data?.message || (isCommentsOnlySheet ? 'Failed to save assessment observations' : 'Failed to save scores'));
     } finally {
       setSaving(false);
     }
@@ -306,7 +329,7 @@ export default function SubjectScores() {
           <div className="staff-scores__hero-copy">
             <span className="staff-scores__eyebrow">Score studio</span>
             <h2>{subjectName || "Student assessment"}</h2>
-            <p>{commentsOnly ? "Record clear, individual learning observations for every student in this class." : `Enter and review scores with the school's ${usesClassicComponents ? "classic" : "compact"} assessment pattern.`}</p>
+            <p>{commentsOnly ? "Record a written observation for each learning area and every student in this class." : `Enter and review scores with the school's ${usesClassicComponents ? "classic" : "compact"} assessment pattern.`}</p>
             <div className="staff-scores__hero-tags">
               <span>{filteredRows.length} student{filteredRows.length === 1 ? "" : "s"}</span>
               <span>{commentsOnly ? "Observation sheet" : `Total: ${schema.total_max}`}</span>
@@ -324,7 +347,7 @@ export default function SubjectScores() {
           <div className="staff-scores__summary-icon" aria-hidden="true">%</div>
           <div>
             <strong>{commentsOnly ? "Observation-based assessment" : "Assessment pattern"}</strong>
-            <p>{commentsOnly ? "Numeric CA and examination scores are disabled for this class." : `${caPattern}. Total maximum: 100.`}</p>
+            <p>{commentsOnly ? `${commentOnlyCriteria.length} configured learning areas are ready for written observations.` : `${caPattern}. Total maximum: 100.`}</p>
           </div>
         </section>
 
@@ -345,22 +368,22 @@ export default function SubjectScores() {
           <div className="staff-scores__workspace-head">
             <div>
               <span className="staff-scores__eyebrow">Entry register</span>
-              <h3>{commentsOnly ? "Student observations" : "Enter student scores"}</h3>
+              <h3>{commentsOnly ? "Learning area observations" : "Enter student scores"}</h3>
               <p>{selectedDepartmentId === "all" ? `${filteredRows.length} students ready for entry.` : `${filteredRows.length} students shown from ${rows.length}.`}</p>
             </div>
-            <button className="staff-scores__save" type="button" onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>{saving ? "Saving..." : commentsOnly ? "Save observations" : "Save scores"}</button>
+            <button className="staff-scores__save" type="button" onClick={saveAll} disabled={saving || loading || rows.length === 0 || resultsPublished}>{saving ? "Saving..." : commentsOnly ? "Save assessment sheet" : "Save scores"}</button>
           </div>
 
           {loading ? <div className="staff-scores__loading">Loading the score register...</div> : (
             <>
               <p className="staff-scores__scroll-hint"><span aria-hidden="true">←</span> Swipe the score fields to the side. Student names stay in view.</p>
               <div className="table-scroll staff-scores-table-wrap" aria-label="Student score entry table">
-                <table className={`staff-scores-table ${usesClassicComponents && !commentsOnly ? "staff-scores-table--classic" : ""}`}>
+                <table className={`staff-scores-table ${usesClassicComponents && !commentsOnly ? "staff-scores-table--classic" : ""} ${commentsOnly ? "staff-scores-table--observations" : ""}`} style={commentsOnly ? { minWidth: `${268 + Math.max(1, commentOnlyCriteria.length) * 360}px` } : undefined}>
                   <thead>
                     <tr>
                       <th className="staff-scores-table__serial staff-scores-table__serial--head" style={{ width: 70 }} rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>S/N</th>
                       <th className="staff-scores-table__student staff-scores-table__student--head" rowSpan={usesClassicComponents && !commentsOnly ? 2 : 1}>Student</th>
-                      {commentsOnly ? <th className="staff-scores-table__observation-head">Teacher&apos;s observation</th> : <>
+                      {commentsOnly ? commentOnlyCriteria.map((criterion) => <th key={criterion.key} className="staff-scores-table__observation-head">{criterion.label}</th>) : <>
                         {caIndices.map((idx) => <th key={`ca-head-${idx}`} rowSpan={usesClassicComponents ? 2 : 1}>{schema.ca_labels?.[idx] || `CA${idx + 1}`} <small>/{schema.ca_maxes[idx]}</small></th>)}
                         <th rowSpan={usesClassicComponents ? 2 : 1}>CA total</th>
                         <th rowSpan={usesClassicComponents ? 2 : 1}>Exam <small>/{schema.exam_max}</small></th>
@@ -378,7 +401,7 @@ export default function SubjectScores() {
                     {filteredRows.map((row, rowIndex) => <tr key={row.student_id}>
                       <td className="staff-scores-table__serial">{rowIndex + 1}</td>
                       <td className="staff-scores-table__student"><strong>{row.student_name}</strong>{row.department_name ? <small>{row.department_name}</small> : null}</td>
-                      {commentsOnly ? <td className="staff-scores-table__observation-cell"><textarea value={row.teacher_comment || ""} onChange={(e) => updateTeacherComment(row.student_id, e.target.value)} disabled={resultsPublished} maxLength={1000} rows={3} placeholder="Write the student's learning observation" /></td> : <>
+                      {commentsOnly ? commentOnlyCriteria.map((criterion) => <td key={`${row.student_id}-${criterion.key}`} className="staff-scores-table__observation-cell"><textarea value={row.learning_observations?.[criterion.key] || ""} onChange={(e) => updateLearningObservation(row.student_id, criterion.key, e.target.value)} disabled={resultsPublished} maxLength={1000} rows={3} placeholder="Write observation" aria-label={`${row.student_name} ${criterion.label} observation`} /></td>) : <>
                         {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" value={Number(row.ca_breakdown?.[idx] || 0)} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
                         <td className="staff-scores-table__calculated">{row.ca}</td>
                         <td><input className="staff-score-input" type="number" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
@@ -388,7 +411,7 @@ export default function SubjectScores() {
                         <td className="staff-scores-table__total">{row.total}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
                       </>}
                     </tr>)}
-                    {filteredRows.length === 0 ? <tr><td colSpan={commentsOnly ? 3 : (usesClassicComponents ? 13 + caIndices.length : 6 + caIndices.length)} className="staff-scores-table__empty">{rows.length === 0 ? "No enrolled students found for this class and term." : "No students found for the selected subclass."}</td></tr> : null}
+                    {filteredRows.length === 0 ? <tr><td colSpan={commentsOnly ? 2 + Math.max(1, commentOnlyCriteria.length) : (usesClassicComponents ? 13 + caIndices.length : 6 + caIndices.length)} className="staff-scores-table__empty">{rows.length === 0 ? "No enrolled students found for this class and term." : "No students found for the selected subclass."}</td></tr> : null}
                   </tbody>
                 </table>
               </div>

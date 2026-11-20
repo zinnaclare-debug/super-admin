@@ -36,10 +36,10 @@ export default function ResultsHome() {
             <span className="rs-pill">Staff Results Desk</span>
             <h2 className="rs-title">Manage scores by subject and class</h2>
             <p className="rs-subtitle">
-              Open any assigned subject to score students and track term-by-term performance with less friction.
+              Open an assigned subject to enter scores, or an assessment sheet to record learning-area observations for a comments-only class.
             </p>
             <div className="rs-meta">
-              <span>{loading ? "Loading..." : `${items.length} assigned subject${items.length === 1 ? "" : "s"}`}</span>
+              <span>{loading ? "Loading..." : `${items.length} assessment task${items.length === 1 ? "" : "s"}`}</span>
               <span>Score and publish workflow</span>
             </div>
           </div>
@@ -65,18 +65,21 @@ export default function ResultsHome() {
 
           {!loading && items.length > 0 ? (
             <div className="rs-cards">
-              {items.map((x) => (
-                <button
-                  key={x.term_subject_id}
-                  className="rs-card-btn"
-                  onClick={() => navigate(`/staff/results/${x.term_subject_id}`)}
-                >
-                  <h3 className="rs-card-title">{x.subject_name}</h3>
-                  <p className="rs-card-meta">
-                    {x.class_name} | {x.term_name}
-                  </p>
-                </button>
-              ))}
+              {items.map((x) => {
+                const commentsOnly = x.entry_type === "comments_only";
+                return (
+                  <button
+                    key={commentsOnly ? `comments-only-${x.class_id}` : x.term_subject_id}
+                    className="rs-card-btn"
+                    onClick={() => navigate(commentsOnly ? `/staff/results/comments-only/${x.class_id}` : `/staff/results/${x.term_subject_id}`)}
+                  >
+                    <h3 className="rs-card-title">{x.subject_name}</h3>
+                    <p className="rs-card-meta">
+                      {x.class_name} | {x.term_name}{commentsOnly ? " | Written observations" : ""}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </section>

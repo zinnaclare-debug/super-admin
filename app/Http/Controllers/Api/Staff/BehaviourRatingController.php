@@ -81,6 +81,15 @@ class BehaviourRatingController extends Controller
           ->orderBy('name')
           ->get(['id', 'name', 'level', 'academic_session_id']);
 
+    $school = School::find($schoolId);
+    // Comments-only classes are assessed from the Staff Results assessment sheet, not here.
+    $classes = $classes
+      ->filter(fn (SchoolClass $class) => ! ClassTemplateSchema::commentsOnlyForClass(
+        $school?->class_templates,
+        $class->level,
+        $class->name
+      ))
+      ->values();
     $selectedClass = $classId ? $classes->firstWhere('id', $classId) : $classes->first();
 
     $terms = Term::where('school_id', $schoolId)

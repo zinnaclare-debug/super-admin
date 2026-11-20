@@ -1860,6 +1860,7 @@ class SchoolController extends Controller
                         return [
                             'name' => $name,
                             'enabled' => $enabled,
+                            'comments_only' => (bool) (is_array($classRow) ? ($classRow['comments_only'] ?? false) : false),
                             'department_enabled' => $enabled && (bool) ($departmentRow['enabled'] ?? false),
                             'department_names' => $departmentRow['names'] ?? [],
                         ];

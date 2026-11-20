@@ -103,7 +103,7 @@ export default function BehaviourRatingHome() {
             <span className="bvr-pill">Staff Behaviour Rating</span>
             <h2>Rate classroom behaviour with structure and speed</h2>
             <p className="bvr-subtitle">
-              Select your assigned class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student. Classes marked Comments-only Result use the configured written learning-area observations instead of numeric scoring.
+              Select your assigned non-comments-only class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student. Comments-only classes use their Assessment Sheet on the Results page instead.
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>

@@ -1810,35 +1810,10 @@ class ResultsController extends Controller
         // A saved observation keeps its original labels even if the school later changes its setup.
         $schema = CommentOnlySchema::normalize($rating?->learning_area_schema ?: $school?->comment_only_schema);
         $observations = CommentOnlySchema::observations($rating?->learning_observations, $schema);
-
-        // Preserve observations entered before structured learning areas were introduced.
-        $legacyComments = [];
-        if (Schema::hasColumn('results', 'teacher_comment')) {
-            $legacyComments = TermSubject::query()
-                ->where('term_subjects.school_id', $schoolId)
-                ->where('term_subjects.class_id', $classId)
-                ->where('term_subjects.term_id', $termId)
-                ->join('subjects', 'subjects.id', '=', 'term_subjects.subject_id')
-                ->leftJoin('results', function ($join) use ($schoolId, $studentId) {
-                    $join->on('results.term_subject_id', '=', 'term_subjects.id')
-                        ->where('results.school_id', '=', $schoolId)
-                        ->where('results.student_id', '=', $studentId);
-                })
-                ->orderBy('subjects.name')
-                ->pluck('results.teacher_comment')
-                ->map(fn ($comment) => trim((string) $comment))
-                ->values()
-                ->all();
-        }
-
         return collect($schema['criteria'])
             ->values()
-            ->map(function (array $criterion, int $index) use ($observations, $legacyComments) {
+            ->map(function (array $criterion) use ($observations) {
                 $observation = trim((string) ($observations[$criterion['key']] ?? ''));
-                if ($observation === '') {
-                    $observation = trim((string) ($legacyComments[$index] ?? ''));
-                }
-
                 return [
                     'term_subject_id' => 'comment-only-' . $criterion['key'],
                     'subject_id' => 0,

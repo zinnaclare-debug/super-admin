@@ -7,10 +7,14 @@ use App\Models\AcademicSession;
 use App\Models\Enrollment;
 use App\Models\Result;
 use App\Models\School;
+use App\Models\SchoolClass;
+use App\Models\StudentBehaviourRating;
 use App\Models\Term;
 use App\Models\TermSubject;
 use App\Support\AssessmentSchema;
 use App\Support\ClassicResultComponents;
+use App\Support\ClassTemplateSchema;
+use App\Support\CommentOnlySchema;
 use App\Support\GradingSchema;
 use App\Support\ResultPdfTemplate;
 use Illuminate\Http\Request;
@@ -100,7 +104,42 @@ class TeacherResultsController extends Controller
       ->orderBy('subjects.name')
       ->get();
 
-    return response()->json(['data' => $items]);
+    $school = School::find((int) $schoolId);
+    $numericSubjects = $items
+      ->reject(fn ($item) => ClassTemplateSchema::commentsOnlyForClass(
+        $school?->class_templates,
+        $item->class_level ?? null,
+        $item->class_name ?? null
+      ))
+      ->values();
+
+    // Comments-only classes have one class assessment sheet, not a list of legacy subjects.
+    $assessmentSheets = SchoolClass::query()
+      ->where('school_id', $schoolId)
+      ->where('academic_session_id', $session->id)
+      ->where('class_teacher_user_id', $user->id)
+      ->orderBy('level')
+      ->orderBy('name')
+      ->get(['id', 'name', 'level'])
+      ->filter(fn (SchoolClass $class) => ClassTemplateSchema::commentsOnlyForClass(
+        $school?->class_templates,
+        $class->level,
+        $class->name
+      ))
+      ->map(fn (SchoolClass $class) => [
+        'entry_type' => 'comments_only',
+        'term_subject_id' => null,
+        'subject_name' => 'Assessment Sheet',
+        'subject_code' => null,
+        'class_name' => (string) $class->name,
+        'class_level' => (string) $class->level,
+        'term_name' => (string) $currentTerm->name,
+        'class_id' => (int) $class->id,
+        'term_id' => (int) $currentTerm->id,
+        'subject_id' => null,
+      ]);
+
+    return response()->json(['data' => $numericSubjects->concat($assessmentSheets)->values()]);
   }
 
   // GET /api/staff/results/subjects/{termSubject}/students
@@ -139,6 +178,7 @@ class TeacherResultsController extends Controller
       ])
       ->first();
     $assessmentSchema = $this->assessmentSchemaForTermSubject($school, $termSubject);
+    abort_unless(! (bool) ($assessmentSchema['comments_only'] ?? false), 404);
     $usesClassicComponents = AssessmentSchema::usesClassicComponents($assessmentSchema);
 
     // Build the class list from current term enrollments first, then layer exclusions/results on top.
@@ -281,6 +321,7 @@ class TeacherResultsController extends Controller
     $commentsOnly = (bool) ($assessmentSchema['comments_only'] ?? false);
 
     abort_unless((int)$termSubject->school_id === (int)$schoolId, 403);
+    abort_unless(! $commentsOnly, 404);
     abort_unless((int)$termSubject->teacher_user_id === (int)$user->id, 403);
 
     $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
@@ -451,6 +492,133 @@ class TeacherResultsController extends Controller
     return response()->json([
       'message' => $commentsOnly ? 'Teacher observations saved successfully' : 'Scores saved successfully',
     ]);
+  }
+
+  // GET /api/staff/results/comments-only/classes/{schoolClass}/students
+  public function commentOnlyClassStudents(Request $request, SchoolClass $schoolClass)
+  {
+    $user = $request->user();
+    $schoolId = (int) $user->school_id;
+    $school = School::find($schoolId);
+    $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
+    $currentTerm = $session
+      ? Term::where('school_id', $schoolId)->where('academic_session_id', $session->id)->where('is_current', true)->first()
+      : null;
+
+    abort_unless($session && $currentTerm, 422);
+    abort_unless((int) $schoolClass->school_id === $schoolId, 403);
+    abort_unless((int) $schoolClass->academic_session_id === (int) $session->id, 403);
+    abort_unless((int) $schoolClass->class_teacher_user_id === (int) $user->id, 403);
+    abort_unless(ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $schoolClass->level, $schoolClass->name), 404);
+
+    $canUseDepartments = Schema::hasTable('class_departments') && Schema::hasColumn('enrollments', 'department_id');
+    $studentsQuery = Enrollment::query()
+      ->join('students', 'students.id', '=', 'enrollments.student_id')
+      ->join('users', 'users.id', '=', 'students.user_id')
+      ->where('enrollments.class_id', $schoolClass->id)
+      ->where('enrollments.term_id', $currentTerm->id)
+      ->where('students.school_id', $schoolId)
+      ->select([
+        'students.id as student_id',
+        'users.name as student_name',
+        ...($canUseDepartments ? ['class_departments.id as department_id', 'class_departments.name as department_name'] : [DB::raw('NULL as department_id'), DB::raw('NULL as department_name')]),
+      ])
+      ->orderBy('users.name');
+    if ($canUseDepartments) {
+      $studentsQuery->leftJoin('class_departments', 'class_departments.id', '=', 'enrollments.department_id');
+    }
+    if (Schema::hasColumn('enrollments', 'school_id')) {
+      $studentsQuery->where('enrollments.school_id', $schoolId);
+    }
+
+    $observations = StudentBehaviourRating::query()
+      ->where('school_id', $schoolId)
+      ->where('class_id', $schoolClass->id)
+      ->where('term_id', $currentTerm->id)
+      ->get()
+      ->keyBy('student_id');
+    $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
+
+    $students = $studentsQuery->get()->map(function ($student) use ($observations, $commentOnlySchema) {
+      $observation = $observations->get((int) $student->student_id);
+      return [
+        'student_id' => (int) $student->student_id,
+        'student_name' => (string) $student->student_name,
+        'department_id' => isset($student->department_id) ? (int) $student->department_id : null,
+        'department_name' => (string) ($student->department_name ?? ''),
+        'learning_observations' => CommentOnlySchema::observations($observation?->learning_observations, $commentOnlySchema),
+      ];
+    })->values();
+
+    return response()->json(['data' => [
+      'entry_type' => 'comments_only',
+      'class_id' => (int) $schoolClass->id,
+      'class_name' => (string) $schoolClass->name,
+      'class_level' => (string) $schoolClass->level,
+      'term_id' => (int) $currentTerm->id,
+      'term_name' => (string) $currentTerm->name,
+      'subject_name' => 'Assessment Sheet',
+      'assessment_schema' => ['comments_only' => true],
+      'comment_only_schema' => $commentOnlySchema,
+      'results_published' => $school?->resultsArePublished() ?? false,
+      'students' => $students,
+    ]]);
+  }
+
+  // POST /api/staff/results/comments-only/classes/{schoolClass}/observations
+  public function saveCommentOnlyClassObservations(Request $request, SchoolClass $schoolClass)
+  {
+    $user = $request->user();
+    $schoolId = (int) $user->school_id;
+    $school = School::find($schoolId);
+    $session = AcademicSession::where('school_id', $schoolId)->where('status', 'current')->first();
+    $currentTerm = $session
+      ? Term::where('school_id', $schoolId)->where('academic_session_id', $session->id)->where('is_current', true)->first()
+      : null;
+
+    abort_unless($session && $currentTerm, 422);
+    abort_unless((int) $schoolClass->school_id === $schoolId, 403);
+    abort_unless((int) $schoolClass->academic_session_id === (int) $session->id, 403);
+    abort_unless((int) $schoolClass->class_teacher_user_id === (int) $user->id, 403);
+    abort_unless(ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $schoolClass->level, $schoolClass->name), 404);
+    if ($school?->resultsArePublished()) {
+      return response()->json(['message' => 'Results have been published. Staff can edit again after results are unpublished.'], 423);
+    }
+
+    $payload = $request->validate([
+      'rows' => 'required|array|min:1',
+      'rows.*.student_id' => 'required|integer',
+      'rows.*.learning_observations' => 'nullable|array|max:' . CommentOnlySchema::MAX_CRITERIA_COUNT,
+      'rows.*.learning_observations.*' => 'nullable|string|max:1000',
+    ]);
+    $validStudentIds = Enrollment::query()
+      ->where('class_id', $schoolClass->id)
+      ->where('term_id', $currentTerm->id)
+      ->when(Schema::hasColumn('enrollments', 'school_id'), fn ($query) => $query->where('school_id', $schoolId))
+      ->pluck('student_id')
+      ->map(fn ($id) => (int) $id)
+      ->all();
+    $validSet = array_flip($validStudentIds);
+    $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
+
+    DB::transaction(function () use ($payload, $schoolId, $schoolClass, $currentTerm, $user, $validSet, $commentOnlySchema) {
+      foreach ($payload['rows'] as $row) {
+        $studentId = (int) $row['student_id'];
+        if (! isset($validSet[$studentId])) {
+          continue;
+        }
+        StudentBehaviourRating::updateOrCreate(
+          ['school_id' => $schoolId, 'class_id' => $schoolClass->id, 'term_id' => $currentTerm->id, 'student_id' => $studentId],
+          [
+            'learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema),
+            'learning_area_schema' => $commentOnlySchema,
+            'set_by_user_id' => $user->id,
+          ]
+        );
+      }
+    });
+
+    return response()->json(['message' => 'Assessment observations saved successfully.']);
   }
 
   private function gradeFromTotal(int $schoolId, int $total): string

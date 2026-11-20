@@ -552,6 +552,8 @@ Route::middleware(['auth:sanctum', 'role:staff'])->group(function () {
     Route::post('/staff/profile/photo', [StaffProfileController::class, 'uploadPhoto']);
     Route::get('/staff/features', [FeatureAccessController::class, 'staffFeatures']);
     Route::get('/staff/results/subjects', [TeacherResultsController::class, 'mySubjects']);
+    Route::get('/staff/results/comments-only/classes/{schoolClass}/students', [TeacherResultsController::class, 'commentOnlyClassStudents']);
+    Route::post('/staff/results/comments-only/classes/{schoolClass}/observations', [TeacherResultsController::class, 'saveCommentOnlyClassObservations']);
     Route::get('/staff/results/subjects/{termSubject}/students', [TeacherResultsController::class, 'subjectStudents']);
     Route::post('/staff/results/subjects/{termSubject}/scores', [TeacherResultsController::class, 'saveScores']);
     Route::get('/staff/attendance/status', [StaffAttendanceController::class, 'status']);

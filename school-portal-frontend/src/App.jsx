@@ -273,6 +273,7 @@ function App() {
         <Route path="teaching" element={<StaffTeachingHome />} />
         <Route path="attendant" element={<StaffAttendantHome />} />
         <Route path="results" element={<ResultsHome />} />
+        <Route path="results/comments-only/:classId" element={<SubjectScores />} />
         <Route path="results/:termSubjectId" element={<SubjectScores />} />
         <Route path=":featureKey" element={<FeaturePage />} />
         <Route path="attendance" element={<AttendanceHome />} />
@@ -343,7 +344,6 @@ function App() {
 export default App;
 
 // TPM1LRPnhO
-
 
 
 
