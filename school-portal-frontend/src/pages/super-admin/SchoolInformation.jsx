@@ -29,7 +29,7 @@ const normalizeScoreProfile = (raw, layout) => {
   const labels = (field, fallback) => Array.from({ length: 5 }, (_, index) => String(source[field]?.[index] || fallback[index]).trim().slice(0, 30) || fallback[index]);
 
   return {
-    ca_maxes: layout === "classic" ? [8, 8, 8, 8, 8] : values("ca_maxes", defaults.ca_maxes),
+    ca_maxes: values("ca_maxes", defaults.ca_maxes),
     ca_labels: labels("ca_labels", defaults.ca_labels),
     psychomotor_maxes: layout === "classic" ? [2, 2, 2, 2, 2] : values("psychomotor_maxes", defaults.psychomotor_maxes),
     psychomotor_labels: labels("psychomotor_labels", defaults.psychomotor_labels),
@@ -37,7 +37,7 @@ const normalizeScoreProfile = (raw, layout) => {
     quiz_label: String(source.quiz_label || defaults.quiz_label).trim().slice(0, 30) || defaults.quiz_label,
     note_copying_max: layout === "classic" ? 5 : 0,
     note_copying_label: String(source.note_copying_label || defaults.note_copying_label).trim().slice(0, 30) || defaults.note_copying_label,
-    exam_max: layout === "classic" ? 40 : number(source.exam_max, defaults.exam_max),
+    exam_max: number(source.exam_max, defaults.exam_max),
   };
 };
 
@@ -1192,7 +1192,7 @@ export default function SchoolInformation() {
           <h4>Score Allocation: Total 100</h4>
           <p className="sai-note">
             {resultTemplate.layout === "classic"
-              ? "Classic Full is fixed at CA 40, Exam 40, Psychomotor / Affective 10, Quiz 5 and Note Copying 5. You can rename the fields below."
+              ? "Classic Full fixes Psychomotor / Affective at 10, Quiz at 5 and Note Copying at 5. Set the five CA fields and Exam to share the remaining 80 marks."
               : "Choose the five CA and Exam maximums. They must add up to exactly 100."}
           </p>
           <div className="sai-grid">
@@ -1201,13 +1201,13 @@ export default function SchoolInformation() {
                 <label>CA {index + 1} name and maximum</label>
                 <div className="sai-inline-fields">
                   <input value={resultTemplate.score_profile.ca_labels[index]} maxLength={30} onChange={(e) => updateScoreProfile("ca_labels", e.target.value, index)} />
-                  <input type="number" value={resultTemplate.score_profile.ca_maxes[index]} readOnly disabled aria-label={`CA ${index + 1} fixed maximum`} />
+                  <input type="number" min="0" max="80" value={resultTemplate.score_profile.ca_maxes[index]} onChange={(e) => updateScoreProfile("ca_maxes", e.target.value, index)} aria-label={`CA ${index + 1} maximum`} />
                 </div>
               </div>
             ))}
             <div className="sai-field">
               <label>Examination maximum</label>
-              <input type="number" value={resultTemplate.score_profile.exam_max} readOnly disabled aria-label="Fixed examination maximum" />
+              <input type="number" min="0" max="80" value={resultTemplate.score_profile.exam_max} onChange={(e) => updateScoreProfile("exam_max", e.target.value)} aria-label="Examination maximum" />
             </div>
           </div>
           {resultTemplate.layout === "classic" ? (

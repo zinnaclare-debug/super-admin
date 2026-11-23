@@ -46,9 +46,9 @@ class AssessmentSchema
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            $normalizedCa[$index] = $usesFixedClassicComponents
-                ? 8
-                : max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
+            // Classic Full fixes only the enrichment components. Schools still
+            // choose how the remaining 80 marks are shared by CA and Exam.
+            $normalizedCa[$index] = max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
             $label = trim((string) ($caLabels[$index] ?? ''));
             $labels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
             $normalizedPsychomotor[$index] = $usesFixedClassicComponents
@@ -63,7 +63,7 @@ class AssessmentSchema
         $componentsTotalMax = array_sum($normalizedPsychomotor) + $quizMax + $noteCopyingMax;
         $numericTotalMax = max(0, 100 - $componentsTotalMax);
         $caTotalMax = array_sum($normalizedCa);
-        $examMax = $isClassic ? 40 : (isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax));
+        $examMax = isset($schema['exam_max']) ? (int) $schema['exam_max'] : ($numericTotalMax - $caTotalMax);
         $examMax = max(0, min(100, $examMax));
         if (($caTotalMax + $examMax) !== $numericTotalMax) {
             $examMax = max(0, $numericTotalMax - $caTotalMax);

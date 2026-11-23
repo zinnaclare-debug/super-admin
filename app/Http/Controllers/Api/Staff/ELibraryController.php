@@ -7,7 +7,9 @@ use App\Models\AcademicSession;
 use App\Models\ELibraryBook;
 use App\Models\Term;
 use App\Models\TermSubject;
+use App\Support\PdfUploadOptimizer;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 
 class ELibraryController extends Controller
@@ -129,7 +131,9 @@ class ELibraryController extends Controller
       'title' => 'required|string|max:150',
       'author' => 'nullable|string|max:150',
       'description' => 'nullable|string|max:500',
-      'file' => 'required|file|mimes:pdf|max:150',
+      // Larger source PDFs are accepted only so the inbuilt optimizer can
+      // create a final e-library file at or below the 2 MB storage limit.
+      'file' => 'required|file|mimes:pdf|max:20480',
     ]);
 
     // ✅ enforce: term_subject belongs to same school AND assigned to this teacher
@@ -154,7 +158,11 @@ class ELibraryController extends Controller
 
     $file = $request->file('file');
     $dir = "schools/{$schoolId}/e-library";
-    $path = $file->store($dir, 'public');
+    try {
+      $storedFile = PdfUploadOptimizer::storeWithinLimit($file, $dir);
+    } catch (\RuntimeException $error) {
+      throw ValidationException::withMessages(['file' => [$error->getMessage()]]);
+    }
 
     $book = ELibraryBook::create([
       'school_id' => $schoolId,
@@ -164,14 +172,14 @@ class ELibraryController extends Controller
       'title' => $data['title'],
       'author' => $data['author'] ?? null,
       'description' => $data['description'] ?? null,
-      'file_path' => $path,
+      'file_path' => $storedFile['path'],
       'original_name' => $file->getClientOriginalName(),
       'mime_type' => $file->getClientMimeType(),
-      'size' => $file->getSize(),
+      'size' => $storedFile['size'],
     ]);
 
     return response()->json([
-      'message' => 'Uploaded',
+      'message' => $storedFile['optimized'] ? 'Uploaded and optimized to 2 MB or less.' : 'Uploaded',
       'data' => [
         'id' => $book->id,
         'file_url' => Storage::disk('public')->url($book->file_path),

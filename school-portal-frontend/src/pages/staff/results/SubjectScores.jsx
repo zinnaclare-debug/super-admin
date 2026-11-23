@@ -344,7 +344,7 @@ export default function SubjectScores() {
           </div>
         </section>
 
-        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic Full is fixed at CA 40, Exam 40, Psychomotor / Affective 10, Quiz 5 and Note Copying 5. Enter only CA and Exam scores.</p> : null}
+        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic Full fixes Psychomotor / Affective at 10, Quiz at 5 and Note Copying at 5. Enter CA and Exam scores using your school's configured 80-mark allocation.</p> : null}
         {resultsPublished ? <div className="staff-scores__locked" role="status"><span aria-hidden="true">!</span>Results are published. Editing is locked until the school administrator unpublishes them.</div> : null}
 
         {departmentOptions.length > 0 ? (

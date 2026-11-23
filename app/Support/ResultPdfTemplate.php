@@ -95,7 +95,9 @@ class ResultPdfTemplate
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            $normalizedMaxes[$index] = $isClassic ? 8 : max(0, min(100, (int) ($maxes[$index] ?? 0)));
+            // Classic Full reserves 20 marks for its fixed enrichment fields,
+            // but CA allocations remain configurable by each school.
+            $normalizedMaxes[$index] = max(0, min(100, (int) ($maxes[$index] ?? 0)));
             $label = trim((string) ($labels[$index] ?? ''));
             $normalizedLabels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
             $normalizedPsychomotor[$index] = $isClassic ? 2 : 0;
@@ -116,7 +118,7 @@ class ResultPdfTemplate
             'quiz_label' => $quiz !== '' ? substr($quiz, 0, 30) : 'Quiz',
             'note_copying_max' => $isClassic ? 5 : 0,
             'note_copying_label' => $note !== '' ? substr($note, 0, 30) : 'Note Copying',
-            'exam_max' => $isClassic ? 40 : max(0, min(100, (int) ($source['exam_max'] ?? $defaults['exam_max']))),
+            'exam_max' => max(0, min(100, (int) ($source['exam_max'] ?? $defaults['exam_max']))),
         ];
     }
 
@@ -133,9 +135,9 @@ class ResultPdfTemplate
         $exam = $raw['exam_max'] ?? null;
         if (!is_numeric($exam) || (int) $exam < 0 || (int) $exam > 100) return 'The examination allocation must be a whole number between 0 and 100.';
         if ($layout === 'classic') {
-            return $total === 40 && (int) $exam === 40
+            return $total + (int) $exam === 80
                 ? null
-                : 'Classic Full uses five CA fields totaling 40, an examination maximum of 40, and fixed 20 marks for Psychomotor, Quiz and Note Copying.';
+                : 'Classic Full reserves 20 fixed marks for Psychomotor, Quiz and Note Copying. The five CA fields and examination maximum must total 80.';
         }
 
         $total += (int) $exam;

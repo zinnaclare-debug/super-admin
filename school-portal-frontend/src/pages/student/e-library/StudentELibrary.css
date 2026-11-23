@@ -163,6 +163,23 @@
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
 }
 
+.sel-file-note,
+.sel-file-status {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sel-file-note { color: #475569; }
+
+.sel-file-status {
+  border-left: 3px solid #06b6d4;
+  padding: 7px 9px;
+  color: #0c4a6e;
+  background: #ecfeff;
+}
+
 .sel-btn {
   border: 0;
   border-radius: 10px;

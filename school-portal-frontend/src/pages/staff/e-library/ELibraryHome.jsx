@@ -6,6 +6,11 @@ import onlineReadingArt from "../../../assets/e-library/online-reading.svg";
 import audiobookArt from "../../../assets/e-library/audiobook.svg";
 import "../../student/e-library/StudentELibrary.css";
 
+const MAX_FINAL_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+
+const fileSizeLabel = (bytes) => `${(bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 2 : 1)} MB`;
+
 export default function ELibraryHome() {
   const [books, setBooks] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -16,6 +21,7 @@ export default function ELibraryHome() {
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
+  const [fileNotice, setFileNotice] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -46,6 +52,30 @@ export default function ELibraryHome() {
 
   useEffect(() => { load(); }, []);
 
+  const selectFile = (event) => {
+    const selected = event.target.files?.[0] || null;
+    if (!selected) {
+      setFile(null);
+      setFileNotice("");
+      return;
+    }
+
+    if (selected.size > MAX_SOURCE_FILE_BYTES) {
+      event.target.value = "";
+      setFile(null);
+      setFileNotice("");
+      alert("Choose a PDF no larger than 20 MB. The e-library stores only a final file of 2 MB or less.");
+      return;
+    }
+
+    setFile(selected);
+    setFileNotice(
+      selected.size > MAX_FINAL_FILE_BYTES
+        ? `${selected.name} is ${fileSizeLabel(selected.size)}. It will be optimized automatically; upload succeeds only if the final PDF is 2 MB or less.`
+        : `${selected.name} is ${fileSizeLabel(selected.size)} and already meets the 2 MB limit.`
+    );
+  };
+
   const upload = async (e) => {
     e.preventDefault();
     if (!termSubjectId) return alert("Select an assigned subject");
@@ -60,7 +90,7 @@ export default function ELibraryHome() {
 
     setUploading(true);
     try {
-      await api.post("/api/staff/e-library", fd, {
+      const response = await api.post("/api/staff/e-library", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setTermSubjectId("");
@@ -68,8 +98,9 @@ export default function ELibraryHome() {
       setAuthor("");
       setDescription("");
       setFile(null);
+      setFileNotice("");
       await load();
-      alert("Uploaded");
+      alert(response.data?.message || "Uploaded");
     } catch (e2) {
       alert(e2?.response?.data?.message || "Upload failed");
     } finally {
@@ -145,8 +176,12 @@ export default function ELibraryHome() {
               className="sel-field"
               type="file"
               accept=".pdf,application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={selectFile}
             />
+            <p className="sel-file-note">
+              Final e-library PDFs are limited to <strong>2 MB</strong>. PDFs above 2 MB are optimized automatically before they are saved.
+            </p>
+            {fileNotice ? <p className="sel-file-status" role="status">{fileNotice}</p> : null}
 
             <button className="sel-btn" type="submit" disabled={uploading}>
               {uploading ? "Uploading..." : "Upload"}
