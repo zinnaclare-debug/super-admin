@@ -124,3 +124,63 @@
   }
 }
 
+
+.promo-recovery-card {
+  margin-top: 18px;
+  border: 1px solid #fed7aa;
+  background: linear-gradient(135deg, #fffaf4 0%, #ffffff 58%, #fffbeb 100%);
+}
+
+.promo-recovery-card .payx-pill {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.promo-recovery-card h3 {
+  margin: 9px 0 0;
+  color: #7c2d12;
+}
+
+.promo-recovery-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(240px, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.promo-recovery-controls label {
+  font-weight: 800;
+  color: #7c2d12;
+}
+
+.promo-recovery-controls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  color: #1f2937;
+  background: #fff;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+}
+
+.promo-recovery-warning {
+  margin: 12px 0 14px;
+  padding: 10px 12px;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.5;
+  background: rgba(255, 237, 213, 0.7);
+  border-left: 4px solid #f97316;
+  border-radius: 8px;
+}
+
+@media (max-width: 640px) {
+  .promo-recovery-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .promo-recovery-card .payx-btn {
+    width: 100%;
+  }
+}

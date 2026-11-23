@@ -68,6 +68,7 @@ class ResultPdfTemplate
 
         return [
             'ca_maxes' => $classic ? [8, 8, 8, 8, 8] : [6, 6, 6, 6, 6],
+            'classic_fixed_components' => $classic,
             'ca_labels' => ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],
             'psychomotor_maxes' => $classic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
             'psychomotor_labels' => ['P1', 'P2', 'P3', 'P4', 'P5'],
@@ -107,6 +108,7 @@ class ResultPdfTemplate
 
         return [
             'ca_maxes' => $normalizedMaxes,
+            'classic_fixed_components' => $isClassic,
             'ca_labels' => $normalizedLabels,
             'psychomotor_maxes' => $normalizedPsychomotor,
             'psychomotor_labels' => $normalizedPsychomotorLabels,

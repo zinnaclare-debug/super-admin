@@ -52,6 +52,7 @@ const normalizeSchema = (schema) => {
     exam_max: numeric(raw.exam_max, 100 - normalizedCa.reduce((sum, value) => sum + value, 0)),
     total_max: 100,
     layout: usesClassicComponents ? "classic" : "compact",
+    classic_fixed_components: usesClassicComponents && Boolean(raw.classic_fixed_components),
     psychomotor_maxes: normalizedPsychomotorMaxes,
     psychomotor_labels: psychomotorLabels,
     quiz_max: usesClassicComponents ? numeric(raw.quiz_max, 0) : 0,
@@ -90,11 +91,22 @@ const activeCaIndices = (schema) => {
   return out.length ? out : [0];
 };
 
-const normalizedClassicComponents = (row, schema) => ({
-  psychomotor: schema.layout === "classic" ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
-  quiz: schema.layout === "classic" ? 5 : 0,
-  note_copying: schema.layout === "classic" ? 5 : 0,
-});
+const normalizedClassicComponents = (row, schema) => {
+  if (schema.layout !== "classic") return { psychomotor: [0, 0, 0, 0, 0], quiz: 0, note_copying: 0 };
+  const saved = row?.classic_components;
+  const hasSavedComponents = Array.isArray(saved?.psychomotor)
+    || Object.prototype.hasOwnProperty.call(saved || {}, "quiz")
+    || Object.prototype.hasOwnProperty.call(saved || {}, "note_copying");
+  if (schema.classic_fixed_components && !hasSavedComponents) {
+    return { psychomotor: [2, 2, 2, 2, 2], quiz: 5, note_copying: 5 };
+  }
+
+  return {
+    psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(saved?.psychomotor?.[index] || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0))),
+    quiz: clamp(Number(saved?.quiz || 0), 0, Number(schema.quiz_max || 0)),
+    note_copying: clamp(Number(saved?.note_copying || 0), 0, Number(schema.note_copying_max || 0)),
+  };
+};
 const scoreTotal = (ca, exam, components, usesClassicComponents) => {
   const extras = usesClassicComponents
     ? components.psychomotor.reduce((sum, score) => sum + Number(score || 0), 0) + Number(components.quiz || 0) + Number(components.note_copying || 0)
@@ -291,6 +303,7 @@ export default function SubjectScores() {
             student_id: row.student_id,
             ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
             exam: Number(row.exam || 0),
+            ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
           })),
         });
       }

@@ -445,6 +445,161 @@ class PromotionController extends Controller
             ],
         ]);
     }
+    // POST /api/school-admin/promotion/classes/{class}/restore
+    // Repairs an accidental same-session promotion without touching unselected new students.
+    public function restoreAccidentallyPromotedStudents(Request $request, SchoolClass $class)
+    {
+        $user = $request->user();
+        $schoolId = (int) $user->school_id;
+        abort_unless((int) $class->school_id === $schoolId, 403);
+
+        [$session, $currentTerm] = $this->resolveCurrentSessionAndTerm($schoolId);
+        if (!$session || !$currentTerm || (int) $class->academic_session_id !== (int) $session->id) {
+            return response()->json(['message' => 'Class recovery is only available for the current academic session.'], 422);
+        }
+
+        $payload = $request->validate([
+            'target_class_id' => 'required|integer',
+            'student_ids' => 'required|array|min:1|max:1000',
+            'student_ids.*' => 'required|integer|distinct',
+        ]);
+
+        $targetClass = SchoolClass::query()
+            ->where('id', (int) $payload['target_class_id'])
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->first();
+
+        if (!$targetClass || (int) $targetClass->id === (int) $class->id || !$this->classIsTemplateActive($targetClass)) {
+            return response()->json(['message' => 'Choose a different active class in the current academic session to restore the selected students to.'], 422);
+        }
+
+        $studentIds = collect($payload['student_ids'])->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $currentMemberships = DB::table('class_students')
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->where('class_id', $class->id)
+            ->whereIn('student_id', $studentIds)
+            ->get()
+            ->keyBy('student_id');
+
+        if ($currentMemberships->count() !== count($studentIds)) {
+            return response()->json(['message' => 'One or more selected students are no longer enrolled in the incorrectly promoted class. Refresh the list and try again.'], 422);
+        }
+
+        // Moving an already graded student would leave marks tied to the wrong class subjects.
+        $studentIdsWithResults = DB::table('results')
+            ->join('term_subjects', 'term_subjects.id', '=', 'results.term_subject_id')
+            ->join('terms', 'terms.id', '=', 'term_subjects.term_id')
+            ->where('results.school_id', $schoolId)
+            ->where('term_subjects.class_id', $class->id)
+            ->where('terms.academic_session_id', $session->id)
+            ->whereIn('results.student_id', $studentIds)
+            ->distinct()
+            ->pluck('results.student_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        if (!empty($studentIdsWithResults)) {
+            return response()->json([
+                'message' => 'Recovery was not applied because one or more selected students already have current-session results in this class. Contact support before moving graded records.',
+            ], 422);
+        }
+
+        $termIds = Term::query()
+            ->where('school_id', $schoolId)
+            ->where('academic_session_id', $session->id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        DB::transaction(function () use ($schoolId, $session, $currentTerm, $class, $targetClass, $studentIds, $currentMemberships, $termIds) {
+            foreach ($studentIds as $studentId) {
+                $membership = $currentMemberships->get($studentId);
+                $sourceDepartmentId = $this->resolveSourceDepartmentId(
+                    $schoolId,
+                    (int) $session->id,
+                    (int) $currentTerm->id,
+                    (int) $class->id,
+                    $studentId
+                );
+                $targetDepartmentId = $this->resolveTargetDepartmentId($schoolId, $targetClass, $sourceDepartmentId);
+
+                DB::table('class_students')
+                    ->where('school_id', $schoolId)
+                    ->where('academic_session_id', $session->id)
+                    ->where('class_id', $class->id)
+                    ->where('student_id', $studentId)
+                    ->delete();
+
+                DB::table('class_students')->updateOrInsert([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $session->id,
+                    'class_id' => $targetClass->id,
+                    'student_id' => $studentId,
+                ], [
+                    'roll_number' => $membership->roll_number ?? null,
+                    'enrolled_at' => $membership->enrolled_at ?? now()->toDateString(),
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]);
+
+                foreach ($termIds as $termId) {
+                    $sourceEnrollment = DB::table('enrollments')
+                        ->where('student_id', $studentId)
+                        ->where('class_id', $class->id)
+                        ->where('term_id', $termId);
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $sourceEnrollment->where('school_id', $schoolId);
+                    }
+                    $sourceEnrollment->delete();
+
+                    $targetEnrollment = DB::table('enrollments')
+                        ->where('student_id', $studentId)
+                        ->where('class_id', $targetClass->id)
+                        ->where('term_id', $termId);
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $targetEnrollment->where('school_id', $schoolId);
+                    }
+
+                    if ($targetEnrollment->exists()) {
+                        $targetEnrollment->update([
+                            'department_id' => $targetDepartmentId,
+                            'updated_at' => now(),
+                        ]);
+                        continue;
+                    }
+
+                    $enrollmentData = [
+                        'student_id' => $studentId,
+                        'class_id' => $targetClass->id,
+                        'term_id' => $termId,
+                        'department_id' => $targetDepartmentId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    if (Schema::hasColumn('enrollments', 'school_id')) {
+                        $enrollmentData['school_id'] = $schoolId;
+                    }
+                    DB::table('enrollments')->insert($enrollmentData);
+                }
+
+                Student::query()->where('id', $studentId)->where('school_id', $schoolId)->update([
+                    'education_level' => $targetClass->level,
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        return response()->json([
+            'message' => count($studentIds) . ' selected student(s) restored to ' . $targetClass->name . '. New students not selected were left in ' . $class->name . '.',
+            'data' => [
+                'restored_count' => count($studentIds),
+                'from_class' => ['id' => (int) $class->id, 'name' => $class->name, 'level' => $class->level],
+                'to_class' => ['id' => (int) $targetClass->id, 'name' => $targetClass->name, 'level' => $targetClass->level],
+            ],
+        ]);
+    }
     private function resolvePromotionDestination(int $schoolId, AcademicSession $sourceSession, SchoolClass $sourceClass): array
     {
         $targetSession = $this->resolveTargetPromotionSession($schoolId, (int) $sourceSession->id);

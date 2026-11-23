@@ -13,6 +13,7 @@ class AssessmentSchema
             'total_max' => 100,
             'layout' => 'compact',
             'profile_version' => 0,
+            'classic_fixed_components' => false,
             'psychomotor_maxes' => [0, 0, 0, 0, 0],
             'psychomotor_labels' => ['P1', 'P2', 'P3', 'P4', 'P5'],
             'quiz_max' => 0,
@@ -34,9 +35,10 @@ class AssessmentSchema
         $layout = strtolower(trim((string) ($schema['layout'] ?? 'compact')));
         $layout = $layout === 'classic' ? 'classic' : 'compact';
         $isClassic = $layout === 'classic';
+        $usesFixedClassicComponents = $isClassic && filter_var($schema['classic_fixed_components'] ?? false, FILTER_VALIDATE_BOOL);
         $caMaxes = is_array($schema['ca_maxes'] ?? null) ? $schema['ca_maxes'] : $base['ca_maxes'];
         $caLabels = is_array($schema['ca_labels'] ?? null) ? $schema['ca_labels'] : $base['ca_labels'];
-        $psychomotorMaxes = $isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0];
+        $psychomotorMaxes = is_array($schema['psychomotor_maxes'] ?? null) ? $schema['psychomotor_maxes'] : ($isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0]);
         $psychomotorLabels = is_array($schema['psychomotor_labels'] ?? null) ? $schema['psychomotor_labels'] : $base['psychomotor_labels'];
         $normalizedCa = [];
         $labels = [];
@@ -44,18 +46,20 @@ class AssessmentSchema
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            $normalizedCa[$index] = $isClassic
+            $normalizedCa[$index] = $usesFixedClassicComponents
                 ? 8
                 : max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
             $label = trim((string) ($caLabels[$index] ?? ''));
             $labels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
-            $normalizedPsychomotor[$index] = $isClassic ? 2 : 0;
+            $normalizedPsychomotor[$index] = $usesFixedClassicComponents
+                ? 2
+                : ($isClassic ? max(0, min(100, (int) ($psychomotorMaxes[$index] ?? 0))) : 0);
             $psychomotorLabel = trim((string) ($psychomotorLabels[$index] ?? ''));
             $normalizedPsychomotorLabels[$index] = $psychomotorLabel !== '' ? substr($psychomotorLabel, 0, 30) : 'P' . ($index + 1);
         }
 
-        $quizMax = $isClassic ? 5 : 0;
-        $noteCopyingMax = $isClassic ? 5 : 0;
+        $quizMax = $usesFixedClassicComponents ? 5 : ($isClassic ? max(0, min(100, (int) ($schema['quiz_max'] ?? 5))) : 0);
+        $noteCopyingMax = $usesFixedClassicComponents ? 5 : ($isClassic ? max(0, min(100, (int) ($schema['note_copying_max'] ?? 5))) : 0);
         $componentsTotalMax = array_sum($normalizedPsychomotor) + $quizMax + $noteCopyingMax;
         $numericTotalMax = max(0, 100 - $componentsTotalMax);
         $caTotalMax = array_sum($normalizedCa);
@@ -75,6 +79,7 @@ class AssessmentSchema
             'total_max' => 100,
             'layout' => $layout,
             'profile_version' => max(0, (int) ($schema['profile_version'] ?? 0)),
+            'classic_fixed_components' => $usesFixedClassicComponents,
             'psychomotor_maxes' => $normalizedPsychomotor,
             'psychomotor_labels' => $normalizedPsychomotorLabels,
             'quiz_max' => $quizMax,

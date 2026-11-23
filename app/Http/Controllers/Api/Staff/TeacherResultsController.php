@@ -351,15 +351,22 @@ class TeacherResultsController extends Controller
       if ($usesClassicComponents) {
         $rules['scores.*.classic_components'] = 'nullable|array';
         $rules['scores.*.classic_components.psychomotor'] = 'nullable|array|size:5';
-        foreach ($assessmentSchema['psychomotor_maxes'] as $index => $maximum) {
-          $rules['scores.*.classic_components.psychomotor.' . $index] = 'nullable|integer|min:0|max:' . (int) $maximum;
-        }
-        $rules['scores.*.classic_components.quiz'] = 'nullable|integer|min:0|max:' . (int) $assessmentSchema['quiz_max'];
-        $rules['scores.*.classic_components.note_copying'] = 'nullable|integer|min:0|max:' . (int) $assessmentSchema['note_copying_max'];
+        $rules['scores.*.classic_components.psychomotor.*'] = 'nullable|integer|min:0|max:100';
+        $rules['scores.*.classic_components.quiz'] = 'nullable|integer|min:0|max:100';
+        $rules['scores.*.classic_components.note_copying'] = 'nullable|integer|min:0|max:100';
       }
     }
 
     $payload = $request->validate($rules);
+
+    // A result snapshot is immutable for grading shape. This keeps previously uploaded
+    // Classic Full records intact when a school changes the template for new entries.
+    $existingResultsByStudent = Result::query()
+      ->where('school_id', $schoolId)
+      ->where('term_subject_id', $termSubject->id)
+      ->whereIn('student_id', collect($payload['scores'])->pluck('student_id')->map(fn ($id) => (int) $id)->all())
+      ->get(['student_id', 'assessment_profile', 'classic_components'])
+      ->keyBy('student_id');
 
     $eligibleStudentIdsQuery = Enrollment::query()
       ->where('enrollments.class_id', $termSubject->class_id)
@@ -404,42 +411,50 @@ class TeacherResultsController extends Controller
           'exam' => 0,
           'teacher_comment' => trim((string) ($score['teacher_comment'] ?? '')),
           'classic_components' => null,
+          'uses_classic_components' => false,
           'assessment_profile' => $assessmentSchema,
         ];
         continue;
       }
 
+      $existingResult = $existingResultsByStudent->get($studentId);
+      $rowSchema = AssessmentSchema::schemaForResult($existingResult?->assessment_profile ?? null, $assessmentSchema);
+      $rowCaMaxes = $rowSchema['ca_maxes'];
+      $rowCaSlotCount = max(1, count($rowCaMaxes));
+      $rowCaTotalMax = array_sum($rowCaMaxes);
+      $rowExamMax = (int) $rowSchema['exam_max'];
+      $rowUsesClassicComponents = AssessmentSchema::usesClassicComponents($rowSchema);
       $rawBreakdown = $score['ca_breakdown'] ?? null;
       $legacyCa = (int) ($score['ca'] ?? 0);
 
       if (is_array($rawBreakdown)) {
-        for ($i = 0; $i < $caSlotCount; $i++) {
+        for ($i = 0; $i < $rowCaSlotCount; $i++) {
           $inputVal = (int) ($rawBreakdown[$i] ?? 0);
-          if ($inputVal > (int) $caMaxes[$i]) {
+          if ($inputVal > (int) $rowCaMaxes[$i]) {
             $errors["scores.$idx.ca_breakdown.$i"] = [
-              'CA' . ($i + 1) . " score cannot be more than {$caMaxes[$i]}.",
+              'CA' . ($i + 1) . " score cannot be more than {$rowCaMaxes[$i]}.",
             ];
           }
         }
-      } elseif ($legacyCa > $caTotalMax) {
+      } elseif ($legacyCa > $rowCaTotalMax) {
         $errors["scores.$idx.ca"] = [
-          "CA score cannot be more than {$caTotalMax}.",
+          "CA score cannot be more than {$rowCaTotalMax}.",
         ];
       }
 
-      $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $assessmentSchema, $legacyCa);
+      $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $rowSchema, $legacyCa);
       $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
       $exam = (int) ($score['exam'] ?? 0);
-      if ($exam > $examMax) {
+      if ($exam > $rowExamMax) {
         $errors["scores.$idx.exam"] = [
-          "Exam score cannot be more than {$examMax}.",
+          "Exam score cannot be more than {$rowExamMax}.",
         ];
       }
 
-      $classicComponents = $usesClassicComponents
-        ? ClassicResultComponents::normalize($score['classic_components'] ?? null, $assessmentSchema)
+      $classicComponents = $rowUsesClassicComponents
+        ? ClassicResultComponents::normalize($score['classic_components'] ?? ($existingResult?->classic_components ?? null), $rowSchema)
         : null;
-      if (AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $classicComponents, $assessmentSchema) > 100) {
+      if (AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $classicComponents, $rowSchema) > 100) {
         $errors["scores.$idx.total"] = ['The combined assessment score cannot be more than 100.'];
       }
 
@@ -449,7 +464,8 @@ class TeacherResultsController extends Controller
         'ca_breakdown' => $caBreakdown,
         'exam' => $exam,
         'classic_components' => $classicComponents,
-        'assessment_profile' => $assessmentSchema,
+        'uses_classic_components' => $rowUsesClassicComponents,
+        'assessment_profile' => $rowSchema,
       ];
     }
 
@@ -458,7 +474,7 @@ class TeacherResultsController extends Controller
     }
 
     $hasAssessmentProfile = $this->hasAssessmentProfileColumn();
-    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment, $hasClassicComponents, $usesClassicComponents, $hasAssessmentProfile) {
+    DB::transaction(function () use ($preparedScores, $termSubject, $schoolId, $commentsOnly, $hasTeacherComment, $hasClassicComponents, $hasAssessmentProfile) {
       $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
       foreach ($preparedScores as $score) {
         $updateData = [
@@ -472,7 +488,7 @@ class TeacherResultsController extends Controller
           $updateData['teacher_comment'] = $commentsOnly ? $score['teacher_comment'] : null;
         }
         if ($hasClassicComponents) {
-          $updateData['classic_components'] = $usesClassicComponents ? $score['classic_components'] : null;
+          $updateData['classic_components'] = $score['uses_classic_components'] ? $score['classic_components'] : null;
         }
         if ($hasAssessmentProfile) {
           $updateData['assessment_profile'] = $score['assessment_profile'];

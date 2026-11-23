@@ -32,6 +32,9 @@ export default function Promotion() {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, name: "" });
 
+  const [restoreTargetClassId, setRestoreTargetClassId] = useState("");
+  const [selectedRestoreStudentIds, setSelectedRestoreStudentIds] = useState([]);
+  const [restoringStudents, setRestoringStudents] = useState(false);
   const schoolName = useMemo(() => {
     const u = getStoredUser();
     return u?.school?.name || u?.school_name || "School";
@@ -50,6 +53,12 @@ export default function Promotion() {
   const allPromotableSelected =
     promotableStudents.length > 0 && selectedPromotableIds.length === promotableStudents.length;
 
+  const currentSessionClasses = useMemo(
+    () => levels.flatMap((item) => (item.classes || []).map((classRow) => ({ ...classRow, levelLabel: prettyLevel(classRow.level) }))),
+    [levels]
+  );
+  const restoreDestination = currentSessionClasses.find((classRow) => Number(classRow.id) === Number(restoreTargetClassId)) || null;
+  const allRestoreStudentsSelected = students.length > 0 && selectedRestoreStudentIds.length === students.length;
   const loadClasses = async () => {
     setLoadingLevels(true);
     try {
@@ -77,6 +86,8 @@ export default function Promotion() {
   const loadClassStudents = async (classRow) => {
     setSelectedClass(classRow);
     setSelectedStudentIds([]);
+    setSelectedRestoreStudentIds([]);
+    setRestoreTargetClassId("");
     setLoadingStudents(true);
     try {
       const res = await api.get(`/api/school-admin/promotion/classes/${classRow.id}/students`);
@@ -185,6 +196,36 @@ export default function Promotion() {
     } finally {
       setBulkDemoting(false);
       setSelectedStudentIds([]);
+    }
+  };
+  const toggleRestoreStudentSelection = (studentId) => {
+    setSelectedRestoreStudentIds((previous) => (
+      previous.includes(studentId) ? previous.filter((id) => id !== studentId) : [...previous, studentId]
+    ));
+  };
+
+  const toggleSelectAllForRestore = () => {
+    setSelectedRestoreStudentIds(allRestoreStudentsSelected ? [] : students.map((row) => row.student_id));
+  };
+
+  const restoreAccidentallyPromotedStudents = async () => {
+    if (!selectedClass?.id || !restoreDestination || selectedRestoreStudentIds.length === 0) return;
+    const warning = `Restore ${selectedRestoreStudentIds.length} selected old student(s) from ${selectedClass.name} to ${restoreDestination.name}? Only the students ticked below will move. Newly admitted students must remain unticked.`;
+    if (!window.confirm(warning)) return;
+
+    setRestoringStudents(true);
+    try {
+      const response = await api.post(`/api/school-admin/promotion/classes/${selectedClass.id}/restore`, {
+        target_class_id: restoreDestination.id,
+        student_ids: selectedRestoreStudentIds,
+      });
+      alert(response.data?.message || "Selected students were restored successfully.");
+      await loadClassStudents(selectedClass);
+      await loadClasses();
+    } catch (error) {
+      alert(error?.response?.data?.message || "Unable to restore the selected students.");
+    } finally {
+      setRestoringStudents(false);
     }
   };
   useEffect(() => {
@@ -369,6 +410,45 @@ export default function Promotion() {
               </div>
             )}
           </div>
+        ) : null}
+        {selectedClass && !loadingStudents ? (
+          <section className="payx-card promo-recovery-card">
+            <div className="promo-selected-head">
+              <div>
+                <span className="payx-pill">Accidental Double Promotion Recovery</span>
+                <h3>Return only selected old students by one class</h3>
+                <p className="promo-selected-text">Choose the class they should return to, then tick only students affected by the accidental promotion. Newly admitted students are not selected automatically and will remain in {selectedClass.name}.</p>
+              </div>
+              <button className="payx-btn" type="button" onClick={restoreAccidentallyPromotedStudents} disabled={!restoreDestination || selectedRestoreStudentIds.length === 0 || restoringStudents} style={{ background: "#b45309", borderColor: "#92400e" }}>
+                {restoringStudents ? "Restoring..." : `Restore ${selectedRestoreStudentIds.length || ""} Student${selectedRestoreStudentIds.length === 1 ? "" : "s"}`}
+              </button>
+            </div>
+            <div className="promo-recovery-controls">
+              <label htmlFor="restore-target-class">Return selected students to</label>
+              <select id="restore-target-class" value={restoreTargetClassId} onChange={(event) => setRestoreTargetClassId(event.target.value)} disabled={restoringStudents}>
+                <option value="">Choose the original class</option>
+                {currentSessionClasses.filter((classRow) => classRow.id !== selectedClass.id).map((classRow) => (
+                  <option key={classRow.id} value={classRow.id}>{classRow.name} ({classRow.levelLabel})</option>
+                ))}
+              </select>
+            </div>
+            <p className="promo-recovery-warning">This recovery updates selected students only. It is blocked if a selected student already has results in the wrongly advanced class, protecting marks and result history.</p>
+            <div className="payx-table-wrap">
+              <table className="payx-table">
+                <thead><tr>
+                  <th style={{ width: 60 }}><input type="checkbox" checked={allRestoreStudentsSelected} onChange={toggleSelectAllForRestore} disabled={students.length === 0 || restoringStudents} aria-label="Select all students for class recovery" /></th>
+                  <th style={{ width: 70 }}>S/N</th><th>Name</th><th>Email</th>
+                </tr></thead>
+                <tbody>
+                  {students.map((row) => <tr key={`restore-${row.student_id}`}>
+                    <td><input type="checkbox" checked={selectedRestoreStudentIds.includes(row.student_id)} onChange={() => toggleRestoreStudentSelection(row.student_id)} disabled={restoringStudents} aria-label={`Select ${row.name} for class recovery`} /></td>
+                    <td>{row.sn}</td><td>{row.name}</td><td>{row.email || "-"}</td>
+                  </tr>)}
+                  {students.length === 0 ? <tr><td colSpan="4">No students are enrolled in this class.</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
         ) : null}
       </section>
     </div>

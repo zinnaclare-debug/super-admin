@@ -386,6 +386,9 @@ Route::patch('/school-admin/entrance-exam/applications/{application}/status', [S
     Route::post('/school-admin/promotion/classes/{class}/students/{student}/demote', [PromotionController::class, 'demote'])
         ->middleware('feature:academic_session');
 
+    Route::post('/school-admin/promotion/classes/{class}/restore', [PromotionController::class, 'restoreAccidentallyPromotedStudents'])
+        ->middleware('feature:academic_session');
+
     Route::post('/school-admin/promotion/classes/{class}/students/{student}/promote', [PromotionController::class, 'promote'])
         ->middleware('feature:academic_session');
 
