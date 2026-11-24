@@ -208,13 +208,15 @@ class BehaviourRatingController extends Controller
     $behaviourSchema = BehaviourSchema::normalize($school?->behaviour_schema);
     $commentOnly = ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $ctx['class']->level ?? null, $ctx['class']->name ?? null);
     $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
+    $behaviourRatingFormat = BehaviourSchema::normalizeFormat($school?->behaviour_rating_format);
 
-    $students = $enrollments->map(function ($s) use ($ratings, $behaviourSchema, $commentOnlySchema) {
+    $students = $enrollments->map(function ($s) use ($ratings, $behaviourSchema, $commentOnlySchema, $behaviourRatingFormat) {
       $r = $ratings->get($s->student_id);
       return [
         'student_id' => (int)$s->student_id,
         'student_name' => $s->student_name,
         'ratings' => BehaviourSchema::values($r, $behaviourSchema),
+        'behaviour_rating_format' => BehaviourSchema::normalizeFormat($r?->behaviour_rating_format ?? $behaviourRatingFormat),
         'teacher_comment' => (string)($r->teacher_comment ?? ''),
         'learning_observations' => CommentOnlySchema::observations($r?->learning_observations, $commentOnlySchema),
       ];
@@ -232,6 +234,7 @@ class BehaviourRatingController extends Controller
         'selected_class_id' => (int)$ctx['class']->id,
         'selected_term_id' => (int)$ctx['term']->id,
         'behaviour_schema' => $behaviourSchema,
+        'behaviour_rating_format' => $behaviourRatingFormat,
         'comments_only' => $commentOnly,
         'comment_only_schema' => $commentOnlySchema,
         'students' => $students,
@@ -295,7 +298,6 @@ class BehaviourRatingController extends Controller
     $criteria = BehaviourSchema::normalize($school?->behaviour_schema)['criteria'];
     $commentOnly = ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $ctx['class']->level ?? null, $ctx['class']->name ?? null);
     $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
-
     DB::transaction(function () use ($data, $schoolId, $school, $user, $ctx, $validSet, $criteria, $commentOnly, $commentOnlySchema) {
       foreach ($data['rows'] as $row) {
         $studentId = (int)$row['student_id'];

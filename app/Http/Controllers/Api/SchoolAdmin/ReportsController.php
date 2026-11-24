@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Student\ResultsController as StudentResultsControll
 use App\Jobs\GenerateSchoolAdminDocumentJob;
 use App\Models\GeneratedDocument;
 use App\Support\GeneratedDocumentData;
+use App\Support\BehaviourSchema;
 use App\Models\AcademicSession;
 use App\Models\Term;
 use Dompdf\Dompdf;
@@ -1371,6 +1372,7 @@ class ReportsController extends Controller
                 ->where('term_id', $termId)
                 ->select([
                     'student_id',
+                    'behaviour_rating_format',
                     'handwriting',
                     'speech',
                     'attitude',
@@ -1382,14 +1384,15 @@ class ReportsController extends Controller
                 ->get()
                 ->keyBy(fn ($row) => (int) $row->student_id)
                 ->map(function ($row) {
+                    $format = BehaviourSchema::normalizeFormat($row->behaviour_rating_format ?? 'number');
                     $pairs = [
-                        'HW' => (int) ($row->handwriting ?? 0),
-                        'SP' => (int) ($row->speech ?? 0),
-                        'AT' => (int) ($row->attitude ?? 0),
-                        'RD' => (int) ($row->reading ?? 0),
-                        'PU' => (int) ($row->punctuality ?? 0),
-                        'TW' => (int) ($row->teamwork ?? 0),
-                        'SC' => (int) ($row->self_control ?? 0),
+                        'HW' => BehaviourSchema::formatValue($row->handwriting ?? 0, $format),
+                        'SP' => BehaviourSchema::formatValue($row->speech ?? 0, $format),
+                        'AT' => BehaviourSchema::formatValue($row->attitude ?? 0, $format),
+                        'RD' => BehaviourSchema::formatValue($row->reading ?? 0, $format),
+                        'PU' => BehaviourSchema::formatValue($row->punctuality ?? 0, $format),
+                        'TW' => BehaviourSchema::formatValue($row->teamwork ?? 0, $format),
+                        'SC' => BehaviourSchema::formatValue($row->self_control ?? 0, $format),
                     ];
 
                     return collect($pairs)

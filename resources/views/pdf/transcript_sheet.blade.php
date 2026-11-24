@@ -188,7 +188,7 @@
                         @forelse((array) $behaviourTraits as $trait)
                             <tr>
                                 <td>{{ strtoupper((string) ($trait['label'] ?? '-')) }}</td>
-                                <td class="center">{{ (int) ($trait['value'] ?? 0) }}</td>
+                                <td class="center">{{ $trait['value'] ?? '-' }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -204,16 +204,12 @@
                     <table>
                         <thead>
                         <tr>
-                            <th>RATE KEY</th>
-                            <th>SET</th>
+                            <th colspan="2">RATE KEY</th>
                         </tr>
                         </thead>
                         <tbody>
-                            <tr><td>EXCELLENT</td><td class="center">5</td></tr>
-                            <tr><td>VERY GOOD</td><td class="center">4</td></tr>
-                            <tr><td>SATISFACTORY</td><td class="center">3</td></tr>
-                            <tr><td>POOR</td><td class="center">2</td></tr>
-                            <tr><td>VERY POOR</td><td class="center">1</td></tr>
+                            @php($ratingKey = \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number'))
+                            <tr><td colspan="2" class="center">{{ $ratingKey }}</td></tr>
                         </tbody>
                     </table>
                 </td>

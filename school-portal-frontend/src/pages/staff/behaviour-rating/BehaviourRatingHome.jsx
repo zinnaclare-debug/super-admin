@@ -11,6 +11,9 @@ const DEFAULT_CRITERIA = [
   "Teamwork", "Self Control", "Neatness", "Honesty", "Obedience",
 ].map((label, index) => ({ key: `criterion_${index + 1}`, label }));
 
+const SCORE_TO_LETTER = ["-", "E", "D", "C", "B", "A"];
+const LETTER_TO_SCORE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
+
 const DEFAULT_COMMENT_ONLY_CRITERIA = Array.from({ length: 10 }, (_, index) => ({
   key: `learning_area_${index + 1}`,
   label: `Learning Area ${index + 1}`,
@@ -25,6 +28,7 @@ export default function BehaviourRatingHome() {
   const [termId, setTermId] = useState("");
   const [students, setStudents] = useState([]);
   const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
+  const [ratingFormat, setRatingFormat] = useState("number");
   const [commentsOnly, setCommentsOnly] = useState(false);
   const [commentOnlyCriteria, setCommentOnlyCriteria] = useState(DEFAULT_COMMENT_ONLY_CRITERIA);
 
@@ -51,6 +55,7 @@ export default function BehaviourRatingHome() {
       setClassId(String(data.selected_class_id || ""));
       setTermId(String(data.selected_term_id || ""));
       setCriteria(Array.isArray(data.behaviour_schema?.criteria) ? data.behaviour_schema.criteria : DEFAULT_CRITERIA);
+      setRatingFormat(data.behaviour_rating_format === "letter" ? "letter" : "number");
       setCommentsOnly(Boolean(data.comments_only));
       setCommentOnlyCriteria(Array.isArray(data.comment_only_schema?.criteria) ? data.comment_only_schema.criteria : DEFAULT_COMMENT_ONLY_CRITERIA);
       setStudents(data.students || []);
@@ -103,11 +108,12 @@ export default function BehaviourRatingHome() {
             <span className="bvr-pill">Staff Behaviour Rating</span>
             <h2>Rate classroom behaviour with structure and speed</h2>
             <p className="bvr-subtitle">
-              Select your assigned non-comments-only class, score behaviour criteria on a 0-5 scale, and save current-term ratings for each student. Comments-only classes use their Assessment Sheet on the Results page instead.
+              Rate each behaviour criterion using the school-selected format. Existing ratings retain their original number or letter format. Comments-only classes use their Assessment Sheet on the Results page instead.
             </p>
             <div className="bvr-metrics">
               <span>{loading ? "Loading..." : `${students.length} student${students.length === 1 ? "" : "s"}`}</span>
               <span>{commentsOnly ? `${commentOnlyCriteria.length} learning areas` : `${criteria.length} behaviour criteria`}</span>
+              {!commentsOnly ? <span>{ratingFormat === "letter" ? "Letter entry (E-A)" : "Number entry (1-5)"}</span> : null}
             </div>
           </div>
 
@@ -178,25 +184,50 @@ export default function BehaviourRatingHome() {
                     <tr key={s.student_id}>
                       <td>{idx + 1}</td>
                       <td>{s.student_name}</td>
-                      {criteria.map((criterion) => (
-                        <td key={criterion.key}>
-                          <input
-                            className="bvr-field bvr-field--score"
-                            type="number"
-                            min="0"
-                            max="5"
-                            value={s.ratings?.[criterion.key] ?? 0}
-                            onChange={(e) => {
-                              const v = Number(e.target.value || 0);
-                              setStudents((prev) =>
-                                prev.map((x) => (x.student_id === s.student_id
-                                  ? { ...x, ratings: { ...x.ratings, [criterion.key]: v } }
-                                  : x))
-                              );
-                            }}
-                          />
-                        </td>
-                      ))}
+                      {criteria.map((criterion) => {
+                        const inputFormat = s.behaviour_rating_format || ratingFormat;
+                        const score = Number(s.ratings?.[criterion.key] || 0);
+                        return (
+                          <td key={criterion.key}>
+                            {inputFormat === "letter" ? (
+                              <select
+                                className="bvr-field bvr-field--score"
+                                value={SCORE_TO_LETTER[score] || "0"}
+                                onChange={(event) => {
+                                  const selected = event.target.value;
+                                  const nextScore = selected === "0" ? 0 : LETTER_TO_SCORE[selected];
+                                  setStudents((previous) => previous.map((student) => (
+                                    student.student_id === s.student_id
+                                      ? { ...student, ratings: { ...student.ratings, [criterion.key]: nextScore } }
+                                      : student
+                                  )));
+                                }}
+                                aria-label={`${s.student_name} ${criterion.label} rating letter`}
+                              >
+                                <option value="0">-</option>
+                                {Object.keys(LETTER_TO_SCORE).map((letter) => <option key={letter} value={letter}>{letter}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                className="bvr-field bvr-field--score"
+                                type="number"
+                                min="0"
+                                max="5"
+                                value={score}
+                                onChange={(event) => {
+                                  const value = Math.max(0, Math.min(5, Number(event.target.value || 0)));
+                                  setStudents((previous) => previous.map((student) => (
+                                    student.student_id === s.student_id
+                                      ? { ...student, ratings: { ...student.ratings, [criterion.key]: value } }
+                                      : student
+                                  )));
+                                }}
+                                aria-label={`${s.student_name} ${criterion.label} numeric rating`}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
 
                     </tr>
                   ))}
