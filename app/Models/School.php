@@ -22,6 +22,7 @@ class School extends Model
         'grading_schema',
         'result_template_config',
         'behaviour_schema',
+        'behaviour_rating_format',
         'comment_only_schema',
         'department_templates',
         'class_templates',

@@ -1038,3 +1038,40 @@
   }
 }
 .sai-note--error { color: #b91c1c; font-weight: 700; }
+
+.sai-behaviour-format {
+  margin-top: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(120deg, #eff6ff, #f0fdfa);
+}
+
+.sai-behaviour-format > div:first-child { flex: 1 1 280px; }
+.sai-behaviour-format p { margin: 5px 0; color: #475569; font-size: 13px; }
+.sai-behaviour-format small { color: #0f766e; font-weight: 700; }
+.sai-behaviour-format label { display: grid; gap: 5px; color: #334155; font-size: 12px; font-weight: 700; }
+.sai-behaviour-format select {
+  min-width: 180px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #0f172a;
+  background: white;
+  font: inherit;
+}
+.sai-behaviour-format button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: white;
+  background: linear-gradient(125deg, #1d4ed8, #0f766e);
+  font-weight: 700;
+  cursor: pointer;
+}
+.sai-behaviour-format button:disabled { opacity: .7; cursor: wait; }

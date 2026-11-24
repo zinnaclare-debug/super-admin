@@ -422,11 +422,7 @@
             </table>
             <div class="key-rating-line">
                 <strong>KEY RATING:</strong>
-                5 - EXCELLENT
-                &nbsp;&nbsp;&nbsp; 4 - VERY GOOD
-                &nbsp;&nbsp;&nbsp; 3 - SATISFACTORY
-                &nbsp;&nbsp;&nbsp; 2 - POOR
-                &nbsp;&nbsp;&nbsp; 1 - VERY POOR
+                {{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}
             </div>
         @endif
 

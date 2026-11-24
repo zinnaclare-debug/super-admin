@@ -296,7 +296,7 @@ class BehaviourRatingController extends Controller
     $commentOnly = ClassTemplateSchema::commentsOnlyForClass($school?->class_templates, $ctx['class']->level ?? null, $ctx['class']->name ?? null);
     $commentOnlySchema = CommentOnlySchema::normalize($school?->comment_only_schema);
 
-    DB::transaction(function () use ($data, $schoolId, $user, $ctx, $validSet, $criteria, $commentOnly, $commentOnlySchema) {
+    DB::transaction(function () use ($data, $schoolId, $school, $user, $ctx, $validSet, $criteria, $commentOnly, $commentOnlySchema) {
       foreach ($data['rows'] as $row) {
         $studentId = (int)$row['student_id'];
         if (!isset($validSet[$studentId])) continue;
@@ -307,24 +307,27 @@ class BehaviourRatingController extends Controller
           $ratings[$key] = max(0, min(5, (int) ($row['ratings'][$key] ?? 0)));
         }
 
-        StudentBehaviourRating::updateOrCreate(
-          [
-            'school_id' => $schoolId,
-            'class_id' => $ctx['class']->id,
-            'term_id' => $ctx['term']->id,
-            'student_id' => $studentId,
-          ],
-          [
-            ...BehaviourSchema::legacyValues($ratings),
-            'ratings' => $ratings,
-            'teacher_comment' => isset($row['teacher_comment']) ? (trim((string)$row['teacher_comment']) ?: null) : null,
-            ...($commentOnly ? [
-              'learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema),
-              'learning_area_schema' => $commentOnlySchema,
-            ] : []),
-            'set_by_user_id' => $user->id,
-          ]
-        );
+        $rating = StudentBehaviourRating::firstOrNew([
+          'school_id' => $schoolId,
+          'class_id' => $ctx['class']->id,
+          'term_id' => $ctx['term']->id,
+          'student_id' => $studentId,
+        ]);
+        if (!$rating->exists) {
+          $rating->behaviour_rating_format = BehaviourSchema::normalizeFormat($school?->behaviour_rating_format);
+        }
+
+        $rating->fill([
+          ...BehaviourSchema::legacyValues($ratings),
+          'ratings' => $ratings,
+          'teacher_comment' => isset($row['teacher_comment']) ? (trim((string)$row['teacher_comment']) ?: null) : null,
+          ...($commentOnly ? [
+            'learning_observations' => CommentOnlySchema::observations($row['learning_observations'] ?? [], $commentOnlySchema),
+            'learning_area_schema' => $commentOnlySchema,
+          ] : []),
+          'set_by_user_id' => $user->id,
+        ]);
+        $rating->save();
       }
     });
 

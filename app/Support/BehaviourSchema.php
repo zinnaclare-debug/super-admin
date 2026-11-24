@@ -49,14 +49,37 @@ final class BehaviourSchema
         return $values;
     }
 
+    public static function normalizeFormat(mixed $format): string
+    {
+        return $format === 'letter' ? 'letter' : 'number';
+    }
+
+    public static function formatValue(mixed $value, mixed $format): string
+    {
+        $score = max(0, min(5, (int) $value));
+        if (self::normalizeFormat($format) === 'letter') {
+            return [0 => '-', 1 => 'E', 2 => 'D', 3 => 'C', 4 => 'B', 5 => 'A'][$score];
+        }
+
+        return (string) $score;
+    }
+
+    public static function displayKey(mixed $format): string
+    {
+        return self::normalizeFormat($format) === 'letter'
+            ? 'A - EXCELLENT | B - VERY GOOD | C - SATISFACTORY | D - POOR | E - VERY POOR'
+            : '5 - EXCELLENT | 4 - VERY GOOD | 3 - SATISFACTORY | 2 - POOR | 1 - VERY POOR';
+    }
     public static function traits(?StudentBehaviourRating $rating, mixed $schema): array
     {
         $criteria = self::normalize($schema)['criteria'];
         $values = self::values($rating, $schema);
+        $format = self::normalizeFormat($rating?->behaviour_rating_format);
 
         return array_map(fn (array $criterion) => [
             'label' => $criterion['label'],
-            'value' => $values[$criterion['key']] ?? 0,
+            'value' => self::formatValue($values[$criterion['key']] ?? 0, $format),
+            'format' => $format,
         ], $criteria);
     }
 

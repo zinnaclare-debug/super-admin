@@ -266,6 +266,7 @@ class SchoolController extends Controller
                 'subdomain' => $school->subdomain,
                 'email' => $school->email,
                 'school_admin_login_limit' => $this->schoolAdminLoginLimit($school),
+                'behaviour_rating_format' => in_array($school->behaviour_rating_format, ['number', 'letter'], true) ? $school->behaviour_rating_format : 'number',
             ],
             'branding' => [
                 'school_location' => $school->location,
@@ -873,6 +874,20 @@ class SchoolController extends Controller
         return $normalized;
     }
 
+    public function updateBehaviourRatingFormat(Request $request, School $school)
+    {
+        $payload = $request->validate([
+            'format' => 'required|in:number,letter',
+        ]);
+
+        $school->behaviour_rating_format = $payload['format'];
+        $school->save();
+
+        return response()->json([
+            'message' => 'Default behaviour rating format saved. New ratings will use this format; existing ratings are unchanged.',
+            'format' => $school->behaviour_rating_format,
+        ]);
+    }
     public function updateInformationClassTemplates(Request $request, School $school)
     {
         $payload = $request->validate([

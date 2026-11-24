@@ -1699,23 +1699,28 @@ class ResultsController extends Controller
             ->whereIn('term_id', $termIds)
             ->get();
 
+        $ratingsByTerm = $ratings->keyBy('term_id');
+        $displayFormat = collect(array_reverse($termIds))
+            ->map(fn ($termId) => $ratingsByTerm->get($termId)?->behaviour_rating_format)
+            ->first(fn ($format) => filled($format)) ?? 'number';
         $criteria = BehaviourSchema::normalize($schema)['criteria'];
         return collect($criteria)
-            ->map(function (array $criterion) use ($ratings, $schema) {
+            ->map(function (array $criterion) use ($ratings, $schema, $displayFormat) {
                 $values = $ratings
                     ->map(fn ($rating) => BehaviourSchema::values($rating, $schema)[$criterion['key']] ?? 0)
                     ->filter(fn (int $value) => $value > 0)
                     ->values();
+                $average = $values->isEmpty() ? 0 : (int) round((float) $values->avg());
 
                 return [
                     'label' => $criterion['label'],
-                    'value' => $values->isEmpty() ? 0 : (int) round((float) $values->avg()),
+                    'value' => BehaviourSchema::formatValue($average, $displayFormat),
+                    'format' => BehaviourSchema::normalizeFormat($displayFormat),
                 ];
             })
             ->values()
             ->all();
     }
-
     private function buildCumulativeClassPositionStats(int $schoolId, int $classId, AcademicSession $session, Term $selectedTerm): array
     {
         $studentIdsQuery = Enrollment::query()
@@ -2640,6 +2645,8 @@ class ResultsController extends Controller
             $rowsHtml = '<tr><td colspan="' . ($isCumulative ? 7 : 5 + count($activeCaIndices) + ($isClassic ? 7 : 0) + ($showThirdTermPreviousTotals ? 4 : 0)) . '" style="text-align:center;">No result data found.</td></tr>';
         }
 
+        $behaviourRatingFormat = (string) data_get($behaviourTraits, '0.format', 'number');
+        $behaviourKey = BehaviourSchema::displayKey($behaviourRatingFormat);
         $behaviourCellsPerRow = 5;
         $behaviourHeaderHtml = '';
         for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
@@ -2731,7 +2738,7 @@ class ResultsController extends Controller
             . $behaviourRowsHtml
             . '</tbody></table>'
             . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
-            . '<td style="width:82%;">5 - EXCELLENT | 4 - VERY GOOD | 3 - SATISFACTORY | 2 - POOR | 1 - VERY POOR</td></tr></table>'
+            . '<td style="width:82%;">' . e($behaviourKey) . '</td></tr></table>'
             . '<div class="footer-container">'
             . '<table class="grid" style="margin-top:0;"><tr><td style="width:74%;">'
             . '<table class="info-box"><tr><th>Head of School Name</th><td>' . e($headName) . '</td></tr></table>'

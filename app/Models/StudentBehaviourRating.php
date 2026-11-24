@@ -19,6 +19,7 @@ class StudentBehaviourRating extends Model
     'teamwork',
     'self_control',
     'ratings',
+    'behaviour_rating_format',
     'learning_observations',
     'learning_area_schema',
     'teacher_comment',

@@ -274,6 +274,7 @@ export default function SchoolInformation() {
   const [savingGradingSchema, setSavingGradingSchema] = useState(false);
   const [savingResultTemplate, setSavingResultTemplate] = useState(false);
   const [savingClassTemplates, setSavingClassTemplates] = useState(false);
+  const [savingBehaviourRatingFormat, setSavingBehaviourRatingFormat] = useState(false);
   const [importingHistory, setImportingHistory] = useState(false);
   const [historyFile, setHistoryFile] = useState(null);
   const [makeLatestSessionCurrent, setMakeLatestSessionCurrent] = useState(false);
@@ -315,6 +316,7 @@ export default function SchoolInformation() {
   const [gradingRows, setGradingRows] = useState(() => normalizeGradingRows([]));
   const [resultTemplate, setResultTemplate] = useState(() => normalizeResultTemplate(DEFAULT_RESULT_TEMPLATE));
   const [classTemplates, setClassTemplates] = useState([]);
+  const [behaviourRatingFormat, setBehaviourRatingFormat] = useState("number");
   const activeEducationLevels = useMemo(
     () => classTemplates.filter((section) => section.enabled && section.key),
     [classTemplates]
@@ -328,6 +330,7 @@ export default function SchoolInformation() {
         const payload = res.data || {};
         const brandingData = payload.branding || {};
         setSchool(payload.school || null);
+        setBehaviourRatingFormat(payload.school?.behaviour_rating_format === "letter" ? "letter" : "number");
         setSchoolAdminLoginLimit(Number(payload.school?.school_admin_login_limit || 2));
         setBranding({
           school_location: brandingData.school_location ?? "",
@@ -888,6 +891,20 @@ export default function SchoolInformation() {
     }
   };
 
+  const saveBehaviourRatingFormat = async () => {
+    setSavingBehaviourRatingFormat(true);
+    try {
+      const res = await api.put(`/api/super-admin/schools/${schoolId}/information/behaviour-rating-format`, {
+        format: behaviourRatingFormat,
+      });
+      setSchool((current) => ({ ...current, behaviour_rating_format: res.data?.format || behaviourRatingFormat }));
+      alert("Default behaviour rating format saved. Previously graded results keep their saved format.");
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to save behaviour rating format.");
+    } finally {
+      setSavingBehaviourRatingFormat(false);
+    }
+  };
   const downloadHistoryTemplate = async () => {
     try {
       const res = await api.get(`/api/super-admin/schools/${schoolId}/information/history-import/template`, {
@@ -1453,6 +1470,24 @@ export default function SchoolInformation() {
         <div className="sai-actions">
           <button type="button" onClick={saveClassTemplates} disabled={savingClassTemplates}>
             {savingClassTemplates ? "Saving..." : "Save Class Templates"}
+          </button>
+        </div>
+
+        <div className="sai-behaviour-format">
+          <div>
+            <strong>Behaviour Rating Display</strong>
+            <p>Choose how newly graded behaviour ratings appear in compact and classic results. Existing ratings keep their saved format.</p>
+            {behaviourRatingFormat === "letter" ? <small>Mapping: 1 = E, 2 = D, 3 = C, 4 = B, 5 = A</small> : <small>Ratings display as numbers from 1 to 5.</small>}
+          </div>
+          <label>
+            <span>Default format</span>
+            <select value={behaviourRatingFormat} onChange={(event) => setBehaviourRatingFormat(event.target.value)} disabled={savingBehaviourRatingFormat}>
+              <option value="number">Numbers (1-5)</option>
+              <option value="letter">Letters (E-A)</option>
+            </select>
+          </label>
+          <button type="button" onClick={saveBehaviourRatingFormat} disabled={savingBehaviourRatingFormat}>
+            {savingBehaviourRatingFormat ? "Saving..." : "Save Behaviour Rating Format"}
           </button>
         </div>
       </section>
