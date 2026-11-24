@@ -93,12 +93,12 @@ table { width: 100%; border-collapse: collapse; }
 @if($showTermTotals)<td>{{ $row['first_term_total'] ?? '-' }}</td><td>{{ $row['second_term_total'] ?? '-' }}</td><td>{{ $row['third_term_total'] ?? '-' }}</td>@endif
 @if($showAverage)<td>{{ $row['average'] ?? '-' }}</td>@endif
 @else
-@foreach($caIndices as $index)<td>{{ ($row['ca_breakdown'][$index] ?? '') === '' ? '-' : ($row['ca_breakdown'][$index] ?? '-') }}</td>@endforeach
-<td>{{ $row['exam'] ?? '-' }}</td>
+@foreach($caIndices as $index)@php($caScore = $row['ca_breakdown'][$index] ?? null)<td>{{ ($caScore === null || $caScore === '') ? '-' : \App\Support\AssessmentSchema::formatScore($caScore) }}</td>@endforeach
+<td>{{ array_key_exists('exam', $row) ? \App\Support\AssessmentSchema::formatScore($row['exam']) : '-' }}</td>
 @php($classicComponents = \App\Support\ClassicResultComponents::normalize($row['classic_components'] ?? null, $schema))
 @foreach($classicComponents['psychomotor'] as $component)<td>{{ $component }}</td>@endforeach
 <td>{{ $classicComponents['quiz'] }}</td><td>{{ $classicComponents['note_copying'] }}</td>
-<td>{{ $row['total'] ?? '-' }}</td>
+<td>{{ array_key_exists('total', $row) ? \App\Support\AssessmentSchema::formatScore($row['total']) : '-' }}</td>
 @endif
 <td>{{ strtoupper($row['grade'] ?? '-') }}</td><td>{{ strtoupper($row['remark'] ?? '-') }}</td></tr>
 @empty<tr><td colspan="20" class="center">No result data found.</td></tr>@endforelse

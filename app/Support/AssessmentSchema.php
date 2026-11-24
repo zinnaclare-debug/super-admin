@@ -225,16 +225,16 @@ class AssessmentSchema
 
     public static function totalFromScores(
         mixed $rawBreakdown,
-        int $legacyCa,
-        int $exam,
+        float $legacyCa,
+        float $exam,
         mixed $rawComponents,
         array $schema
-    ): int {
+    ): float {
         $normalized = self::normalizeSchema($schema);
         $breakdown = self::normalizeBreakdown($rawBreakdown, $normalized, $legacyCa);
-        $examScore = max(0, min((int) $normalized['exam_max'], $exam));
+        $examScore = max(0, min((float) $normalized['exam_max'], $exam));
 
-        return min(100, self::breakdownTotal($breakdown) + $examScore + self::componentsTotal($rawComponents, $normalized));
+        return round(min(100, self::breakdownTotal($breakdown) + $examScore + self::componentsTotal($rawComponents, $normalized)), 1);
     }
     public static function activeCaIndices(array $schema): array
     {
@@ -253,7 +253,7 @@ class AssessmentSchema
         return $indices;
     }
 
-    public static function normalizeBreakdown(mixed $rawBreakdown, array $schema, int $legacyCa = 0): array
+    public static function normalizeBreakdown(mixed $rawBreakdown, array $schema, float $legacyCa = 0): array
     {
         $normalizedSchema = self::normalizeSchema($schema);
         $caMaxes = $normalizedSchema['ca_maxes'];
@@ -273,21 +273,21 @@ class AssessmentSchema
             $value = 0;
 
             if (array_key_exists($i, $source)) {
-                $value = (int) $source[$i];
+                $value = (float) $source[$i];
             } elseif (array_key_exists('ca' . ($i + 1), $source)) {
-                $value = (int) $source['ca' . ($i + 1)];
+                $value = (float) $source['ca' . ($i + 1)];
             }
 
-            $breakdown[$i] = max(0, min((int) $caMaxes[$i], $value));
+            $breakdown[$i] = round(max(0, min((float) $caMaxes[$i], $value)), 1);
         }
 
-        if (array_sum($breakdown) === 0 && $legacyCa > 0) {
+        if (self::breakdownTotal($breakdown) === 0.0 && $legacyCa > 0) {
             $remaining = max(0, $legacyCa);
             for ($i = 0; $i < 5; $i++) {
                 if ($remaining <= 0) {
                     break;
                 }
-                $slot = min((int) $caMaxes[$i], $remaining);
+                $slot = min((float) $caMaxes[$i], $remaining);
                 $breakdown[$i] = $slot;
                 $remaining -= $slot;
             }
@@ -296,9 +296,16 @@ class AssessmentSchema
         return $breakdown;
     }
 
-    public static function breakdownTotal(array $breakdown): int
+    public static function breakdownTotal(array $breakdown): float
     {
-        return (int) array_sum(array_map(fn ($v) => (int) $v, $breakdown));
+        return round(array_sum(array_map(fn ($v) => (float) $v, $breakdown)), 1);
+    }
+
+    public static function formatScore(mixed $score): string
+    {
+        $value = round((float) $score, 1);
+
+        return rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.');
     }
 
     public static function formatBreakdown(array $breakdown, array $schema): string
@@ -306,7 +313,7 @@ class AssessmentSchema
         $parts = [];
         $normalizedSchema = self::normalizeSchema($schema);
         foreach (self::activeCaIndices($normalizedSchema) as $index) {
-            $score = (int) ($breakdown[$index] ?? 0);
+            $score = self::formatScore($breakdown[$index] ?? 0);
             $max = (int) ($normalizedSchema['ca_maxes'][$index] ?? 0);
             $label = (string) ($normalizedSchema['ca_labels'][$index] ?? ('CA' . ($index + 1)));
             $parts[] = $label . ': ' . $score . '/' . $max;

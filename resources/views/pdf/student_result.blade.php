@@ -363,7 +363,7 @@
                         @else
                             @foreach($activeCaIndices as $index)
                                 @php($caValue = $row['ca_breakdown'][$index] ?? null)
-                                <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : (int) $caValue }}</td>
+                                <td class="center">{{ ($caValue === null || $caValue === '') ? '-' : \App\Support\AssessmentSchema::formatScore($caValue) }}</td>
                             @endforeach
                             <td class="center">{{ $row['exam'] }}</td>
                             @if($showThirdTermPreviousTotals)

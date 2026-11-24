@@ -325,10 +325,10 @@ class ResultsController extends Controller
                     'combined_total_score' => $this->formatCumulativeScore($combinedTotal),
                     'combined_average' => $this->formatCumulativeScore($combinedAverage),
                     'third_term_combined_grade' => $combinedAverage !== null
-                        ? $this->gradeFromTotal($schoolId, (int) round($combinedAverage))
+                        ? $this->gradeFromTotal($schoolId, (float) $combinedAverage)
                         : ($row['grade'] ?? '-'),
                     'third_term_combined_remark' => $combinedAverage !== null
-                        ? $this->remarkFromTotal($schoolId, (int) round($combinedAverage))
+                        ? $this->remarkFromTotal($schoolId, (float) $combinedAverage)
                         : ($row['remark'] ?? '-'),
                 ]);
             })
@@ -1050,7 +1050,7 @@ class ResultsController extends Controller
         $teacherComment = (string) ($attendance?->comment ?? '');
         if ($teacherComment === '') {
             $teacherComment = $overallGrade !== '-'
-                ? $this->defaultTeacherComment((int) round($averageScore))
+                ? $this->defaultTeacherComment((float) $averageScore)
                 : 'No graded subject available yet.';
         }
 
@@ -1312,11 +1312,11 @@ class ResultsController extends Controller
         $teacherComment = (string) ($attendance?->comment ?? '');
         if ($teacherComment === '') {
             $teacherComment = $overallGrade !== '-'
-                ? $this->defaultTeacherComment((int) round($averageScore))
+                ? $this->defaultTeacherComment((float) $averageScore)
                 : 'No graded subject available yet.';
         }
         $schoolHeadComment = $overallGrade !== '-'
-            ? $this->defaultHeadComment((int) round($averageScore))
+            ? $this->defaultHeadComment((float) $averageScore)
             : 'No graded subject available yet.';
 
         $behaviourTraits = $resultType === self::RESULT_TYPE_CUMULATIVE
@@ -1490,7 +1490,7 @@ class ResultsController extends Controller
         ];
     }
 
-    private function gradedTotalFromResultRow(object $row, array $assessmentSchema): ?int
+    private function gradedTotalFromResultRow(object $row, array $assessmentSchema): ?float
     {
         if (!$this->isResultRecordGraded(
             $row->result_id ?? $row->id ?? null,
@@ -1505,8 +1505,8 @@ class ResultsController extends Controller
         }
 
         $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
-        $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
-        $exam = max(0, min((int) ($rowSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+        $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (float) ($row->ca ?? 0));
+        $exam = max(0, min((float) ($rowSchema['exam_max'] ?? 0), (float) ($row->exam ?? 0)));
 
         return AssessmentSchema::totalFromScores($caBreakdown, AssessmentSchema::breakdownTotal($caBreakdown), $exam, $row->classic_components ?? null, $rowSchema);
     }
@@ -1643,8 +1643,8 @@ class ResultsController extends Controller
                     'average_score' => $average,
                     'average' => $this->formatCumulativeScore($average),
                     'total' => $this->formatCumulativeScore($average),
-                    'grade' => $average !== null ? $this->gradeFromTotal($schoolId, (int) round($average)) : '-',
-                    'remark' => $average !== null ? $this->remarkFromTotal($schoolId, (int) round($average)) : '-',
+                    'grade' => $average !== null ? $this->gradeFromTotal($schoolId, (float) $average) : '-',
+                    'remark' => $average !== null ? $this->remarkFromTotal($schoolId, (float) $average) : '-',
                 ];
             })
             ->values()
@@ -1671,7 +1671,7 @@ class ResultsController extends Controller
             'average_score' => $averageScore,
             'average_display' => $gradedCount > 0 ? number_format($averageScore, 2) : '-',
             'overall_grade' => $gradedCount > 0
-                ? $this->gradeFromTotal($schoolId, (int) round($averageScore))
+                ? $this->gradeFromTotal($schoolId, (float) $averageScore)
                 : '-',
         ];
     }
@@ -1923,10 +1923,10 @@ class ResultsController extends Controller
                     $caBreakdown = AssessmentSchema::normalizeBreakdown(
                         $r->ca_breakdown ?? null,
                         $rowSchema,
-                        (int) ($r->ca ?? 0)
+                        (float) ($r->ca ?? 0)
                     );
                     $ca = AssessmentSchema::breakdownTotal($caBreakdown);
-                    $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($r->exam ?? 0)));
+                    $exam = max(0, min((float) $rowSchema['exam_max'], (float) ($r->exam ?? 0)));
                     $total = AssessmentSchema::totalFromScores($caBreakdown, $ca, $exam, $r->classic_components ?? null, $rowSchema);
                     $grade = $this->gradeFromTotal($schoolId, $total);
                     $remark = $this->remarkFromTotal($schoolId, $total);
@@ -2017,8 +2017,8 @@ class ResultsController extends Controller
             $totals = $subjectRows
                 ->map(function ($row) use ($assessmentSchema) {
                     $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
-                    $breakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
-                    $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($row->exam ?? 0)));
+                    $breakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (float) ($row->ca ?? 0));
+                    $exam = max(0, min((float) $rowSchema['exam_max'], (float) ($row->exam ?? 0)));
                     return [
                         'student_id' => (int) $row->student_id,
                         'total' => AssessmentSchema::totalFromScores(
@@ -2041,8 +2041,8 @@ class ResultsController extends Controller
                 continue;
             }
 
-            $minScore = (int) $totals->min('total');
-            $maxScore = (int) $totals->max('total');
+            $minScore = round((float) $totals->min('total'), 1);
+            $maxScore = round((float) $totals->max('total'), 1);
             $classAverage = (float) round((float) $totals->avg('total'), 2);
 
             $sorted = $totals->sortByDesc('total')->values();
@@ -2078,7 +2078,7 @@ class ResultsController extends Controller
             ->values();
 
         $gradedCount = $gradedRows->count();
-        $totalScore = (int) $gradedRows->sum(fn ($row) => (int) ($row['total'] ?? 0));
+        $totalScore = round((float) $gradedRows->sum(fn ($row) => (float) ($row['total'] ?? 0)), 1);
         $averageScore = $gradedCount > 0
             ? (float) round($totalScore / $gradedCount, 2)
             : 0.0;
@@ -2089,7 +2089,7 @@ class ResultsController extends Controller
             'average_score' => $averageScore,
             'average_display' => $gradedCount > 0 ? number_format($averageScore, 2) : '-',
             'overall_grade' => $gradedCount > 0
-                ? $this->gradeFromTotal($schoolId, (int) round($averageScore))
+                ? $this->gradeFromTotal($schoolId, (float) $averageScore)
                 : '-',
         ];
     }
@@ -2193,8 +2193,8 @@ class ResultsController extends Controller
             }
 
             $rowSchema = AssessmentSchema::schemaForResult($row->assessment_profile ?? null, $assessmentSchema);
-            $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (int) ($row->ca ?? 0));
-            $exam = max(0, min((int) ($rowSchema['exam_max'] ?? 0), (int) ($row->exam ?? 0)));
+            $caBreakdown = AssessmentSchema::normalizeBreakdown($row->ca_breakdown ?? null, $rowSchema, (float) ($row->ca ?? 0));
+            $exam = max(0, min((float) ($rowSchema['exam_max'] ?? 0), (float) ($row->exam ?? 0)));
             $totalsByStudentAndSubject[(int) $row->student_id][(int) $row->term_subject_id] =
                 AssessmentSchema::totalFromScores($caBreakdown, AssessmentSchema::breakdownTotal($caBreakdown), $exam, $row->classic_components ?? null, $rowSchema);
         }
@@ -2289,8 +2289,8 @@ class ResultsController extends Controller
             return true;
         }
 
-        $caScore = (int) ($ca ?? 0);
-        $examScore = (int) ($exam ?? 0);
+        $caScore = (float) ($ca ?? 0);
+        $examScore = (float) ($exam ?? 0);
         if (($caScore + $examScore) > 0) {
             return true;
         }
@@ -2376,12 +2376,12 @@ class ResultsController extends Controller
         return $cache[$schoolId];
     }
 
-    private function gradeFromTotal(int $schoolId, int $total): string
+    private function gradeFromTotal(int $schoolId, float $total): string
     {
         return GradingSchema::gradeForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }
 
-    private function remarkFromTotal(int $schoolId, int $total): string
+    private function remarkFromTotal(int $schoolId, float $total): string
     {
         return GradingSchema::remarkForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }
@@ -2405,7 +2405,7 @@ class ResultsController extends Controller
         };
     }
 
-    private function defaultTeacherComment(int $score): string
+    private function defaultTeacherComment(float $score): string
     {
         return match (true) {
             $score >= 70 => 'Excellent performance. Keep maintaining this standard.',
@@ -2417,7 +2417,7 @@ class ResultsController extends Controller
         };
     }
 
-    private function defaultHeadComment(int $score): string
+    private function defaultHeadComment(float $score): string
     {
         return match (true) {
             $score >= 70 => 'Impressive performance. Keep aiming higher and stay focused.',
@@ -2515,7 +2515,7 @@ class ResultsController extends Controller
         );
         $showResultPosition = (bool) data_get($viewData, 'showResultPosition', true);
         $classPositionDisplay = (string) data_get($viewData, 'classPositionDisplay', '-');
-        $total = (int) data_get($viewData, 'totalScore', 0);
+        $total = AssessmentSchema::formatScore(data_get($viewData, 'totalScore', 0));
         $schoolLogoDataUri = (string) data_get($viewData, 'schoolLogoDataUri', '');
         $studentPhotoDataUri = (string) data_get($viewData, 'studentPhotoDataUri', '');
         $headSignatureDataUri = (string) data_get($viewData, 'headSignatureDataUri', '');
@@ -2601,7 +2601,7 @@ class ResultsController extends Controller
                 foreach ($activeCaIndices as $index) {
                     $caValue = $row['ca_breakdown'][$index] ?? null;
                     $caCellsHtml .= '<td style="text-align:center;">'
-                        . (($caValue === null || $caValue === '') ? '-' : (int) $caValue)
+                        . (($caValue === null || $caValue === '') ? '-' : AssessmentSchema::formatScore($caValue))
                         . '</td>';
                 }
                 if ($isClassic) {

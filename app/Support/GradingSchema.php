@@ -177,26 +177,37 @@ class GradingSchema
         return $normalized;
     }
 
-    public static function resolve(mixed $raw, int $score): array
+    public static function resolve(mixed $raw, float $score): array
     {
         $rows = self::normalize($raw);
         $score = max(0, min(100, $score));
 
+        $previous = null;
         foreach ($rows as $row) {
-            if ($score >= (int) $row['from'] && $score <= (int) $row['to']) {
+            $from = (float) $row['from'];
+            $to = (float) $row['to'];
+            if ($score >= $from && $score <= $to) {
                 return $row;
             }
+
+            // Integer range labels represent the interval up to the next grade.
+            // This keeps 29.5 in the 0-29 band instead of skipping all grades.
+            if ($score < $from) {
+                return $previous ?? $row;
+            }
+
+            $previous = $row;
         }
 
         return $rows[count($rows) - 1] ?? ['from' => 0, 'to' => 100, 'grade' => '-', 'remark' => ''];
     }
 
-    public static function gradeForTotal(mixed $raw, int $score): string
+    public static function gradeForTotal(mixed $raw, float $score): string
     {
         return (string) (self::resolve($raw, $score)['grade'] ?? '-');
     }
 
-    public static function remarkForTotal(mixed $raw, int $score): string
+    public static function remarkForTotal(mixed $raw, float $score): string
     {
         $remark = trim((string) (self::resolve($raw, $score)['remark'] ?? ''));
         return $remark !== '' ? $remark : '-';

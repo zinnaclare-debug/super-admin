@@ -999,7 +999,7 @@ class ReportsController extends Controller
 
             $assignmentStats[$termSubjectId]['graded']++;
             $gradedCountByTeacher[$teacherId]++;
-            $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
+            $band = $this->gradeBandFromScore((float) ($row->ca ?? 0) + (float) ($row->exam ?? 0));
             $gradeCountsByTeacher[$teacherId][$band] = (int) ($gradeCountsByTeacher[$teacherId][$band] ?? 0) + 1;
         }
 
@@ -1419,7 +1419,7 @@ class ReportsController extends Controller
                     }
 
                     $gradedCount++;
-                    $band = $this->gradeBandFromScore((int) ($row->ca ?? 0) + (int) ($row->exam ?? 0));
+                    $band = $this->gradeBandFromScore((float) ($row->ca ?? 0) + (float) ($row->exam ?? 0));
                     $gradeCounts[$band] = (int) ($gradeCounts[$band] ?? 0) + 1;
                 }
 
@@ -1860,7 +1860,7 @@ class ReportsController extends Controller
             }
 
             $subjectId = (int) $meta['subject_id'];
-            $score = (int) $resultRow->ca + (int) $resultRow->exam;
+            $score = (float) $resultRow->ca + (float) $resultRow->exam;
 
             if (!isset($scoreBuckets[$studentId])) {
                 $scoreBuckets[$studentId] = [];
@@ -2073,8 +2073,8 @@ class ReportsController extends Controller
             return false;
         }
 
-        $caScore = (int) ($ca ?? 0);
-        $examScore = (int) ($exam ?? 0);
+        $caScore = (float) ($ca ?? 0);
+        $examScore = (float) ($exam ?? 0);
         if (($caScore + $examScore) > 0) {
             return true;
         }
@@ -2089,7 +2089,7 @@ class ReportsController extends Controller
         return $createdTs !== false && $updatedTs !== false && $updatedTs > $createdTs;
     }
 
-    private function gradeBandFromScore(int $total): string
+    private function gradeBandFromScore(float $total): string
     {
         return match (true) {
             $total >= 70 => 'A',

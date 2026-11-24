@@ -30,6 +30,18 @@ const DEFAULT_GRADING_SCHEMA = [
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const roundScore = (value) => Math.round(Number(value || 0) * 10) / 10;
+const displayScore = (value) => {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return "-";
+  return score.toFixed(1).replace(/\.0$/, "");
+};
+const parseOneDecimalScore = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!/^\d*(?:\.\d?)?$/.test(raw)) return null;
+  const score = Number(raw || 0);
+  return Number.isFinite(score) ? score : null;
+};
 
 const normalizeSchema = (schema) => {
   const raw = schema || {};
@@ -111,13 +123,13 @@ const scoreTotal = (ca, exam, components, usesClassicComponents) => {
   const extras = usesClassicComponents
     ? components.psychomotor.reduce((sum, score) => sum + Number(score || 0), 0) + Number(components.quiz || 0) + Number(components.note_copying || 0)
     : 0;
-  return clamp(Number(ca || 0) + Number(exam || 0) + extras, 0, 100);
+  return roundScore(clamp(Number(ca || 0) + Number(exam || 0) + extras, 0, 100));
 };
 
 const normalizeRow = (row, schema, gradingSchema, usesClassicComponents = false) => {
   const rawBreakdown = Array.isArray(row.ca_breakdown) ? row.ca_breakdown : [];
   const breakdown = Array.from({ length: 5 }, (_, idx) => clamp(Number(rawBreakdown[idx] || 0), 0, schema.ca_maxes[idx] || 0));
-  const ca = breakdown.reduce((sum, score) => sum + score, 0);
+  const ca = roundScore(breakdown.reduce((sum, score) => sum + score, 0));
   const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
   const classicComponents = normalizedClassicComponents(row, schema);
   const total = scoreTotal(ca, exam, classicComponents, usesClassicComponents);
@@ -242,16 +254,27 @@ export default function SubjectScores() {
 
   const updateCa = (studentId, caIndex, value) => {
     if (resultsPublished) return;
-    const score = clamp(Number(value || 0), 0, schema.ca_maxes[caIndex] || 0);
     setRows((prev) =>
       prev.map((row) => {
         if (row.student_id !== studentId) return row;
-        const breakdown = Array.isArray(row.ca_breakdown) ? [...row.ca_breakdown] : [0, 0, 0, 0, 0];
-        breakdown[caIndex] = score;
-        const ca = breakdown.reduce((sum, item) => sum + Number(item || 0), 0);
+        const breakdown = Array.isArray(row.ca_breakdown)
+          ? [...row.ca_breakdown]
+          : [0, 0, 0, 0, 0];
+        breakdown[caIndex] = value;
+        const parsedScore = parseOneDecimalScore(value);
+        if (parsedScore === null) return { ...row, ca_breakdown: breakdown };
+
+        const maxScore = schema.ca_maxes[caIndex] || 0;
+        const score = clamp(parsedScore, 0, maxScore);
+        breakdown[caIndex] = score === parsedScore ? value : String(score);
+        const values = breakdown.map((item, index) => {
+          const parsed = parseOneDecimalScore(item);
+          if (parsed === null) return Number(row.ca_breakdown?.[index] || 0);
+          return clamp(parsed, 0, schema.ca_maxes[index] || 0);
+        });
+        const ca = roundScore(values.reduce((sum, item) => sum + item, 0));
         const exam = clamp(Number(row.exam || 0), 0, schema.exam_max);
         const total = scoreTotal(ca, exam, row.classic_components, usesClassicComponents);
-
         return { ...row, ca_breakdown: breakdown, ca, exam, total, grade: gradeFromTotal(total, gradingSchema) };
       })
     );
@@ -259,17 +282,19 @@ export default function SubjectScores() {
 
   const updateExam = (studentId, value) => {
     if (resultsPublished) return;
-    const exam = clamp(Number(value || 0), 0, schema.exam_max);
+    const parsedScore = parseOneDecimalScore(value);
     setRows((prev) =>
       prev.map((row) => {
         if (row.student_id !== studentId) return row;
+        if (parsedScore === null) return { ...row, exam: value };
+        const exam = clamp(parsedScore, 0, schema.exam_max);
+        const examValue = exam === parsedScore ? value : String(exam);
         const ca = Number(row.ca || 0);
         const total = scoreTotal(ca, exam, row.classic_components, usesClassicComponents);
-        return { ...row, exam, total, grade: gradeFromTotal(total, gradingSchema) };
+        return { ...row, exam: examValue, total, grade: gradeFromTotal(total, gradingSchema) };
       })
     );
   };
-
   const updateLearningObservation = (studentId, key, value) => {
     if (resultsPublished) return;
     setRows((prev) => prev.map((row) => (
@@ -395,13 +420,13 @@ export default function SubjectScores() {
                       <td className="staff-scores-table__serial">{rowIndex + 1}</td>
                       <td className="staff-scores-table__student"><strong>{row.student_name}</strong>{row.department_name ? <small>{row.department_name}</small> : null}</td>
                       {commentsOnly ? commentOnlyCriteria.map((criterion) => <td key={`${row.student_id}-${criterion.key}`} className="staff-scores-table__observation-cell"><textarea value={row.learning_observations?.[criterion.key] || ""} onChange={(e) => updateLearningObservation(row.student_id, criterion.key, e.target.value)} disabled={resultsPublished} maxLength={1000} rows={3} placeholder="Write observation" aria-label={`${row.student_name} ${criterion.label} observation`} /></td>) : <>
-                        {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" value={Number(row.ca_breakdown?.[idx] || 0)} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
-                        <td className="staff-scores-table__calculated">{row.ca}</td>
-                        <td><input className="staff-score-input" type="number" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
+                        {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" step="0.1" inputMode="decimal" value={row.ca_breakdown?.[idx] ?? 0} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
+                        <td className="staff-scores-table__calculated">{displayScore(row.ca)}</td>
+                        <td><input className="staff-score-input" type="number" step="0.1" inputMode="decimal" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
                         {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`} className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} fixed score`}>{value}</td>) : null}
                         {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.quiz_label} fixed score`}>{row.classic_components.quiz}</td> : null}
                         {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.note_copying_label} fixed score`}>{row.classic_components.note_copying}</td> : null}
-                        <td className="staff-scores-table__total">{row.total}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
+                        <td className="staff-scores-table__total">{displayScore(row.total)}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
                       </>}
                     </tr>)}
                     {filteredRows.length === 0 ? <tr><td colSpan={commentsOnly ? 2 + Math.max(1, commentOnlyCriteria.length) : (usesClassicComponents ? 13 + caIndices.length : 6 + caIndices.length)} className="staff-scores-table__empty">{rows.length === 0 ? "No enrolled students found for this class and term." : "No students found for the selected subclass."}</td></tr> : null}

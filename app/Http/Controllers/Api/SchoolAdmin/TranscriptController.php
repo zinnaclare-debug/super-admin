@@ -888,10 +888,10 @@ class TranscriptController extends Controller
                 (int) $term->id
             );
 
-            $totalScore = (int) collect($gradedRows)->sum('total');
+            $totalScore = round((float) collect($gradedRows)->sum('total'), 1);
             $subjectCount = max(1, count($gradedRows));
             $averageScore = (float) round($totalScore / $subjectCount, 2);
-            $overallGrade = $this->gradeFromTotal($schoolId, (int) round($averageScore));
+            $overallGrade = $this->gradeFromTotal($schoolId, (float) $averageScore);
 
             $teacherComment = (string) ($attendance?->comment ?? '');
             if ($teacherComment === '') {
@@ -1043,8 +1043,8 @@ class TranscriptController extends Controller
 
         return $subjects
             ->map(function ($r) use ($subjectStats, $studentId, $schoolId) {
-                $ca = (int) ($r->ca ?? 0);
-                $exam = (int) ($r->exam ?? 0);
+                $ca = (float) ($r->ca ?? 0);
+                $exam = (float) ($r->exam ?? 0);
                 $total = $ca + $exam;
                 $hasResult = $this->isResultRecordGraded(
                     $r->result_id ?? null,
@@ -1146,7 +1146,7 @@ class TranscriptController extends Controller
                     ];
                 }
 
-                $groups[$groupKey]['subjects'][$subjectKey][$termSlot . '_total'] = (int) ($row['total'] ?? 0);
+                $groups[$groupKey]['subjects'][$subjectKey][$termSlot . '_total'] = (float) ($row['total'] ?? 0);
             }
         }
 
@@ -1169,7 +1169,7 @@ class TranscriptController extends Controller
                     : null;
                 $row['annual_average'] = $annualAverage;
                 $row['annual_grade'] = $annualAverage !== null
-                    ? $this->gradeFromTotal($schoolId, (int) round($annualAverage))
+                    ? $this->gradeFromTotal($schoolId, (float) $annualAverage)
                     : '-';
             }
             unset($row);
@@ -1235,7 +1235,7 @@ class TranscriptController extends Controller
             $totals = $subjectRows
                 ->map(fn ($row) => [
                     'student_id' => (int) $row->student_id,
-                    'total' => (int) $row->ca + (int) $row->exam,
+                    'total' => (float) $row->ca + (float) $row->exam,
                 ])
                 ->values();
 
@@ -1249,8 +1249,8 @@ class TranscriptController extends Controller
                 continue;
             }
 
-            $minScore = (int) $totals->min('total');
-            $maxScore = (int) $totals->max('total');
+            $minScore = round((float) $totals->min('total'), 1);
+            $maxScore = round((float) $totals->max('total'), 1);
             $classAverage = (float) round((float) $totals->avg('total'), 2);
 
             $sorted = $totals->sortByDesc('total')->values();
@@ -1290,8 +1290,8 @@ class TranscriptController extends Controller
             return false;
         }
 
-        $caScore = (int) ($ca ?? 0);
-        $examScore = (int) ($exam ?? 0);
+        $caScore = (float) ($ca ?? 0);
+        $examScore = (float) ($exam ?? 0);
         if (($caScore + $examScore) > 0) {
             return true;
         }
@@ -1320,12 +1320,12 @@ class TranscriptController extends Controller
         return $cache[$schoolId];
     }
 
-    private function gradeFromTotal(int $schoolId, int $total): string
+    private function gradeFromTotal(int $schoolId, float $total): string
     {
         return GradingSchema::gradeForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }
 
-    private function remarkFromTotal(int $schoolId, int $total): string
+    private function remarkFromTotal(int $schoolId, float $total): string
     {
         return GradingSchema::remarkForTotal($this->gradingSchemaForSchool($schoolId), $total);
     }

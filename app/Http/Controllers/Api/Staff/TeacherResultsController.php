@@ -253,9 +253,9 @@ class TeacherResultsController extends Controller
       ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId, $usesClassicComponents) {
         $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
         $rowSchema = AssessmentSchema::schemaForResult($resultRow->assessment_profile ?? null, $assessmentSchema);
-        $caBreakdown = AssessmentSchema::normalizeBreakdown($resultRow->ca_breakdown ?? null, $rowSchema, (int) ($resultRow->ca ?? 0));
+        $caBreakdown = AssessmentSchema::normalizeBreakdown($resultRow->ca_breakdown ?? null, $rowSchema, (float) ($resultRow->ca ?? 0));
         $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
-        $exam = max(0, min((int) $rowSchema['exam_max'], (int) ($resultRow->exam ?? 0)));
+        $exam = max(0, min((float) $rowSchema['exam_max'], (float) ($resultRow->exam ?? 0)));
         $total = AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $resultRow->classic_components ?? null, $rowSchema);
 
         return [
@@ -309,7 +309,7 @@ class TeacherResultsController extends Controller
     $school = School::find((int) $schoolId);
     $assessmentSchema = $this->assessmentSchemaForTermSubject($school, $termSubject);
     $caMaxes = $assessmentSchema['ca_maxes'];
-    $examMax = (int) $assessmentSchema['exam_max'];
+    $examMax = (float) $assessmentSchema['exam_max'];
     $caTotalMax = array_sum($caMaxes);
 
     $hasCaBreakdown = $this->hasResultCaBreakdownColumn();
@@ -344,10 +344,10 @@ class TeacherResultsController extends Controller
     if ($commentsOnly) {
       $rules['scores.*.teacher_comment'] = 'nullable|string|max:1000';
     } else {
-      $rules['scores.*.ca'] = 'nullable|integer|min:0|max:100';
+      $rules['scores.*.ca'] = 'nullable|numeric|decimal:0,1|min:0|max:100';
       $rules['scores.*.ca_breakdown'] = 'nullable|array|size:' . $caSlotCount;
-      $rules['scores.*.ca_breakdown.*'] = 'nullable|numeric|min:0|max:100';
-      $rules['scores.*.exam'] = 'required|integer|min:0|max:100';
+      $rules['scores.*.ca_breakdown.*'] = 'nullable|numeric|decimal:0,1|min:0|max:100';
+      $rules['scores.*.exam'] = 'required|numeric|decimal:0,1|min:0|max:100';
       if ($usesClassicComponents) {
         $rules['scores.*.classic_components'] = 'nullable|array';
         $rules['scores.*.classic_components.psychomotor'] = 'nullable|array|size:5';
@@ -422,15 +422,15 @@ class TeacherResultsController extends Controller
       $rowCaMaxes = $rowSchema['ca_maxes'];
       $rowCaSlotCount = max(1, count($rowCaMaxes));
       $rowCaTotalMax = array_sum($rowCaMaxes);
-      $rowExamMax = (int) $rowSchema['exam_max'];
+      $rowExamMax = (float) $rowSchema['exam_max'];
       $rowUsesClassicComponents = AssessmentSchema::usesClassicComponents($rowSchema);
       $rawBreakdown = $score['ca_breakdown'] ?? null;
-      $legacyCa = (int) ($score['ca'] ?? 0);
+      $legacyCa = (float) ($score['ca'] ?? 0);
 
       if (is_array($rawBreakdown)) {
         for ($i = 0; $i < $rowCaSlotCount; $i++) {
-          $inputVal = (int) ($rawBreakdown[$i] ?? 0);
-          if ($inputVal > (int) $rowCaMaxes[$i]) {
+          $inputVal = (float) ($rawBreakdown[$i] ?? 0);
+          if ($inputVal > (float) $rowCaMaxes[$i]) {
             $errors["scores.$idx.ca_breakdown.$i"] = [
               'CA' . ($i + 1) . " score cannot be more than {$rowCaMaxes[$i]}.",
             ];
@@ -444,7 +444,7 @@ class TeacherResultsController extends Controller
 
       $caBreakdown = AssessmentSchema::normalizeBreakdown($rawBreakdown, $rowSchema, $legacyCa);
       $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
-      $exam = (int) ($score['exam'] ?? 0);
+      $exam = round((float) ($score['exam'] ?? 0), 1);
       if ($exam > $rowExamMax) {
         $errors["scores.$idx.exam"] = [
           "Exam score cannot be more than {$rowExamMax}.",
