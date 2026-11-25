@@ -393,39 +393,30 @@
 
         @if($showBehaviour)
             @php
-                $traitPerRow = 5;
-                $traitRows = collect($behaviourTraits ?? [])->values()->chunk($traitPerRow);
+                $traitRows = collect($behaviourTraits ?? [])->values()->chunk(5);
                 if ($traitRows->isEmpty()) {
                     $traitRows = collect([collect()]);
                 }
             @endphp
-            <table class="psycho psycho-horizontal" style="margin-top: 8px;">
-                <thead>
-                    <tr>
-                        @for($i = 0; $i < $traitPerRow; $i++)
-                            <th style="width: 16%;">PSYCHOMOTOR</th>
-                            <th class="rate" style="width: 4%;">RATE</th>
-                        @endfor
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($traitRows as $rowTraits)
-                        <tr>
-                            @for($i = 0; $i < $traitPerRow; $i++)
-                                @php($trait = $rowTraits->get($i))
-                                <td>{{ strtoupper((string)($trait['label'] ?? '')) }}</td>
-                                <td class="rate">{{ $trait['value'] ?? '' }}</td>
-                            @endfor
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+            @foreach($traitRows as $rowTraits)
+                <table class="psycho psycho-horizontal" style="margin-top: 8px; table-layout: fixed;">
+                    <thead><tr>
+                        @foreach($rowTraits as $trait)
+                            <th>{{ strtoupper((string) ($trait['label'] ?? 'QUALITY')) }}</th>
+                        @endforeach
+                    </tr></thead>
+                    <tbody><tr>
+                        @foreach($rowTraits as $trait)
+                            <td class="rate center">GRADE: {{ $trait['value'] ?? '-' }}</td>
+                        @endforeach
+                    </tr></tbody>
+                </table>
+            @endforeach
             <div class="key-rating-line">
                 <strong>KEY RATING:</strong>
                 {{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}
             </div>
         @endif
-
         <div class="footer-container">
             <table class="comment-layout" style="margin-top: 0;">
                 <tr>

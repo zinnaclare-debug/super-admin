@@ -181,7 +181,7 @@
                         <thead>
                         <tr>
                             <th style="width: 75%;">BEHAVIOUR</th>
-                            <th style="width: 25%;">RATE</th>
+                            <th style="width: 25%;">GRADE</th>
                         </tr>
                         </thead>
                         <tbody>

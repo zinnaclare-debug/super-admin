@@ -2648,26 +2648,24 @@ class ResultsController extends Controller
         $behaviourRatingFormat = (string) data_get($behaviourTraits, '0.format', 'number');
         $behaviourKey = BehaviourSchema::displayKey($behaviourRatingFormat);
         $behaviourCellsPerRow = 5;
-        $behaviourHeaderHtml = '';
-        for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
-            $behaviourHeaderHtml .= '<th style="width:16%;">PSYCHOMOTOR</th><th style="width:4%;text-align:center;">RATE</th>';
-        }
         $behaviourRowsHtml = '';
         $behaviourChunks = collect($behaviourTraits)->values()->chunk($behaviourCellsPerRow);
         if ($behaviourChunks->isEmpty()) {
             $behaviourChunks = collect([collect()]);
         }
         foreach ($behaviourChunks as $chunk) {
-            $behaviourRowsHtml .= '<tr>';
-            for ($i = 0; $i < $behaviourCellsPerRow; $i++) {
-                $trait = $chunk->get($i);
-                $label = strtoupper((string) ($trait['label'] ?? ''));
-                $value = $trait ? (string) ((int) ($trait['value'] ?? 0)) : '';
-                $behaviourRowsHtml .= '<td>' . e($label) . '</td><td style="text-align:center;">' . e($value) . '</td>';
+            $behaviourRowsHtml .= '<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;"><thead><tr>';
+            foreach ($chunk as $trait) {
+                $label = strtoupper((string) ($trait['label'] ?? 'QUALITY'));
+                $behaviourRowsHtml .= '<th style="border:1px solid #222;padding:3px;text-align:center;">' . e($label) . '</th>';
             }
-            $behaviourRowsHtml .= '</tr>';
+            $behaviourRowsHtml .= '</tr></thead><tbody><tr>';
+            foreach ($chunk as $trait) {
+                $value = (string) ($trait['value'] ?? '-');
+                $behaviourRowsHtml .= '<td style="border:1px solid #222;padding:3px;text-align:center;">GRADE: ' . e($value) . '</td>';
+            }
+            $behaviourRowsHtml .= '</tr></tbody></table>';
         }
-
         $studentPhotoBlock = $studentPhotoDataUri !== ''
             ? '<img src="' . e($studentPhotoDataUri) . '" alt="Student Photo" style="width:72px;height:72px;object-fit:cover;border:1px solid #222;" />'
             : '<div style="width:72px;height:72px;border:1px solid #222;"></div>';
@@ -2683,7 +2681,7 @@ class ResultsController extends Controller
             : '';
 
         $classicPdfCss = $isClassic
-            ? '@page { size: A4 landscape; margin: 8mm; }.scores{table-layout:fixed;font-size:5.5px;}.scores th,.scores td{padding:2px;overflow-wrap:anywhere;}'
+            ? '@page { size: A4 landscape; margin: 8mm; }.scores{table-layout:fixed;font-size:5.5px;}.scores th,.scores td{padding:1px;overflow-wrap:anywhere;}.scores th:nth-last-child(2),.scores td:nth-last-child(2){width:4%;}.scores th:last-child,.scores td:last-child{width:8%;}'
             : '';
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
@@ -2734,9 +2732,7 @@ class ResultsController extends Controller
             . '</table>'
             . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
             . '<td style="width:82%;">' . e(GradingSchema::displayKey(data_get($viewData, 'school.grading_schema'))) . '</td></tr></table>'
-            . '<table><thead><tr>' . $behaviourHeaderHtml . '</tr></thead><tbody>'
             . $behaviourRowsHtml
-            . '</tbody></table>'
             . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
             . '<td style="width:82%;">' . e($behaviourKey) . '</td></tr></table>'
             . '<div class="footer-container">'

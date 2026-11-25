@@ -40,8 +40,8 @@ table { width: 100%; border-collapse: collapse; }
 .info th { width: 15%; background: #E8EFF7; text-align: left; color: {{ $primary }}; }
 .info td { width: 18.33%; }
 .scores { margin-top: 7px; font-size: 7.5px; table-layout: fixed; }
-.scores th { background: {{ $primary }}; color: #fff; text-align: center; font-size: 6.6px; line-height: 1.2; overflow-wrap: anywhere; }
-.scores td { text-align: center; }
+.scores th { padding: 2px 1px; background: {{ $primary }}; color: #fff; text-align: center; font-size: 6.6px; line-height: 1.2; overflow-wrap: anywhere; }
+.scores td { text-align: center; padding: 2px 1px; }
 .scores td:first-child { text-align: left; font-weight: bold; width: 18%; }
 .section { margin-top: 7px; border: 1px solid {{ $primary }}; }
 .section-title { background: #E8EFF7; color: {{ $primary }}; font-weight: bold; padding: 4px 6px; }
@@ -76,14 +76,14 @@ table { width: 100%; border-collapse: collapse; }
 <tr><th>LEARNING AREA / SUBJECT</th>
 @if($showTermTotals)<th>FIRST TERM</th><th>SECOND TERM</th><th>THIRD TERM</th>@endif
 @if($showAverage)<th>AVERAGE</th>@endif
-<th>GRADE</th><th>REMARK</th></tr></thead><tbody>
+<th style="width:4%;">GRADE</th><th style="width:8%;">REMARK</th></tr></thead><tbody>
 @else
 <tr>
 <th rowspan="2">LEARNING AREA / SUBJECT</th>
 @if(count($caIndices) > 0)<th colspan="{{ count($caIndices) }}">CONTINUOUS ASSESSMENT</th>@endif
 <th rowspan="2">EXAM</th><th colspan="5">PSYCHOMOTOR / AFFECTIVE {{ array_sum($schema['psychomotor_maxes'] ?? []) }}%</th><th colspan="2">QUIZ / NOTE COPYING {{ (int) ($schema['quiz_max'] ?? 0) + (int) ($schema['note_copying_max'] ?? 0) }}%</th>
 <th rowspan="2">TOTAL</th>
-<th rowspan="2">GRADE</th><th rowspan="2">REMARK</th>
+<th rowspan="2" style="width:4%;">GRADE</th><th rowspan="2" style="width:8%;">REMARK</th>
 </tr>
 <tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach@foreach(range(0, 4) as $index)<th>{{ strtoupper($schema['psychomotor_labels'][$index] ?? ('P'.($index + 1))) }} ({{ $schema['psychomotor_maxes'][$index] ?? 0 }})</th>@endforeach<th>{{ strtoupper($schema['quiz_label'] ?? 'QUIZ') }} ({{ $schema['quiz_max'] ?? 0 }})</th><th>{{ strtoupper($schema['note_copying_label'] ?? 'NOTE COPYING') }} ({{ $schema['note_copying_max'] ?? 0 }})</th></tr>
 </thead><tbody>
@@ -100,11 +100,11 @@ table { width: 100%; border-collapse: collapse; }
 <td>{{ $classicComponents['quiz'] }}</td><td>{{ $classicComponents['note_copying'] }}</td>
 <td>{{ array_key_exists('total', $row) ? \App\Support\AssessmentSchema::formatScore($row['total']) : '-' }}</td>
 @endif
-<td>{{ strtoupper($row['grade'] ?? '-') }}</td><td>{{ strtoupper($row['remark'] ?? '-') }}</td></tr>
+<td style="width:4%;">{{ strtoupper($row['grade'] ?? '-') }}</td><td style="width:8%;">{{ strtoupper($row['remark'] ?? '-') }}</td></tr>
 @empty<tr><td colspan="20" class="center">No result data found.</td></tr>@endforelse
 </tbody></table>
 <div class="section"><div class="section-title">GRADE INTERPRETATION</div><div class="grade-key">{{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}</div></div>
-@if($showBehaviour)<div class="section"><div class="section-title">GENERAL BEHAVIOUR / PSYCHOMOTOR ASSESSMENT</div><table class="traits">@foreach(collect($behaviourTraits ?? [])->chunk(5) as $traitChunk)<tr>@foreach($traitChunk as $trait)<th>{{ strtoupper($trait['label'] ?? '') }}</th><td>{{ $trait['value'] ?? '-' }}</td>@endforeach</tr>@endforeach</table><div class="grade-key">{{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}</div></div>@endif
+@if($showBehaviour)<div class="section"><div class="section-title">GENERAL BEHAVIOUR / PSYCHOMOTOR ASSESSMENT</div>@foreach(collect($behaviourTraits ?? [])->chunk(5) as $traitChunk)<table class="traits"><thead><tr>@foreach($traitChunk as $trait)<th>{{ strtoupper($trait['label'] ?? 'QUALITY') }}</th>@endforeach</tr></thead><tbody><tr>@foreach($traitChunk as $trait)<td class="center">GRADE: {{ $trait['value'] ?? '-' }}</td>@endforeach</tr></tbody></table>@endforeach<div class="grade-key">{{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}</div></div>@endif
 <div class="section"><div class="section-title">COMMENTS</div><table class="comment-grid"><tr><td><div class="comment-card"><strong>CLASS TEACHER: {{ strtoupper($classTeacher?->name ?? '-') }}</strong><br>{{ strtoupper($teacherComment ?? '-') }}</div></td><td><div class="comment-card"><strong>HEAD OF SCHOOL: {{ strtoupper($school?->head_of_school_name ?? '-') }}</strong><br>{{ strtoupper($schoolHeadComment ?? '-') }}</div></td></tr></table></div>
 <table class="signatures"><tr><td>@if($showSignature && $headSignatureDataUri)<img class="signature" src="{{ $headSignatureDataUri }}">@endif<div class="signature-line"></div>Head of School's Signature</td></tr></table>
 </div></body></html>
