@@ -39,9 +39,9 @@ table { width: 100%; border-collapse: collapse; }
 .info td, .info th, .scores td, .scores th, .traits td, .traits th { border: 1px solid #758399; padding: 4px; }
 .info th { width: 15%; background: #E8EFF7; text-align: left; color: {{ $primary }}; }
 .info td { width: 18.33%; }
-.scores { width: 90%; margin: 7px auto 0; font-size: 7.5px; table-layout: fixed; }
-.scores th { background: {{ $primary }}; color: #fff; text-align: center; font-size: 6.6px; line-height: 1.2; overflow-wrap: anywhere; }
-.scores td { text-align: center; }
+.scores { width: 96%; margin: 7px auto 0; font-size: 8.5px; table-layout: fixed; }
+.scores th { padding: 5px 3px; background: {{ $primary }}; color: #fff; text-align: center; font-size: 7.5px; line-height: 1.2; overflow-wrap: anywhere; }
+.scores td { text-align: center; padding: 5px 3px; }
 .scores td:first-child { text-align: left; font-weight: bold; width: 18%; }
 .section { margin-top: 7px; border: 1px solid {{ $primary }}; }
 .section-title { background: #E8EFF7; color: {{ $primary }}; font-weight: bold; padding: 4px 6px; }

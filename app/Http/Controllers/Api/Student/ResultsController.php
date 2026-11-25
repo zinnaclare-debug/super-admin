@@ -2681,7 +2681,7 @@ class ResultsController extends Controller
             : '';
 
         $classicPdfCss = $isClassic
-            ? '@page { size: A4 landscape; margin: 8mm; }.scores{width:90%;margin-left:auto;margin-right:auto;table-layout:fixed;font-size:5.5px;}.scores th,.scores td{padding:2px;overflow-wrap:anywhere;}'
+            ? '@page { size: A4 landscape; margin: 8mm; }.scores{width:96%;margin-left:auto;margin-right:auto;table-layout:fixed;font-size:6.5px;}.scores th,.scores td{padding:3px;overflow-wrap:anywhere;}'
             : '';
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
