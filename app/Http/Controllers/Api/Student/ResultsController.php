@@ -2300,8 +2300,13 @@ class ResultsController extends Controller
             return true;
         }
 
-        $components = ClassicResultComponents::normalize($classicComponents);
-        if (array_sum($components['psychomotor']) + $components['quiz'] + $components['note_copying'] > 0) {
+        $components = is_string($classicComponents) ? json_decode($classicComponents, true) : $classicComponents;
+        $components = is_array($components) ? $components : [];
+        if (filter_var($components['_initialized'] ?? false, FILTER_VALIDATE_BOOL)) {
+            return true;
+        }
+        $psychomotor = is_array($components['psychomotor'] ?? null) ? $components['psychomotor'] : [];
+        if (array_sum(array_map('floatval', $psychomotor)) + (float) ($components['quiz'] ?? 0) + (float) ($components['note_copying'] ?? 0) > 0) {
             return true;
         }
 

@@ -252,7 +252,7 @@ class TeacherResultsController extends Controller
     $rows = $students
       ->map(function ($student) use ($assessmentSchema, $resultsByStudentId, $schoolId, $usesClassicComponents) {
         $resultRow = $resultsByStudentId[(int) $student->student_id] ?? null;
-        $rowSchema = AssessmentSchema::schemaForResult($resultRow->assessment_profile ?? null, $assessmentSchema);
+        $rowSchema = $this->entrySchemaForResult($resultRow, $assessmentSchema);
         $caBreakdown = AssessmentSchema::normalizeBreakdown($resultRow->ca_breakdown ?? null, $rowSchema, (float) ($resultRow->ca ?? 0));
         $caTotal = AssessmentSchema::breakdownTotal($caBreakdown);
         $exam = max(0, min((float) $rowSchema['exam_max'], (float) ($resultRow->exam ?? 0)));
@@ -365,7 +365,7 @@ class TeacherResultsController extends Controller
       ->where('school_id', $schoolId)
       ->where('term_subject_id', $termSubject->id)
       ->whereIn('student_id', collect($payload['scores'])->pluck('student_id')->map(fn ($id) => (int) $id)->all())
-      ->get(['student_id', 'assessment_profile', 'classic_components'])
+      ->get(['student_id', 'ca', 'ca_breakdown', 'exam', 'assessment_profile', 'classic_components'])
       ->keyBy('student_id');
 
     $eligibleStudentIdsQuery = Enrollment::query()
@@ -418,7 +418,7 @@ class TeacherResultsController extends Controller
       }
 
       $existingResult = $existingResultsByStudent->get($studentId);
-      $rowSchema = AssessmentSchema::schemaForResult($existingResult?->assessment_profile ?? null, $assessmentSchema);
+      $rowSchema = $this->entrySchemaForResult($existingResult, $assessmentSchema);
       $rowCaMaxes = $rowSchema['ca_maxes'];
       $rowCaSlotCount = max(1, count($rowCaMaxes));
       $rowCaTotalMax = array_sum($rowCaMaxes);
@@ -452,7 +452,7 @@ class TeacherResultsController extends Controller
       }
 
       $classicComponents = $rowUsesClassicComponents
-        ? ClassicResultComponents::normalize($score['classic_components'] ?? ($existingResult?->classic_components ?? null), $rowSchema)
+        ? ClassicResultComponents::forStorage($score['classic_components'] ?? ($existingResult?->classic_components ?? null), $rowSchema)
         : null;
       if (AssessmentSchema::totalFromScores($caBreakdown, $caTotal, $exam, $classicComponents, $rowSchema) > 100) {
         $errors["scores.$idx.total"] = ['The combined assessment score cannot be more than 100.'];
@@ -637,10 +637,63 @@ class TeacherResultsController extends Controller
     return response()->json(['message' => 'Assessment observations saved successfully.']);
   }
 
-  private function gradeFromTotal(int $schoolId, int $total): string
+  private function gradeFromTotal(int $schoolId, float $total): string
   {
     $schema = School::where('id', $schoolId)->value('grading_schema');
     return GradingSchema::gradeForTotal($schema, $total);
+  }
+
+  private function entrySchemaForResult(?object $result, array $currentSchema): array
+  {
+    // A zero-only row was created before staff began grading. It is safe to
+    // adopt the school’s latest allocation, avoiding stale CA limits such as
+    // “CA4 cannot be more than 0”. Rows containing actual entered scores keep
+    // their snapshot so a later template change cannot erase or reinterpret it.
+    if (!$this->resultHasEnteredScores($result)) {
+      return AssessmentSchema::normalizeSchema($currentSchema);
+    }
+
+    return AssessmentSchema::schemaForResult($result?->assessment_profile ?? null, $currentSchema);
+  }
+
+  private function resultHasEnteredScores(?object $result): bool
+  {
+    if (!$result) {
+      return false;
+    }
+
+    if ((float) ($result->ca ?? 0) > 0 || (float) ($result->exam ?? 0) > 0) {
+      return true;
+    }
+
+    $breakdown = $result->ca_breakdown ?? [];
+    if (is_string($breakdown)) {
+      $decoded = json_decode($breakdown, true);
+      $breakdown = is_array($decoded) ? $decoded : [];
+    }
+    if (is_array($breakdown) && collect($breakdown)->contains(fn ($value) => (float) $value > 0)) {
+      return true;
+    }
+
+    $components = $result->classic_components ?? [];
+    if (is_string($components)) {
+      $decoded = json_decode($components, true);
+      $components = is_array($decoded) ? $decoded : [];
+    }
+    if (!is_array($components)) {
+      return false;
+    }
+
+    // _initialized is written only after a staff member saves an editable
+    // classic component, including a deliberate zero score.
+    if (filter_var($components['_initialized'] ?? false, FILTER_VALIDATE_BOOL)) {
+      return true;
+    }
+
+    $psychomotor = is_array($components['psychomotor'] ?? null) ? $components['psychomotor'] : [];
+    return collect($psychomotor)->contains(fn ($value) => (float) $value > 0)
+      || (float) ($components['quiz'] ?? 0) > 0
+      || (float) ($components['note_copying'] ?? 0) > 0;
   }
 
   private function assessmentSchemaForTermSubject(?School $school, TermSubject $termSubject): array

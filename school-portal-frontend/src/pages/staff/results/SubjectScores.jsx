@@ -64,7 +64,7 @@ const normalizeSchema = (schema) => {
     exam_max: numeric(raw.exam_max, 100 - normalizedCa.reduce((sum, value) => sum + value, 0)),
     total_max: 100,
     layout: usesClassicComponents ? "classic" : "compact",
-    classic_fixed_components: usesClassicComponents && Boolean(raw.classic_fixed_components),
+    classic_fixed_components: false,
     psychomotor_maxes: normalizedPsychomotorMaxes,
     psychomotor_labels: psychomotorLabels,
     quiz_max: usesClassicComponents ? numeric(raw.quiz_max, 0) : 0,
@@ -109,14 +109,26 @@ const normalizedClassicComponents = (row, schema) => {
   const hasSavedComponents = Array.isArray(saved?.psychomotor)
     || Object.prototype.hasOwnProperty.call(saved || {}, "quiz")
     || Object.prototype.hasOwnProperty.call(saved || {}, "note_copying");
-  if (schema.classic_fixed_components && !hasSavedComponents) {
-    return { psychomotor: [2, 2, 2, 2, 2], quiz: 5, note_copying: 5 };
+  const initialized = Boolean(saved?._initialized);
+  const legacyEmpty = hasSavedComponents
+    && !initialized
+    && (saved?.psychomotor || []).every((value) => Number(value || 0) === 0)
+    && Number(saved?.quiz || 0) === 0
+    && Number(saved?.note_copying || 0) === 0;
+  if (!hasSavedComponents || legacyEmpty) {
+    return {
+      psychomotor: Array.from({ length: 5 }, (_, index) => Number(schema.psychomotor_maxes?.[index] || 0)),
+      quiz: Number(schema.quiz_max || 0),
+      note_copying: Number(schema.note_copying_max || 0),
+      _initialized: false,
+    };
   }
 
   return {
     psychomotor: Array.from({ length: 5 }, (_, index) => clamp(Number(saved?.psychomotor?.[index] || 0), 0, Number(schema.psychomotor_maxes?.[index] || 0))),
     quiz: clamp(Number(saved?.quiz || 0), 0, Number(schema.quiz_max || 0)),
     note_copying: clamp(Number(saved?.note_copying || 0), 0, Number(schema.note_copying_max || 0)),
+    _initialized: initialized,
   };
 };
 const scoreTotal = (ca, exam, components, usesClassicComponents) => {
@@ -295,6 +307,26 @@ export default function SubjectScores() {
       })
     );
   };
+  const updateClassicComponent = (studentId, key, value, index = null) => {
+    if (resultsPublished) return;
+    setRows((prev) => prev.map((row) => {
+      if (row.student_id !== studentId) return row;
+      const parsedScore = Number(value);
+      const maximum = index === null
+        ? Number(schema[key === "quiz" ? "quiz_max" : "note_copying_max"] || 0)
+        : Number(schema.psychomotor_maxes?.[index] || 0);
+      const safeValue = Number.isFinite(parsedScore) ? clamp(Math.round(parsedScore), 0, maximum) : 0;
+      const components = {
+        ...row.classic_components,
+        [key]: index === null
+          ? safeValue
+          : row.classic_components.psychomotor.map((score, scoreIndex) => scoreIndex === index ? safeValue : score),
+        _initialized: true,
+      };
+      const total = scoreTotal(row.ca, Number(row.exam || 0), components, true);
+      return { ...row, classic_components: components, total, grade: gradeFromTotal(total, gradingSchema) };
+    }));
+  };
   const updateLearningObservation = (studentId, key, value) => {
     if (resultsPublished) return;
     setRows((prev) => prev.map((row) => (
@@ -328,13 +360,14 @@ export default function SubjectScores() {
             student_id: row.student_id,
             ca_breakdown: Array.from({ length: 5 }, (_, idx) => Number(row.ca_breakdown?.[idx] || 0)),
             exam: Number(row.exam || 0),
-            ...(usesClassicComponents ? { classic_components: row.classic_components } : {}),
+            ...(usesClassicComponents ? { classic_components: { ...row.classic_components, _initialized: true } } : {}),
           })),
         });
       }
       alert(isCommentsOnlySheet ? 'Assessment observations saved successfully' : 'Saved successfully');
     } catch (e) {
-      alert(e.response?.data?.message || (isCommentsOnlySheet ? 'Failed to save assessment observations' : 'Failed to save scores'));
+      const fieldErrors = Object.values(e.response?.data?.errors || {}).flat().filter(Boolean);
+      alert(fieldErrors.join("\n") || e.response?.data?.message || (isCommentsOnlySheet ? 'Failed to save assessment observations' : 'Failed to save scores'));
     } finally {
       setSaving(false);
     }
@@ -369,7 +402,7 @@ export default function SubjectScores() {
           </div>
         </section>
 
-        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Classic Full fixes Psychomotor / Affective at 10, Quiz at 5 and Note Copying at 5. Enter CA and Exam scores using your school's configured 80-mark allocation.</p> : null}
+        {!commentsOnly && usesClassicComponents ? <p className="staff-scores-classic-note">Psychomotor, Quiz and Note Copying start with the school&apos;s configured defaults. Adjust them for an individual student when needed; all components together must remain within 100 marks.</p> : null}
         {resultsPublished ? <div className="staff-scores__locked" role="status"><span aria-hidden="true">!</span>Results are published. Editing is locked until the school administrator unpublishes them.</div> : null}
 
         {departmentOptions.length > 0 ? (
@@ -423,9 +456,9 @@ export default function SubjectScores() {
                         {caIndices.map((idx) => <td key={`ca-input-${row.student_id}-${idx}`}><input className="staff-score-input" type="number" step="0.1" inputMode="decimal" value={row.ca_breakdown?.[idx] ?? 0} min="0" max={schema.ca_maxes[idx]} onChange={(e) => updateCa(row.student_id, idx, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.ca_labels?.[idx] || `CA${idx + 1}`} score`} /></td>)}
                         <td className="staff-scores-table__calculated">{displayScore(row.ca)}</td>
                         <td><input className="staff-score-input" type="number" step="0.1" inputMode="decimal" value={row.exam} min="0" max={schema.exam_max} onChange={(e) => updateExam(row.student_id, e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} examination score`} /></td>
-                        {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`} className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} fixed score`}>{value}</td>) : null}
-                        {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.quiz_label} fixed score`}>{row.classic_components.quiz}</td> : null}
-                        {usesClassicComponents ? <td className="staff-scores-table__calculated" aria-label={`${row.student_name} ${schema.note_copying_label} fixed score`}>{row.classic_components.note_copying}</td> : null}
+                        {usesClassicComponents ? row.classic_components.psychomotor.map((value, index) => <td key={`psy-${row.student_id}-${index}`}><input className="staff-score-input" type="number" step="1" inputMode="numeric" value={value} min="0" max={schema.psychomotor_maxes[index]} onChange={(e) => updateClassicComponent(row.student_id, "psychomotor", e.target.value, index)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.psychomotor_labels[index]} score`} /></td>) : null}
+                        {usesClassicComponents ? <td><input className="staff-score-input" type="number" step="1" inputMode="numeric" value={row.classic_components.quiz} min="0" max={schema.quiz_max} onChange={(e) => updateClassicComponent(row.student_id, "quiz", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.quiz_label} score`} /></td> : null}
+                        {usesClassicComponents ? <td><input className="staff-score-input" type="number" step="1" inputMode="numeric" value={row.classic_components.note_copying} min="0" max={schema.note_copying_max} onChange={(e) => updateClassicComponent(row.student_id, "note_copying", e.target.value)} disabled={resultsPublished} aria-label={`${row.student_name} ${schema.note_copying_label} score`} /></td> : null}
                         <td className="staff-scores-table__total">{displayScore(row.total)}</td><td><span className="staff-scores-table__grade">{row.grade}</span></td>
                       </>}
                     </tr>)}

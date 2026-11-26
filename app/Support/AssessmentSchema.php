@@ -35,7 +35,6 @@ class AssessmentSchema
         $layout = strtolower(trim((string) ($schema['layout'] ?? 'compact')));
         $layout = $layout === 'classic' ? 'classic' : 'compact';
         $isClassic = $layout === 'classic';
-        $usesFixedClassicComponents = $isClassic && filter_var($schema['classic_fixed_components'] ?? false, FILTER_VALIDATE_BOOL);
         $caMaxes = is_array($schema['ca_maxes'] ?? null) ? $schema['ca_maxes'] : $base['ca_maxes'];
         $caLabels = is_array($schema['ca_labels'] ?? null) ? $schema['ca_labels'] : $base['ca_labels'];
         $psychomotorMaxes = is_array($schema['psychomotor_maxes'] ?? null) ? $schema['psychomotor_maxes'] : ($isClassic ? [2, 2, 2, 2, 2] : [0, 0, 0, 0, 0]);
@@ -46,20 +45,20 @@ class AssessmentSchema
         $normalizedPsychomotorLabels = [];
 
         for ($index = 0; $index < 5; $index++) {
-            // Classic Full fixes only the enrichment components. Schools still
-            // choose how the remaining 80 marks are shared by CA and Exam.
+            // Each school controls the full Classic Full allocation, including
+            // CA, examination, psychomotor, quiz, and note-copying maxima.
             $normalizedCa[$index] = max(0, min(100, (int) ($caMaxes[$index] ?? 0)));
             $label = trim((string) ($caLabels[$index] ?? ''));
             $labels[$index] = $label !== '' ? substr($label, 0, 30) : 'CA' . ($index + 1);
-            $normalizedPsychomotor[$index] = $usesFixedClassicComponents
-                ? 2
-                : ($isClassic ? max(0, min(100, (int) ($psychomotorMaxes[$index] ?? 0))) : 0);
+            $normalizedPsychomotor[$index] = $isClassic
+                ? max(0, min(100, (int) ($psychomotorMaxes[$index] ?? 0)))
+                : 0;
             $psychomotorLabel = trim((string) ($psychomotorLabels[$index] ?? ''));
             $normalizedPsychomotorLabels[$index] = $psychomotorLabel !== '' ? substr($psychomotorLabel, 0, 30) : 'P' . ($index + 1);
         }
 
-        $quizMax = $usesFixedClassicComponents ? 5 : ($isClassic ? max(0, min(100, (int) ($schema['quiz_max'] ?? 5))) : 0);
-        $noteCopyingMax = $usesFixedClassicComponents ? 5 : ($isClassic ? max(0, min(100, (int) ($schema['note_copying_max'] ?? 5))) : 0);
+        $quizMax = $isClassic ? max(0, min(100, (int) ($schema['quiz_max'] ?? 5))) : 0;
+        $noteCopyingMax = $isClassic ? max(0, min(100, (int) ($schema['note_copying_max'] ?? 5))) : 0;
         $componentsTotalMax = array_sum($normalizedPsychomotor) + $quizMax + $noteCopyingMax;
         $numericTotalMax = max(0, 100 - $componentsTotalMax);
         $caTotalMax = array_sum($normalizedCa);
@@ -79,7 +78,7 @@ class AssessmentSchema
             'total_max' => 100,
             'layout' => $layout,
             'profile_version' => max(0, (int) ($schema['profile_version'] ?? 0)),
-            'classic_fixed_components' => $usesFixedClassicComponents,
+            'classic_fixed_components' => false,
             'psychomotor_maxes' => $normalizedPsychomotor,
             'psychomotor_labels' => $normalizedPsychomotorLabels,
             'quiz_max' => $quizMax,
