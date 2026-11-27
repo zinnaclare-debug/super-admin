@@ -70,14 +70,18 @@ final class BehaviourSchema
             ? 'A - EXCELLENT | B - VERY GOOD | C - SATISFACTORY | D - POOR | E - VERY POOR'
             : '5 - EXCELLENT | 4 - VERY GOOD | 3 - SATISFACTORY | 2 - POOR | 1 - VERY POOR';
     }
-    public static function traits(?StudentBehaviourRating $rating, mixed $schema): array
+    public static function traits(?StudentBehaviourRating $rating, mixed $schema, mixed $fallbackFormat = null): array
     {
         $criteria = self::normalize($schema)['criteria'];
         $values = self::values($rating, $schema);
-        $format = self::normalizeFormat($rating?->behaviour_rating_format);
+        // New ratings retain their chosen display format. Older rows without a snapshot
+        // safely inherit the school's current preference instead of always showing numbers.
+        $storedFormat = trim((string) ($rating?->behaviour_rating_format ?? ''));
+        $format = self::normalizeFormat($storedFormat !== '' ? $storedFormat : $fallbackFormat);
 
         return array_map(fn (array $criterion) => [
             'label' => $criterion['label'],
+            'score' => $values[$criterion['key']] ?? 0,
             'value' => self::formatValue($values[$criterion['key']] ?? 0, $format),
             'format' => $format,
         ], $criteria);

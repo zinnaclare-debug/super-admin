@@ -16,6 +16,16 @@
     $sessionLabel = strtoupper($session?->academic_year ?: $session?->session_name ?: '-');
     $daysPresent = (int) ($attendance?->days_present ?? 0);
     $schoolDays = (int) ($attendanceSetting?->total_school_days ?? 0);
+    $displayBehaviourValue = static function (array $trait): string {
+        if (array_key_exists('score', $trait)) {
+            return \App\Support\BehaviourSchema::formatValue(
+                $trait['score'],
+                $trait['format'] ?? 'number'
+            );
+        }
+
+        return (string) ($trait['value'] ?? '-');
+    };
     $nextTerm = '-';
     if (!empty($nextTermBeginDate)) {
         try { $nextTerm = \Carbon\Carbon::parse($nextTermBeginDate)->format('j M Y'); } catch (\Throwable $error) { $nextTerm = '-'; }
@@ -38,16 +48,20 @@ table { width: 100%; border-collapse: collapse; }
 .report-title { margin: 6px 0; padding: 6px; background: {{ $primary }}; color: #fff; font-size: 11px; font-weight: bold; text-align: center; letter-spacing: .3px; }
 .info td, .info th, .scores td, .scores th, .traits td, .traits th { border: 1px solid #758399; padding: 4px; }
 .info th { width: 15%; background: #E8EFF7; text-align: left; color: {{ $primary }}; }
-.info td { width: 18.33%; }
+.info td { width: 18.33%; font-weight: 600; }
 .scores { width: 96%; margin: 7px auto 0; font-size: 8.5px; table-layout: fixed; }
-.scores th { padding: 5px 3px; background: {{ $primary }}; color: #fff; text-align: center; font-size: 7.5px; line-height: 1.2; overflow-wrap: anywhere; }
-.scores td { text-align: center; padding: 5px 3px; }
+.scores th { padding: 5px 3px; background: {{ $primary }}; color: #fff; text-align: center; font-size: 7.5px; font-weight: bold; line-height: 1.2; overflow-wrap: anywhere; }
+.scores td { text-align: center; padding: 5px 3px; font-weight: 600; }
 .scores td:first-child { text-align: left; font-weight: bold; width: 18%; }
 .section { margin-top: 7px; border: 1px solid {{ $primary }}; }
 .section-title { background: #E8EFF7; color: {{ $primary }}; font-weight: bold; padding: 4px 6px; }
-.grade-key, .comments { padding: 5px 6px; line-height: 1.5; }
+.grade-key, .comments { padding: 5px 6px; font-weight: 600; line-height: 1.5; }
+.grade-key--rating { border-top: 1px solid #B9C4D4; }
 .traits { margin-top: 0; }
-.traits th { background: #F4F7FB; text-align: left; }
+.traits td { width: 20%; background: #F8FAFD; font-weight: bold; text-align: center; }
+.trait-label { color: {{ $primary }}; }
+.trait-separator { color: #64748B; padding: 0 3px; }
+.trait-value { color: #111827; }
 .comment-grid td { width: 50%; vertical-align: top; padding: 4px; }
 .comment-card { min-height: 47px; border: 1px solid #758399; padding: 5px; }
 .comment-card strong { color: {{ $primary }}; }
@@ -85,7 +99,8 @@ table { width: 100%; border-collapse: collapse; }
 <th rowspan="2">TOTAL</th>
 <th rowspan="2">GRADE</th><th rowspan="2">REMARK</th>
 </tr>
-<tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach@foreach(range(0, 4) as $index)<th>{{ strtoupper($schema['psychomotor_labels'][$index] ?? ('P'.($index + 1))) }} ({{ $schema['psychomotor_maxes'][$index] ?? 0 }})</th>@endforeach<th>{{ strtoupper($schema['quiz_label'] ?? 'QUIZ') }} ({{ $schema['quiz_max'] ?? 0 }})</th><th>{{ strtoupper($schema['note_copying_label'] ?? 'NOTE COPYING') }} ({{ $schema['note_copying_max'] ?? 0 }})</th></tr>
+<tr>@foreach($caIndices as $index)<th>{{ strtoupper($schema['ca_labels'][$index] ?? ('CA'.($index + 1))) }}</th>@endforeach
+@foreach(range(0, 4) as $index)<th>{{ strtoupper($schema['psychomotor_labels'][$index] ?? ('P'.($index + 1))) }} ({{ $schema['psychomotor_maxes'][$index] ?? 0 }})</th>@endforeach<th>{{ strtoupper($schema['quiz_label'] ?? 'QUIZ') }} ({{ $schema['quiz_max'] ?? 0 }})</th><th>{{ strtoupper($schema['note_copying_label'] ?? 'NOTE COPYING') }} ({{ $schema['note_copying_max'] ?? 0 }})</th></tr>
 </thead><tbody>
 @endif
 @forelse($rows as $row)<tr><td>{{ strtoupper($row['subject_name'] ?? '-') }}</td>
@@ -103,8 +118,8 @@ table { width: 100%; border-collapse: collapse; }
 <td>{{ strtoupper($row['grade'] ?? '-') }}</td><td>{{ strtoupper($row['remark'] ?? '-') }}</td></tr>
 @empty<tr><td colspan="20" class="center">No result data found.</td></tr>@endforelse
 </tbody></table>
-<div class="section"><div class="section-title">GRADE INTERPRETATION</div><div class="grade-key">{{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}</div></div>
-@if($showBehaviour)<div class="section"><div class="section-title">GENERAL BEHAVIOUR / PSYCHOMOTOR ASSESSMENT</div>@foreach(collect($behaviourTraits ?? [])->chunk(5) as $traitChunk)<table class="traits"><thead><tr>@foreach($traitChunk as $trait)<th>{{ strtoupper($trait['label'] ?? 'QUALITY') }}</th>@endforeach</tr></thead><tbody><tr>@foreach($traitChunk as $trait)<td class="center">GRADE: {{ $trait['value'] ?? '-' }}</td>@endforeach</tr></tbody></table>@endforeach<div class="grade-key">{{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}</div></div>@endif
-<div class="section"><div class="section-title">COMMENTS</div><table class="comment-grid"><tr><td><div class="comment-card"><strong>CLASS TEACHER: {{ strtoupper($classTeacher?->name ?? '-') }}</strong><br>{{ strtoupper($teacherComment ?? '-') }}</div></td><td><div class="comment-card"><strong>HEAD OF SCHOOL: {{ strtoupper($school?->head_of_school_name ?? '-') }}</strong><br>{{ strtoupper($schoolHeadComment ?? '-') }}</div></td></tr></table></div>
+<div class="section grade-reference"><div class="section-title">GRADE INTERPRETATION</div><div class="grade-key"><strong>GRADES:</strong> {{ \App\Support\GradingSchema::displayKey($school->grading_schema ?? null) }}</div>@if($showBehaviour)<div class="grade-key grade-key--rating"><strong>KEY RATING:</strong> {{ \App\Support\BehaviourSchema::displayKey($behaviourTraits[0]['format'] ?? 'number') }}</div>@endif</div>
+@if($showBehaviour)<div class="section"><div class="section-title">GENERAL BEHAVIOUR / PSYCHOMOTOR ASSESSMENT</div>@foreach(collect($behaviourTraits ?? [])->chunk(5) as $traitChunk)<table class="traits"><tbody><tr>@foreach($traitChunk as $trait)<td><span class="trait-label">{{ strtoupper($trait['label'] ?? 'QUALITY') }}</span><span class="trait-separator">|</span><span class="trait-value">{{ $displayBehaviourValue($trait) }}</span></td>@endforeach</tr></tbody></table>@endforeach</div>@endif
+<div class="section"><div class="section-title">COMMENTS</div><table class="comment-grid"><tr><td><div class="comment-card"><strong>CLASS TEACHER: {{ strtoupper($classTeacher?->name ?? '-') }}</strong></div></td><td><div class="comment-card"><strong>HEAD OF SCHOOL: {{ strtoupper($school?->head_of_school_name ?? '-') }}</strong><br>{{ strtoupper($schoolHeadComment ?? '-') }}</div></td></tr></table></div>
 <table class="signatures"><tr><td>@if($showSignature && $headSignatureDataUri)<img class="signature" src="{{ $headSignatureDataUri }}">@endif<div class="signature-line"></div>Head of School's Signature</td></tr></table>
 </div></body></html>

@@ -899,7 +899,11 @@ class TranscriptController extends Controller
             }
             $schoolHeadComment = $this->defaultHeadComment((int) round($averageScore));
 
-            $behaviourTraits = BehaviourSchema::traits($behaviour, $school?->behaviour_schema);
+            $behaviourTraits = BehaviourSchema::traits(
+                $behaviour,
+                $school?->behaviour_schema,
+                $school?->behaviour_rating_format
+            );
 
             $viewData = [
                 'school' => $school,

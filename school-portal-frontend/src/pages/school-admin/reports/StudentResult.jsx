@@ -8,6 +8,15 @@ import "../../shared/ResultsShowcase.css";
 
 const asDash = (value) => (value == null || value === "" ? "-" : value);
 
+const displayBehaviourValue = (trait) => {
+  const score = Number(trait?.score);
+  if (trait?.format === "letter" && Number.isInteger(score) && score >= 0 && score <= 5) {
+    return ["-", "E", "D", "C", "B", "A"][score];
+  }
+
+  return asDash(trait?.value);
+};
+
 const formatMaybeNumber = (value, digits = 2) => {
   if (value == null || value === "") return "-";
   const num = Number(value);
@@ -389,15 +398,17 @@ export default function StudentResult() {
             </div>
 
             <div className="rs-cards" style={{ marginBottom: 14 }}>
-              <div className="rs-card-btn" style={{ cursor: "default" }}>
-                <h3 className="rs-card-title">Teacher Comment</h3>
-                <p className="rs-card-meta">{entry.teacher_comment || "-"}</p>
-              </div>
+              {!usesClassicPreview ? (
+                <div className="rs-card-btn" style={{ cursor: "default" }}>
+                  <h3 className="rs-card-title">Teacher Comment</h3>
+                  <p className="rs-card-meta">{entry.teacher_comment || "-"}</p>
+                </div>
+              ) : null}
 
               {(entry.behaviour_traits || []).map((trait) => (
                 <div key={trait.label} className="rs-card-btn" style={{ cursor: "default" }}>
                   <h3 className="rs-card-title">{trait.label}</h3>
-                  <p className="rs-card-meta">{trait.value ?? 0}</p>
+                  <p className="rs-card-meta">{displayBehaviourValue(trait)}</p>
                 </div>
               ))}
             </div>

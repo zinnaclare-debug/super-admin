@@ -27,6 +27,15 @@ const classicComponentCells = (row) => Array.from(
 
 const asDash = (value) => (value == null || value === "" ? "-" : value);
 
+const displayBehaviourValue = (trait) => {
+  const score = Number(trait?.score);
+  if (trait?.format === "letter" && Number.isInteger(score) && score >= 0 && score <= 5) {
+    return ["-", "E", "D", "C", "B", "A"][score];
+  }
+
+  return asDash(trait?.value);
+};
+
 const formatMaybeNumber = (value, digits = 2) => {
   if (value == null || value === "") return "-";
   const num = Number(value);
@@ -589,17 +598,19 @@ export default function StudentReport() {
               </p>
 
 
-              <div className="student-report-note-block">
-                <div className="student-report-note-label">Teacher Comment</div>
-                <div className="student-report-note-box student-report-note-box--tall">{resultEntry.teacher_comment || "-"}</div>
-              </div>
+              {!usesClassicResultPreview ? (
+                <div className="student-report-note-block">
+                  <div className="student-report-note-label">Teacher Comment</div>
+                  <div className="student-report-note-box student-report-note-box--tall">{resultEntry.teacher_comment || "-"}</div>
+                </div>
+              ) : null}
 
               {(resultEntry.behaviour_traits || []).length > 0 ? (
                 <div className="student-report-trait-grid">
                   {(resultEntry.behaviour_traits || []).map((trait) => (
                     <div key={trait.label} className="student-report-trait-card">
                       <div className="student-report-trait-label">{trait.label}</div>
-                      <div className="student-report-trait-value">{trait.value ?? 0}</div>
+                      <div className="student-report-trait-value">{displayBehaviourValue(trait)}</div>
                     </div>
                   ))}
                 </div>

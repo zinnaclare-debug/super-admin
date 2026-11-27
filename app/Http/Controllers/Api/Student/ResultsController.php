@@ -1054,14 +1054,18 @@ class ResultsController extends Controller
                 : 'No graded subject available yet.';
         }
 
-        $behaviourTraits = $this->behaviourTraitsFromRating($behaviour, $school?->behaviour_schema);
+        $behaviourTraits = $this->behaviourTraitsFromRating(
+            $behaviour,
+            $school?->behaviour_schema,
+            $school?->behaviour_rating_format
+        );
 
         $behaviourSummary = collect($behaviourTraits)
             ->map(function (array $trait) {
                 $words = preg_split('/\\s+/', trim((string) ($trait['label'] ?? ''))) ?: [];
                 $label = strtoupper(substr(implode('', array_map(fn ($word) => substr($word, 0, 1), $words)), 0, 3));
 
-                return $label . ':' . (int) ($trait['value'] ?? 0);
+                return $label . ':' . ($trait['value'] ?? '-');
             })
             ->implode(', ');
 
@@ -1320,8 +1324,19 @@ class ResultsController extends Controller
             : 'No graded subject available yet.';
 
         $behaviourTraits = $resultType === self::RESULT_TYPE_CUMULATIVE
-            ? $this->cumulativeBehaviourTraits($schoolId, (int) $class->id, $session, (int) $student->id, $school?->behaviour_schema)
-            : $this->behaviourTraitsFromRating($behaviour, $school?->behaviour_schema);
+            ? $this->cumulativeBehaviourTraits(
+                $schoolId,
+                (int) $class->id,
+                $session,
+                (int) $student->id,
+                $school?->behaviour_schema,
+                $school?->behaviour_rating_format
+            )
+            : $this->behaviourTraitsFromRating(
+                $behaviour,
+                $school?->behaviour_schema,
+                $school?->behaviour_rating_format
+            );
 
         $viewData = [
             'school' => $school,
@@ -1676,12 +1691,19 @@ class ResultsController extends Controller
         ];
     }
 
-    private function behaviourTraitsFromRating(?StudentBehaviourRating $behaviour, mixed $schema): array
+    private function behaviourTraitsFromRating(?StudentBehaviourRating $behaviour, mixed $schema, mixed $fallbackFormat = null): array
     {
-        return BehaviourSchema::traits($behaviour, $schema);
+        return BehaviourSchema::traits($behaviour, $schema, $fallbackFormat);
     }
 
-    private function cumulativeBehaviourTraits(int $schoolId, int $classId, AcademicSession $session, int $studentId, mixed $schema): array
+    private function cumulativeBehaviourTraits(
+        int $schoolId,
+        int $classId,
+        AcademicSession $session,
+        int $studentId,
+        mixed $schema,
+        mixed $fallbackFormat = null
+    ): array
     {
         $termIds = collect($this->cumulativeTermsByOrder($schoolId, (int) $session->id))
             ->filter()
@@ -1690,7 +1712,7 @@ class ResultsController extends Controller
             ->all();
 
         if (empty($termIds)) {
-            return $this->behaviourTraitsFromRating(null, $schema);
+            return $this->behaviourTraitsFromRating(null, $schema, $fallbackFormat);
         }
 
         $ratings = StudentBehaviourRating::where('school_id', $schoolId)
@@ -1702,7 +1724,7 @@ class ResultsController extends Controller
         $ratingsByTerm = $ratings->keyBy('term_id');
         $displayFormat = collect(array_reverse($termIds))
             ->map(fn ($termId) => $ratingsByTerm->get($termId)?->behaviour_rating_format)
-            ->first(fn ($format) => filled($format)) ?? 'number';
+            ->first(fn ($format) => filled($format)) ?? $fallbackFormat;
         $criteria = BehaviourSchema::normalize($schema)['criteria'];
         return collect($criteria)
             ->map(function (array $criterion) use ($ratings, $schema, $displayFormat) {
@@ -1714,6 +1736,7 @@ class ResultsController extends Controller
 
                 return [
                     'label' => $criterion['label'],
+                    'score' => $average,
                     'value' => BehaviourSchema::formatValue($average, $displayFormat),
                     'format' => BehaviourSchema::normalizeFormat($displayFormat),
                 ];
@@ -2659,6 +2682,22 @@ class ResultsController extends Controller
             $behaviourChunks = collect([collect()]);
         }
         foreach ($behaviourChunks as $chunk) {
+            if ($isClassic) {
+                $behaviourRowsHtml .= '<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;"><tbody><tr>';
+                foreach ($chunk as $trait) {
+                    $label = strtoupper((string) ($trait['label'] ?? 'QUALITY'));
+                    $value = (string) ($trait['value'] ?? '-');
+                    $behaviourRowsHtml .= '<td style="border:1px solid #222;padding:4px;text-align:center;font-weight:700;">'
+                        . '<span style="color:#17365D;">' . e($label) . '</span> <span style="color:#64748B;">|</span> '
+                        . '<span>' . e($value) . '</span></td>';
+                }
+                for ($emptyCell = $chunk->count(); $emptyCell < $behaviourCellsPerRow; $emptyCell++) {
+                    $behaviourRowsHtml .= '<td style="border:1px solid #222;padding:4px;">&nbsp;</td>';
+                }
+                $behaviourRowsHtml .= '</tr></tbody></table>';
+                continue;
+            }
+
             $behaviourRowsHtml .= '<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;"><thead><tr>';
             foreach ($chunk as $trait) {
                 $label = strtoupper((string) ($trait['label'] ?? 'QUALITY'));
@@ -2670,6 +2709,20 @@ class ResultsController extends Controller
                 $behaviourRowsHtml .= '<td style="border:1px solid #222;padding:3px;text-align:center;">GRADE: ' . e($value) . '</td>';
             }
             $behaviourRowsHtml .= '</tr></tbody></table>';
+        }
+
+        $gradeReferenceHtml = $isClassic
+            ? '<table class="meta"><tr><th style="width:18%;">GRADES / KEY RATING</th><td style="width:82%;font-weight:600;">'
+                . '<strong>GRADES:</strong> ' . e(GradingSchema::displayKey(data_get($viewData, 'school.grading_schema')))
+                . '<br><strong>KEY RATING:</strong> ' . e($behaviourKey)
+                . '</td></tr></table>'
+            : '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
+                . '<td style="width:82%;">' . e(GradingSchema::displayKey(data_get($viewData, 'school.grading_schema'))) . '</td></tr></table>'
+                . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
+                . '<td style="width:82%;">' . e($behaviourKey) . '</td></tr></table>';
+        $classTeacherFooterHtml = '<table class="info-box"><tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr></table>';
+        if (! $isClassic) {
+            $classTeacherFooterHtml .= '<table class="info-box"><tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr></table>';
         }
         $studentPhotoBlock = $studentPhotoDataUri !== ''
             ? '<img src="' . e($studentPhotoDataUri) . '" alt="Student Photo" style="width:72px;height:72px;object-fit:cover;border:1px solid #222;" />'
@@ -2686,7 +2739,7 @@ class ResultsController extends Controller
             : '';
 
         $classicPdfCss = $isClassic
-            ? '@page { size: A4 landscape; margin: 8mm; }.scores{width:96%;margin-left:auto;margin-right:auto;table-layout:fixed;font-size:6.5px;}.scores th,.scores td{padding:3px;overflow-wrap:anywhere;}'
+            ? '@page { size: A4 landscape; margin: 8mm; }.scores{width:96%;margin-left:auto;margin-right:auto;table-layout:fixed;font-size:6.5px;}.scores th,.scores td{padding:3px;overflow-wrap:anywhere;}.classic-result .meta td,.classic-result .scores td{font-weight:600;}.classic-result .scores th{font-weight:700;}'
             : '';
         $html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Student Result</title>'
             . '<style>'
@@ -2710,7 +2763,7 @@ class ResultsController extends Controller
             . '.info-box th,.info-box td{border:1px solid #222;padding:5px 6px;}'
             . '.info-box th{background:#f3f4f6;text-align:left;width:28%;}'
             . '.signature-only{border:1px solid #222;min-height:64px;display:flex;align-items:center;justify-content:center;padding:4px;text-align:center;}'
-            . '</style></head><body><div class="sheet">' . $watermarkBlock . '<div class="content">'
+            . '</style></head><body><div class="sheet">' . $watermarkBlock . '<div class="content' . ($isClassic ? ' classic-result' : '') . '">'
             . '<table class="grid"><tr><td style="width:80px;">' . $studentPhotoBlock . '</td><td>'
             . '<h1>' . e($schoolName) . '</h1>'
             . '<h2>' . e($schoolLocation) . '</h2>'
@@ -2735,17 +2788,13 @@ class ResultsController extends Controller
             . '<th style="width:8%;">Grade</th><th style="width:16%;">Remark</th></tr></thead>'
             . '<tbody>' . $rowsHtml . '</tbody>'
             . '</table>'
-            . '<table class="meta"><tr><th style="width:18%;">GRADES</th>'
-            . '<td style="width:82%;">' . e(GradingSchema::displayKey(data_get($viewData, 'school.grading_schema'))) . '</td></tr></table>'
+            . $gradeReferenceHtml
             . $behaviourRowsHtml
-            . '<table class="meta" style="margin-top:0;"><tr><th style="width:18%;">KEY RATING</th>'
-            . '<td style="width:82%;">' . e($behaviourKey) . '</td></tr></table>'
             . '<div class="footer-container">'
             . '<table class="grid" style="margin-top:0;"><tr><td style="width:74%;">'
             . '<table class="info-box"><tr><th>Head of School Name</th><td>' . e($headName) . '</td></tr></table>'
             . '<table class="info-box"><tr><th>Head of School Comment</th><td>' . e($headComment) . '</td></tr></table>'
-            . '<table class="info-box"><tr><th>Class Teacher Name</th><td>' . e($classTeacherName) . '</td></tr></table>'
-            . '<table class="info-box"><tr><th>Class Teacher Comment</th><td>' . e($teacherComment) . '</td></tr></table>'
+            . $classTeacherFooterHtml
             . '</td><td style="width:2%;"></td><td style="width:16%;">'
             . '<div class="signature-only">' . $signatureBlock . '</div>'
             . '</td></tr></table>'
